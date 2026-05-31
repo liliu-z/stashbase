@@ -45,6 +45,26 @@ export interface SpaceConfig {
   skillsDirs?: string[];
 }
 
+export type ImportFolderMode = 'copy' | 'move';
+
+export interface FolderImportPreview {
+  source: string;
+  name: string;
+  destination: string;
+  exists: boolean;
+  entryCount: number;
+  totalBytes: number;
+  requiresConfirmation: boolean;
+  warnings: string[];
+  hasSnapshot: boolean;
+}
+
+export interface FolderImportResult {
+  path: string;
+  name: string;
+  mode: ImportFolderMode;
+}
+
 export interface FilesPayload {
   files: FileMeta[];
   folders: FolderMeta[];
@@ -330,10 +350,20 @@ export const api = {
     send<{ path: string }>('POST', '/api/git/clone', { url, name }),
   /** Copy a local folder into kbRoot as a new space. `source` is an
    *  absolute path; the renderer obtains it from
-   *  `window.stashbase.openFolderDialog` (Electron-only). `name`
+   *  `window.electron.openFolderDialog` (Electron-only). `name`
    *  defaults to the basename of `source` server-side. */
-  importFolder: (source: string, name = '') =>
-    send<{ path: string }>('POST', '/api/space/import-folder', { source, name }),
+  previewImportFolder: (source: string, name = '') =>
+    send<FolderImportPreview>('POST', '/api/space/import-folder/preview', { source, name }),
+  importFolder: (
+    source: string,
+    opts: { name?: string; mode?: ImportFolderMode; confirmExisting?: boolean } = {},
+  ) =>
+    send<FolderImportResult>('POST', '/api/space/import-folder', {
+      source,
+      name: opts.name ?? '',
+      mode: opts.mode ?? 'copy',
+      confirmExisting: opts.confirmExisting === true,
+    }),
   /** Mirror this space's `skills/<name>/SKILL.md` into the active
    *  CLI's per-project prompt dir (`.claude/commands` / `.codex/prompts`).
    *  Renderer fires this on terminal panel open / CLI switch. */

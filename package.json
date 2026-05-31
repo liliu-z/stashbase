@@ -37,6 +37,7 @@
     "build:server": "node scripts/build-server.mjs",
     "build:mcp": "node scripts/build-mcp.mjs",
     "build:python-sidecar": "node scripts/build-python-sidecar.mjs",
+    "test:import-folder": "node --import tsx --test server/import-folder.test.ts",
     "postinstall": "node scripts/fix-pty-helper.mjs",
     "build": "pnpm build:web && pnpm build:server && pnpm build:mcp",
     "build:desktop": "pnpm build && pnpm build:python-sidecar",

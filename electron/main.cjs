@@ -482,10 +482,12 @@ async function createWindow(initialSpace) {
 // `defaultPath` opens the panel at a sensible starting location; the
 // caller still validates the result is under kbRoot before using it.
 ipcMain.handle('dialog:openFolder', async (_e, opts = {}) => {
+  const properties = ['openDirectory'];
+  if (opts.allowCreateDirectory !== false) properties.push('createDirectory');
   const dialogOpts = {
     title: opts.title || 'Choose a folder',
     buttonLabel: opts.buttonLabel || 'Choose',
-    properties: ['openDirectory', 'createDirectory'],
+    properties,
   };
   if (typeof opts.defaultPath === 'string' && opts.defaultPath) {
     dialogOpts.defaultPath = opts.defaultPath;

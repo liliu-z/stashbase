@@ -101,7 +101,7 @@ Drop a PDF in and a converter generates a readable, indexable HTML companion (`p
 
 ### Space-level import
 
-Drag a folder, or paste a public GitHub URL into the Welcome screen — StashBase clones / copies it as a new space. If the import bundle includes a `snapshot.parquet`, embeddings are bulk-loaded (skipping re-embed, saving tokens).
+Use **Import folder** or paste a public GitHub URL into the Welcome screen — StashBase copies the folder or clones the repo as a new space under your KB root. Folder import copies by default, with an explicit move option. If the imported bundle includes `.stashbase/snapshot.parquet`, embeddings are bulk-loaded when the space opens, skipping re-embed when compatible.
 
 ### MCP exposure with one-click connector
 

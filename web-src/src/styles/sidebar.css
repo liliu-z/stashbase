@@ -268,6 +268,20 @@
       outline-offset: -1px;
     }
 
+    .modal-check {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      margin-bottom: 14px;
+      color: var(--fg);
+      font-size: 13px;
+    }
+
+    .modal-check input {
+      margin: 0;
+    }
+
     .modal-error {
       margin-top: 10px;
       padding: 8px 10px;
@@ -1205,4 +1219,3 @@
       color: var(--muted);
       font-style: italic;
     }
-

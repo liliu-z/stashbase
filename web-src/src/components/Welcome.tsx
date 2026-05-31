@@ -1,5 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
-import { api, ApiError, errorMessage } from '../api';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  api,
+  ApiError,
+  errorMessage,
+  type FolderImportPreview,
+  type ImportFolderMode,
+} from '../api';
 import { CubeLogoIcon, FolderIcon, GitCloneIcon, NewFolderIcon } from '../icons';
 import { useApp } from '../store/AppContext';
 import { CloneRepoModal } from './CloneRepoModal';
@@ -7,7 +13,12 @@ import { ModalShell } from './ModalShell';
 import { openSettings } from './SettingsModal';
 
 interface ElectronBridge {
-  openFolderDialog?: (opts?: unknown) => Promise<string | null>;
+  openFolderDialog?: (opts?: {
+    title?: string;
+    buttonLabel?: string;
+    defaultPath?: string;
+    allowCreateDirectory?: boolean;
+  }) => Promise<string | null>;
 }
 
 /** Shorten an absolute path for display: `/Users/foo/Notes` → `~/Notes`
@@ -39,6 +50,7 @@ export function Welcome() {
   const [cloneOpen, setCloneOpen] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
   const [openOpen, setOpenOpen] = useState(false);
+  const [importSource, setImportSource] = useState<string | null>(null);
   const [kbRoot, setKbRoot] = useState('');
   const [rootPickerOpen, setRootPickerOpen] = useState(false);
   const [showAllRecent, setShowAllRecent] = useState(false);
@@ -107,7 +119,7 @@ export function Welcome() {
             </span>
             <span className="welcome-action-label">Clone repo</span>
           </button>
-          <ImportFolderButton />
+          <ImportFolderButton onPicked={setImportSource} />
         </div>
 
         <div className="welcome-mcp">
@@ -164,6 +176,13 @@ export function Welcome() {
         )}
       </div>
       {cloneOpen && <CloneRepoModal onClose={() => setCloneOpen(false)} />}
+      {importSource && (
+        <ImportFolderModal
+          source={importSource}
+          homeDir={state.homeDir ?? ''}
+          onClose={() => setImportSource(null)}
+        />
+      )}
       {rootPickerOpen && (
         <KbRootPickerModal
           initialPath={kbRoot}
@@ -190,10 +209,6 @@ export function Welcome() {
       )}
     </div>
   );
-}
-
-interface ElectronBridge {
-  openFolderDialog?: (opts?: unknown) => Promise<string | null>;
 }
 
 function KbRootPickerModal({
@@ -280,8 +295,8 @@ function KbRootPickerModal({
  *  a brand-new space. Browser fallback (no Electron bridge) hides the
  *  button entirely: there's no portable file-picker we'd trust to
  *  return an absolute path the server can act on. */
-function ImportFolderButton() {
-  const { actions, dispatch } = useApp();
+function ImportFolderButton({ onPicked }: { onPicked: (path: string) => void }) {
+  const { dispatch } = useApp();
   const [busy, setBusy] = useState(false);
   const bridge = useMemo<ElectronBridge | undefined>(
     () => (window as { electron?: ElectronBridge }).electron,
@@ -294,13 +309,10 @@ function ImportFolderButton() {
     try {
       const picked = await bridge!.openFolderDialog!({
         title: 'Import folder as space',
-        buttonLabel: 'Import',
+        buttonLabel: 'Choose Folder',
+        allowCreateDirectory: false,
       });
-      if (!picked) return;
-      const result = await api.importFolder(picked);
-      // Server returns the destination path; flip into it like
-      // CloneRepoModal does so the user lands in the new space.
-      await actions.openSpace(result.path);
+      if (picked) onPicked(picked);
     } catch (err) {
       dispatch({ type: 'WELCOME_ERROR', error: errorMessage(err) });
     } finally {
@@ -318,8 +330,162 @@ function ImportFolderButton() {
       <span className="welcome-action-icon">
         <FolderIcon />
       </span>
-      <span className="welcome-action-label">{busy ? 'Importing…' : 'Import folder'}</span>
+      <span className="welcome-action-label">{busy ? 'Choosing…' : 'Import folder'}</span>
     </button>
+  );
+}
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${value >= 10 || unit === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[unit]}`;
+}
+
+function ImportFolderModal({
+  source,
+  homeDir,
+  onClose,
+}: {
+  source: string;
+  homeDir: string;
+  onClose: () => void;
+}) {
+  const { actions } = useApp();
+  const [preview, setPreview] = useState<FolderImportPreview | null>(null);
+  const [name, setName] = useState('');
+  const [mode, setMode] = useState<ImportFolderMode>('copy');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const previewSeq = useRef(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    const seq = ++previewSeq.current;
+    setPreview(null);
+    setError(null);
+    void (async () => {
+      try {
+        const p = await api.previewImportFolder(source);
+        if (cancelled || seq !== previewSeq.current) return;
+        setPreview(p);
+        setName(p.name);
+      } catch (err) {
+        if (!cancelled && seq === previewSeq.current) setError(errorMessage(err));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [source]);
+
+  async function refreshName(nextName: string) {
+    setName(nextName);
+    const seq = ++previewSeq.current;
+    if (!nextName.trim()) {
+      setPreview(null);
+      setError(null);
+      return;
+    }
+    try {
+      const p = await api.previewImportFolder(source, nextName);
+      if (seq !== previewSeq.current) return;
+      setPreview(p);
+      setError(null);
+    } catch (err) {
+      if (seq !== previewSeq.current) return;
+      setError(errorMessage(err));
+    }
+  }
+
+  async function submit() {
+    const n = name.trim();
+    if (!n) { setError('Name required'); return; }
+    if (n.includes('/') || n.includes('\\') || n.startsWith('.')) {
+      setError('Name cannot contain slashes or start with "."');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await api.importFolder(source, {
+        name: n,
+        mode,
+        confirmExisting: true,
+      });
+      onClose();
+      await actions.openSpaceByName(result.name);
+    } catch (err) {
+      setError(errorMessage(err));
+      setBusy(false);
+    }
+  }
+
+  const sourceDisplay = prettifyHome(source, homeDir);
+  const destinationDisplay = preview ? prettifyHome(preview.destination, homeDir) : '';
+  const importActionMessage = mode === 'move'
+    ? 'Importing moves this existing folder into your StashBase library and removes the original.'
+    : 'Importing copies this existing folder into your StashBase library.';
+  const serverWarnings = (preview?.warnings ?? []).filter((w) =>
+    w !== 'Importing copies this existing folder into your StashBase library.',
+  );
+
+  return (
+    <ModalShell onCancel={busy ? () => { /* swallow during import */ } : onClose}>
+      <h3>Import folder</h3>
+      <p className="modal-hint">
+        Imports <code>{sourceDisplay}</code> as a new space.
+      </p>
+      <input
+        type="text"
+        className="modal-input"
+        placeholder="Space name"
+        autoComplete="off"
+        spellCheck={false}
+        value={name}
+        onChange={(e) => { void refreshName(e.target.value); }}
+        disabled={busy}
+        autoFocus
+        onKeyDown={(e) => {
+          if (e.nativeEvent.isComposing) return;
+          if (e.key === 'Enter') { e.preventDefault(); void submit(); }
+          else if (e.key === 'Escape' && !busy) { e.preventDefault(); onClose(); }
+        }}
+      />
+      <label className="modal-check">
+        <input
+          type="checkbox"
+          checked={mode === 'move'}
+          disabled={busy}
+          onChange={(e) => setMode(e.target.checked ? 'move' : 'copy')}
+        />
+        <span>Move folder into StashBase instead of copying</span>
+      </label>
+      {preview && (
+        <div className="modal-hint">
+          <div>Destination: <code>{destinationDisplay}</code></div>
+          <div>{preview.entryCount} item{preview.entryCount === 1 ? '' : 's'} · {formatBytes(preview.totalBytes)}</div>
+          {preview.exists && <div>{importActionMessage}</div>}
+          {preview.hasSnapshot && <div>Snapshot found; StashBase will import it when the space opens.</div>}
+          {serverWarnings.map((w) => <div key={w}>{w}</div>)}
+        </div>
+      )}
+      {error && <div className="modal-error">{error}</div>}
+      <div className="modal-actions">
+        <button type="button" className="modal-btn" onClick={onClose} disabled={busy}>
+          Cancel
+        </button>
+        <button
+          type="button"
+          className="modal-btn primary"
+          onClick={() => { void submit(); }}
+          disabled={busy || !preview || !name.trim()}
+        >{busy ? 'Importing…' : mode === 'move' ? 'Move into StashBase' : 'Copy into StashBase'}</button>
+      </div>
+    </ModalShell>
   );
 }
 

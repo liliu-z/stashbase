@@ -15,9 +15,9 @@ window.addEventListener('DOMContentLoaded', () => {
 
 contextBridge.exposeInMainWorld('electron', {
   /** Show the OS folder picker. Returns the picked absolute path or
-   *  null if the user cancelled. Accepts an optional `defaultPath` so
-   *  the dialog opens at a meaningful location (kbRoot for the clone
-   *  flow). The OS-native "New Folder" affordance is always enabled. */
+   *  null if the user cancelled. Accepts `defaultPath` and
+   *  `allowCreateDirectory`; import-folder passes false so the dialog
+   *  only selects existing directories. */
   openFolderDialog: (opts) => ipcRenderer.invoke('dialog:openFolder', opts),
   /** Hand an http(s) URL to the OS default browser. Replaces an earlier
    *  in-app webview overlay; too many sites block iframing for it to
