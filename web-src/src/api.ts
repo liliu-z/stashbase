@@ -63,6 +63,10 @@ export interface FolderImportResult {
   path: string;
   name: string;
   mode: ImportFolderMode;
+  /** Present only when a `move` import copied successfully but the
+   *  original folder could not be fully deleted; the new space is intact
+   *  and the original needs manual cleanup. */
+  warning?: string;
 }
 
 export interface FilesPayload {

@@ -292,6 +292,16 @@
       line-height: 1.45;
     }
 
+    .modal-warning {
+      margin-top: 10px;
+      padding: 8px 10px;
+      background: rgba(217, 119, 6, 0.1);
+      color: #b45309;
+      border-radius: 6px;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
     .mcp-client-list {
       display: flex;
       flex-direction: column;

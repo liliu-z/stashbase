@@ -84,6 +84,34 @@ test('move imports by copy-then-delete, preserving dereferenced content in the s
   assert.equal(fs.existsSync(source), false);
 });
 
+test('move keeps the imported space and warns when the original cannot be removed', () => {
+  const kbRoot = tmpDir('kb');
+  const parent = tmpDir('parent');
+  const source = path.join(parent, 'src');
+  fs.mkdirSync(source);
+  fs.writeFileSync(path.join(source, 'note.md'), '# moved\n');
+  // Strip write permission on the parent so the source entry cannot be
+  // unlinked — simulates a copy-succeeds-but-delete-fails move (a lock or
+  // permission issue). The copy is already committed at that point.
+  fs.chmodSync(parent, 0o500);
+  try {
+    const result = importFolderAsSpace({
+      source,
+      kbRoot,
+      name: 'kept',
+      mode: 'move',
+      confirmExisting: true,
+    });
+    // The new space must survive — tearing it down would lose data on
+    // both sides, since the original is also partially gone.
+    assert.equal(fs.readFileSync(path.join(result.path, 'note.md'), 'utf8'), '# moved\n');
+    assert.equal(fs.existsSync(source), true);
+    assert.match(result.warning ?? '', /could not be fully removed/);
+  } finally {
+    fs.chmodSync(parent, 0o700);
+  }
+});
+
 test('import refuses to merge into an existing space', () => {
   const kbRoot = tmpDir('kb');
   const source = tmpDir('source');

@@ -30,6 +30,7 @@ import {
   setKbRoot,
   validateSpaceName,
   writeSpaceConfig,
+  pruneStashbasePerMachineState,
 } from '../space.ts';
 import { errorMessage } from '../log.ts';
 import { sendError } from '../http.ts';
@@ -272,7 +273,7 @@ export function mount(app: express.Express): void {
       //     the new user skip re-embedding (auto-imported on bind)
       //   - any future portable artefacts the maintainer ships
       // `.git/` and other dotdirs are user content and stay.
-      pruneClonedStashbase(path.join(dest, '.stashbase'));
+      pruneStashbasePerMachineState(path.join(dest, '.stashbase'));
       res.json({ path: dest });
     } catch (err: unknown) {
       sendError(res, err);
@@ -316,22 +317,6 @@ function walkSpace(
     const full = path.join(dir, e.name);
     fn(rel, full, e);
     if (e.isDirectory()) walkSpace(full, rel, fn);
-  }
-}
-
-/** Internal entries under `.stashbase/` that **must** be wiped after a
- *  clone — per-machine state, never portable. Everything else in the
- *  directory stays; the snapshot file lives here intentionally. */
-const STASHBASE_PER_MACHINE_ENTRIES = ['config.json', 'store', 'mfs', 'cache', 'state.db'];
-
-/** Selectively delete per-machine internal state out of a freshly-
- *  cloned space's `.stashbase/` directory, leaving portable artefacts
- *  (notably `snapshot.parquet`) intact. No-op if the directory doesn't
- *  exist. */
-function pruneClonedStashbase(stashbaseDir: string): void {
-  if (!fs.existsSync(stashbaseDir)) return;
-  for (const entry of STASHBASE_PER_MACHINE_ENTRIES) {
-    fs.rmSync(path.join(stashbaseDir, entry), { recursive: true, force: true });
   }
 }
 

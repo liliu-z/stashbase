@@ -362,6 +362,10 @@ function ImportFolderModal({
   const [mode, setMode] = useState<ImportFolderMode>('copy');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Set once a move import finished but left the original behind (see
+  // FolderImportResult.warning). The space exists; we keep the modal up
+  // to show the cleanup notice and let the user open it deliberately.
+  const [doneName, setDoneName] = useState<string | null>(null);
   const previewSeq = useRef(0);
 
   useEffect(() => {
@@ -416,6 +420,15 @@ function ImportFolderModal({
         mode,
         confirmExisting: true,
       });
+      if (result.warning) {
+        // Import succeeded but the original couldn't be removed. Keep the
+        // modal open so the notice survives; the user opens the space
+        // (which unmounts Welcome) only after acknowledging it.
+        setDoneName(result.name);
+        setError(result.warning);
+        setBusy(false);
+        return;
+      }
       onClose();
       await actions.openSpaceByName(result.name);
     } catch (err) {
@@ -473,17 +486,25 @@ function ImportFolderModal({
           {serverWarnings.map((w) => <div key={w}>{w}</div>)}
         </div>
       )}
-      {error && <div className="modal-error">{error}</div>}
+      {error && <div className={doneName ? 'modal-warning' : 'modal-error'}>{error}</div>}
       <div className="modal-actions">
         <button type="button" className="modal-btn" onClick={onClose} disabled={busy}>
-          Cancel
+          {doneName ? 'Close' : 'Cancel'}
         </button>
-        <button
-          type="button"
-          className="modal-btn primary"
-          onClick={() => { void submit(); }}
-          disabled={busy || !preview || !name.trim()}
-        >{busy ? 'Importing…' : mode === 'move' ? 'Move into StashBase' : 'Copy into StashBase'}</button>
+        {doneName ? (
+          <button
+            type="button"
+            className="modal-btn primary"
+            onClick={() => { onClose(); void actions.openSpaceByName(doneName); }}
+          >Open space</button>
+        ) : (
+          <button
+            type="button"
+            className="modal-btn primary"
+            onClick={() => { void submit(); }}
+            disabled={busy || !preview || !name.trim()}
+          >{busy ? 'Importing…' : mode === 'move' ? 'Move into StashBase' : 'Copy into StashBase'}</button>
+        )}
       </div>
     </ModalShell>
   );

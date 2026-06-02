@@ -200,6 +200,26 @@ export function validateSpaceName(name: string): string | null {
   return null;
 }
 
+/** Internal entries under `.stashbase/` that **must** be wiped when a
+ *  space arrives from elsewhere — a git clone or a folder import.
+ *  These are per-machine state (embedder routing, the local vector store,
+ *  the storage-state DB, the cache) and never portable. Everything else
+ *  stays; `snapshot.parquet` lives here intentionally and is preserved.
+ *  Shared by the clone and import-folder flows so a rename here only
+ *  happens once. (`mfs` is the pre-rename store dir, kept until legacy
+ *  spaces age out.) */
+export const STASHBASE_PER_MACHINE_ENTRIES = ['config.json', 'store', 'mfs', 'cache', 'state.db'];
+
+/** Selectively delete per-machine internal state out of a space's
+ *  `.stashbase/` directory, leaving portable artefacts (notably
+ *  `snapshot.parquet`) intact. No-op if the directory doesn't exist. */
+export function pruneStashbasePerMachineState(stashbaseDir: string): void {
+  if (!fs.existsSync(stashbaseDir)) return;
+  for (const entry of STASHBASE_PER_MACHINE_ENTRIES) {
+    fs.rmSync(path.join(stashbaseDir, entry), { recursive: true, force: true });
+  }
+}
+
 /** Direct child directories of the KB root, sorted alphabetically.
  *  Powers the "Open space" dropdown — every entry is a candidate the
  *  server will accept as a space name. Dot-dirs are skipped (`.git`,

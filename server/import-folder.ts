@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { validateSpaceName } from './space.ts';
+import { validateSpaceName, pruneStashbasePerMachineState } from './space.ts';
 
 export type ImportFolderMode = 'copy' | 'move';
 
@@ -29,10 +29,21 @@ export interface ImportFolderResult {
   path: string;
   name: string;
   mode: ImportFolderMode;
+  /** Set only on a `move` where the copy succeeded but deleting the
+   *  original folder failed (permissions / file in use). The new space
+   *  is intact and usable; this tells the caller the source still needs
+   *  manual cleanup. */
+  warning?: string;
 }
 
-const STASHBASE_PER_MACHINE_ENTRIES = ['config.json', 'store', 'mfs', 'cache', 'state.db'];
 const CONFIRM_ENTRY_LIMIT = 0;
+/** Cap on how deep `scanFolder` walks before it stops counting. A
+ *  preview is informational, not a manifest — without a bound, pointing
+ *  the picker at a tens-of-GB tree would block the server on a full
+ *  recursive stat. Past the cap we report an approximate count and warn.
+ *  The real copy still walks everything, but that's a deliberate,
+ *  user-confirmed action rather than an incidental preview. */
+const SCAN_ENTRY_CAP = 50_000;
 
 export function previewFolderImport(
   opts: Pick<ImportFolderOptions, 'source' | 'kbRoot' | 'name'>,
@@ -47,7 +58,7 @@ export function previewFolderImport(
 
   const destination = path.join(kbRoot, name);
   const stats = scanFolder(source);
-  const warnings = buildWarnings(source, kbRoot, name, stats.entryCount);
+  const warnings = buildWarnings(source, kbRoot, name, stats.entryCount, stats.truncated);
 
   return {
     source,
@@ -80,17 +91,36 @@ export function importFolderAsSpace(opts: ImportFolderOptions): ImportFolderResu
     throw err;
   }
 
+  // Phase 1 — build the new space. Anything that throws here leaves a
+  // partial destination behind, so we roll it back. The source is still
+  // untouched, so rolling back the destination is safe and complete.
   try {
     copyDirectoryDereferenced(preview.source, preview.destination);
-    pruneImportedStashbase(path.join(preview.destination, '.stashbase'));
-    if (mode === 'move') {
-      fs.rmSync(preview.source, { recursive: true, force: false });
-    }
-    return { path: preview.destination, name: preview.name, mode };
+    pruneStashbasePerMachineState(path.join(preview.destination, '.stashbase'));
   } catch (err) {
     try { fs.rmSync(preview.destination, { recursive: true, force: true }); } catch { /* best-effort rollback */ }
     throw err;
   }
+
+  // Phase 2 — for a move, delete the original now that the copy is
+  // committed. This is deliberately *outside* the rollback above: if
+  // deleting the source fails partway (permissions / file in use), the
+  // new space is already complete and must be kept. Tearing it down here
+  // would lose data on both sides. Surface a warning instead so the user
+  // can clean up the leftover original by hand.
+  if (mode === 'move') {
+    try {
+      fs.rmSync(preview.source, { recursive: true, force: false });
+    } catch {
+      return {
+        path: preview.destination,
+        name: preview.name,
+        mode,
+        warning: `Imported into "${preview.name}", but the original folder at ${preview.source} could not be fully removed. Please delete it manually.`,
+      };
+    }
+  }
+  return { path: preview.destination, name: preview.name, mode };
 }
 
 function normalizeSource(raw: string): string {
@@ -122,13 +152,14 @@ function assertImportableSource(source: string, kbRoot: string): void {
   }
 }
 
-function scanFolder(source: string): { entryCount: number; totalBytes: number } {
+function scanFolder(source: string): { entryCount: number; totalBytes: number; truncated: boolean } {
   let entryCount = 0;
   let totalBytes = 0;
   const seenDirectories = new Set<string>();
   try { seenDirectories.add(fs.realpathSync(source)); } catch { /* source was already stat-checked */ }
   const stack = [source];
   while (stack.length) {
+    if (entryCount >= SCAN_ENTRY_CAP) return { entryCount, totalBytes, truncated: true };
     const dir = stack.pop()!;
     let entries: fs.Dirent[];
     try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { continue; }
@@ -150,7 +181,7 @@ function scanFolder(source: string): { entryCount: number; totalBytes: number } 
       }
     }
   }
-  return { entryCount, totalBytes };
+  return { entryCount, totalBytes, truncated: false };
 }
 
 function copyDirectoryDereferenced(source: string, destination: string): void {
@@ -185,25 +216,27 @@ function copyEntryDereferenced(source: string, destination: string, seenDirector
   throw new Error(`unsupported filesystem entry: ${source}`);
 }
 
-function buildWarnings(source: string, kbRoot: string, name: string, entryCount: number): string[] {
+function buildWarnings(
+  source: string,
+  kbRoot: string,
+  name: string,
+  entryCount: number,
+  truncated: boolean,
+): string[] {
   const warnings: string[] = [];
   const home = os.homedir();
   const sensitiveNames = new Set(['Desktop', 'Documents', 'Downloads']);
   if (path.dirname(source) === home && sensitiveNames.has(path.basename(source))) {
     warnings.push(`This looks like your ${path.basename(source)} folder.`);
   }
+  if (truncated) {
+    warnings.push(`Large folder (${SCAN_ENTRY_CAP.toLocaleString()}+ items); the count below is approximate and importing may take a while.`);
+  }
   if (entryCount > 0) {
     warnings.push('Importing copies this existing folder into your StashBase library.');
   }
   warnings.push(`Destination will be ${path.join(kbRoot, name)}.`);
   return warnings;
-}
-
-function pruneImportedStashbase(stashbaseDir: string): void {
-  if (!fs.existsSync(stashbaseDir)) return;
-  for (const entry of STASHBASE_PER_MACHINE_ENTRIES) {
-    fs.rmSync(path.join(stashbaseDir, entry), { recursive: true, force: true });
-  }
 }
 
 function dirExists(p: string): boolean {
