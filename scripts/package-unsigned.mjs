@@ -8,6 +8,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
 const args = process.argv.slice(2);
 const platform = args.includes('--linux') ? 'linux' : args.includes('--win') ? 'win' : 'mac';
+const skipSidecarBuild = args.includes('--skip-sidecar-build') || process.env.STASHBASE_SKIP_SIDECAR_BUILD === '1';
 const target = args.includes('--dir')
   ? ['dir']
   : platform === 'win'
@@ -130,18 +131,76 @@ exec "${realPnpm}" "$@"
 }
 
 function sidecarCandidates(name) {
-  const exe = process.platform === 'win32' || platform === 'win' ? `${name}.exe` : name;
+  const exe = platform === 'win' ? `${name}.exe` : name;
   return [
     path.join(root, 'python', 'sidecar.nosync', name, exe),
     path.join(root, 'python', 'sidecar.nosync', exe),
   ];
 }
 
+function targetRuntime() {
+  if (platform === 'win') {
+    return { nodePlatform: 'win32', binaryFormat: 'pe', label: 'Windows' };
+  }
+  if (platform === 'linux') {
+    return { nodePlatform: 'linux', binaryFormat: 'elf', label: 'Linux' };
+  }
+  return { nodePlatform: 'darwin', binaryFormat: 'macho', label: 'macOS' };
+}
+
+function hostMatchesTarget() {
+  return process.platform === targetRuntime().nodePlatform;
+}
+
+function binaryFormat(file) {
+  const header = Buffer.alloc(4);
+  const fd = fs.openSync(file, 'r');
+  try {
+    fs.readSync(fd, header, 0, header.length, 0);
+  } finally {
+    fs.closeSync(fd);
+  }
+
+  const hex = header.toString('hex');
+  if (hex === '7f454c46') return 'elf';
+  if (header[0] === 0x4d && header[1] === 0x5a) return 'pe';
+  if (
+    hex === 'feedface' ||
+    hex === 'feedfacf' ||
+    hex === 'cefaedfe' ||
+    hex === 'cffaedfe' ||
+    hex === 'cafebabe' ||
+    hex === 'cafebabf'
+  ) {
+    return 'macho';
+  }
+  return 'unknown';
+}
+
+function formatLabel(format) {
+  if (format === 'elf') return 'Linux ELF';
+  if (format === 'pe') return 'Windows PE';
+  if (format === 'macho') return 'macOS Mach-O';
+  return 'unknown binary format';
+}
+
+function sidecarIssue(file, label) {
+  const expected = targetRuntime().binaryFormat;
+  const actual = binaryFormat(file);
+  if (actual === expected) return null;
+  return `${path.relative(root, file)} (${label}) is ${formatLabel(actual)}, expected ${formatLabel(expected)}`;
+}
+
 function assertSidecarsForPlatform() {
   const daemon = sidecarCandidates('stashbase-daemon').find((candidate) => fs.existsSync(candidate));
   const extract = sidecarCandidates('stashbase-extract').find((candidate) => fs.existsSync(candidate));
   const requireExtract = process.env.STASHBASE_REQUIRE_EXTRACT === '1' || process.env.STASHBASE_BUILD_EXTRACT === '1';
-  if (daemon && (extract || !requireExtract)) {
+  const issues = [
+    daemon ? sidecarIssue(daemon, 'daemon') : null,
+    extract ? sidecarIssue(extract, 'extractor') : null,
+  ].filter(Boolean);
+
+  if (daemon && (extract || !requireExtract) && issues.length === 0) {
     if (!extract) {
       console.warn(
         `[package] optional PDF/OCR extractor sidecar not found; packaged local PDF/OCR extraction will be disabled.\n` +
@@ -153,8 +212,8 @@ function assertSidecarsForPlatform() {
 
   const expected = sidecarCandidates('stashbase-daemon')[0];
   const extractExpected = sidecarCandidates('stashbase-extract')[0];
-  const hint = platform === 'win'
-    ? 'Build the Windows Python sidecars on Windows before running `pnpm dist:win` from another OS.'
+  const hint = !hostMatchesTarget()
+    ? `Build the ${targetRuntime().label} Python sidecars on ${targetRuntime().label} before running \`pnpm dist:${platform}\` from another OS.`
     : requireExtract
       ? 'Run `STASHBASE_BUILD_EXTRACT=1 pnpm build:python-sidecar` before packaging.'
       : 'Run `pnpm build:python-sidecar` before packaging.';
@@ -163,13 +222,13 @@ function assertSidecarsForPlatform() {
     requireExtract && !extract ? path.relative(root, extractExpected) : null,
   ].filter(Boolean);
   throw new Error(
-    `${platform} packaging requires missing Python sidecar${missing.length === 1 ? '' : 's'}:\n` +
-      missing.map((item) => `  - ${item}`).join('\n') +
+    `${platform} packaging requires valid Python sidecar${missing.length + issues.length === 1 ? '' : 's'}:\n` +
+      [...missing.map((item) => `missing ${item}`), ...issues].map((item) => `  - ${item}`).join('\n') +
       `\n${hint}`,
   );
 }
 
-if (platform === 'win' && process.platform !== 'win32') {
+if (!hostMatchesTarget() || skipSidecarBuild) {
   assertSidecarsForPlatform();
   runScript('build');
 } else {

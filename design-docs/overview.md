@@ -165,6 +165,7 @@ Maintenance happens during the collaboration between the user and the Agent, not
 
 The initial release includes:
 * macOS desktop application
+* Linux x86_64 Debian package
 * Space management
 * HTML / Markdown / PDF / image / folder import (clone the repo yourself, then import it as a folder)
 * Hybrid Retrieval
@@ -172,7 +173,7 @@ The initial release includes:
 * Claude Code & Codex integration
 
 The subsequent roadmap includes:
-* Windows / Linux
+* Windows
 * Cloud sync
 * Mobile access
 * Team collaboration

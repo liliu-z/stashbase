@@ -43,10 +43,10 @@ brew install --cask liliu-z/stashbase/stashbase
 
 ### Linux Install (Debian/Ubuntu)
 
-Download the `.deb` package from the [Releases](https://github.com/liliu-z/stashbase/releases) page and install it:
+Download the latest `StashBase-*-linux-amd64.deb` asset from the [Releases](https://github.com/liliu-z/stashbase/releases) page and install it:
 
 ```bash
-sudo dpkg -i StashBase-0.9.0-linux-amd64.deb
+sudo dpkg -i ./StashBase-*-linux-amd64.deb
 ```
 
 Once the app is running:
@@ -214,7 +214,7 @@ pnpm test:import-folder
 
 ## Publishing
 
-`release:verify:mac` is the local preflight: build the macOS package, run the packaged daemon/server smoke tests, run PDF/OCR smoke tests only when the optional extractor is bundled, and mount the DMG to verify its helper files. `dist:brew` is the one-command publishing flow: build the macOS package, upload the current version's files in `release.nosync/` to this repository's GitHub Release, then publish the Homebrew cask update.
+`release:verify:mac` is the local preflight: build the macOS package, run the packaged daemon/server smoke tests, run PDF/OCR smoke tests only when the optional extractor is bundled, and mount the DMG to verify its helper files. `dist:brew` is the one-command macOS publishing flow: build the macOS package, upload the current version's files in `release.nosync/` to this repository's GitHub Release, then publish the Homebrew cask update. When that GitHub Release is published, the `Release Linux` workflow builds the Linux `.deb` on Ubuntu and uploads it to the same release; use the workflow's manual `tag` input to backfill an existing release.
 
 ```bash
 pnpm release:verify:mac
