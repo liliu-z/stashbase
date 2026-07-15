@@ -303,6 +303,8 @@ It runs the user's installed Agent CLI in the current folder and relies on the s
 
 Each opened folder has one root-level `AGENTS.md` file for durable Agent instructions about that folder. Built-in Codex uses it directly through the normal folder context. Built-in Claude uses a root-level `CLAUDE.md` bridge that contains only `@AGENTS.md`; the bridge is created on first Claude launch if missing. Both files are ordinary Markdown source files, so the user can edit or delete them.
 
+Every session starts with a short orientation preamble (`server/agent-preamble.ts`): the current folder plus the library MCP tool surface. When the opened folder is a [MemFlywheel](https://github.com/iflytek/memflywheel) memory store — a root `MEMORY.md` index plus a `.memflywheel/` trace directory — the preamble also describes the store layout (index cues, typed memory documents, source traces, learned skills) so the agent reads the index first instead of bulk-loading memory files.
+
 Packaged builds resolve the user-installed `claude` and `codex` executables explicitly, including common Homebrew paths, npm global paths, and Windows npm command shims, before launching the built-in panel. This keeps the panel aligned with the user's normal CLI setup instead of depending on optional SDK binaries bundled in `node_modules`.
 
 The key architectural point is:

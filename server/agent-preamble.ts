@@ -16,6 +16,7 @@
  * folders tears the session down), so the live context here — current folder,
  * sibling folders — is always current.
  */
+import fs from 'node:fs';
 import path from 'node:path';
 
 export function buildStashbasePreamble(cwd: string): string {
@@ -30,5 +31,34 @@ export function buildStashbasePreamble(cwd: string): string {
     '- `reindex` refreshes the index after you create, edit, delete, or move files so search reflects the latest content on disk.',
   ];
 
+  const memoryStore = memflywheelStoreLines(cwd);
+  if (memoryStore.length) lines.push('', ...memoryStore);
+
   return lines.join('\n');
+}
+
+/**
+ * MemFlywheel (https://github.com/iflytek/memflywheel) stores agent memory as
+ * ordinary Markdown: a root `MEMORY.md` index over typed memory documents,
+ * with source traces and learned skills alongside. Those files index and
+ * search like any other Markdown, but a bare folder listing invites the model
+ * to bulk-load every memory file. When the opened folder is such a store,
+ * orient the model on the layout so it reads the index first and follows it.
+ *
+ * Detection requires both the index and the `.memflywheel/` trace directory —
+ * a folder that merely contains a MEMORY.md is not a store.
+ */
+function memflywheelStoreLines(cwd: string): string[] {
+  try {
+    if (!fs.statSync(path.join(cwd, 'MEMORY.md')).isFile()) return [];
+    if (!fs.statSync(path.join(cwd, '.memflywheel')).isDirectory()) return [];
+  } catch {
+    return [];
+  }
+  return [
+    'This folder is a MemFlywheel memory store: file-native agent memory kept as Markdown.',
+    '- `MEMORY.md` is the index of memory cues. Read it first and follow its links instead of scanning the folder.',
+    '- Typed subfolders (for example `preference/`, `workflow/`) hold the memory bodies the index points to.',
+    '- `.memflywheel/sources/` holds JSONL source traces behind each memory; `learned-skills/*/SKILL.md` holds learned skills. Open these only when a memory body is not enough.',
+  ];
 }
