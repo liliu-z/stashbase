@@ -51,6 +51,7 @@ import { mount as mountIndexingRoutes } from './routes/indexing.ts';
 import { mount as mountLibraryFileRoutes } from './routes/library-files.ts';
 import { mount as mountTerminalRoutes } from './routes/terminal.ts';
 import { mount as mountMcpRoutes } from './routes/mcp.ts';
+import { mount as mountMcpHttpRoutes } from './routes/mcp-http.ts';
 import { mount as mountSessionsRoutes } from './routes/sessions.ts';
 import { mount as mountCodexSessionsRoutes } from './routes/codex-sessions.ts';
 
@@ -252,6 +253,7 @@ mountIndexingRoutes(app);
 mountLibraryFileRoutes(app);
 mountTerminalRoutes(app);
 mountMcpRoutes(app);
+mountMcpHttpRoutes(app, PORT); // POST /mcp — token-gated Streamable HTTP for URL-only MCP clients
 mountSessionsRoutes(app); // global (no requireFolder) — lists all local sessions
 mountCodexSessionsRoutes(app); // global (no requireFolder) — filters to current folder when open
 

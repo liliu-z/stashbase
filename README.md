@@ -164,6 +164,17 @@ command = "/Users/YOUR_USER/.stashbase/bin/stashbase-mcp"
 command = "C:\\Users\\YOUR_USER\\.stashbase\\bin\\stashbase-mcp.cmd"
 ```
 
+#### URL-based clients (Streamable HTTP)
+
+Clients that cannot spawn a local process (self-hosted agent platforms in Docker, web-based agents) can attach to the same tool surface at:
+
+```text
+http://127.0.0.1:8090/mcp                    # same machine
+http://host.docker.internal:8090/mcp         # from a Docker container on this machine
+```
+
+Requests need `Authorization: Bearer <token>`; the token is generated on first use at `~/.stashbase/mcp-http-token`. The endpoint listens on the loopback interface only and is stateless (plain JSON-RPC over POST).
+
 Restart the client after changing MCP config.
 
 ---

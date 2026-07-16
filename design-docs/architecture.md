@@ -281,11 +281,13 @@ One machine runs one StashBase library through one MCP server.
 
 External clients and the built-in Agent panel use the same MCP server while the StashBase app is running. CLI-backed panels rely on the same local client configuration that Settings writes; there is no separate built-in MCP path.
 
+The server is reachable over two transports that share one implementation: `mcp/library-server.ts` owns the tool definitions and handlers, `mcp/server.ts` connects them to stdio for spawned clients, and `server/routes/mcp-http.ts` serves them at `POST /mcp` (Streamable HTTP, stateless) for clients that can only attach to a URL. Both paths forward every tool call to the same `/api/library/*` routes. The HTTP endpoint stays on the loopback bind and requires a bearer token from `~/.stashbase/mcp-http-token`; same-machine Docker clients reach it as `http://host.docker.internal:<port>/mcp`.
+
 If the StashBase app is not running, the MCP server is unavailable in V1. This keeps process ownership simple.
 
 ## 7.3 Permissions
 
-MCP has no separate auth layer. This follows the local-first assumption: any local process that can connect to the running StashBase MCP server is trusted as the local user.
+The stdio transport has no separate auth layer. This follows the local-first assumption: a spawned stdio server is reachable only by the client that spawned it, which is trusted as the local user. The HTTP transport is different: a loopback URL can be probed by any local process or rebound browser page without spawning anything, so `POST /mcp` requires the bearer token from `~/.stashbase/mcp-http-token` (0600) — possession of the token file is what marks a caller as the local user.
 
 The practical permission boundary in V1 is the opened-folder set. MCP file helpers cannot read or write outside those folders.
 
