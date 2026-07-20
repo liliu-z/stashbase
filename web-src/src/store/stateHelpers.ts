@@ -31,6 +31,8 @@ export function makeTab(): Tab {
     id: crypto.randomUUID(),
     file: null,
     editMode: false,
+    dirty: false,
+    editorSessionVersion: 0,
     preview: false,
     pendingAnchor: null,
     pendingHighlight: null,

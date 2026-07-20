@@ -82,6 +82,7 @@ test('MCP library mutations work outside an active folder and enforce versions',
     content: 'version one',
   });
   assert.ok(created.version);
+  assert.equal('content' in created, false);
   assert.equal(fs.readFileSync(source, 'utf8'), 'version one');
   assert.equal(folder.getCurrentFolder(), null);
 

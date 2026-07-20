@@ -40,7 +40,7 @@ export async function writeLibraryFile(
   validateLibraryWritableFolderRel(target.folderRel);
   return runWithFolderRoot(target.folderRoot, async () => {
     const result = await saveFileContent(target.folderRel, content, opts);
-    return { path: target.abs, ...result };
+    return { path: target.abs, version: result.version, indexWarning: result.indexWarning };
   });
 }
 

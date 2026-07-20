@@ -5,6 +5,7 @@ import { detectFormat, isDerivedNoteName } from './format.ts';
 import { fileVersion, readText, saveText } from './files.ts';
 import { contentSizeError } from './indexable.ts';
 import { errorMessage, logger } from './log.ts';
+import { preserveMarkdownSourceFormat } from './markdown-source-format.ts';
 import { indexer } from './state.ts';
 import { noteTreeChanged } from './watcher.ts';
 
@@ -65,13 +66,18 @@ export async function saveFileContent(
   name: string,
   content: string,
   opts: { baseVersion?: string } = {},
-): Promise<{ indexWarning?: string; version?: string }> {
+): Promise<{ content: string; indexWarning?: string; version?: string }> {
   validateEditableFileWrite(name);
+  const format = detectFormat(name);
   if (opts.baseVersion !== undefined) {
     const currentVersion = fileVersion(name);
     if (currentVersion !== opts.baseVersion) {
-      if (readText(name) === content) {
-        return { version: currentVersion ?? undefined };
+      const currentContent = readText(name);
+      const serializedContent = format === 'md'
+        ? preserveMarkdownSourceFormat(currentContent ?? '', content)
+        : content;
+      if (currentContent === serializedContent) {
+        return { content: serializedContent, version: currentVersion ?? undefined };
       }
       const err = new Error('file changed on disk; reload before saving');
       (err as any).code = 'FILE_CHANGED';
@@ -79,8 +85,18 @@ export async function saveFileContent(
       throw err;
     }
   }
-  saveText(name, content);
-  const indexWarning = await upsertSavedFile(name, content);
+  // CodeMirror stores its document with LF line separators. Markdown source
+  // still owns its byte-level presentation: retain a leading UTF-8 BOM and
+  // serialize edits using the source's uniform (or dominant mixed) ending.
+  const previousContent = format === 'md' ? readText(name) : null;
+  const savedContent = format === 'md'
+    ? preserveMarkdownSourceFormat(previousContent ?? '', content)
+    : content;
+  if (previousContent !== null && savedContent === previousContent) {
+    return { content: savedContent, version: fileVersion(name) ?? undefined };
+  }
+  saveText(name, savedContent);
+  const indexWarning = await upsertSavedFile(name, savedContent);
   noteTreeChanged();
-  return { indexWarning, version: fileVersion(name) ?? undefined };
+  return { content: savedContent, indexWarning, version: fileVersion(name) ?? undefined };
 }
