@@ -76,7 +76,9 @@ and library HTTP surface. `server/library-directory.ts` owns member-folder
 listing, `server/library-file-reader.ts` owns direct versus derived reads and
 the conversion-not-ready contract, and `server/library-file-mutations.ts` owns
 library write, edit, move, and delete transactions. `server/file-save.ts`
-provides the shared editable-file save and index-update path, while
+provides the shared editable-file save and index-update path, and
+`server/markdown-source-format.ts` preserves Markdown UTF-8 BOM and line-ending
+conventions at that boundary, while
 `server/file-operation-guard.ts` prevents rename/delete only while conversion
 is running. `server/routes/library-files.ts` keeps request and response
 orchestration. The active-folder filesystem facade is `server/files.ts`;
