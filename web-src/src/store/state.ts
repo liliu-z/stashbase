@@ -87,6 +87,10 @@ export interface Tab {
   id: string;
   file: OpenFile | null;
   editMode: boolean;
+  /** True only after the user changes the live editor buffer. */
+  dirty: boolean;
+  /** Increments when this tab is assigned a different document. */
+  editorSessionVersion: number;
   preview: boolean;
   pendingAnchor: string | null;
   /** Set when a viewer should highlight a specific chunk on next
@@ -403,7 +407,8 @@ export type Action =
    *  path) or vice versa. Omit to preserve the tab's existing flag —
    *  back/forward and in-place anchor nav rely on that. */
   | { type: 'FILE_OPEN'; body: FileBody; newTab?: boolean; preview?: boolean }
-  | { type: 'FILE_PATCH'; patch: Partial<OpenFile> }
+  | { type: 'FILE_PATCH'; patch: Partial<OpenFile>; invalidateEditorSession?: boolean }
+  | { type: 'DOCUMENT_DIRTY'; dirty: boolean }
   | { type: 'PRUNE_MISSING_FILE_TABS'; names: string[] }
   | { type: 'REMAP_PATHS'; from: string; to: string; kind: 'file' | 'folder' }
   /** Push an empty tab and activate it (Obsidian-style `+`). The next

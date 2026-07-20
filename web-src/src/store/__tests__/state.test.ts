@@ -26,6 +26,8 @@ function documentTab(id: string, name: string | null, preview = false): Tab {
     id,
     file: name ? { name, format: 'md', content: name } : null,
     editMode: false,
+    dirty: false,
+    editorSessionVersion: 0,
     preview,
     pendingAnchor: null,
     pendingHighlight: null,
@@ -43,6 +45,7 @@ test('document tab lifecycle reuses a blank tab and selects a neighbor on close'
   assert.equal(state.tabs.length, 1);
   assert.equal(state.tabs[0].preview, true);
   assert.equal(state.selectedPath, 'one.md');
+  assert.equal(state.tabs[0].editMode, true);
 
   state = reducer(state, { type: 'NEW_TAB' });
   const blankId = state.activeTabId!;
@@ -57,6 +60,67 @@ test('document tab lifecycle reuses a blank tab and selects a neighbor on close'
   state = reducer(state, { type: 'CLOSE_TAB', id: blankId });
   assert.equal(state.activeTabId, firstId);
   assert.equal(state.selectedPath, 'one.md');
+});
+
+test('Markdown opens in Live Editing while read-only formats remain out of edit mode', () => {
+  const markdown = reducer(freshState(), {
+    type: 'FILE_OPEN',
+    body: { name: 'note.md', format: 'md', content: '# Note' },
+  });
+  assert.equal(markdown.tabs[0].editMode, true);
+
+  const html = reducer(freshState(), {
+    type: 'FILE_OPEN',
+    body: { name: 'page.html', format: 'html', content: '<p>Read only</p>' },
+  });
+  assert.equal(html.tabs[0].editMode, false);
+});
+
+test('only dirty missing document tabs survive sidebar pruning', () => {
+  let state = reducer(freshState(), {
+    type: 'FILE_OPEN',
+    body: { name: 'deleted.md', format: 'md', content: '# Deleted' },
+  });
+  state = reducer(state, { type: 'PRUNE_MISSING_FILE_TABS', names: [] });
+  assert.equal(state.tabs.length, 0);
+
+  state = reducer(freshState(), {
+    type: 'FILE_OPEN',
+    body: { name: 'draft.md', format: 'md', content: '# Draft' },
+  });
+  state = reducer(state, { type: 'DOCUMENT_DIRTY', dirty: true });
+  state = reducer(state, { type: 'PRUNE_MISSING_FILE_TABS', names: [] });
+  assert.equal(state.tabs[0].file?.name, 'draft.md');
+});
+
+test('renames retain an editor session generation while replacements invalidate it', () => {
+  let state = reducer(freshState(), {
+    type: 'FILE_OPEN',
+    body: { name: 'draft.md', format: 'md', content: '# Draft' },
+  });
+  const version = state.tabs[0].editorSessionVersion;
+  state = reducer(state, { type: 'REMAP_PATHS', from: 'draft.md', to: 'renamed.md', kind: 'file' });
+  assert.equal(state.tabs[0].editorSessionVersion, version);
+  state = reducer(state, {
+    type: 'FILE_OPEN',
+    body: { name: 'replacement.md', format: 'md', content: '# Replacement' },
+  });
+  assert.equal(state.tabs[0].editorSessionVersion, version + 1);
+});
+
+test('external content patches invalidate an editor session', () => {
+  let state = reducer(freshState(), {
+    type: 'FILE_OPEN',
+    body: { name: 'note.md', format: 'md', content: '# Before' },
+  });
+  const version = state.tabs[0].editorSessionVersion;
+  state = reducer(state, {
+    type: 'FILE_PATCH',
+    patch: { content: '# After' },
+    invalidateEditorSession: true,
+  });
+  assert.equal(state.tabs[0].file?.content, '# After');
+  assert.equal(state.tabs[0].editorSessionVersion, version + 1);
 });
 
 test('folder path remap updates files, tabs, expansion, focus, and manual order together', () => {

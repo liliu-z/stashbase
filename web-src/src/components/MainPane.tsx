@@ -96,7 +96,9 @@ export function MainPane() {
             <LazyLoadBoundary className="doc-loading" label="Markdown editor" resetKey={resourceResetKey}>
               <Suspense fallback={<div className="doc-loading">Loading editor…</div>}>
                 <LazyCodeEditor
-                  key={cur.name}
+                  key={activeTab?.id ?? cur.name}
+                  tabId={activeTab?.id ?? ''}
+                  sessionVersion={activeTab?.editorSessionVersion ?? 0}
                   name={cur.name}
                   initialContent={cur.content}
                   onChange={() => actions.scheduleSave()}
@@ -122,7 +124,8 @@ export function MainPane() {
           <button
             className={'icon-btn edit-toggle' + (editMode ? ' editing' : '')}
             type="button"
-            title={editMode ? 'Preview (read-only)' : 'Edit'}
+            title={editMode ? 'Switch to Reading View' : 'Switch to Live Editing'}
+            aria-label={editMode ? 'Switch to Reading View' : 'Switch to Live Editing'}
             onClick={() => { void actions.toggleEditMode(); }}
           >
             <EditIcon className="icon-edit" />

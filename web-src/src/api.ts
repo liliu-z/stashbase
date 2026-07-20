@@ -104,7 +104,7 @@ export const api = {
   // File body ----------------------------------------------------
   getFile: (name: string) => getJson<FileBody>('/api/files/' + encodePath(name)),
   putFile: (name: string, content: string, baseVersion?: string) =>
-    send<{ indexWarning?: string; version?: string }>(
+    send<{ content: string; indexWarning?: string; version?: string }>(
       'PUT',
       '/api/files/' + encodePath(name),
       { content, ...(baseVersion !== undefined ? { baseVersion } : {}) },

@@ -46,7 +46,7 @@ export function useFindActions(stateRef: MutableRefObject<State>, dispatch: Disp
     if (!controller) return;
     const { query, wholeWord, caseSensitive, open } = stateRef.current.find;
     if (open && query) {
-      void applyMatchInfo(controller.setQuery(query, { wholeWord, caseSensitive }));
+      void applyMatchInfo((controller.restoreQuery ?? controller.setQuery)(query, { wholeWord, caseSensitive }));
     }
   }, [applyMatchInfo, stateRef]);
 
@@ -111,4 +111,3 @@ export function useFindActions(stateRef: MutableRefObject<State>, dispatch: Disp
     toggleFindWholeWord,
   };
 }
-

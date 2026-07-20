@@ -92,6 +92,7 @@ export function reducer(s: State, a: Action): State {
         content: a.body.content,
         version: a.body.version,
       };
+      const liveEditing = file.format === 'md';
       // New-tab mode (double-click in tree, `+` then a click): create
       // a fresh tab and load into it. Otherwise replace the active
       // tab's file (VS Code single-click mode). If there's no active
@@ -99,6 +100,8 @@ export function reducer(s: State, a: Action): State {
       if (a.newTab || s.activeTabId == null || !getActiveTab(s)) {
         const tab = makeTab();
         tab.file = file;
+        tab.editMode = liveEditing;
+        tab.dirty = false;
         tab.preview = a.preview ?? false;
         return {
           ...s,
@@ -110,7 +113,9 @@ export function reducer(s: State, a: Action): State {
       return {
         ...patchActiveTab(s, {
           file,
-          editMode: false,
+          editMode: liveEditing,
+          dirty: false,
+          editorSessionVersion: getActiveTab(s)!.editorSessionVersion + 1,
           saveStatus: { text: '', cls: '' },
           pendingAnchor: null,
           pendingHighlight: null,
@@ -128,15 +133,22 @@ export function reducer(s: State, a: Action): State {
       const file = { ...tab.file, ...a.patch };
       const renamed = a.patch.name && s.selectedPath === tab.file.name;
       return {
-        ...patchActiveTab(s, { file }),
+        ...patchActiveTab(s, {
+          file,
+          ...(a.invalidateEditorSession
+            ? { editorSessionVersion: tab.editorSessionVersion + 1 }
+            : {}),
+        }),
         selectedPath: renamed ? a.patch.name! : s.selectedPath,
       };
     }
+    case 'DOCUMENT_DIRTY':
+      return patchActiveTab(s, { dirty: a.dirty });
     case 'PRUNE_MISSING_FILE_TABS': {
       const names = new Set(a.names);
       const stale = new Set(
         s.tabs
-          .filter((t) => t.file && !t.editMode && !names.has(t.file.name))
+          .filter((t) => t.file && !t.dirty && !names.has(t.file.name))
           .map((t) => t.id),
       );
       if (stale.size === 0) return s;

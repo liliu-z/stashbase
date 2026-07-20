@@ -34,16 +34,19 @@ import { useApp, type MatchInfo } from '../store/AppContext';
  * prop-drilling refs around.
  *
  * Markdown is the only editable format, so the editor is md-only.
- * Editor identity is keyed by `name` — switching files destroys the
- * view + makes a new one (no state to migrate, the new content comes
- * in fresh). Initial content is read once from props at mount time and
- * never thereafter — CM owns the buffer.
+ * Editor identity is keyed by the tab plus its document generation, so
+ * replacing a tab's file starts fresh while renames preserve its state.
+ * Initial content is read once per document generation; CM owns it after.
  */
 export function CodeEditor({
+  tabId,
+  sessionVersion,
   name,
   initialContent,
   onChange,
 }: {
+  tabId: string;
+  sessionVersion: number;
   name: string;
   initialContent: string;
   onChange?: (doc: string) => void;
@@ -65,12 +68,6 @@ export function CodeEditor({
   // captures whatever's current at mount time). Refs side-step that.
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
-  // Snapshot the find-bar state at mount time so a new editor view
-  // (tab/format switch with the bar already open) immediately
-  // re-applies the current query against the new buffer.
-  const findAtMount = useRef(state.find);
-  findAtMount.current = state.find;
-
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
@@ -125,10 +122,16 @@ export function CodeEditor({
       }),
     ];
 
+    const session = actions.getEditorSession(tabId);
+    const savedSession = session?.version === sessionVersion ? session : undefined;
     const view = new EditorView({
-      state: EditorState.create({ doc: initialContent, extensions }),
+      state: savedSession?.state ?? EditorState.create({ doc: initialContent, extensions }),
       parent: host,
     });
+    if (savedSession) {
+      view.scrollDOM.scrollTop = savedSession.scrollTop;
+      view.scrollDOM.scrollLeft = savedSession.scrollLeft;
+    }
     viewRef.current = view;
     actions.registerEditor({
       getValue: () => view.state.doc.toString(),
@@ -136,32 +139,31 @@ export function CodeEditor({
     });
     actions.registerFindController({
       setQuery: (q, opts) => applyEditorQuery(view, q, opts.wholeWord, opts.caseSensitive),
+      restoreQuery: (q, opts) => applyEditorQuery(view, q, opts.wholeWord, opts.caseSensitive, false),
       next: () => { findNext(view); return matchInfoFor(view); },
       prev: () => { findPrevious(view); return matchInfoFor(view); },
       close: () => {
         view.dispatch({ effects: setSearchQuery.of(new SearchQuery({ search: '' })) });
       },
     });
-    // If the find bar is already open when this view mounts (e.g. the
-    // user switched tabs while it was visible), re-apply the active
-    // query against the freshly mounted document so the count + first
-    // match update immediately.
-    const snap = findAtMount.current;
-    if (snap.open && snap.query) {
-      applyEditorQuery(view, snap.query, snap.wholeWord, snap.caseSensitive);
-    }
     if (!renamingAtMountRef.current) view.focus();
 
     return () => {
+      actions.setEditorSession(tabId, {
+        version: sessionVersion,
+        state: view.state,
+        scrollTop: view.scrollDOM.scrollTop,
+        scrollLeft: view.scrollDOM.scrollLeft,
+      });
       actions.registerFindController(null);
       actions.registerEditor(null);
       view.destroy();
       viewRef.current = null;
     };
-  // Mount once per file; initialContent and onChange are captured via
+  // Mount once per document generation; initialContent and onChange are captured via
   // refs so they don't trigger re-mounts.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name]);
+  }, [sessionVersion, tabId]);
 
   // Re-focus the editor when an inline rename ends (commit or cancel).
   useEffect(() => {
@@ -195,10 +197,16 @@ export function CodeEditor({
   return <div ref={hostRef} style={{ height: '100%' }} />;
 }
 
-/** Push a new SearchQuery and land selection on the first match at or
- *  after the current cursor. Returns the post-jump match info so the
- *  find bar's counter reflects the visible "N of M". */
-function applyEditorQuery(view: EditorView, q: string, wholeWord: boolean, caseSensitive: boolean): MatchInfo {
+/** Push a new SearchQuery and, for an interactive query, land selection on
+ * the first match at or after the current cursor. Restored sessions keep
+ * their saved selection while regaining query decorations and match counts. */
+export function applyEditorQuery(
+  view: EditorView,
+  q: string,
+  wholeWord: boolean,
+  caseSensitive: boolean,
+  selectMatch = true,
+): MatchInfo {
   const query = new SearchQuery({
     search: q,
     caseSensitive,
@@ -206,7 +214,7 @@ function applyEditorQuery(view: EditorView, q: string, wholeWord: boolean, caseS
     wholeWord,
   });
   view.dispatch({ effects: setSearchQuery.of(query) });
-  if (q && query.valid) findNext(view);
+  if (selectMatch && q && query.valid) findNext(view);
   return matchInfoFor(view);
 }
 
