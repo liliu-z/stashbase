@@ -169,7 +169,7 @@ Different formats have different read and search paths. The product rule is: kee
 | PDF | Derived Markdown | Derived Markdown |
 | DOCX | Derived HTML | Extracted clean text from derived HTML |
 
-Markdown is edited, read, and indexed directly. Renderer callers cross the two-function seam in `web-src/src/markdown.ts`; the document pipeline is implemented under `web-src/src/markdown/` as focused modules for orchestration, sanitization, and preview-document presentation, with package-native Marked extensions for footnotes and heading IDs. The full read-only preview pipeline, iframe boundary, asset resolution, and navigation behavior are described in [markdown-rendering.md](markdown-rendering.md).
+Markdown is edited, read, and indexed directly. Renderer callers cross the two-function seam in `web-src/src/markdown.ts`; the document pipeline is implemented under `web-src/src/markdown/` as focused modules for orchestration, sanitization, and preview-document presentation, with package-native Marked extensions for footnotes and heading IDs. Live Editing keeps the source document in CodeMirror and derives its selection-aware Markdown presentation from `web-src/src/components/liveMarkdown.ts`; that module also owns the strong/emphasis command transforms. The full read-only preview pipeline, iframe boundary, asset resolution, and navigation behavior are described in [markdown-rendering.md](markdown-rendering.md).
 
 HTML stays as the source file. StashBase extracts clean text from HTML only as an indexing representation, so embedding and change tracking can operate on stable text. When an Agent reads an HTML file, it reads the original HTML.
 
