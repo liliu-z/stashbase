@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { EditorState } from '@codemirror/state';
-import { EditorView, keymap, lineNumbers, highlightActiveLine } from '@codemirror/view';
+import { EditorView, keymap } from '@codemirror/view';
 import {
   defaultKeymap,
   history,
@@ -8,11 +8,8 @@ import {
   indentWithTab,
 } from '@codemirror/commands';
 import {
-  syntaxHighlighting,
-  defaultHighlightStyle,
   bracketMatching,
   indentOnInput,
-  foldGutter,
 } from '@codemirror/language';
 import {
   searchKeymap,
@@ -24,8 +21,9 @@ import {
   findNext,
   findPrevious,
 } from '@codemirror/search';
-import { markdown as mdLang } from '@codemirror/lang-markdown';
+import { markdown as mdLang, markdownLanguage } from '@codemirror/lang-markdown';
 import { useApp, type MatchInfo } from '../store/AppContext';
+import { liveMarkdownProjection, toggleMarkdownEmphasis, toggleMarkdownStrong } from './liveMarkdown';
 
 /**
  * CodeMirror 6 host. Mounts a CM EditorView into a div the first time,
@@ -72,49 +70,55 @@ export function CodeEditor({
     const host = hostRef.current;
     if (!host) return;
 
-    const lang = mdLang({ addKeymap: false });
+    const lang = mdLang({ base: markdownLanguage, addKeymap: false });
     // Strip CM's built-in Cmd-F binding — we route Cmd+F to our own
     // FindBar component instead. Cmd-G / Shift-Cmd-G (find next/prev)
     // stay so the bar's hotkeys still work when focus is in the editor.
     const editorSearchKeymap = searchKeymap.filter((b) => b.key !== 'Mod-f');
-    const linkKeymap = [{ key: 'Mod-k', run: insertMarkdownLink }];
+    const writingKeymap = [
+      { key: 'Mod-b', run: toggleMarkdownStrong },
+      { key: 'Mod-i', run: toggleMarkdownEmphasis },
+      { key: 'Mod-k', run: insertMarkdownLink },
+    ];
     const extensions = [
-      lineNumbers(),
-      foldGutter(),
       history(),
       bracketMatching(),
       indentOnInput(),
-      syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-      highlightActiveLine(),
       EditorView.lineWrapping,
+      liveMarkdownProjection,
       highlightSelectionMatches(),
       // search() owns the SearchQuery state + match decorations even
       // though we never call openSearchPanel — our FindBar drives it
       // imperatively via setSearchQuery / findNext / findPrevious.
       search(),
-      keymap.of([indentWithTab, ...linkKeymap, ...defaultKeymap, ...historyKeymap, ...editorSearchKeymap]),
+      keymap.of([indentWithTab, ...writingKeymap, ...defaultKeymap, ...historyKeymap, ...editorSearchKeymap]),
       EditorView.theme({
-        '&': { height: '100%', fontSize: '13px' },
+        '&': { height: '100%', fontSize: '16px' },
         '.cm-scroller': {
           fontFamily:
-            '"SF Mono", "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace',
-          lineHeight: '1.55',
+            'ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+          lineHeight: '1.7',
         },
         '.cm-line': {
           overflowWrap: 'anywhere',
         },
-        '.cm-content': { padding: '12px 0 12px 8px' },
-        '.cm-gutters': {
-          // Opaque so content scrolling horizontally doesn't show
-          // through the line-number column — matches `.md-editor`'s
-          // background (`var(--bg)`).
-          background: 'var(--bg)',
-          color: '#9aa0a6',
-          border: 'none',
-          padding: '0 8px 0 12px',
+        '.cm-content': { maxWidth: '820px', width: '100%', margin: '0 auto', padding: '32px 56px 80px' },
+        '.cm-live-heading': { fontWeight: '700', lineHeight: '1.25' },
+        '.cm-live-heading-1': { fontSize: '2em' },
+        '.cm-live-heading-2': { fontSize: '1.5em' },
+        '.cm-live-heading-3': { fontSize: '1.25em' },
+        '.cm-live-heading-4, .cm-live-heading-5, .cm-live-heading-6': { fontSize: '1.1em' },
+        '.cm-live-emphasis': { fontStyle: 'italic' },
+        '.cm-live-strong': { fontWeight: '700' },
+        '.cm-live-inline-code': {
+          fontFamily: '"SF Mono", "JetBrains Mono", Menlo, Consolas, monospace',
+          fontSize: '0.9em',
+          backgroundColor: 'rgba(175, 184, 193, 0.2)',
+          borderRadius: '4px',
+          padding: '0.1em 0.25em',
         },
-        '.cm-activeLine': { background: 'rgba(0,0,0,0.025)' },
-        '.cm-activeLineGutter': { background: 'transparent', color: '#5f6368' },
+        '.cm-live-strikethrough': { textDecoration: 'line-through' },
+        '.cm-live-horizontal-rule': { border: '0', borderTop: '1px solid #d0d7de', margin: '1.25em 0', width: '100%' },
       }),
       lang,
       EditorView.updateListener.of((u) => {
