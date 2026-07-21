@@ -19,6 +19,11 @@ import type {
   SessionBlock,
   SessionInfo,
   SyncResult,
+  TranscriptionModelId,
+  TranscriptionModelState,
+  TranscriptionSettings,
+  AudioTranscriptState,
+  AudioPreviewStatus,
   UploadResult,
 } from './apiTypes';
 import type { SearchTypeCategory } from '../../shared/search-types.ts';
@@ -182,12 +187,47 @@ export const api = {
   /** Reprocess a specific source file (folder-relative path). PDF/image
    *  sources re-run extraction; directly readable files clear the
    *  failure row and trigger reconcile/index. */
-  reprocessFile: (path: string, opts?: { folder?: string }) =>
-    send<{ ok: boolean; mode?: 'conversion' | 'index' }>('POST', '/api/files/reprocess', { path, folder: opts?.folder }),
+  reprocessFile: (path: string, opts?: { folder?: string; language?: string }) =>
+    send<{ ok: boolean; mode?: 'conversion' | 'index' }>('POST', '/api/files/reprocess', {
+      path,
+      folder: opts?.folder,
+      language: opts?.language,
+    }),
+  cancelFilePreparation: (path: string, opts?: { folder?: string }) =>
+    send<{ ok: boolean; cancelled: boolean }>('POST', '/api/files/cancel-preparation', {
+      path,
+      folder: opts?.folder,
+    }),
   /** Prepare an opened DOCX's searchable/Agent-readable text at interactive
    *  scheduler priority. Visible preview does not wait for this request. */
   prepareDocx: (path: string, opts?: { folder?: string }) =>
     send<{ ok: boolean }>('POST', '/api/files/prepare', { path, folder: opts?.folder }),
+  prepareAudio: (path: string, opts?: { folder?: string }) =>
+    send<{ ok: boolean }>('POST', '/api/files/prepare', { path, folder: opts?.folder }),
+  prepareAudioPreview: async (path: string, opts: { signal?: AbortSignal } = {}) => {
+    const r = await fetch('/api/audio/preview/prepare', {
+      method: 'POST',
+      headers: { ...requestHeaders(), 'content-type': 'application/json' },
+      body: JSON.stringify({ path }),
+      signal: opts.signal,
+    });
+    return parseJsonOrThrow<{ ok: boolean }>(r);
+  },
+  audioPreviewStatus: (path: string) =>
+    getJson<AudioPreviewStatus>(`/api/audio/preview/status?path=${encodeURIComponent(path)}`),
+  audioTranscript: (path: string) =>
+    getJson<AudioTranscriptState>(`/api/audio/transcript?path=${encodeURIComponent(path)}`),
+  transcriptionSettings: () =>
+    getJson<TranscriptionSettings>('/api/transcription/settings'),
+  setTranscriptionPreferences: (preferences: { providerId?: string; modelId?: string; language?: string }) =>
+    send<{ providerId: string; modelId: string; language: string }>('PUT', '/api/transcription/preferences', preferences),
+  downloadTranscriptionModel: (id: TranscriptionModelId) =>
+    send<{ id: TranscriptionModelId; download: NonNullable<TranscriptionModelState['operation']> }>(
+      'POST',
+      `/api/transcription/models/${encodeURIComponent(id)}/download`,
+    ),
+  removeTranscriptionModel: (id: TranscriptionModelId) =>
+    send<{ ok: true }>('DELETE', `/api/transcription/models/${encodeURIComponent(id)}`),
   // Embedder ----------------------------------------------------
   getEmbedder: () => getJson<EmbedderState>('/api/embedder'),
 
@@ -273,6 +313,11 @@ export function versionedAssetUrl(name: string, version: string): string {
 
 export function derivedAssetUrl(name: string): string {
   return assetWindowPrefix('/asset-derived/') + encodePath(name);
+}
+
+export function audioPreviewAssetUrl(name: string, version = ''): string {
+  const url = assetWindowPrefix('/asset-audio-preview/') + encodePath(name);
+  return version ? `${url}?v=${encodeURIComponent(version)}` : url;
 }
 
 export function versionedDerivedAssetUrl(name: string, version: string): string {

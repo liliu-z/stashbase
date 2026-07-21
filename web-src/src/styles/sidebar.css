@@ -861,6 +861,10 @@
       color: var(--fg);
     }
 
+    .tree-row.file.preparation-cancelled {
+      color: var(--fg);
+    }
+
     .preparation-status-icon {
       width: 20px;
       height: 20px;
@@ -880,6 +884,11 @@
     .preparation-failure-icon {
       color: #9aa0a6;
       opacity: .9;
+    }
+
+    .preparation-cancelled-icon {
+      color: var(--muted);
+      opacity: .85;
     }
 
     .preparation-failure-icon .warning-mark-shape {

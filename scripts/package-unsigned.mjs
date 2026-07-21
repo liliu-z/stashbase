@@ -12,6 +12,7 @@ const claudeAgentSdkDir = path.join(root, 'node_modules', '@anthropic-ai', 'clau
 const args = process.argv.slice(2);
 const platform = args.includes('--linux') ? 'linux' : args.includes('--win') ? 'win' : 'mac';
 const skipSidecarBuild = args.includes('--skip-sidecar-build') || process.env.STASHBASE_SKIP_SIDECAR_BUILD === '1';
+const skipTranscriptionBuild = process.env.STASHBASE_SKIP_TRANSCRIPTION_BUILD === '1';
 const target = args.includes('--dir')
   ? ['dir']
   : platform === 'win'
@@ -28,6 +29,48 @@ const electronBuilderCli = path.join(
   'cli.js',
 );
 const pnpmListFallback = path.join(root, 'scripts', 'pnpm-list-for-electron-builder.mjs');
+const TRANSCRIPTION_TOOLCHAIN = JSON.parse(
+  fs.readFileSync(path.join(root, 'native', 'transcription', 'toolchain.json'), 'utf8'),
+);
+validateTranscriptionToolchain(TRANSCRIPTION_TOOLCHAIN);
+const EXPECTED_TRANSCRIPTION_BUILD = Object.freeze({
+  providerId: TRANSCRIPTION_TOOLCHAIN.providerId,
+  whisperCppVersion: TRANSCRIPTION_TOOLCHAIN.whisperCppVersion,
+  whisperCppCommit: TRANSCRIPTION_TOOLCHAIN.whisperCppCommit,
+  ggmlNative: TRANSCRIPTION_TOOLCHAIN.ggmlNative,
+  ggmlBlas: TRANSCRIPTION_TOOLCHAIN.ggmlBlas,
+  ffmpegVersion: TRANSCRIPTION_TOOLCHAIN.ffmpegVersion,
+  ffmpegLicense: TRANSCRIPTION_TOOLCHAIN.ffmpegLicense,
+  opusVersion: TRANSCRIPTION_TOOLCHAIN.opusVersion,
+  macosDeploymentTarget: TRANSCRIPTION_TOOLCHAIN.macosDeploymentTarget,
+  linuxGlibcBaseline: TRANSCRIPTION_TOOLCHAIN.linuxGlibcBaseline,
+  linuxGlibcxxBaseline: TRANSCRIPTION_TOOLCHAIN.linuxGlibcxxBaseline,
+});
+
+function validateTranscriptionToolchain(info) {
+  for (const field of [
+    'providerId',
+    'whisperCppVersion',
+    'whisperCppCommit',
+    'ffmpegVersion',
+    'ffmpegSha256',
+    'ffmpegLicense',
+    'opusVersion',
+    'opusSha256',
+    'macosDeploymentTarget',
+    'linuxGlibcBaseline',
+    'linuxGlibcxxBaseline',
+  ]) {
+    if (typeof info[field] !== 'string' || !info[field].trim()) {
+      throw new Error(`native/transcription/toolchain.json requires non-empty string ${field}`);
+    }
+  }
+  for (const field of ['ggmlNative', 'ggmlBlas']) {
+    if (typeof info[field] !== 'boolean') {
+      throw new Error(`native/transcription/toolchain.json requires boolean ${field}`);
+    }
+  }
+}
 
 function run(command, args, env = {}) {
   execFileSync(command, args, {
@@ -57,6 +100,7 @@ function clearQuarantine(extraCandidates = []) {
     'python/requirements.txt',
     'python/requirements-extract.txt',
     'python/sidecar.nosync',
+    'native/transcription/sidecar.nosync',
     'package.json',
     'package-lock.json',
     'node_modules',
@@ -158,16 +202,17 @@ function sidecarCandidates(name) {
 
 function targetRuntime() {
   if (platform === 'win') {
-    return { nodePlatform: 'win32', binaryFormat: 'pe', label: 'Windows' };
+    return { nodePlatform: 'win32', arch: 'x64', binaryFormat: 'pe', label: 'Windows' };
   }
   if (platform === 'linux') {
-    return { nodePlatform: 'linux', binaryFormat: 'elf', label: 'Linux' };
+    return { nodePlatform: 'linux', arch: 'x64', binaryFormat: 'elf', label: 'Linux' };
   }
-  return { nodePlatform: 'darwin', binaryFormat: 'macho', label: 'macOS' };
+  return { nodePlatform: 'darwin', arch: 'arm64', binaryFormat: 'macho', label: 'macOS' };
 }
 
 function hostMatchesTarget() {
-  return process.platform === targetRuntime().nodePlatform;
+  const runtime = targetRuntime();
+  return process.platform === runtime.nodePlatform && process.arch === runtime.arch;
 }
 
 function binaryFormat(file) {
@@ -246,6 +291,145 @@ function assertSidecarsForPlatform() {
   );
 }
 
+function transcriptionRoot() {
+  const runtime = targetRuntime();
+  return path.join(root, 'native', 'transcription', 'sidecar.nosync', `${runtime.nodePlatform}-${runtime.arch}`);
+}
+
+function transcriptionExecutable(name) {
+  return path.join(transcriptionRoot(), platform === 'win' ? `${name}.exe` : name);
+}
+
+function assertTranscriptionToolsForPlatform() {
+  const required = [
+    transcriptionExecutable('whisper-cli'),
+    transcriptionExecutable('ffmpeg'),
+    transcriptionExecutable('ffprobe'),
+    path.join(transcriptionRoot(), 'build-info.json'),
+    path.join(transcriptionRoot(), 'THIRD_PARTY_NOTICES.txt'),
+    path.join(transcriptionRoot(), 'LICENSE.whisper.cpp'),
+    path.join(transcriptionRoot(), 'COPYING.FFmpeg.LGPLv2.1'),
+    path.join(transcriptionRoot(), 'COPYING.FFmpeg.LGPLv3'),
+    path.join(transcriptionRoot(), 'LICENSE.Opus'),
+  ];
+  const missing = required.filter((file) => !fs.existsSync(file));
+  const empty = required.filter((file) => fs.existsSync(file) && fs.statSync(file).size === 0);
+  const binaries = [
+    [transcriptionExecutable('whisper-cli'), 'whisper-cli'],
+    [transcriptionExecutable('ffmpeg'), 'ffmpeg'],
+    [transcriptionExecutable('ffprobe'), 'ffprobe'],
+  ];
+  const issues = binaries
+    .filter(([file]) => fs.existsSync(file))
+    .map(([file, label]) => sidecarIssue(file, label))
+    .filter(Boolean);
+  issues.push(...empty.map((file) => `${path.relative(root, file)} is empty`));
+
+  if (missing.length === 0) {
+    try {
+      const info = JSON.parse(fs.readFileSync(path.join(transcriptionRoot(), 'build-info.json'), 'utf8'));
+      const expectedTarget = `${targetRuntime().nodePlatform}-${targetRuntime().arch}`;
+      if (info.target !== expectedTarget) issues.push(`build-info.json targets ${info.target}, expected ${expectedTarget}`);
+      for (const [field, expected] of Object.entries(EXPECTED_TRANSCRIPTION_BUILD)) {
+        const targetExpected = field === 'macosDeploymentTarget' && platform !== 'mac'
+          ? null
+          : (field === 'linuxGlibcBaseline' || field === 'linuxGlibcxxBaseline') && platform !== 'linux'
+            ? null
+            : expected;
+        if (info[field] !== targetExpected) {
+          issues.push(`build-info.json ${field} is ${JSON.stringify(info[field])}, expected ${JSON.stringify(targetExpected)}`);
+        }
+      }
+      const notices = fs.readFileSync(path.join(transcriptionRoot(), 'THIRD_PARTY_NOTICES.txt'), 'utf8');
+      for (const expectedNotice of [
+        `whisper.cpp ${EXPECTED_TRANSCRIPTION_BUILD.whisperCppVersion} (${EXPECTED_TRANSCRIPTION_BUILD.whisperCppCommit})`,
+        `FFmpeg ${EXPECTED_TRANSCRIPTION_BUILD.ffmpegVersion}`,
+        `libopus ${EXPECTED_TRANSCRIPTION_BUILD.opusVersion}`,
+      ]) {
+        if (!notices.includes(expectedNotice)) issues.push(`THIRD_PARTY_NOTICES.txt is missing ${expectedNotice}`);
+      }
+    } catch (err) {
+      issues.push(`build-info.json is invalid: ${err.message}`);
+    }
+  }
+
+  if (missing.length === 0 && issues.length === 0 && hostMatchesTarget()) {
+    try {
+      const version = execFileSync(transcriptionExecutable('ffmpeg'), ['-version'], {
+        encoding: 'utf8',
+        maxBuffer: 2 * 1024 * 1024,
+      });
+      if (version.includes('--enable-gpl') || version.includes('--enable-nonfree')) {
+        issues.push('ffmpeg enables GPL or nonfree components');
+      }
+      for (const flag of ['--disable-gpl', '--disable-nonfree', '--enable-libopus']) {
+        if (!version.includes(flag)) issues.push(`ffmpeg is missing required configure flag ${flag}`);
+      }
+      if (!version.includes(`ffmpeg version ${EXPECTED_TRANSCRIPTION_BUILD.ffmpegVersion}`)) {
+        issues.push(`ffmpeg runtime version is not ${EXPECTED_TRANSCRIPTION_BUILD.ffmpegVersion}`);
+      }
+      execFileSync(transcriptionExecutable('ffprobe'), ['-version'], { stdio: 'ignore' });
+      execFileSync(transcriptionExecutable('whisper-cli'), ['--help'], { stdio: 'ignore' });
+      if (platform === 'mac') {
+        for (const [file, label] of binaries) {
+          const output = execFileSync('otool', ['-l', file], { encoding: 'utf8' });
+          const versions = [...output.matchAll(/^\s*minos\s+(\S+)/gm)].map((match) => match[1]);
+          if (versions.length === 0) {
+            issues.push(`${label} has no LC_BUILD_VERSION minimum macOS version`);
+          } else if (versions.some((version) => compareDottedVersions(version, EXPECTED_TRANSCRIPTION_BUILD.macosDeploymentTarget) > 0)) {
+            issues.push(`${label} requires macOS ${versions.join(', ')}, above ${EXPECTED_TRANSCRIPTION_BUILD.macosDeploymentTarget}`);
+          }
+        }
+      } else if (platform === 'linux') {
+        assertLinuxTranscriptionAbi(binaries, issues);
+      }
+    } catch (err) {
+      issues.push(`native transcription tool smoke failed: ${err.message}`);
+    }
+  }
+
+  if (missing.length === 0 && issues.length === 0) return;
+  const hint = hostMatchesTarget()
+    ? 'Run `pnpm build:transcription-sidecar` before packaging.'
+    : `Build the ${targetRuntime().label} transcription sidecar on ${targetRuntime().label} before cross-packaging.`;
+  throw new Error(
+    `${platform} packaging requires a verified native transcription toolchain:\n` +
+      [
+        ...missing.map((file) => `missing ${path.relative(root, file)}`),
+        ...issues,
+      ].map((item) => `  - ${item}`).join('\n') +
+      `\n${hint}`,
+  );
+}
+
+function assertLinuxTranscriptionAbi(binaries, issues) {
+  for (const [file, label] of binaries) {
+    const output = execFileSync('objdump', ['-T', file], { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 });
+    for (const [family, baseline] of [
+      ['GLIBC', EXPECTED_TRANSCRIPTION_BUILD.linuxGlibcBaseline],
+      ['GLIBCXX', EXPECTED_TRANSCRIPTION_BUILD.linuxGlibcxxBaseline],
+    ]) {
+      const matches = [...output.matchAll(new RegExp(`${family}_(\\d+(?:\\.\\d+)+)`, 'g'))]
+        .map((match) => match[1]);
+      const required = matches.sort(compareDottedVersions).at(-1);
+      if (required && compareDottedVersions(required, baseline) > 0) {
+        issues.push(`${label} requires ${family}_${required}, above ${baseline}`);
+      }
+    }
+  }
+}
+
+function compareDottedVersions(left, right) {
+  const a = left.split('.').map(Number);
+  const b = right.split('.').map(Number);
+  const length = Math.max(a.length, b.length);
+  for (let index = 0; index < length; index++) {
+    const delta = (a[index] || 0) - (b[index] || 0);
+    if (delta !== 0) return delta;
+  }
+  return 0;
+}
+
 function assertRipgrepForPlatform() {
   if (!hostMatchesTarget()) return;
 
@@ -280,14 +464,18 @@ function assertClaudeAgentSdkForPlatform() {
   }
 }
 
-if (!hostMatchesTarget() || skipSidecarBuild) {
+if (!hostMatchesTarget()) {
   assertSidecarsForPlatform();
+  assertTranscriptionToolsForPlatform();
   assertRipgrepForPlatform();
   assertClaudeAgentSdkForPlatform();
   runScript('build');
 } else {
-  runScript('build:desktop');
+  runScript('build');
+  if (!skipSidecarBuild) runScript('build:python-sidecar');
+  if (!skipTranscriptionBuild) runScript('build:transcription-sidecar');
   assertSidecarsForPlatform();
+  assertTranscriptionToolsForPlatform();
   assertRipgrepForPlatform();
   assertClaudeAgentSdkForPlatform();
 }

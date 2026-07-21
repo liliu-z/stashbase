@@ -29,6 +29,23 @@ jobs:
         with:
           python-version: '3.13'
 
+      - uses: msys2/setup-msys2@v2
+        if: runner.os == 'Windows'
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            git
+            make
+            tar
+            xz
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-curl
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-nasm
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-pkgconf
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -66,15 +83,21 @@ jobs:
         if: runner.os == 'Windows'
         run: pnpm build:python-extract-sidecar
 
+      - name: Build Windows transcription sidecar
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: bash scripts/build-transcription-sidecar.sh
+
       - name: Build packaged Windows app
         if: runner.os == 'Windows'
         env:
           STASHBASE_REQUIRE_EXTRACT: '1'
           STASHBASE_SKIP_SIDECAR_BUILD: '1'
+          STASHBASE_SKIP_TRANSCRIPTION_BUILD: '1'
         run: pnpm dist:win
 
       - name: Smoke packaged Windows server
         if: runner.os == 'Windows'
         env:
           STASHBASE_REQUIRE_EXTRACT: '1'
-        run: node scripts/smoke-packaged-server.mjs --require-extract
+        run: node scripts/smoke-packaged-server.mjs --require-extract --require-transcription

@@ -1,24 +1,8 @@
-import { getScheduledConversion } from './conversion.ts';
+import { cancelConversionAndWait } from './conversion.ts';
 import { toSourcePath } from './folder.ts';
 
-export type InFlightFileAction = 'rename' | 'delete';
-
-export interface InFlightRouteError {
-  status: 409;
-  body: {
-    error: string;
-    code: 'CONVERSION_IN_FLIGHT';
-  };
-}
-
-export function inFlightFileOperationError(name: string, action: InFlightFileAction): InFlightRouteError | null {
-  if (getScheduledConversion(toSourcePath(name))?.state !== 'running') return null;
-  const verb = action === 'rename' ? 'Rename' : 'Delete';
-  return {
-    status: 409,
-    body: {
-      error: `This file is still processing. ${verb} it after processing finishes.`,
-      code: 'CONVERSION_IN_FLIGHT',
-    },
-  };
+/** File ownership operations cancel queued/running source and preview work,
+ * then wait for native processes to release the source before disk mutation. */
+export function prepareFileOperation(name: string): Promise<boolean> {
+  return cancelConversionAndWait(toSourcePath(name), 'file-operation');
 }

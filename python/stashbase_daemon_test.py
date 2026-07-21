@@ -7,6 +7,7 @@ import tempfile
 import types
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -15,6 +16,78 @@ with contextlib.redirect_stdout(io.StringIO()):
 
 
 class StashbaseDaemonTests(unittest.TestCase):
+    def test_index_listing_pages_past_1000_rows_without_primary_key_order(self) -> None:
+        try:
+            import milvus_lite  # noqa: F401
+        except ImportError:
+            self.skipTest("milvus_lite is not installed")
+
+        from milvus_lite.engine.collection import Collection
+        from mfs.store import ChunkRecord
+
+        class FakeEmbedder:
+            dimension = 3
+            model_name = "test-embedder"
+
+            def embed(self, texts):  # noqa: ANN001
+                return [[float(len(text)), 1.0, 0.0] for text in texts]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "library"
+            store_root = Path(tmp) / "store"
+            root.mkdir()
+            root_source = str(root)
+            # Keep the two flushed segments separate. Their local ordering is
+            # valid, but their combined physical ordering is not global PK
+            # ordering; that is the real shape that exposed the live bug.
+            with mock.patch.object(Collection, "_schedule_bg_maintenance", lambda self: None):
+                svc = stashbase_daemon.StashbaseStore(str(store_root))
+                store = svc._ensure_store(FakeEmbedder())
+                svc.bind_root(root_source, "openai", root_identity=root_source)
+                try:
+                    records = []
+                    # The first page ends on the lexicographically greatest id;
+                    # the final physical row has a smaller id. A primary-key
+                    # cursor therefore loses it when the storage response itself
+                    # is not primary-key ordered.
+                    physical_ids = [f"{n:04d}" for n in range(1, 1001)] + ["0000"]
+                    for chunk_id in physical_ids:
+                        note = root / f"note-{chunk_id}.md"
+                        content = f"# Note {chunk_id}\n"
+                        note.write_text(content, encoding="utf-8")
+                        records.append(ChunkRecord(
+                            id=chunk_id,
+                            source=str(note),
+                            parent_dir=root_source,
+                            chunk_index=0,
+                            start_line=1,
+                            end_line=1,
+                            chunk_text=content,
+                            dense_vector=[1.0, 0.0, 0.0],
+                            content_type="markdown",
+                            file_hash=stashbase_daemon.blake3(
+                                content.encode("utf-8")
+                            ).hexdigest(),
+                            is_dir=False,
+                            embed_status="complete",
+                            metadata={},
+                            account_id="",
+                        ))
+                    store.insert_chunks(records[:1000])
+                    stashbase_daemon._flush_store(store)
+                    store.insert_chunks(records[1000:])
+                    stashbase_daemon._flush_store(store)
+
+                    indexed = store.get_indexed_files(root_source + "/")
+                    self.assertEqual(set(indexed), {record.source for record in records})
+
+                    self.assertEqual(
+                        stashbase_daemon.op_status(svc, {"folder": root_source})["pending"],
+                        [],
+                    )
+                finally:
+                    svc.close_all()
+
     def test_filesystem_roots_keep_root_semantics(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             posix = stashbase_daemon.StashbaseStore(tmp)

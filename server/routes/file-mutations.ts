@@ -1,9 +1,9 @@
 import express from 'express';
 import { getApiKey } from '../app-config.ts';
-import { cancelConversion } from '../conversion.ts';
+import { queueConvertibleSource } from '../conversion-dispatch.ts';
 import { clearRecord } from '../conversion-status.ts';
 import { deleteDerivedForSource } from '../derived-store.ts';
-import { inFlightFileOperationError } from '../file-operation-guard.ts';
+import { prepareFileOperation } from '../file-operation-guard.ts';
 import { remapFileOrderPath, removeFileOrderPath } from '../file-order.ts';
 import {
   deleteFile,
@@ -16,17 +16,14 @@ import {
   sanitizeFilename,
 } from '../files.ts';
 import { getCurrentFolder, runWithFolderRoot, toSourcePath } from '../folder.ts';
-import { detectViewerFormat, isImageFile } from '../format.ts';
+import { detectViewerFormat, isConvertibleSource } from '../format.ts';
 import { sendError } from '../http.ts';
-import { maybeConvertImage } from '../image.ts';
 import { contentSizeError } from '../indexable.ts';
 import { applyRenamePlan, planRenameLinks, type RenameEntry } from '../links.ts';
 import { errorMessage, logger } from '../log.ts';
-import { maybeConvertPdf } from '../pdf.ts';
 import { bundleRenameEntry, renameWithRollback } from '../rename-helpers.ts';
 import { indexer } from '../state.ts';
 import { noteTreeChanged } from '../watcher.ts';
-import { maybeConvertDocx } from '../docx.ts';
 
 const log = logger('routes/file-mutations');
 
@@ -42,10 +39,8 @@ export function mountFileMutationRoutes(app: express.Express): void {
     if (!oldFormat) return res.status(415).json({ error: 'unsupported format' });
     const requestFolderRoot = getCurrentFolder();
     if (!requestFolderRoot) return res.status(412).json({ error: 'no folder open', code: 'NO_FOLDER' });
-    const inFlightError = inFlightFileOperationError(oldName, 'rename');
-    if (inFlightError) return res.status(inFlightError.status).json(inFlightError.body);
     const oldStructuredFormat = detectFormat(oldName);
-    const viewerOnly = !oldStructuredFormat && (oldFormat === 'pdf' || oldFormat === 'image' || oldFormat === 'docx');
+    const viewerOnly = !oldStructuredFormat && isConvertibleSource(oldName);
     let newName = requested;
     const requestedHasCompatibleExt = oldStructuredFormat
       ? detectFormat(newName) !== null
@@ -64,6 +59,9 @@ export function mountFileMutationRoutes(app: express.Express): void {
     if (pathExists(newName) && !isSameExistingPath(oldName, newName)) {
       return res.status(409).json({ error: 'target exists' });
     }
+    // Validate the mutation before cancelling expensive work. A typo or target
+    // collision must not discard a transcription the user did not move.
+    await prepareFileOperation(oldName);
     const oldDerivedArtifacts = derivedArtifactsForSource(oldName);
     const cascadeOn = req.body?.cascade !== false;
     const asyncIndex = req.body?.async_index === true;
@@ -91,7 +89,6 @@ export function mountFileMutationRoutes(app: express.Express): void {
         if (viewerOnly) {
           const oldSourceAbs = oldViewerSourceAbs!;
           const newSourceAbs = newViewerSourceAbs!;
-          cancelConversion(oldSourceAbs);
           clearRecord(oldSourceAbs);
           clearRecord(newSourceAbs);
           try { deleteDerivedForSource(oldSourceAbs); } catch (err: unknown) {
@@ -135,7 +132,6 @@ export function mountFileMutationRoutes(app: express.Express): void {
     if (asyncIndex) {
       try {
         renameOnDisk(oldName, newName);
-        if (oldViewerSourceAbs) cancelConversion(oldViewerSourceAbs);
       } catch (err: unknown) {
         sendError(res, err);
         return;
@@ -192,12 +188,10 @@ export function mountFileMutationRoutes(app: express.Express): void {
   app.delete('/api/files/*', async (req, res) => {
     const name = (req.params as any)[0] as string;
     try {
-      const inFlightError = inFlightFileOperationError(name, 'delete');
-      if (inFlightError) return res.status(inFlightError.status).json(inFlightError.body);
+      await prepareFileOperation(name);
       const sourceAbs = toSourcePath(name);
       const derivedArtifacts = derivedArtifactsForSource(name);
       const removed = deleteFile(name);
-      cancelConversion(sourceAbs);
       try { deleteDerivedForSource(sourceAbs); }
       catch (err: unknown) { log.warn(`delete: derived cleanup failed for ${name}: ${errorMessage(err)}`); }
       if (removed) {
@@ -260,9 +254,9 @@ function queueViewerConversion(
   logContext = 'rename',
 ): void {
   try {
-    if (format === 'pdf') maybeConvertPdf(sourceAbs);
-    else if (isImageFile(name)) maybeConvertImage(sourceAbs);
-    else if (format === 'docx') maybeConvertDocx(sourceAbs);
+    if (!queueConvertibleSource(sourceAbs, name)) {
+      log.warn(`${logContext}: no conversion owner for ${format ?? 'unknown'} source ${name}`);
+    }
   } catch (err: unknown) {
     log.warn(`${logContext}: conversion kickoff failed for ${name}: ${errorMessage(err)}`);
   }

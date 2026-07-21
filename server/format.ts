@@ -7,10 +7,10 @@
  *     the single source of truth and is indexed directly — markdown
  *     as-is; HTML via a cheap in-memory "→ heading markdown" optimization
  *     at MFS-feed time (`analyzeHtml`), NOT materialized to disk.
- *   - **Convertible** (`UNSTRUCTURED_SOURCE_EXTS`: pdf, images, docx): a
+ *   - **Convertible** (`UNSTRUCTURED_SOURCE_EXTS`: pdf, images, docx, audio): a
  *     converter extracts text into an AppData-derived representation. That
- *     text layer feeds search; PDFs/DOCX also use it for Agent text reading,
- *     while images remain the read/view source.
+ *     text layer feeds search; PDFs/DOCX/audio also use it for Agent text
+ *     reading, while images remain the read/view source.
  * So MFS only ever sees markdown; all format knowledge lives here / in
  * the converters, never in MFS.
  *
@@ -22,6 +22,20 @@
  * cycle that the packaged bundle can't resolve correctly.
  */
 
+import {
+  AUDIO_SOURCE_EXTENSIONS,
+  AUDIO_SOURCE_EXTENSION_ALTERNATION,
+  CONVERTIBLE_SOURCE_EXTENSION_ALTERNATION,
+  DOCX_EXTENSIONS,
+  DOCX_EXTENSION_ALTERNATION,
+  HTML_NOTE_EXTENSIONS,
+  IMAGE_SOURCE_EXTENSIONS,
+  IMAGE_SOURCE_EXTENSION_ALTERNATION,
+  LEGACY_DERIVED_SOURCE_EXTENSIONS,
+  MARKDOWN_NOTE_EXTENSIONS,
+  PDF_EXTENSIONS,
+  PDF_EXTENSION_ALTERNATION,
+} from '../shared/file-formats.ts';
 import { SEARCH_TYPE_CATEGORIES, type SearchTypeCategory } from '../shared/search-types.ts';
 
 /** Structured note formats — indexed directly (the file is the source). */
@@ -32,29 +46,29 @@ export type FileFormat = 'md' | 'html';
  *  viewable but searched via AppData-derived text. Kept
  *  distinct from `FileFormat` so the indexing pipeline (chunker, daemon
  *  upsert, scan_diff) only ever sees structured `md` / `html`. */
-export type ViewerFormat = FileFormat | 'pdf' | 'image' | 'docx';
+export type ViewerFormat = FileFormat | 'pdf' | 'image' | 'docx' | 'audio';
 
 /** Recognised note extensions and how the rest of the pipeline should
  *  treat them. Adding a format = one line here + a chunker + a viewer —
  *  every note / derived-note / bundle regex elsewhere derives from this
  *  list (via `NOTE_EXTS` and the `isNoteName` / `matchNoteStem` /
  *  `matchDerivedNote` helpers), so the extension set has a single home. */
-const NOTE_FORMATS: Array<{ exts: string[]; format: FileFormat }> = [
-  { exts: ['md', 'markdown'], format: 'md' },
-  { exts: ['html', 'htm'], format: 'html' },
+const NOTE_FORMATS: Array<{ exts: readonly string[]; format: FileFormat }> = [
+  { exts: MARKDOWN_NOTE_EXTENSIONS, format: 'md' },
+  { exts: HTML_NOTE_EXTENSIONS, format: 'html' },
 ];
 
 /** Every note extension (no leading dot), e.g. `['md','markdown','html','htm']`.
  *  Single source for the alternation baked into the regexes below. */
 export const NOTE_EXTS: readonly string[] = NOTE_FORMATS.flatMap((f) => f.exts);
 
-/** Convertible source extensions — PDFs (pdf_extract), images
- *  (ocr_extract), and DOCX (Mammoth HTML). Current derived text lives in AppData. The hidden
- *  sibling-note regex below remains for legacy cleanup/remap only. */
-const UNSTRUCTURED_SOURCE_EXTS = ['pdf', 'png', 'jpg', 'jpeg', 'webp', 'docx'] as const;
+/** Only formats that actually emitted sibling derived notes participate in
+ * compatibility hiding. Current converted output, including all audio
+ * transcripts, lives in AppData. */
+const LEGACY_DERIVED_SOURCE_EXTS = LEGACY_DERIVED_SOURCE_EXTENSIONS;
 
 const NOTE_EXT_ALT = NOTE_EXTS.join('|');
-const SRC_EXT_ALT = UNSTRUCTURED_SOURCE_EXTS.join('|');
+const SRC_EXT_ALT = LEGACY_DERIVED_SOURCE_EXTS.join('|');
 const NOTE_EXT_RE = new RegExp(`\\.(${NOTE_EXT_ALT})$`, 'i');
 /** Legacy `<dir>/.<sourceBasename>.md` — an app-derived hidden note, where
  *  `sourceBasename` is the full source filename incl. extension. Capture
@@ -99,11 +113,16 @@ export function matchNoteStem(rel: string): { dir: string; stem: string } | null
 /** Image extensions we OCR + view. Deliberately narrow for V1
  *  (png / jpg / jpeg / webp) — the OCR pipeline and viewer are tested
  *  against these; widen here when we add gif / heic / etc. */
-const IMAGE_PATTERN = /\.(png|jpe?g|webp)$/i;
+const PDF_PATTERN = new RegExp(`\\.(${PDF_EXTENSION_ALTERNATION})$`, 'i');
+const IMAGE_PATTERN = new RegExp(`\\.(${IMAGE_SOURCE_EXTENSION_ALTERNATION})$`, 'i');
+const DOCX_PATTERN = new RegExp(`\\.(${DOCX_EXTENSION_ALTERNATION})$`, 'i');
+const AUDIO_PATTERN = new RegExp(`\\.(${AUDIO_SOURCE_EXTENSION_ALTERNATION})$`, 'i');
+const CONVERTIBLE_SOURCE_PATTERN = new RegExp(`\\.(${CONVERTIBLE_SOURCE_EXTENSION_ALTERNATION})$`, 'i');
 
 const VIEWER_ONLY_FORMATS: Array<{ pattern: RegExp; format: ViewerFormat }> = [
-  { pattern: /\.pdf$/i, format: 'pdf' },
+  { pattern: PDF_PATTERN, format: 'pdf' },
   { pattern: IMAGE_PATTERN, format: 'image' },
+  { pattern: AUDIO_PATTERN, format: 'audio' },
 ];
 
 /** True for the image extensions the OCR pipeline handles. Used by the
@@ -115,25 +134,33 @@ export function isImageFile(name: string): boolean {
 
 export function isDocxFile(name: string): boolean {
   const base = pathBasename(name);
-  return /\.docx$/i.test(base) && !base.startsWith('~$') && !base.startsWith('.~');
+  return DOCX_PATTERN.test(base) && !base.startsWith('~$') && !base.startsWith('.~');
 }
 
-/** True for an unstructured **convertible source** (PDF or image) — files
+/** Audio sources accepted by the local transcription pipeline. Video
+ *  containers are deliberately excluded even when they carry audio. */
+export function isAudioFile(name: string): boolean {
+  return AUDIO_PATTERN.test(pathBasename(name));
+}
+
+/** True for an unstructured **convertible source** — files
  *  whose searchable text comes from an app-data derived note and are
  *  indexed under their own path. They are NOT directly index-readable
  *  (raw bytes would be garbage), so reconcile must not treat them as plain
  *  notes; it lets the conversion path own their index entry. */
 export function isConvertibleSource(name: string): boolean {
-  return /\.pdf$/i.test(name) || isImageFile(name) || isDocxFile(name);
+  const base = pathBasename(name);
+  if (!CONVERTIBLE_SOURCE_PATTERN.test(base)) return false;
+  // Office lock files share the `.docx` suffix but are never user documents.
+  return !DOCX_PATTERN.test(base) || isDocxFile(base);
 }
-
-const IMAGE_EXTS: readonly string[] = ['png', 'jpg', 'jpeg', 'webp'];
 
 const SEARCH_TYPE_EXTENSIONS: Record<SearchTypeCategory, readonly string[]> = {
   notes: NOTE_EXTS,
-  pdf: ['pdf'],
-  image: IMAGE_EXTS,
-  docx: ['docx'],
+  pdf: PDF_EXTENSIONS,
+  image: IMAGE_SOURCE_EXTENSIONS,
+  docx: DOCX_EXTENSIONS,
+  audio: AUDIO_SOURCE_EXTENSIONS,
 };
 
 /** Lowercase dot-prefixed source extensions for a set of search

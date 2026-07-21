@@ -48,8 +48,19 @@ export function sendError(res: express.Response, err: unknown): void {
  *  the path prefixes (/api/files, /api/folders, /api/search, …) that
  *  rely on `getCurrentFolder()` returning a value. Routes that work
  *  before a folder is open (welcome screen) stay outside the prefix. */
-export const requireFolder: express.RequestHandler = (_req, res, next) => {
+const FOLDER_EXPLICIT_ROUTES = new Set([
+  'POST /api/files/prepare',
+  'POST /api/files/reprocess',
+  'POST /api/files/cancel-preparation',
+]);
+
+export const requireFolder: express.RequestHandler = (req, res, next) => {
   if (!getCurrentFolder()) {
+    const route = `${req.method.toUpperCase()} ${req.baseUrl}${req.path}`;
+    const explicitFolder = req.body?.folder;
+    if (FOLDER_EXPLICIT_ROUTES.has(route) && typeof explicitFolder === 'string' && explicitFolder.trim()) {
+      return next();
+    }
     return res.status(412).json({ error: 'no folder open', code: 'NO_FOLDER' });
   }
   next();
@@ -70,7 +81,9 @@ export const withWindowContext: express.RequestHandler = (req, _res, next) => {
 };
 
 function assetWindowIdFromPath(reqPath: string): string | undefined {
-  const prefix = reqPath.startsWith('/asset-derived/__window/')
+  const prefix = reqPath.startsWith('/asset-audio-preview/__window/')
+    ? '/asset-audio-preview/__window/'
+    : reqPath.startsWith('/asset-derived/__window/')
     ? '/asset-derived/__window/'
     : reqPath.startsWith('/asset/__window/')
       ? '/asset/__window/'

@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type MouseEvent } from 'react';
+import { VIEWABLE_FILE_EXTENSION_ALTERNATION } from '../../../shared/file-formats.ts';
 import { BotIcon, ChevronDownIcon, ClaudeIcon } from '../icons';
 import type { FileMeta, FolderMeta } from '../api';
 import { FILE_MIME, FOLDER_MIME } from '../dragMime';
 import { useApp } from '../store/AppContext';
 import { getFileReadiness } from '../store/fileReadiness';
 import { RenameInput, useRenameTarget } from './RenameInput';
+
+const VIEWABLE_EXTENSION_RE = new RegExp(`\\.(${VIEWABLE_FILE_EXTENSION_ALTERNATION})$`, 'i');
 
 /** Where in a row the cursor is during dragover — drives the drop
  *  indicator + the action the drop triggers. `into` is folder-only
@@ -353,7 +356,7 @@ function FileRow({
   siblings,
 }: {
   path: string;
-  format: 'md' | 'html' | 'pdf' | 'image' | 'docx';
+  format: 'md' | 'html' | 'pdf' | 'image' | 'docx' | 'audio';
   paddingLeft: number;
   parent: string;
   siblings: string[];
@@ -373,19 +376,22 @@ function FileRow({
     `tree-row file format-${format}` +
     (isActive ? ' active' : '') +
     (readiness.preparationFailure ? ' preparation-failed' : '') +
+    (readiness.preparationCancellation ? ' preparation-cancelled' : '') +
     (dropEdge === 'above' ? ' drop-edge-above' : '') +
     (dropEdge === 'below' ? ' drop-edge-below' : '');
 
   const display = displayName(basename);
   const title = readiness.preparationFailure
     ? `File preparation failed; this file may not be searchable. ${path}`
+    : readiness.preparationCancellation
+      ? `File preparation was cancelled; this file is not searchable until reprocessed. ${path}`
     : path;
   // Protect the extension during inline rename for every recognised
   // format — notes (md/html) *and* the binary viewer formats (pdf +
   // images). Without the binaries here, editing "photo.png" exposes the
   // whole name and a user can drop ".png", which silently breaks format
   // detection (the row vanishes) and orphans the derived OCR note.
-  const extMatch = basename.match(/\.(md|markdown|html|htm|pdf|png|jpe?g|webp|docx)$/i);
+  const extMatch = basename.match(VIEWABLE_EXTENSION_RE);
   const ext = extMatch ? extMatch[0] : '';
 
   function onDragStart(e: DragEvent<HTMLDivElement>) {
@@ -523,8 +529,25 @@ function FileRow({
         >
           <WarningGlyph />
         </span>
+      ) : readiness.preparationCancellation ? (
+        <span
+          className="preparation-status-icon preparation-cancelled-icon"
+          aria-label="File preparation cancelled"
+          title="File preparation was cancelled. Reprocess it when you want searchable text."
+        >
+          <CancelledGlyph />
+        </span>
       ) : null}
     </div>
+  );
+}
+
+function CancelledGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M5.25 8h5.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
   );
 }
 
@@ -607,7 +630,7 @@ function NewFolderInput({ parentPath, depth }: { parentPath: string; depth: numb
 // 6px "PDF"/"MD" label did not. Each SVG keeps its native viewBox and
 // hard-coded brand fill, so the `.format-*` CSS colour rules no longer
 // apply to them (they targeted `currentColor`).
-function FileTypeIcon({ format }: { format: 'md' | 'html' | 'pdf' | 'image' | 'docx' }) {
+function FileTypeIcon({ format }: { format: 'md' | 'html' | 'pdf' | 'image' | 'docx' | 'audio' }) {
   if (format === 'image') {
     return (
       <svg viewBox="0 0 16 16">
@@ -635,6 +658,13 @@ function FileTypeIcon({ format }: { format: 'md' | 'html' | 'pdf' | 'image' | 'd
         <path fill="#2b579a" d="M6 3h13l7 7v19H6z" />
         <path fill="#fff" opacity=".9" d="M19 3v7h7z" />
         <path fill="#fff" d="M9 14h2.1l1 6 1.2-6H15l1.2 6 1-6H19l-1.7 9h-2l-1.1-5.7L13 23h-2z" />
+      </svg>
+    );
+  }
+  if (format === 'audio') {
+    return (
+      <svg viewBox="0 0 24 24">
+        <path fill="#8b5cf6" d="M5 9h2v6H5zm3-4h2v14H8zm3 2h2v10h-2zm3-5h2v20h-2zm3 6h2v8h-2z" />
       </svg>
     );
   }

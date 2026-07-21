@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode, type RefObject } from 'react';
+import { VIEWABLE_FILE_EXTENSION_ALTERNATION } from '../../../../shared/file-formats.ts';
 import { renderMarkdownInline } from '../../markdown';
 import { ChevronDownIcon, CopyIcon, EditIcon, FileGenericIcon } from '../../icons';
 import type { Attachment, Block, ToolBlock, ToolStatus } from './types';
@@ -328,7 +329,10 @@ function InlineUserMessageEditor({
 
 const USER_TEXT_CHAR_LIMIT = 300;
 const USER_TEXT_LINE_LIMIT = 4;
-const FILE_MENTION_RE = /(^|\s)@([^\n]*?\.(?:md|markdown|html|htm|pdf|docx|png|jpe?g|webp))(?![/.])/gi;
+const FILE_MENTION_RE = new RegExp(
+  `(^|\\s)@([^\\n]*?\\.(?:${VIEWABLE_FILE_EXTENSION_ALTERNATION}))(?![/.])`,
+  'gi',
+);
 
 function UserMessageText({ text }: { text: string }) {
   const [open, setOpen] = useState(false);

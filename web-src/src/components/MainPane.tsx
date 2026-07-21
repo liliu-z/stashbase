@@ -11,6 +11,7 @@ import { LazyLoadBoundary, lazyWithRetry } from './ErrorBoundary';
 const LazyMarkdownPreview = lazyWithRetry(() => import('./MarkdownPreview').then((mod) => ({ default: mod.MarkdownPreview })));
 const LazyPdfPreview = lazyWithRetry(() => import('./PdfPreview').then((mod) => ({ default: mod.PdfPreview })));
 const LazyDocxPreview = lazyWithRetry(() => import('./DocxPreview').then((mod) => ({ default: mod.DocxPreview })));
+const LazyAudioPreview = lazyWithRetry(() => import('./AudioPreview').then((mod) => ({ default: mod.AudioPreview })));
 const LazyCodeEditor = lazyWithRetry(() => import('./CodeEditor').then((mod) => ({ default: mod.CodeEditor })));
 
 /**
@@ -43,7 +44,7 @@ export function MainPane() {
           <div className="empty-doc">
             <p>
               Drop files or folders anywhere to stash them<br />
-              — Markdown, HTML, PDFs, images —<br />
+              — Markdown, HTML, PDFs, images, audio —<br />
               or click{' '}
               <button
                 type="button"
@@ -88,9 +89,16 @@ export function MainPane() {
           // Images, like PDFs, are binary — no edit mode.
           <ImagePreview name={cur.name} />
         )}
+        {cur && cur.format === 'audio' && (
+          <LazyLoadBoundary className="audio-preview-loading" label="audio preview" resetKey={resourceResetKey}>
+            <Suspense fallback={<div className="audio-preview-loading">Opening audio…</div>}>
+              <LazyAudioPreview name={cur.name} />
+            </Suspense>
+          </LazyLoadBoundary>
+        )}
         {cur && editMode && cur.format === 'md' && (
           // Markdown is the only editable format — HTML/PDF/image/DOCX are
-          // read-only viewers. The editor is a single CodeMirror pane
+          // read-only viewers, including audio. The editor is a single CodeMirror pane
           // (no source+preview split); save is scheduled on every edit.
           <div className="md-editor">
             <LazyLoadBoundary className="doc-loading" label="Markdown editor" resetKey={resourceResetKey}>

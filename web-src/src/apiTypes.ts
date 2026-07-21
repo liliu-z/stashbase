@@ -2,6 +2,29 @@
  * Renderer-facing request and response contracts for the local HTTP API.
  * These declarations have no runtime dependencies.
  */
+import type { ConversionProgress } from '../../shared/conversion.ts';
+import type {
+  AudioPreviewStatus,
+  AudioTranscript,
+  AudioTranscriptSegment,
+  AudioTranscriptState,
+  LocalTranscriptionModelId,
+  TranscriptionModelOperation,
+  TranscriptionModelState,
+  TranscriptionSettings,
+} from '../../shared/transcription.ts';
+export type { ConversionProgress } from '../../shared/conversion.ts';
+export type {
+  AudioPreviewStatus,
+  AudioTranscript,
+  AudioTranscriptSegment,
+  AudioTranscriptState,
+  LocalTranscriptionModelId,
+  TranscriptionModelOperation,
+  TranscriptionModelState,
+  TranscriptionSettings,
+} from '../../shared/transcription.ts';
+export type TranscriptionModelId = LocalTranscriptionModelId;
 
 /** Viewer format the renderer uses for tab routing. `md` / `html` are
  *  text formats loaded from `/api/files/*`; `pdf`, `image`, and `docx` load
@@ -9,7 +32,7 @@
  *  in the renderer, while its searchable/Agent-readable text and preview
  *  fallback live in AppData-derived HTML. This type is therefore wider than
  *  the server's editable text format on purpose. */
-export type FileFormat = 'md' | 'html' | 'pdf' | 'image' | 'docx';
+export type FileFormat = 'md' | 'html' | 'pdf' | 'image' | 'docx' | 'audio';
 
 export interface ApiKeySaveResult {
   hasKey: true;
@@ -91,6 +114,9 @@ export interface IndexStatus {
   /** Folder-relative paths of PDF/image/DOCX sources that are queued or
    *  running. Empty when no conversions are pending. */
   pendingConversions?: string[];
+  /** Incomplete convertible sources that cannot be queued until setup is
+   *  resolved (currently audio with an unavailable runtime/provider/model). */
+  blockedConversions?: string[];
   /** Folder-relative conversion progress keyed by visible source path.
    *  Used by PDF/image preview banners for queue/extraction/indexing copy. */
   conversionProgress?: Record<string, ConversionProgress>;
@@ -116,11 +142,6 @@ export interface IndexStatus {
   indexWarning?: IndexWarning | null;
 }
 
-export type ConversionProgress =
-  | { phase: 'queued'; lane: 'light' | 'heavy'; tasksAhead: number }
-  | { phase: 'extracting'; currentPage?: number }
-  | { phase: 'indexing' };
-
 export interface IndexWarning {
   message: string;
   at: string;
@@ -132,6 +153,7 @@ export interface PreparationFailure {
   path: string;
   lastError: string;
   attempts: number;
+  status?: 'failed' | 'cancelled';
 }
 
 /** Full file preparation status entries returned by `GET /api/pdf/status`.
@@ -196,6 +218,7 @@ export interface KeywordMatch {
   text: string;
   ranges: Array<[number, number]>;
   pdfPage?: number;
+  audioTimestampMs?: number;
 }
 
 export interface KeywordHitFile {
@@ -230,7 +253,6 @@ export interface McpHttpStatus {
   dockerError?: string;
   settingsError?: string;
 }
-
 
 export interface Agent {
   id: string;

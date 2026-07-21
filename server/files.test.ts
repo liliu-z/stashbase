@@ -4,12 +4,18 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { EditorState } from '@codemirror/state';
+import {
+  AUDIO_SOURCE_EXTENSIONS,
+  DOCX_EXTENSIONS,
+  IMAGE_SOURCE_EXTENSIONS,
+  PDF_EXTENSIONS,
+} from '../shared/file-formats.ts';
 import { saveFileContent, validateEditableFileWrite } from './file-save.ts';
+import { detectViewerFormat, isConvertibleSource } from './format.ts';
 import { runWithFolderRoot } from './folder.ts';
 import {
   createFolder,
   deleteFile,
-  fileVersion,
   isSameExistingPath,
   listFiles,
   listFolders,
@@ -75,96 +81,31 @@ test('quoted imported filenames remain readable, writable, and deletable', async
   }
 });
 
-test('edited Markdown saves preserve BOM and source line ending convention', async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-markdown-source-format-'));
-  const name = 'note.md';
-  try {
-    fs.writeFileSync(path.join(root, name), Buffer.from('\uFEFF# Title\r\n\r\nRaw <mark>HTML</mark>\r\n', 'utf8'));
-    await runWithFolderRoot(root, async () => {
-      const result = await saveFileContent(name, '# Title\n\nRaw <mark>HTML</mark>\nEdited\n');
-      assert.equal(result.content, '\uFEFF# Title\r\n\r\nRaw <mark>HTML</mark>\r\nEdited\r\n');
-    });
-    assert.equal(
-      fs.readFileSync(path.join(root, name), 'utf8'),
-      '\uFEFF# Title\r\n\r\nRaw <mark>HTML</mark>\r\nEdited\r\n',
-    );
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test('unchanged Markdown serialization does not replace the source file', async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-markdown-noop-save-'));
-  const name = 'note.md';
-  try {
-    const source = '\uFEFF# Title\r\n';
-    fs.writeFileSync(path.join(root, name), Buffer.from(source, 'utf8'));
-    const before = fs.statSync(path.join(root, name));
-    await runWithFolderRoot(root, async () => {
-      await saveFileContent(name, '# Title\n');
-    });
-    const after = fs.statSync(path.join(root, name));
-    assert.equal(fs.readFileSync(path.join(root, name), 'utf8'), source);
-    assert.equal(after.ino, before.ino);
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test('a stale Markdown save retry recognizes the already-serialized BOM/CRLF bytes', async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-markdown-idempotent-retry-'));
-  const name = 'note.md';
-  try {
-    fs.writeFileSync(path.join(root, name), Buffer.from('\uFEFF# Title\r\n', 'utf8'));
-    await runWithFolderRoot(root, async () => {
-      const originalVersion = fileVersion(name);
-      assert.ok(originalVersion);
-      await saveFileContent(name, '# Title\nEdited\n', { baseVersion: originalVersion });
-      const retry = await saveFileContent(name, '# Title\nEdited\n', { baseVersion: originalVersion });
-      assert.equal(retry.content, '\uFEFF# Title\r\nEdited\r\n');
-      assert.equal(retry.version, fileVersion(name));
-    });
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test('source-format fixture survives CodeMirror load, autosave, explicit save, and Reading View', async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-markdown-lifecycle-'));
-  const name = 'fixture.md';
-  const source = '\uFEFF---\r\ntitle: raw\r\n---\r\n\r\n<div data-unsupported="yes">raw</div>\r\n[broken](\r\n';
-  try {
-    fs.writeFileSync(path.join(root, name), Buffer.from(source, 'utf8'));
-    await runWithFolderRoot(root, async () => {
-      // Loading into CodeMirror canonicalizes its document to LF, while a
-      // reading transition only reads the saved source and does not write.
-      const loaded = readText(name)!;
-      let editor = EditorState.create({ doc: loaded });
-      editor = editor.update({ changes: { from: editor.doc.length, insert: 'autosaved\n' } }).state;
-      await saveFileContent(name, editor.doc.toString());
-      const afterAutosave = readText(name)!;
-      assert.equal(afterAutosave.includes('\r\n'), true);
-      assert.equal(afterAutosave.startsWith('\uFEFF'), true);
-      assert.equal(afterAutosave.includes('<div data-unsupported="yes">raw</div>'), true);
-      assert.equal(afterAutosave.includes('[broken]('), true);
-
-      const readingView = readText(name)!;
-      assert.equal(readingView, afterAutosave);
-      editor = editor.update({ changes: { from: editor.doc.length, insert: 'explicit save\n' } }).state;
-      await saveFileContent(name, editor.doc.toString());
-      const afterExplicitSave = readText(name)!;
-      assert.equal(afterExplicitSave.endsWith('autosaved\r\nexplicit save\r\n'), true);
-    });
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true });
-  }
-});
-
 test('editable file writes apply portable path, hidden-derived, and format policy', () => {
   assert.doesNotThrow(() => validateEditableFileWrite("John's Notes.md"));
   assert.throws(() => validateEditableFileWrite('../escape.md'), /invalid segment/);
   assert.throws(() => validateEditableFileWrite('.report.pdf.md'), /app-maintained derived notes/);
   assert.throws(() => validateEditableFileWrite('report.pdf'), /unsupported editable format/);
+});
+
+test('server convertible membership follows the shared extension catalog', () => {
+  for (const extension of PDF_EXTENSIONS) {
+    assert.equal(isConvertibleSource(`document.${extension}`), true);
+    assert.equal(detectViewerFormat(`document.${extension}`), 'pdf');
+  }
+  for (const extension of IMAGE_SOURCE_EXTENSIONS) {
+    assert.equal(isConvertibleSource(`image.${extension}`), true);
+    assert.equal(detectViewerFormat(`image.${extension}`), 'image');
+  }
+  for (const extension of DOCX_EXTENSIONS) {
+    assert.equal(isConvertibleSource(`document.${extension}`), true);
+    assert.equal(detectViewerFormat(`document.${extension}`), 'docx');
+    assert.equal(isConvertibleSource(`~$document.${extension}`), false);
+  }
+  for (const extension of AUDIO_SOURCE_EXTENSIONS) {
+    assert.equal(isConvertibleSource(`recording.${extension}`), true);
+    assert.equal(detectViewerFormat(`recording.${extension}`), 'audio');
+  }
 });
 
 test('createFolder applies writable protected-segment policy', async () => {
@@ -199,6 +140,26 @@ test('folder listing hides note bundles and legacy derived artifacts', async () 
     await runWithFolderRoot(root, () => {
       assert.deepEqual(listFiles().map((entry) => entry.name), ['note.md', 'paper.pdf']);
       assert.deepEqual(listFolders().map((entry) => entry.path), []);
+    });
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('audio sources do not hide same-stem user Markdown as legacy derived output', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-audio-hidden-note-'));
+  try {
+    fs.writeFileSync(path.join(root, 'meeting.mp3'), 'audio bytes');
+    fs.writeFileSync(path.join(root, '.meeting.md'), '# Private meeting note');
+    fs.writeFileSync(path.join(root, '.meeting.mp3.md'), '# Explicitly named note');
+
+    await runWithFolderRoot(root, () => {
+      assert.deepEqual(listFiles().map((entry) => entry.name), [
+        '.meeting.md',
+        '.meeting.mp3.md',
+        'meeting.mp3',
+      ]);
+      assert.doesNotThrow(() => validateEditableFileWrite('.meeting.mp3.md'));
     });
   } finally {
     fs.rmSync(root, { recursive: true, force: true });

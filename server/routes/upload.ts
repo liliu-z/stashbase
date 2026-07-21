@@ -15,13 +15,15 @@
 import express from 'express';
 import multer from 'multer';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import {
   detectFormat,
   pathExists,
   sanitizeFilename,
 } from '../files.ts';
-import { isDocxFile, isImageFile, isNoteName } from '../format.ts';
+import { isConvertibleSource, isNoteName } from '../format.ts';
 import { getApiKey } from '../app-config.ts';
 import { normalizeFolderRelativePath } from '../folder-relative-path.ts';
 import { errorMessage, logger } from '../log.ts';
@@ -33,21 +35,33 @@ import {
   WINDOW_ID_HEADER,
 } from '../folder.ts';
 import { filesystemPath } from '../filesystem-path.ts';
-import { maybeConvertImage } from '../image.ts';
-import { maybeConvertPdf } from '../pdf.ts';
-import { maybeConvertDocx } from '../docx.ts';
+import { publishStagedImport, recoverInterruptedPublication } from '../import-publication.ts';
+import { queueConvertibleSource } from '../conversion-dispatch.ts';
 import { indexer } from '../state.ts';
 import { noteTreeChanged } from '../watcher.ts';
 
 const log = logger('routes/upload');
 
-// In-memory upload buffer. Bumped beyond the original 8 MB / 50-file
-// limits to accommodate "Save Page As Complete" bundles (arxiv HTML
-// pulls in dozens of figures + CSS) and large PDFs before the async
-// extractor takes over.
-const MAX_UPLOAD_FILE_BYTES = 512 * 1024 * 1024;
+// Multipart bodies stream into an app-owned OS-temp staging directory. This
+// keeps long PCM recordings and PDFs out of both renderer and server heaps;
+// the generous cap is a disk-safety boundary rather than a memory boundary.
+export const MAX_UPLOAD_FILE_BYTES = 8 * 1024 * 1024 * 1024;
+const UPLOAD_TEMP_ROOT = path.join(os.tmpdir(), 'stashbase-upload');
+const UPLOAD_STALE_MAX_AGE_MS = 24 * 60 * 60_000;
 const uploadParser = multer({
-  storage: multer.memoryStorage(),
+  storage: multer.diskStorage({
+    destination: (_req, _file, callback) => {
+      try {
+        fs.mkdirSync(UPLOAD_TEMP_ROOT, { recursive: true, mode: 0o700 });
+        callback(null, UPLOAD_TEMP_ROOT);
+      } catch (err) {
+        callback(err as Error, UPLOAD_TEMP_ROOT);
+      }
+    },
+    filename: (_req, _file, callback) => {
+      callback(null, `${process.pid}-${Date.now()}-${randomUUID()}.upload`);
+    },
+  }),
   limits: { fileSize: MAX_UPLOAD_FILE_BYTES, files: 500 },
 });
 
@@ -72,12 +86,19 @@ function resolveUploadFolder(explicitFolder: string): string {
 }
 
 export function mount(app: express.Express): void {
+  cleanupStaleUploads();
   app.post('/api/upload', (req, res, next) => {
     uploadParser.array('files', 500)(req, res, (err: unknown) => {
       if (err) {
+        cleanupUploadedFiles((req.files as Express.Multer.File[]) ?? []);
         sendUploadError(res, err);
         return;
       }
+      const controller = new AbortController();
+      const abort = () => controller.abort(new Error('upload request closed'));
+      const abortOnPrematureClose = () => { if (!res.writableEnded) abort(); };
+      req.once('aborted', abort);
+      res.once('close', abortOnPrematureClose);
       void (async () => {
         // Multer consumes the request body stream, and its callbacks run in the
         // connection-time async context — which drops the windowId that
@@ -87,17 +108,67 @@ export function mount(app: express.Express): void {
         // DEFAULT_WINDOW_ID and the upload fails with "no folder open" even
         // though the client sent the right window header. Re-establish the
         // context from the header before doing any per-window work.
-        await runWithWindowId(req.header(WINDOW_ID_HEADER), () => handleUpload(req, res));
-      })().catch(next);
+        await runWithWindowId(
+          req.header(WINDOW_ID_HEADER),
+          () => handleUpload(req, res, controller.signal),
+        );
+      })().catch((caught: unknown) => {
+        if (!controller.signal.aborted) next(caught);
+      }).finally(() => {
+        req.removeListener('aborted', abort);
+        res.removeListener('close', abortOnPrematureClose);
+      });
     });
   });
+}
+
+/** Reclaim crash residue without touching a live server's current streams.
+ * PID liveness handles immediate restart; the age bound handles PID reuse and
+ * platforms where a liveness probe cannot distinguish another user's process. */
+export function cleanupStaleUploads(
+  root = UPLOAD_TEMP_ROOT,
+  maxAgeMs = UPLOAD_STALE_MAX_AGE_MS,
+  now = Date.now(),
+): void {
+  let entries: fs.Dirent[];
+  try { entries = fs.readdirSync(root, { withFileTypes: true }); } catch { return; }
+  const candidates = entries
+    .filter((entry) => entry.isFile())
+    // Recover a publication before removing the staging file it owns.
+    .sort((left, right) => Number(right.name.endsWith('.publication.json')) - Number(left.name.endsWith('.publication.json')));
+  for (const entry of candidates) {
+    const match = /^(\d+)-\d+-[0-9a-f-]+\.upload(?:\.publication\.json)?$/i.exec(entry.name);
+    if (!match) continue;
+    const abs = path.join(root, entry.name);
+    try {
+      const pid = Number(match[1]);
+      const staleByAge = now - fs.statSync(abs).mtimeMs > maxAgeMs;
+      if (staleByAge || !processIsAlive(pid)) {
+        if (entry.name.endsWith('.publication.json')) recoverInterruptedPublication(abs);
+        else fs.rmSync(abs, { force: true });
+      }
+    } catch (err: unknown) {
+      log.warn(`upload staging cleanup failed for ${entry.name}: ${errorMessage(err)}`);
+    }
+  }
+}
+
+function processIsAlive(pid: number): boolean {
+  if (!Number.isSafeInteger(pid) || pid <= 0) return false;
+  if (pid === process.pid) return true;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err: unknown) {
+    return (err as NodeJS.ErrnoException)?.code === 'EPERM';
+  }
 }
 
 function sendUploadError(res: express.Response, err: unknown): void {
   if (err instanceof multer.MulterError) {
     const status = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
     const message = err.code === 'LIMIT_FILE_SIZE'
-      ? `file is too large to upload (max ${Math.floor(MAX_UPLOAD_FILE_BYTES / 1024 / 1024)} MB)`
+      ? `file is too large to import (max ${Math.floor(MAX_UPLOAD_FILE_BYTES / 1024 / 1024 / 1024)} GiB)`
       : err.code === 'LIMIT_FILE_COUNT'
         ? 'too many files in one upload'
         : err.message;
@@ -117,24 +188,32 @@ function pathExistsInFolder(folderRoot: string, relPath: string): boolean {
   }
 }
 
-function saveBytesInFolder(folderRoot: string, relPath: string, bytes: Buffer): string {
-  validateUploadPath(relPath);
-  const target = filesystemPath.resolveUnder(folderRoot, relPath, { access: 'creatable' });
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  filesystemPath.resolveUnder(folderRoot, relPath, { access: 'creatable' });
-  const tmp = path.join(path.dirname(target), `.${path.basename(target)}.${process.pid}.${Date.now()}.tmp`);
+async function handleUpload(
+  req: express.Request,
+  res: express.Response,
+  signal: AbortSignal,
+): Promise<void> {
+  const files = (req.files as Express.Multer.File[]) ?? [];
   try {
-    fs.writeFileSync(tmp, bytes);
-    fs.renameSync(tmp, target);
-  } catch (err) {
-    try { fs.rmSync(tmp, { force: true }); } catch { /* best-effort */ }
-    throw err;
+    await processUploadedFiles(req, res, files, signal);
+  } finally {
+    cleanupUploadedFiles(files);
   }
-  return target;
 }
 
-async function handleUpload(req: express.Request, res: express.Response): Promise<void> {
-  const files = (req.files as Express.Multer.File[]) ?? [];
+function cleanupUploadedFiles(files: Express.Multer.File[]): void {
+  for (const file of files) {
+    if (!file.path) continue;
+    try { fs.rmSync(file.path, { force: true }); } catch { /* best-effort staging cleanup */ }
+  }
+}
+
+async function processUploadedFiles(
+  req: express.Request,
+  res: express.Response,
+  files: Express.Multer.File[],
+  signal: AbortSignal,
+): Promise<void> {
   if (files.length === 0) { res.status(400).json({ error: 'no files' }); return; }
   const explicitFolder = typeof req.body?.folder === 'string' && req.body.folder.trim()
     ? req.body.folder.trim()
@@ -175,9 +254,7 @@ async function handleUpload(req: express.Request, res: express.Response): Promis
 
   const out: { file: string; error?: string }[] = [];
   const toIndex: { name: string; sourcePath: string; text: string }[] = [];
-  const toConvertPdf: { abs: string; rel: string }[] = [];
-  const toOcrImage: { abs: string; rel: string }[] = [];
-  const toConvertDocx: { abs: string; rel: string }[] = [];
+  const toConvert: { abs: string; rel: string }[] = [];
   for (let i = 0; i < files.length; i++) {
     const f = files[i];
     const name = finalNames[i];
@@ -188,32 +265,35 @@ async function handleUpload(req: express.Request, res: express.Response): Promis
       // shipped alongside an arxiv HTML) are needed by the iframe even
       // though they're not indexable. Only indexable formats go to
       // the indexer.
-      const savedAbs = saveBytesInFolder(folderAbs, name, f.buffer);
+      const textFormat = detectFormat(name) != null;
+      const published = await publishStagedImport({
+        folderRoot: folderAbs,
+        relativePath: name,
+        stagedPath: f.path,
+        signal,
+        captureIndexText: textFormat,
+      });
+      const savedAbs = published.path;
       out.push({ file: name });
-      if (detectFormat(name)) {
+      if (textFormat) {
         // Structured notes (Markdown / HTML) are saved and indexed
         // **exactly as dropped** — we never rewrite the user's file. Inline
         // `data:` resources stay inline (the preview renders them directly;
         // HTML's `analyzeHtml` flattens them out of the *indexed* text in
         // memory). This honours the "don't modify the opened folder" rule
         // now that any folder on disk can be opened in place.
-        const text = f.buffer.toString('utf8');
-        toIndex.push({ name, sourcePath: filesystemPath.join(folderRoot, name), text });
-      } else if (folderAbs && /\.pdf$/i.test(name)) {
-        // PDFs run through the PyMuPDF pipeline so the
-        // app gets AppData-derived Markdown + extracted assets, then pushes
-        // the derived text into the index when semantic indexing is available.
-        toConvertPdf.push({ abs: savedAbs, rel: name });
-      } else if (folderAbs && isImageFile(name)) {
-        // Images run through RapidOCR so any text in a screenshot /
-        // photo becomes AppData-derived OCR Markdown for search.
-        toOcrImage.push({ abs: savedAbs, rel: name });
-      } else if (folderAbs && isDocxFile(name)) {
-        // DOCX is converted to AppData-derived semantic HTML for preview,
-        // search, and Agent reads. The source .docx stays unchanged.
-        toConvertDocx.push({ abs: savedAbs, rel: name });
+        if (published.indexText !== undefined) {
+          toIndex.push({ name, sourcePath: filesystemPath.join(folderRoot, name), text: published.indexText });
+        } else if (published.indexSkipReason) {
+          log.info(`upload: imported ${name} without indexing: ${published.indexSkipReason}`);
+        }
+      } else if (folderAbs && isConvertibleSource(name)) {
+        // The shared dispatcher owns PDF/OCR/DOCX/audio scheduling so import,
+        // rename, move, and folder rediscovery cannot drift by format.
+        toConvert.push({ abs: savedAbs, rel: name });
       }
     } catch (err: unknown) {
+      if (signal.aborted) throw signal.reason ?? err;
       log.warn(`upload: save failed for ${name}: ${errorMessage(err)}`);
       out.push({ file: name, error: errorMessage(err) });
     }
@@ -238,14 +318,9 @@ async function handleUpload(req: express.Request, res: express.Response): Promis
   // failures internally; guard only against a synchronous throw at
   // kickoff (the response is already sent, so it'd otherwise be an
   // unhandled error) — same discipline as the index loop above.
-  for (const { abs, rel } of toConvertPdf) {
-    try { maybeConvertPdf(abs); } catch (err: unknown) { log.warn(`upload: pdf convert kickoff failed for ${rel}: ${errorMessage(err)}`); }
-  }
-  for (const { abs, rel } of toOcrImage) {
-    try { maybeConvertImage(abs); } catch (err: unknown) { log.warn(`upload: image OCR kickoff failed for ${rel}: ${errorMessage(err)}`); }
-  }
-  for (const { abs, rel } of toConvertDocx) {
-    try { maybeConvertDocx(abs, { urgency: 'interactive' }); } catch (err: unknown) { log.warn(`upload: docx convert kickoff failed for ${rel}: ${errorMessage(err)}`); }
+  for (const { abs, rel } of toConvert) {
+    try { queueConvertibleSource(abs, rel, { urgency: 'interactive' }); }
+    catch (err: unknown) { log.warn(`upload: conversion kickoff failed for ${rel}: ${errorMessage(err)}`); }
   }
 }
 

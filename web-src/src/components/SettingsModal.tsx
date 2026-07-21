@@ -13,11 +13,13 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { EmbeddingPanel } from './settings/EmbeddingPanel';
 import { McpClientsPanel } from './settings/McpClientsPanel';
+import { TranscriptionPanel } from './settings/TranscriptionPanel';
 
-export type SettingsSection = 'embedding' | 'mcp';
+export type SettingsSection = 'embedding' | 'transcription' | 'mcp';
 
 const SECTIONS: { id: SettingsSection; label: string; render: () => ReactNode }[] = [
   { id: 'embedding', label: 'Embedding', render: () => <EmbeddingPanel /> },
+  { id: 'transcription', label: 'Transcription', render: () => <TranscriptionPanel /> },
   { id: 'mcp', label: 'MCP', render: () => <McpClientsPanel /> },
 ];
 

@@ -46,7 +46,8 @@ function basenameOfPath(path: string): string {
 }
 
 function folderIndexSnapshot(status: IndexStatus): FolderIndexSnapshot {
-  const hasError = status.indexWarning || (status.preparationFailures?.length ?? 0) > 0;
+  const hasError = status.indexWarning
+    || (status.preparationFailures?.some((problem) => problem.status !== 'cancelled') ?? false);
   const pending = status.pendingCount ?? 0;
   const converting = status.pendingConversions?.length ?? 0;
   const total = Math.max(0, status.total ?? 0);

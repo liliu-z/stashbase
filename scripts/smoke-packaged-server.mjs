@@ -171,6 +171,37 @@ function requestText(port, requestPath, timeoutMs, options = {}) {
   });
 }
 
+function requestBytes(port, requestPath, timeoutMs, options = {}) {
+  return new Promise((resolve) => {
+    const req = http.request(
+      {
+        host: '127.0.0.1',
+        port,
+        path: requestPath,
+        method: options.method ?? 'GET',
+        timeout: timeoutMs,
+        headers: options.headers ?? {},
+      },
+      (res) => {
+        const chunks = [];
+        res.on('data', (chunk) => chunks.push(chunk));
+        res.on('end', () => resolve({
+          ok: true,
+          statusCode: res.statusCode ?? 0,
+          headers: res.headers,
+          body: Buffer.concat(chunks),
+        }));
+      },
+    );
+    req.on('error', () => resolve({ ok: false, statusCode: 0, headers: {}, body: Buffer.alloc(0) }));
+    req.on('timeout', () => {
+      req.destroy();
+      resolve({ ok: false, statusCode: 0, headers: {}, body: Buffer.alloc(0) });
+    });
+    req.end();
+  });
+}
+
 async function requestOk(port, timeoutMs) {
   const res = await requestJson(port, '/api/folder', timeoutMs);
   return res.ok && res.statusCode >= 200 && res.statusCode < 500;
@@ -269,7 +300,7 @@ async function assertPackagedRendererWorkers(port) {
   console.log('[smoke] packaged renderer serves the DOCX worker asset from app.asar');
 }
 
-async function assertPackagedUserFlow(port, home) {
+async function assertPackagedUserFlow(port, home, options = {}) {
   const folderRoot = path.join(home, 'User Yuan Li', 'Documents', 'StashBase Demo');
   fs.mkdirSync(path.join(folderRoot, '项目 A', '子目录'), { recursive: true });
   fs.writeFileSync(path.join(folderRoot, 'README Windows.md'), '# Hello Windows\n\nkeyword-one body\n', 'utf8');
@@ -277,6 +308,7 @@ async function assertPackagedUserFlow(port, home) {
   fs.writeFileSync(path.join(folderRoot, 'page with space.html'), '<h1>HTML Test</h1> keyword-one', 'utf8');
   fs.writeFileSync(path.join(folderRoot, '项目 A', '子目录', 'deep.md'), '# Deep\n\nkeyword-three\n', 'utf8');
   writeDocxFixture(path.join(folderRoot, 'report smoke.docx'));
+  if (options.requireTranscription) writeWavFixture(path.join(folderRoot, 'transcription smoke.wav'));
 
   const opened = await requestApi(port, 'POST', '/api/folder', { path: folderRoot });
   if (opened?.current?.name !== 'StashBase Demo') {
@@ -286,7 +318,9 @@ async function assertPackagedUserFlow(port, home) {
   const listing = await requestApi(port, 'GET', '/api/files');
   const files = (listing?.files ?? []).map((file) => file.name).sort();
   const folders = (listing?.folders ?? []).map((folder) => folder.path).sort();
-  for (const expected of ['README Windows.md', 'page with space.html', 'report smoke.docx', '项目 A/测试 file.md', '项目 A/子目录/deep.md']) {
+  const expectedFiles = ['README Windows.md', 'page with space.html', 'report smoke.docx', '项目 A/测试 file.md', '项目 A/子目录/deep.md'];
+  if (options.requireTranscription) expectedFiles.push('transcription smoke.wav');
+  for (const expected of expectedFiles) {
     if (!files.includes(expected)) throw new Error(`file listing missing ${expected}: ${JSON.stringify(listing)}`);
   }
   for (const expected of ['项目 A', '项目 A/子目录']) {
@@ -325,6 +359,10 @@ async function assertPackagedUserFlow(port, home) {
     throw new Error('packaged DOCX preview contains an inline event handler');
   }
   console.log('[smoke] packaged DOCX worker converted a fixture from app.asar');
+
+  if (options.requireTranscription) {
+    await assertPackagedTranscriptionFlow(port);
+  }
 
   await requestApi(port, 'POST', '/api/folders', { path: 'New Folder' });
   const created = await requestApi(port, 'POST', '/api/files', {
@@ -369,6 +407,100 @@ async function assertPackagedUserFlow(port, home) {
   await requestApi(port, 'DELETE', `/api/files/${encodePath('项目 A/moved windows.md')}`);
   await requestApi(port, 'DELETE', `/api/folders/${encodePath('New Folder')}`);
   console.log('[smoke] packaged user file flow passed');
+}
+
+async function assertPackagedTranscriptionFlow(port) {
+  const settings = await requestApi(port, 'GET', '/api/transcription/settings');
+  const localProvider = settings?.providers?.find((provider) => provider.kind === 'local');
+  if (!localProvider) throw new Error(`packaged local transcription provider missing: ${JSON.stringify(settings)}`);
+  if (localProvider.runtimeError) {
+    throw new Error(`packaged transcription runtime unavailable: ${localProvider.runtimeError}`);
+  }
+  await requestApi(port, 'PUT', '/api/transcription/preferences', {
+    providerId: localProvider.id,
+    modelId: 'tiny',
+    language: 'en',
+  });
+  await requestApi(port, 'POST', '/api/transcription/models/tiny/download');
+
+  const downloadDeadline = Date.now() + 3 * 60_000;
+  let tiny = null;
+  while (Date.now() < downloadDeadline) {
+    const next = await requestApi(port, 'GET', '/api/transcription/settings');
+    tiny = next.providers?.find((provider) => provider.id === localProvider.id)
+      ?.models?.find((model) => model.id === 'tiny') ?? null;
+    if (tiny?.available) break;
+    if (tiny?.operation?.status === 'failed') {
+      throw new Error(`tiny transcription model download failed: ${tiny.operation.error}`);
+    }
+    await sleep(500);
+  }
+  if (!tiny?.available) throw new Error('tiny transcription model did not install within 3 minutes');
+
+  const transcriptDeadline = Date.now() + 3 * 60_000;
+  let transcriptState = null;
+  while (Date.now() < transcriptDeadline) {
+    transcriptState = await requestApi(
+      port,
+      'GET',
+      `/api/audio/transcript?path=${encodeURIComponent('transcription smoke.wav')}`,
+    );
+    if (transcriptState?.status === 'ready') break;
+    if (transcriptState?.status === 'failed' || transcriptState?.status === 'blocked') {
+      throw new Error(`packaged transcription failed: ${JSON.stringify(transcriptState)}`);
+    }
+    await sleep(500);
+  }
+  if (transcriptState?.status !== 'ready') {
+    throw new Error(`packaged transcription did not finish: ${JSON.stringify(transcriptState)}`);
+  }
+  if (
+    transcriptState.transcript?.provider?.model !== 'tiny'
+    || !transcriptState.transcript?.source?.contentHash
+  ) {
+    throw new Error(`packaged transcript metadata is incomplete: ${JSON.stringify(transcriptState)}`);
+  }
+
+  await requestApi(port, 'POST', '/api/audio/preview/prepare', { path: 'transcription smoke.wav' });
+  const preview = await requestBytes(
+    port,
+    `/asset-audio-preview/__window/packaged-smoke/${encodePath('transcription smoke.wav')}`,
+    15_000,
+  );
+  if (!preview.ok || preview.statusCode !== 200 || preview.body.length === 0) {
+    throw new Error(`packaged FFmpeg preview failed: status=${preview.statusCode} bytes=${preview.body.length}`);
+  }
+  if (!String(preview.headers['content-type'] ?? '').startsWith('audio/webm')) {
+    throw new Error(`packaged preview has unexpected content type: ${preview.headers['content-type']}`);
+  }
+  console.log('[smoke] packaged model download, FFmpeg decode/preview, and whisper.cpp inference passed');
+}
+
+function writeWavFixture(file) {
+  const sampleRate = 16_000;
+  const seconds = 2;
+  const sampleCount = sampleRate * seconds;
+  const dataBytes = sampleCount * 2;
+  const wav = Buffer.alloc(44 + dataBytes);
+  wav.write('RIFF', 0);
+  wav.writeUInt32LE(36 + dataBytes, 4);
+  wav.write('WAVE', 8);
+  wav.write('fmt ', 12);
+  wav.writeUInt32LE(16, 16);
+  wav.writeUInt16LE(1, 20);
+  wav.writeUInt16LE(1, 22);
+  wav.writeUInt32LE(sampleRate, 24);
+  wav.writeUInt32LE(sampleRate * 2, 28);
+  wav.writeUInt16LE(2, 32);
+  wav.writeUInt16LE(16, 34);
+  wav.write('data', 36);
+  wav.writeUInt32LE(dataBytes, 40);
+  for (let index = 0; index < sampleCount; index += 1) {
+    const envelope = Math.sin(Math.PI * index / sampleCount);
+    const sample = Math.round(Math.sin(2 * Math.PI * 440 * index / sampleRate) * envelope * 4_000);
+    wav.writeInt16LE(sample, 44 + index * 2);
+  }
+  fs.writeFileSync(file, wav);
 }
 
 function writeDocxFixture(file) {
@@ -581,6 +713,8 @@ const extractBin = findSidecarExecutable(resourcesPath, 'stashbase-extract');
 const requireExtract = args.includes('--require-extract')
   || process.env.STASHBASE_REQUIRE_EXTRACT === '1'
   || process.env.STASHBASE_BUILD_EXTRACT === '1';
+const requireTranscription = args.includes('--require-transcription')
+  || process.env.STASHBASE_REQUIRE_TRANSCRIPTION === '1';
 const rgPath = path.join(
   resourcesPath,
   'app.asar.unpacked',
@@ -655,7 +789,7 @@ try {
   });
   console.log('[smoke] packaged server responded');
   await assertPackagedRendererWorkers(port);
-  await assertPackagedUserFlow(port, home);
+  await assertPackagedUserFlow(port, home, { requireTranscription });
 } finally {
   if (child.exitCode == null) child.kill('SIGTERM');
   await Promise.race([

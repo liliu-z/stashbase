@@ -2331,6 +2331,153 @@
       padding: 12px 0;
     }
 
+    .settings-select {
+      min-width: 180px;
+      height: 34px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: var(--card);
+      color: var(--fg);
+      padding: 0 9px;
+      font: inherit;
+    }
+
+    .transcription-model-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .transcription-model-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 8px 14px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--card);
+    }
+
+    .transcription-model-row.selected { border-color: rgba(var(--accent-rgb), .55); }
+    .transcription-model-row label { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+    .transcription-model-row label > span { display: grid; }
+    .transcription-model-row small { color: var(--muted); font-size: 11px; }
+    .transcription-model-action { min-width: 104px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+    .transcription-model-error { grid-column: 1 / -1; }
+
+    .transcription-download-progress {
+      position: relative;
+      width: 104px;
+      height: 7px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: var(--hover);
+    }
+
+    .transcription-download-progress > span {
+      position: absolute;
+      inset: 0 auto 0 0;
+      border-radius: inherit;
+      background: var(--accent);
+      transition: width .2s linear;
+    }
+
+    .audio-preview {
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      background: var(--pane);
+    }
+
+    .audio-player-card {
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--card);
+    }
+
+    .audio-player-title {
+      margin-bottom: 10px;
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .audio-player-card audio { width: min(760px, 100%); display: block; }
+    .audio-player-hint { margin-top: 6px; color: var(--muted); font-size: 11px; display: flex; gap: 8px; align-items: center; }
+    .audio-player-hint.error { color: var(--danger); }
+    .audio-player-hint button { font-size: 11px; }
+    .audio-preview-progress { width: min(180px, 28vw); height: 6px; accent-color: var(--accent); }
+
+    .audio-transcript-pane {
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr);
+      padding: 18px 24px 24px;
+      overflow: hidden;
+    }
+
+    .audio-transcript-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .audio-transcript-meta { margin-left: 10px; color: var(--muted); font-size: 11px; }
+    .audio-retry-controls { display: flex; align-items: center; gap: 6px; }
+    .audio-retry-controls select,
+    .audio-retry-controls button,
+    .audio-transcript-state button {
+      height: 30px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--card);
+      color: var(--fg);
+      padding: 0 9px;
+      font: inherit;
+    }
+
+    .audio-transcript-state {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 7px;
+      background: rgba(var(--accent-rgb), .08);
+      color: #0e7490;
+    }
+
+    .audio-transcript-state.error { background: #fef2f2; color: var(--danger); }
+    .audio-segments { grid-row: 3; min-height: 0; overflow: auto; display: grid; align-content: start; gap: 3px; }
+    .audio-segment {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 68px minmax(0, 1fr);
+      gap: 12px;
+      padding: 8px 10px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--fg);
+      text-align: left;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .audio-segment:hover { background: var(--hover); }
+    .audio-segment.current { background: rgba(var(--accent-rgb), .1); }
+    .audio-segment-time { color: var(--accent); font-variant-numeric: tabular-nums; font-size: 12px; }
+    .audio-segment-text { line-height: 1.55; }
+    .audio-transcript-empty,
+    .audio-preview-loading { color: var(--muted); padding: 24px; }
+    .audio-transcript-empty { grid-row: 3; }
+
     /* Bottom-right stack of toast notifications. `fixed` so the stack
      * floats over scroll containers without being clipped; column-
      * reverse so the newest toast pops in below the existing ones

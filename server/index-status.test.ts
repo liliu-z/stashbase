@@ -14,6 +14,7 @@ test('index status conversion maps are scoped and folder-relative', () => {
     revision: 7,
     tasks: [
       { key: inside, state: 'queued', lane: 'heavy', tasksAhead: 2 },
+      { key: path.join(root, 'recordings', 'meeting.wav'), state: 'yielded', lane: 'heavy', tasksAhead: 1 },
       { key: outside, state: 'queued', lane: 'heavy', tasksAhead: 0 },
     ],
     versions: {
@@ -24,6 +25,7 @@ test('index status conversion maps are scoped and folder-relative', () => {
 
   assert.deepEqual(conversionProgressForFolder(root, snapshot as any), {
     'docs/paper.pdf': { phase: 'queued', lane: 'heavy', tasksAhead: 2 },
+    'recordings/meeting.wav': { phase: 'yielded', lane: 'heavy', tasksAhead: 1 },
   });
   assert.deepEqual(conversionVersionsForFolder(root, snapshot as any), {
     'docs/paper.pdf': 11,

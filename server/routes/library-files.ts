@@ -18,6 +18,7 @@ import { getLibraryInfo } from '../library-info.ts';
 import { sendError } from '../http.ts';
 import { getApiKey } from '../app-config.ts';
 import { isConversionTextUnavailable } from '../conversion.ts';
+import { isAudioTranscriptTextUnavailable } from '../audio-transcription.ts';
 import {
   normalizeLibrarySearchScope,
   requireLibraryStatusFolder,
@@ -73,7 +74,7 @@ export function mount(app: express.Express): void {
       // drives PDF page-marker resolution; absolute hits resolve regardless.
       const rawHits = await indexer.search(query, topK, folderRoot, pathPrefix);
       const hits = remapSearchHitsForDisplay(
-        rawHits.filter((hit) => !isConversionTextUnavailable(hit.fileName)),
+        rawHits.filter((hit) => !isConversionTextUnavailable(hit.fileName) && !isAudioTranscriptTextUnavailable(hit.fileName)),
         filesystemPath.absolute(getFolderHome()),
       );
       res.json({ hits });

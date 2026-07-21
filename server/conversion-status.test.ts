@@ -76,6 +76,11 @@ test('conversion progress and durable failures use filesystem path identity', as
   );
   assert.equal(status.listFailed()[0]?.entry.attempts, 6);
 
+  status.markCancelled(source);
+  assert.deepEqual(status.listFailed(), []);
+  assert.equal(status.listPreparationProblems()[0]?.entry.status, 'cancelled');
+  assert.equal(status.isPendingOrFailed(source), true);
+
   status.clearRecordsUnder(folderVariant);
   assert.equal(status.isPendingOrFailed(source), false);
   assert.deepEqual(status.listFailed(), []);

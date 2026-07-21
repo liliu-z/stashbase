@@ -24,7 +24,9 @@ jobs:
 
   linux-deb:
     needs: release-ci-gate
-    runs-on: ubuntu-latest
+    # This runner defines the oldest supported native ABI. The sidecar build
+    # also rejects symbols newer than toolchain.json's declared baseline.
+    runs-on: ubuntu-22.04
     env:
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && (startsWith(inputs.tag, 'v') && inputs.tag || format('v{0}', inputs.tag)) || github.event.release.tag_name }}
     steps:
@@ -52,19 +54,26 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install transcription build dependencies
+        run: sudo apt-get update && sudo apt-get install -y binutils cmake nasm pkg-config xz-utils
+
       - name: Build Linux Python sidecar
         run: pnpm build:python-extract-sidecar
+
+      - name: Build Linux transcription sidecar
+        run: pnpm build:transcription-sidecar
 
       - name: Build Debian package
         env:
           GH_TOKEN: ${{ github.token }}
           STASHBASE_REQUIRE_EXTRACT: '1'
+          STASHBASE_SKIP_TRANSCRIPTION_BUILD: '1'
         run: STASHBASE_SKIP_SIDECAR_BUILD=1 pnpm dist:linux
 
       - name: Smoke packaged Linux server
         env:
           STASHBASE_REQUIRE_EXTRACT: '1'
-        run: node scripts/smoke-packaged-server.mjs --require-extract
+        run: node scripts/smoke-packaged-server.mjs --require-extract --require-transcription
 
       - name: Upload Debian package to release
         env:

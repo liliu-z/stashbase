@@ -29,7 +29,8 @@ interface FolderActionDependencies {
 }
 
 function libraryStatusFromActiveFolder(state: State): LibraryFolderStatus {
-  if (state.indexWarning || state.preparationFailures.length > 0) return 'failed';
+  const hasPreparationFailure = state.preparationFailures.some((problem) => problem.status !== 'cancelled');
+  if (state.indexWarning || hasPreparationFailure || state.blockedConversions.length > 0) return 'failed';
   const semanticPending = state.embedderHasKey !== false && state.pendingSemanticNames.size > 0;
   if (state.syncRunning || semanticPending || state.pendingConversions.length > 0) return 'preparing';
   return 'ready';
@@ -88,6 +89,7 @@ export function useFolderActions(
     dispatch({ type: 'ACTIVE_FOLDER', path: '' });
     dispatch({ type: 'PENDING_SEMANTIC_NAMES', names: new Set() });
     dispatch({ type: 'PENDING_CONVERSIONS', paths: [] });
+    dispatch({ type: 'BLOCKED_CONVERSIONS', paths: [] });
     dispatch({ type: 'CONVERSION_PROGRESS', progress: {} });
     dispatch({ type: 'CONVERSION_SCHEDULER_STATE', revision: 0, versions: {} });
     dispatch({ type: 'INDEX_WARNING', warning: null });
@@ -267,4 +269,3 @@ export function useFolderActions(
 
   return { bootstrap, goHome, openFolder, openFolderByName };
 }
-

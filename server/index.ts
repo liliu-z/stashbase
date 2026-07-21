@@ -18,8 +18,6 @@
 import express from 'express';
 import fs from 'node:fs';
 import path from 'node:path';
-import { blake3 } from '@noble/hashes/blake3.js';
-import { bytesToHex } from '@noble/hashes/utils.js';
 import { fileURLToPath } from 'node:url';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { WebSocketServer } from 'ws';
@@ -38,12 +36,18 @@ import { bootBindAllFolders, reconcileLibraryFolders } from './state.ts';
 import { reapOrphanDaemons } from './stale-lock.ts';
 import { logger } from './log.ts';
 import { cancelAllConversions, setDerivedNoteIndexer } from './conversion.ts';
+import { cancelAllTranscriptionModelDownloads } from './transcription-models.ts';
+import {
+  initializeTranscriptionRuntime,
+  recoverTranscriptionRuntimeAfterServerBind,
+} from './transcription-runtime.ts';
 import { noteTreeChanged } from './watcher.ts';
 import { indexer } from './state.ts';
 import { closeStateDb } from './state-db.ts';
 import { requireFolder, withWindowContext } from './http.ts';
 import { mount as mountLibraryRoutes } from './routes/library.ts';
 import { mount as mountEmbedderRoutes } from './routes/embedder.ts';
+import { mount as mountTranscriptionRoutes } from './routes/transcription.ts';
 import { mount as mountFilesRoutes } from './routes/files.ts';
 import { mount as mountFoldersRoutes } from './routes/folders.ts';
 import { mount as mountUploadRoutes } from './routes/upload.ts';
@@ -54,12 +58,15 @@ import { mount as mountTerminalRoutes } from './routes/terminal.ts';
 import { mount as mountMcpRoutes } from './routes/mcp.ts';
 import { createMcpHttpService } from './mcp-http-service.ts';
 import { runShutdownCleanup } from './shutdown-cleanup.ts';
+import { blake3File } from './file-hash.ts';
 import { mount as mountSessionsRoutes } from './routes/sessions.ts';
 import { mount as mountCodexSessionsRoutes } from './routes/codex-sessions.ts';
 import { mount as mountAgentSessionsRoutes } from './routes/agent-sessions.ts';
 import { BUILT_IN_AGENT_ADAPTERS } from './agent-adapters.ts';
 
 const log = logger('server');
+
+initializeTranscriptionRuntime();
 
 // Compatibility adapters preserve the established Claude SDK and Codex
 // app-server behaviour behind one panel contract.  Their native protocols
@@ -69,14 +76,22 @@ for (const adapter of BUILT_IN_AGENT_ADAPTERS) registerAgentAdapter(adapter);
 // Converters push their derived notes straight into the index on
 // completion — there is no fs-watcher intermediary anymore. Wired here
 // (not inside conversion.ts) to avoid a conversion ↔ state module cycle.
-setDerivedNoteIndexer(async (sourceAbs, derivedAbs) => {
+setDerivedNoteIndexer(async (sourceAbs, derivedAbs, boundSourceHash) => {
   if (!getApiKey()) return;
   // Derived text lives in app data; index it UNDER the source
   // PDF/image/DOCX path so folder-scoped search finds it. Stamp the SOURCE's
   // byte hash so the daemon's scan_diff (which hashes the source file) sees
   // it as unchanged rather than re-converting in a loop.
   const derivedContent = fs.readFileSync(derivedAbs, 'utf8');
-  const sourceHash = bytesToHex(blake3(fs.readFileSync(sourceAbs)));
+  let sourceHash = boundSourceHash;
+  if (!sourceHash) {
+    const beforeHash = fs.statSync(sourceAbs);
+    sourceHash = await blake3File(sourceAbs);
+    const afterHash = fs.statSync(sourceAbs);
+    if (beforeHash.size !== afterHash.size || beforeHash.mtimeMs !== afterHash.mtimeMs) {
+      throw new Error(`source changed while hashing converted content: ${sourceAbs}`);
+    }
+  }
   await indexer.upsertConvertedFile(filesystemPath.absolute(sourceAbs), derivedContent, sourceHash, path.extname(derivedAbs));
   noteTreeChanged();
 });
@@ -222,8 +237,8 @@ app.get('/api/health', (_req, res) => {
 // Static layer is mounted before the API routes for renderer bundle
 // requests, but data routes must bypass it entirely. In packaged asar
 // builds, serve-static can still issue directory-normalisation redirects
-// before "falling through"; `/api/*` and `/asset/*` must always reach the
-// route handlers below as-is.
+// before "falling through"; `/api/*`, `/asset/*`, and the dedicated audio
+// preview asset prefix must always reach the route handlers below as-is.
 if (!DEV_VITE) {
   if (fs.existsSync(path.join(WEB_BUILD_DIR, 'index.html'))) {
     const webStatic = express.static(WEB_BUILD_DIR, { redirect: false });
@@ -233,6 +248,8 @@ if (!DEV_VITE) {
         req.path.startsWith('/api/') ||
         req.path === '/asset' ||
         req.path.startsWith('/asset/') ||
+        req.path === '/asset-audio-preview' ||
+        req.path.startsWith('/asset-audio-preview/') ||
         req.path === '/mcp'
       ) {
         return next();
@@ -263,10 +280,13 @@ app.use([
   '/api/file-order',
   '/api/reveal',
   '/asset',
+  '/asset-audio-preview',
+  '/api/audio',
 ], requireFolder);
 
 // ----- mount routes -------------------------------------------------------
 mountEmbedderRoutes(app);
+mountTranscriptionRoutes(app);
 // Register exact `/api/files/prepare` and `/api/files/reprocess` endpoints
 // before the generic file-content wildcard routes.
 mountIndexingRoutes(app);
@@ -318,6 +338,17 @@ if (viteProxy) app.use(viteProxy);
 
 const server = app.listen(PORT, '127.0.0.1', () => {
   log.info(`listening on http://127.0.0.1:${PORT}`);
+  try {
+    const recovered = recoverTranscriptionRuntimeAfterServerBind();
+    if (recovered.modelDownloads.length || recovered.audioPreviews.length) {
+      log.info(
+        `reclaimed transcription crash residue: ${recovered.modelDownloads.length} model download(s), `
+        + `${recovered.audioPreviews.length} audio preview(s)`,
+      );
+    }
+  } catch (err: unknown) {
+    log.warn(`transcription crash recovery failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
   void mcpHttpService.start().catch((err: unknown) => {
     log.warn(`MCP HTTP startup failed: ${err instanceof Error ? err.message : String(err)}`);
   });
@@ -494,11 +525,15 @@ async function shutdown(reason: string): Promise<void> {
   try {
     await runShutdownCleanup({
       closeMcp: () => mcpHttpService.close(),
+      cancelModelDownloads: cancelAllTranscriptionModelDownloads,
       cancelConversions: cancelAllConversions,
       closeStateDb,
       closeIndexer: () => indexer.close(),
       onCancelled: (cancelled) => {
         if (cancelled.length) log.info(`shutdown: cancelled ${cancelled.length} conversion(s)`);
+      },
+      onModelDownloadsCancelled: (cancelled) => {
+        if (cancelled.length) log.info(`shutdown: cancelled ${cancelled.length} model download(s)`);
       },
       onError: (step, err) => {
         log.warn(`shutdown: ${step} cleanup failed: ${err instanceof Error ? err.message : String(err)}`);

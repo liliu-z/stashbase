@@ -5,8 +5,14 @@ import { rgPath } from '@vscode/ripgrep';
 import { analyzeHtml } from './html.ts';
 import { derivedHtmlPathForDocx } from './docx.ts';
 import { isConversionTextUnavailable } from './conversion.ts';
+import { isAudioTranscriptTextUnavailable } from './audio-transcription.ts';
 import { derivedNoteFor } from './derived-store.ts';
-import { isDocxFile, isImageFile } from './format.ts';
+import {
+  isAudioFile,
+  isConvertibleSource,
+  isDocxFile,
+  matchesSearchTypes,
+} from './format.ts';
 import { isCloudPlaceholderName, isIndexExcludedDirName } from './indexable.ts';
 import {
   type KeywordHitFile,
@@ -44,7 +50,7 @@ export async function runKeywordSearch(
   const types = opts.types ?? [];
   const wantsNotes = types.length === 0 || types.includes('notes');
   const wantsConvertible = types.length === 0
-    || types.some((t) => t === 'pdf' || t === 'image' || t === 'docx');
+    || types.some((type) => type !== 'notes');
   const empty: KeywordSearchResult = { files: [], totalMatches: 0, truncated: false };
   return mergeKeywordResults(
     wantsNotes ? await runRipgrep(query, folderRoot, opts) : empty,
@@ -157,11 +163,13 @@ function searchDerivedMarkdown(query: string, folderRoot: string, opts: KeywordS
         .filter(([start, end]) => !opts.wholeWord || hasWholeTokenBoundaries(line, start, end));
       if (ranges.length === 0) return;
       const snippet = snippetForLine(line, ranges);
+      const audioTimestampMs = isAudioFile(rel) ? audioTimestampForTranscriptLine(line) : null;
       matches.push({
         line: i + 1,
         text: snippet.text,
         ranges: snippet.ranges,
         ...(/\.pdf$/i.test(rel) ? { pdfPage: pdfPageForDerivedLine(lines, i + 1) } : {}),
+        ...(audioTimestampMs == null ? {} : { audioTimestampMs }),
       });
       fileMatches += ranges.length;
       total += ranges.length;
@@ -176,7 +184,7 @@ function searchDerivedMarkdown(query: string, folderRoot: string, opts: KeywordS
 }
 
 function readDerivedSearchText(rel: string, abs: string): string | null {
-  if (isConversionTextUnavailable(abs)) return null;
+  if (isConversionTextUnavailable(abs) || isAudioTranscriptTextUnavailable(abs)) return null;
   try {
     if (isDocxFile(rel)) {
       const raw = fs.readFileSync(derivedHtmlPathForDocx(abs), 'utf8');
@@ -204,7 +212,7 @@ function walkConvertibleSources(
     const abs = path.join(dir, ent.name);
     if (ent.isDirectory()) {
       walkConvertibleSources(abs, rel, fn);
-    } else if (ent.isFile() && (/\.pdf$/i.test(ent.name) || isImageFile(ent.name) || isDocxFile(ent.name))) {
+    } else if (ent.isFile() && isConvertibleSource(ent.name)) {
       fn(rel, abs);
     }
   }
@@ -213,11 +221,7 @@ function walkConvertibleSources(
 /** Category membership for the convertible-source walk. Empty types =
  *  every convertible category (`notes` never reaches this leg). */
 function convertibleMatchesTypes(rel: string, types: readonly SearchTypeCategory[]): boolean {
-  if (types.length === 0) return true;
-  if (/\.pdf$/i.test(rel)) return types.includes('pdf');
-  if (isImageFile(rel)) return types.includes('image');
-  if (isDocxFile(rel)) return types.includes('docx');
-  return false;
+  return matchesSearchTypes(rel, types);
 }
 
 function findLiteralRanges(line: string, query: string, caseSensitive: boolean): Array<[number, number]> {
@@ -244,7 +248,12 @@ export function snippetForLine(line: string, matchRanges: Array<[number, number]
     ));
   }
   const windowEnd = Math.min(line.length, windowStart + RG_MAX_LINE_CHARS);
-  const leading = windowStart > 0 ? '…' : '';
+  const timestampPrefix = windowStart > 0 ? transcriptTimestampPrefix(line) : '';
+  const leading = windowStart > 0
+    ? timestampPrefix && windowStart >= timestampPrefix.length
+      ? `${timestampPrefix.trimEnd()} … `
+      : '…'
+    : '';
   const trailing = windowEnd < line.length ? '…' : '';
   const text = leading + line.slice(windowStart, windowEnd) + trailing;
   const ranges: Array<[number, number]> = [];
@@ -259,6 +268,21 @@ export function snippetForLine(line: string, matchRanges: Array<[number, number]
     ]);
   }
   return { text, ranges };
+}
+
+function transcriptTimestampPrefix(line: string): string {
+  return line.match(/^\s*-\s*\[\d{1,3}:\d{2}:\d{2}(?:\.\d{1,3})?\]\s*/)?.[0] ?? '';
+}
+
+export function audioTimestampForTranscriptLine(line: string): number | null {
+  const match = line.match(/^\s*-\s*\[(\d{1,3}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?\]/);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const seconds = Number(match[3]);
+  if (minutes > 59 || seconds > 59) return null;
+  const millis = Number((match[4] ?? '').padEnd(3, '0')) || 0;
+  return ((hours * 3600) + (minutes * 60) + seconds) * 1000 + millis;
 }
 
 function pdfPageForDerivedLine(lines: string[], lineNumber: number): number | undefined {

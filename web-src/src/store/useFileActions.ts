@@ -1,4 +1,8 @@
 import { useCallback, type MutableRefObject } from 'react';
+import {
+  CONVERTIBLE_SOURCE_EXTENSION_ALTERNATION,
+  VIEWABLE_FILE_EXTENSION_ALTERNATION,
+} from '../../../shared/file-formats.ts';
 import { api, ApiError, errorMessage } from '../api';
 import { isFolderFileTab } from './appContextHelpers';
 import {
@@ -8,6 +12,9 @@ import {
   type State,
 } from './state';
 import type { ToastOptions } from './useFeedbackActions';
+
+const CONVERTIBLE_SOURCE_RE = new RegExp(`\\.(${CONVERTIBLE_SOURCE_EXTENSION_ALTERNATION})$`, 'i');
+const VIEWABLE_FILE_RE = new RegExp(`\\.(${VIEWABLE_FILE_EXTENSION_ALTERNATION})$`, 'i');
 
 type Dispatch = (action: Action) => void;
 type Toast = (message: string, opts?: ToastOptions) => string;
@@ -384,7 +391,7 @@ export function useFileActions(
       // conversion only after responding, so the immediate status poll can
       // otherwise briefly undercount pending PDF/image/DOCX work.
       const converting = (j.files || [])
-        .filter((x) => !x.error && /\.(pdf|png|jpe?g|webp|docx)$/i.test(x.file))
+        .filter((x) => !x.error && CONVERTIBLE_SOURCE_RE.test(x.file))
         .map((x) => x.file);
       if (converting.length) {
         // Protect the optimistic entries from being wiped by an index
@@ -420,7 +427,7 @@ export function useFileActions(
       // pdf + image + DOCX synthesized in `loadFile`). Opens at most ONE file,
       // so a batch drop doesn't explode into tabs.
       const first = j.files?.find(
-        (x) => !x.error && /\.(md|markdown|html|htm|pdf|png|jpe?g|webp|docx)$/i.test(x.file),
+        (x) => !x.error && VIEWABLE_FILE_RE.test(x.file),
       );
       // Pinned, not preview: a drop is a deliberate, committed gesture
       // (the double-click analog), so the imported file should stay open
@@ -451,4 +458,3 @@ export function useFileActions(
     upload,
   };
 }
-

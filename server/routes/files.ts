@@ -22,10 +22,7 @@ import { mountFileAssetRoutes } from './file-assets.ts';
 import { mountFileMutationRoutes } from './file-mutations.ts';
 import { mountFileOrderRoutes } from './file-order.ts';
 
-export {
-  inFlightFileOperationError,
-  type InFlightRouteError,
-} from '../file-operation-guard.ts';
+export { prepareFileOperation } from '../file-operation-guard.ts';
 export { saveFileContent, validateEditableFileWrite } from '../file-save.ts';
 
 export function fileHeadStatus(name: string): number {

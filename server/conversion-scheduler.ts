@@ -14,23 +14,46 @@ import {
 
 export type ConversionLane = 'light' | 'heavy';
 export type ConversionUrgency = 'interactive' | 'active-folder' | 'background';
-export type ScheduledConversionState = 'queued' | 'running';
+export type ScheduledConversionState = 'queued' | 'running' | 'yielded';
 export type ConversionCancellationReason =
   | 'source-change'
   | 'folder-removed'
   | 'shutdown'
+  | 'request-aborted'
+  | 'interactive-preview'
+  | 'user-request'
+  | 'file-operation'
+  | 'model-removed'
   | 'conversion-started';
 
+export interface ConversionRunContext {
+  signal: AbortSignal;
+  /**
+   * Cooperatively release this task's lane between durable work units.
+   * The same task identity and completion promise are retained while another
+   * queued task may run. Resolves after this task reacquires the lane, or
+   * rejects when cancellation retires it while yielded.
+   */
+  yieldLane: () => Promise<void>;
+}
+
 export interface ConversionJob {
-  /** Canonical absolute POSIX source path. */
+  /** Canonical absolute task identity. Normally the source path; auxiliary
+   *  work may use its derived output path so it can share the same lanes
+   *  without colliding with the source's text conversion. */
   key: string;
+  /** Source path used for subtree cancellation and active-folder priority. */
+  scope?: string;
+  /** Hidden tasks consume capacity and affect queue positions but do not
+   *  appear as user-visible source conversions in scheduler snapshots. */
+  visible?: boolean;
   lane: ConversionLane;
   urgency: ConversionUrgency;
   /** Lower values run first after urgency. */
   cost: number;
   /** Optional bounded preflight that refines cost while the task is queued. */
   classifyCost?: (signal: AbortSignal) => Promise<number>;
-  run: (signal: AbortSignal) => Promise<void>;
+  run: (context: ConversionRunContext) => Promise<void>;
   /** Runs synchronously after this task identity is retired. */
   onSettled?: () => void;
 }
@@ -78,6 +101,10 @@ interface Task extends ConversionJob {
   aged: boolean;
   classifierState: 'queued' | 'running' | 'done';
   controller: AbortController;
+  runStarted: boolean;
+  ownsLane: boolean;
+  cancelling: boolean;
+  resumeYield?: () => void;
   completion: Promise<void>;
   resolveCompletion: () => void;
   rejectCompletion: (error: unknown) => void;
@@ -85,6 +112,7 @@ interface Task extends ConversionJob {
 
 interface ClassifierRun {
   key: string;
+  scope: string;
   controller: AbortController;
   completion: Promise<void>;
 }
@@ -177,6 +205,9 @@ export class ConversionScheduler {
       aged: false,
       classifierState: job.classifyCost ? 'queued' : 'done',
       controller: new AbortController(),
+      runStarted: false,
+      ownsLane: false,
+      cancelling: false,
       completion,
       resolveCompletion,
       rejectCompletion,
@@ -191,7 +222,7 @@ export class ConversionScheduler {
 
   promote(key: string, urgency: ConversionUrgency): boolean {
     const task = this.tasks.get(this.identity(key));
-    if (!task || task.state !== 'queued') return false;
+    if (!task || task.state === 'running') return false;
     if (URGENCY_RANK[urgency] >= URGENCY_RANK[task.urgency]) return false;
     task.urgency = urgency;
     this.noteLaneChange(task.lane);
@@ -206,14 +237,14 @@ export class ConversionScheduler {
 
   hasUnder(prefix: string): boolean {
     for (const task of this.tasks.values()) {
-      if (this.paths.contains(prefix, task.key)) return true;
+      if (this.paths.contains(prefix, this.scopeOf(task))) return true;
     }
     return false;
   }
 
   hasRunningUnder(prefix: string): boolean {
     for (const task of this.tasks.values()) {
-      if (task.state === 'running' && this.paths.contains(prefix, task.key)) return true;
+      if (task.ownsLane && this.paths.contains(prefix, this.scopeOf(task))) return true;
     }
     return false;
   }
@@ -224,14 +255,19 @@ export class ConversionScheduler {
     const classifierCompletions = this.abortClassifierRuns(key, reason);
     if (!task && classifierCompletions.length === 0) return null;
     if (task) {
-      if (task.state === 'queued') {
+      if (!task.runStarted) {
         this.tasks.delete(identity);
         task.controller.abort(reason);
         task.resolveCompletion();
         this.noteLaneChange(task.lane, [task.key]);
         this.scheduleDrain();
       } else {
+        task.cancelling = true;
         task.controller.abort(reason);
+        // A yielded task has no active child work to deliver the abort. Wake
+        // its suspended run so yieldLane() can reject and normal retirement
+        // can settle the shared completion promise.
+        task.resumeYield?.();
         this.bump([task.key]);
       }
     }
@@ -246,10 +282,24 @@ export class ConversionScheduler {
   cancelUnder(prefix: string, reason?: ConversionCancellationReason): Array<{ key: string; completion: Promise<void> }> {
     const keys = new Set<string>();
     for (const task of this.tasks.values()) {
-      if (this.paths.contains(prefix, task.key)) keys.add(task.key);
+      if (this.paths.contains(prefix, this.scopeOf(task))) keys.add(task.key);
     }
     for (const run of this.classifierRuns) {
-      if (this.paths.contains(prefix, run.key)) keys.add(run.key);
+      if (this.paths.contains(prefix, run.scope)) keys.add(run.key);
+    }
+    return [...keys].map((key) => ({
+      key,
+      completion: this.cancel(key, reason) ?? Promise.resolve(),
+    }));
+  }
+
+  cancelScope(scope: string, reason?: ConversionCancellationReason): Array<{ key: string; completion: Promise<void> }> {
+    const keys = new Set<string>();
+    for (const task of this.tasks.values()) {
+      if (this.paths.equal(scope, this.scopeOf(task))) keys.add(task.key);
+    }
+    for (const run of this.classifierRuns) {
+      if (this.paths.equal(scope, run.scope)) keys.add(run.key);
     }
     return [...keys].map((key) => ({
       key,
@@ -270,7 +320,7 @@ export class ConversionScheduler {
 
   /** Notify the scheduler that its injected active-folder classifier changed. */
   prioritiesChanged(): void {
-    const queued = [...this.tasks.values()].filter((task) => task.state === 'queued');
+    const queued = [...this.tasks.values()].filter((task) => task.state !== 'running');
     if (queued.length === 0) return;
     this.bump(queued.map((task) => task.key));
     this.scheduleDrain();
@@ -285,11 +335,16 @@ export class ConversionScheduler {
         .filter((task) => task.lane === lane && task.state === 'running')
         .sort((a, b) => (a.startedAt ?? 0) - (b.startedAt ?? 0) || a.seq - b.seq);
       const queued = this.sortedQueued(lane);
-      tasks.push(...running.map((task) => this.publicTask(task)));
-      tasks.push(...queued.map((task, index) => ({
-        ...this.publicTask(task),
-        tasksAhead: running.length + index,
-      })));
+      tasks.push(...running
+        .filter((task) => task.visible !== false)
+        .map((task) => this.publicTask(task)));
+      tasks.push(...queued
+        .map((task, index) => ({ task, index }))
+        .filter(({ task }) => task.visible !== false)
+        .map(({ task, index }) => ({
+          ...this.publicTask(task),
+          tasksAhead: running.length + index,
+        })));
     }
     return {
       revision: this.revision,
@@ -313,13 +368,22 @@ export class ConversionScheduler {
   get(key: string): ScheduledConversion | null {
     const task = this.tasks.get(this.identity(key));
     if (!task) return null;
-    return this.snapshot().tasks.find((candidate) => candidate.key === task.key) ?? null;
+    const scheduled = this.publicTask(task);
+    if (task.state === 'running') return scheduled;
+    const runningAhead = [...this.tasks.values()]
+      .filter((candidate) => candidate.lane === task.lane && candidate.state === 'running')
+      .length;
+    const queuedIndex = this.sortedQueued(task.lane).indexOf(task);
+    return {
+      ...scheduled,
+      tasksAhead: runningAhead + Math.max(0, queuedIndex),
+    };
   }
 
   private effectiveUrgency(task: Task): ConversionUrgency {
     if (task.urgency === 'interactive') return 'interactive';
     if (task.urgency === 'active-folder') return 'active-folder';
-    if (this.isActive(task.key)) return 'active-folder';
+    if (this.isActive(this.scopeOf(task))) return 'active-folder';
     if (task.aged) return 'active-folder';
     return 'background';
   }
@@ -332,7 +396,7 @@ export class ConversionScheduler {
 
   private sortedQueued(lane: ConversionLane): Task[] {
     return [...this.tasks.values()]
-      .filter((task) => task.lane === lane && task.state === 'queued')
+      .filter((task) => task.lane === lane && task.state !== 'running' && !task.cancelling)
       .sort(this.compare);
   }
 
@@ -352,15 +416,27 @@ export class ConversionScheduler {
     while (this.running[lane] < this.capacity[lane]) {
       const task = this.sortedQueued(lane)[0];
       if (!task) return;
+      const resuming = task.state === 'yielded';
       task.state = 'running';
-      task.startedAt = this.now();
-      this.abortClassifierRuns(task.key, 'conversion-started');
+      task.ownsLane = true;
+      task.startedAt ??= this.now();
       this.running[lane] += 1;
       this.noteLaneChange(lane);
       this.scheduleClassifierDrain();
       this.scheduleAgeingCheck();
+      if (resuming) {
+        const resume = task.resumeYield;
+        task.resumeYield = undefined;
+        resume?.();
+        continue;
+      }
+      task.runStarted = true;
+      this.abortClassifierRuns(task.key, 'conversion-started');
       void Promise.resolve()
-        .then(() => task.run(task.controller.signal))
+        .then(() => task.run({
+          signal: task.controller.signal,
+          yieldLane: () => this.yieldLane(task),
+        }))
         .then(
           () => this.finish(task),
           (error) => this.finish(task, error),
@@ -372,7 +448,11 @@ export class ConversionScheduler {
     const identity = this.identity(task.key);
     if (this.tasks.get(identity) !== task) return;
     this.tasks.delete(identity);
-    this.running[task.lane] = Math.max(0, this.running[task.lane] - 1);
+    if (task.ownsLane) {
+      this.running[task.lane] = Math.max(0, this.running[task.lane] - 1);
+      task.ownsLane = false;
+    }
+    task.resumeYield = undefined;
     this.noteLaneChange(task.lane, [task.key]);
     if (error == null) task.resolveCompletion();
     else task.rejectCompletion(error);
@@ -380,6 +460,26 @@ export class ConversionScheduler {
     this.scheduleClassifierDrain();
     this.scheduleDrain();
     this.scheduleAgeingCheck();
+  }
+
+  private async yieldLane(task: Task): Promise<void> {
+    if (task.controller.signal.aborted) throw cancelledYieldError(task);
+    if (task.state !== 'running' || !task.ownsLane) {
+      throw new Error(`conversion task ${task.key} can only yield while it owns the ${task.lane} lane`);
+    }
+
+    let resume!: () => void;
+    const reacquired = new Promise<void>((resolve) => { resume = resolve; });
+    task.resumeYield = resume;
+    task.state = 'yielded';
+    task.ownsLane = false;
+    this.running[task.lane] = Math.max(0, this.running[task.lane] - 1);
+    this.noteLaneChange(task.lane);
+    this.scheduleDrain();
+    this.scheduleAgeingCheck();
+
+    await reacquired;
+    if (task.controller.signal.aborted) throw cancelledYieldError(task);
   }
 
   private scheduleClassifierDrain(): void {
@@ -421,7 +521,7 @@ export class ConversionScheduler {
         if (task.classifierState === 'running') task.classifierState = 'done';
         this.scheduleClassifierDrain();
       });
-    run = { key: task.key, controller, completion };
+    run = { key: task.key, scope: this.scopeOf(task), controller, completion };
     this.classifierRuns.add(run);
   }
 
@@ -442,7 +542,7 @@ export class ConversionScheduler {
     const now = this.now();
     const lanes = new Set<ConversionLane>();
     for (const task of this.tasks.values()) {
-      if (task.state !== 'queued' || task.urgency !== 'background' || task.aged) continue;
+      if (task.state === 'running' || task.urgency !== 'background' || task.aged) continue;
       if (now - task.queuedAt < this.ageingMs) continue;
       task.aged = true;
       lanes.add(task.lane);
@@ -458,7 +558,7 @@ export class ConversionScheduler {
     }
     let nextAt = Number.POSITIVE_INFINITY;
     for (const task of this.tasks.values()) {
-      if (task.state !== 'queued' || task.urgency !== 'background' || task.aged) continue;
+      if (task.state === 'running' || task.urgency !== 'background' || task.aged) continue;
       nextAt = Math.min(nextAt, task.queuedAt + this.ageingMs);
     }
     if (!Number.isFinite(nextAt)) return;
@@ -472,7 +572,7 @@ export class ConversionScheduler {
 
   private noteLaneChange(lane: ConversionLane, extraKeys: string[] = []): void {
     const affected = [...this.tasks.values()]
-      .filter((task) => task.lane === lane)
+      .filter((task) => task.lane === lane && task.visible !== false)
       .map((task) => task.key);
     this.bump([...affected, ...extraKeys]);
   }
@@ -487,6 +587,10 @@ export class ConversionScheduler {
   private identity(key: string): string {
     return this.paths.identity(key);
   }
+
+  private scopeOf(task: Pick<ConversionJob, 'key' | 'scope'>): string {
+    return task.scope ?? task.key;
+  }
 }
 
 function positiveInteger(value: number | undefined, fallback: number): number {
@@ -497,4 +601,9 @@ function positiveInteger(value: number | undefined, fallback: number): number {
 
 function settleAll(completions: Promise<void>[]): Promise<void> {
   return Promise.allSettled(completions).then(() => undefined);
+}
+
+function cancelledYieldError(task: Task): Error {
+  const reason = task.controller.signal.reason;
+  return new Error(`conversion task ${task.key} cancelled while yielded${reason ? `: ${String(reason)}` : ''}`);
 }

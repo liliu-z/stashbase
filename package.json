@@ -42,14 +42,15 @@
     "build:mcp": "node scripts/build-mcp.mjs",
     "build:python-sidecar": "node scripts/build-python-sidecar.mjs",
     "build:python-extract-sidecar": "node scripts/build-python-sidecar.mjs --with-extract",
+    "build:transcription-sidecar": "bash scripts/build-transcription-sidecar.sh",
     "clean:python-build": "node scripts/clean-python-build.mjs",
     "build": "pnpm build:web && pnpm build:server && pnpm build:mcp",
-    "build:desktop": "pnpm build && pnpm build:python-sidecar",
+    "build:desktop": "pnpm build && pnpm build:python-sidecar && pnpm build:transcription-sidecar",
     "setup:python": "node scripts/setup-python.mjs",
     "test:python": "node scripts/test-python.mjs",
     "test:renderer": "node --import tsx --test web-src/src/__tests__/*.test.ts web-src/src/markdown/__tests__/*.test.ts web-src/src/store/__tests__/*.test.ts",
     "test:renderer-chunks": "node scripts/check-renderer-chunks.mjs",
-    "test:conversion-scheduler": "node --import tsx --test server/filesystem-path.test.ts server/folder-relative-path.test.ts server/files.test.ts server/markdown-source-format.test.ts server/keyword-search.test.ts server/index-status.test.ts server/indexer-mfs-path.test.ts server/session-path.test.ts server/conversion-scheduler.test.ts server/conversion-status.test.ts server/conversion.test.ts server/extractor-process.test.ts",
+    "test:conversion-scheduler": "node --import tsx --test server/filesystem-path.test.ts server/folder-relative-path.test.ts server/files.test.ts server/file-hash.test.ts server/http.test.ts server/markdown-source-format.test.ts server/keyword-search.test.ts server/index-status.test.ts server/indexer-mfs-path.test.ts server/session-path.test.ts server/conversion-scheduler.test.ts server/conversion-auxiliary.test.ts server/conversion-status.test.ts server/conversion.test.ts server/extractor-process.test.ts server/audio-transcription.test.ts server/transcription-models.test.ts server/transcription-provider.test.ts server/transcription-runtime.test.ts server/transcription-tools.test.ts server/upload.test.ts",
     "test:library-files": "node --import tsx --test server/library-file-mutations.test.ts",
     "test:agent": "node --import tsx --test server/__tests__/agent.test.ts server/__tests__/agent-contract.test.ts server/__tests__/codex-agent.test.ts",
     "test:agent:native": "node --import tsx --test server/__tests__/agent-native-smoke.test.ts",
@@ -107,6 +108,10 @@
       {
         "from": "python/sidecar.nosync",
         "to": "python/sidecar"
+      },
+      {
+        "from": "native/transcription/sidecar.nosync",
+        "to": "transcription"
       },
       {
         "from": "assets/builtin-library",

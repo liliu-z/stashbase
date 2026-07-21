@@ -6,6 +6,7 @@ import { filesystemPath } from './filesystem-path.ts';
 import { detectFormat, detectViewerFormat } from './format.ts';
 import { fileVersion, pathExists, readText } from './files.ts';
 import { isConversionTextUnavailable } from './conversion.ts';
+import { isAudioTranscriptTextUnavailable } from './audio-transcription.ts';
 import { derivedHtmlPathForDocx } from './docx.ts';
 import {
   normalizeLibraryFilePath,
@@ -32,7 +33,7 @@ export async function agentContextFile(rawPath: unknown): Promise<AgentContextFi
     if (!sourceFormat) throw routeError('unsupported format', 415, 'UNSUPPORTED_FORMAT');
     if (!pathExists(target.folderRel)) throw routeError('not found', 404);
 
-    if (sourceFormat !== 'pdf' && sourceFormat !== 'docx') {
+    if (sourceFormat !== 'pdf' && sourceFormat !== 'docx' && sourceFormat !== 'audio') {
       return {
         path: target.abs,
         folder: folderName,
@@ -52,7 +53,7 @@ export async function agentContextFile(rawPath: unknown): Promise<AgentContextFi
     const derivedAbs = sourceFormat === 'docx'
       ? derivedHtmlPathForDocx(target.abs)
       : derivedNoteFor(target.abs);
-    if (isConversionTextUnavailable(target.abs)) {
+    if (isConversionTextUnavailable(target.abs) || isAudioTranscriptTextUnavailable(target.abs)) {
       return {
         path: target.abs,
         folder: folderName,
@@ -75,7 +76,9 @@ export async function agentContextFile(rawPath: unknown): Promise<AgentContextFi
         available: false,
         reason: sourceFormat === 'docx'
           ? 'No extracted HTML exists yet for this DOCX; retry after conversion if you need text context.'
-          : 'No extracted Markdown exists yet for this PDF; retry after conversion if you need text context.',
+          : sourceFormat === 'audio'
+            ? 'No transcript exists yet for this audio file; install the selected local model or retry after transcription.'
+            : 'No extracted Markdown exists yet for this PDF; retry after conversion if you need text context.',
       };
     }
 
@@ -89,7 +92,9 @@ export async function agentContextFile(rawPath: unknown): Promise<AgentContextFi
       available: true,
       reason: sourceFormat === 'docx'
         ? 'Read the extracted HTML file (an absolute app-data path) first for this DOCX; the original DOCX stays as the source identity.'
-        : 'Read the extracted Markdown note (an absolute app-data path) first for this PDF; use the original only when raw visual or binary detail is needed.',
+        : sourceFormat === 'audio'
+          ? 'Read the timestamped transcript Markdown (an absolute app-data path) first; the original audio stays as the source identity.'
+          : 'Read the extracted Markdown note (an absolute app-data path) first for this PDF; use the original only when raw visual or binary detail is needed.',
     };
   });
 }
@@ -108,6 +113,9 @@ export async function readLibraryFile(rawPath: unknown): Promise<LibraryFileRead
       if (viewerFormat === 'docx') {
         return readSourceDerivedFile(target.abs, target.folderRel, 'docx');
       }
+      if (viewerFormat === 'audio') {
+        return readSourceDerivedFile(target.abs, target.folderRel, 'audio');
+      }
       if (viewerFormat === 'image') {
         throw routeError('read_file cannot return image bytes; image OCR text is used for search evidence, while the image remains the source file', 415, 'UNSUPPORTED_FORMAT');
       }
@@ -124,9 +132,9 @@ export async function readLibraryFile(rawPath: unknown): Promise<LibraryFileRead
   });
 }
 
-function readSourceDerivedFile(sourceAbs: string, folderRel: string, sourceFormat: 'pdf' | 'docx'): LibraryFileRead {
+function readSourceDerivedFile(sourceAbs: string, folderRel: string, sourceFormat: 'pdf' | 'docx' | 'audio'): LibraryFileRead {
   const label = sourceFormat === 'docx' ? 'HTML' : 'Markdown';
-  if (isConversionTextUnavailable(sourceAbs)) {
+  if (isConversionTextUnavailable(sourceAbs) || isAudioTranscriptTextUnavailable(sourceAbs)) {
     throw routeError(`extracted ${label} is pending or preparation failed; retry after completion or reprocess the ${sourceFormat.toUpperCase()}`, 409, 'CONVERSION_NOT_READY');
   }
   const derivedAbs = sourceFormat === 'docx'
@@ -140,7 +148,7 @@ function readSourceDerivedFile(sourceAbs: string, folderRel: string, sourceForma
   }
   return {
     path: sourceAbs,
-    format: sourceFormat === 'docx' ? 'docx-derived-html' : 'pdf-derived-md',
+    format: sourceFormat === 'docx' ? 'docx-derived-html' : sourceFormat === 'audio' ? 'audio-transcript-md' : 'pdf-derived-md',
     sourceFormat,
     readPath: derivedAbs,
     derived: true,
@@ -166,7 +174,7 @@ function normalizeDerivedReadPath(rawPath: unknown): Promise<LibraryFileRead> | 
 }
 
 function readDerivedLibraryFile(derivedAbs: string, sourceAbs: string, folderRoot: string): Promise<LibraryFileRead> {
-  if (isConversionTextUnavailable(sourceAbs)) {
+  if (isConversionTextUnavailable(sourceAbs) || isAudioTranscriptTextUnavailable(sourceAbs)) {
     throw routeError('derived text is pending or preparation failed; retry after completion or reprocess the source', 409, 'CONVERSION_NOT_READY');
   }
   const folderRel = filesystemPath.relative(folderRoot, sourceAbs);
@@ -174,13 +182,13 @@ function readDerivedLibraryFile(derivedAbs: string, sourceAbs: string, folderRoo
     throw routeError('derived source path is invalid for its folder', 400);
   }
   const sourceFormat = detectViewerFormat(folderRel);
-  if (sourceFormat !== 'pdf' && sourceFormat !== 'docx') {
-    throw routeError('derived reads are only exposed for PDF/DOCX text context', 403);
+  if (sourceFormat !== 'pdf' && sourceFormat !== 'docx' && sourceFormat !== 'audio') {
+    throw routeError('derived reads are only exposed for PDF/DOCX/audio text context', 403);
   }
   return runWithFolderRoot(folderRoot, async () => {
     return {
       path: sourceAbs,
-      format: sourceFormat === 'docx' ? 'docx-derived-html' : 'pdf-derived-md',
+      format: sourceFormat === 'docx' ? 'docx-derived-html' : sourceFormat === 'audio' ? 'audio-transcript-md' : 'pdf-derived-md',
       sourceFormat,
       readPath: derivedAbs,
       derived: true,
@@ -190,12 +198,14 @@ function readDerivedLibraryFile(derivedAbs: string, sourceAbs: string, folderRoo
   });
 }
 
-function readDerivedText(derivedAbs: string, sourceFormat: 'pdf' | 'docx'): string {
+function readDerivedText(derivedAbs: string, sourceFormat: 'pdf' | 'docx' | 'audio'): string {
   try {
     return fs.readFileSync(derivedAbs, 'utf8');
   } catch {
     throw routeError(sourceFormat === 'docx'
       ? 'extracted HTML is not available for this DOCX yet; retry conversion or run reindex first'
-      : 'extracted Markdown is not available for this PDF yet; retry conversion or run reindex first', 409, 'CONVERSION_NOT_READY');
+      : sourceFormat === 'audio'
+        ? 'transcript Markdown is not available for this audio file yet; install a model or retry transcription first'
+        : 'extracted Markdown is not available for this PDF yet; retry conversion or run reindex first', 409, 'CONVERSION_NOT_READY');
   }
 }

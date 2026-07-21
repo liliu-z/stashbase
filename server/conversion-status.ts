@@ -33,10 +33,8 @@ import { filesystemPath } from './filesystem-path.ts';
 
 export type { ConversionStatus, ConversionStatusEntry };
 export type ConversionStatusMap = Record<string, ConversionStatusEntry>;
-export type ConversionProgress =
-  | { phase: 'queued'; lane: 'light' | 'heavy'; tasksAhead: number }
-  | { phase: 'extracting'; currentPage?: number }
-  | { phase: 'indexing' };
+export type { ConversionProgress } from '../shared/conversion.ts';
+import type { ConversionProgress } from '../shared/conversion.ts';
 
 const inFlight = new Set<string>();
 const progress = new Map<string, ConversionProgress>();
@@ -80,6 +78,16 @@ export function markFailed(sourcePath: string, errorMsg: string): void {
   setConversionStatus(sourcePath, 'failed', { error: errorMsg, incrementAttempts: true });
 }
 
+/** Explicit user cancellation is durable so reconcile does not immediately
+ * restart the work. It is not counted as a failed inference attempt and is
+ * cleared by the same manual Reprocess boundary as a real failure. */
+export function markCancelled(sourcePath: string): void {
+  const key = filesystemPath.identity(sourcePath);
+  inFlight.delete(key);
+  progress.delete(key);
+  setConversionStatus(sourcePath, 'cancelled', { error: 'Cancelled by user' });
+}
+
 export function clearRecord(sourcePath: string): void {
   const key = filesystemPath.identity(sourcePath);
   inFlight.delete(key);
@@ -99,6 +107,11 @@ export function clearRecordsUnder(sourcePathPrefix: string): void {
 
 export function listFailed(): Array<{ path: string; entry: ConversionStatusEntry }> {
   return listConversionStatus('failed');
+}
+
+export function listPreparationProblems(): Array<{ path: string; entry: ConversionStatusEntry }> {
+  return [...listConversionStatus('failed'), ...listConversionStatus('cancelled')]
+    .sort((left, right) => left.path.localeCompare(right.path));
 }
 
 export function setProgress(sourcePath: string, next: ConversionProgress): void {

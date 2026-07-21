@@ -11,12 +11,22 @@ import {
   resolveFolderRoot,
 } from '../folder.ts';
 import { getApiKey } from '../app-config.ts';
-import { derivedPathsForPdf, maybeConvertPdf } from '../pdf.ts';
-import { derivedNotePathForImage, maybeConvertImage } from '../image.ts';
-import { derivedHtmlPathForDocx, maybeConvertDocx } from '../docx.ts';
-import { isConversionPending, isConversionTextUnavailable, promoteConversion } from '../conversion.ts';
-import { isDocxFile, isImageFile } from '../format.ts';
-import { clearRecord, readAll as readConversionStatus } from '../conversion-status.ts';
+import {
+  cancelAudioPreparation,
+  isAudioTranscriptTextUnavailable,
+} from '../audio-transcription.ts';
+import {
+  cancelConversionAndWait,
+  isConversionPending,
+  isConversionTextUnavailable,
+  promoteConversion,
+} from '../conversion.ts';
+import { isAudioFile, isConvertibleSource } from '../format.ts';
+import { clearRecord, markCancelled, readAll as readConversionStatus } from '../conversion-status.ts';
+import {
+  prepareConvertibleSource,
+  reprocessConvertibleSource,
+} from '../conversion-dispatch.ts';
 import { clearIndexWarning, indexer, syncFolderNow } from '../state.ts';
 import { noteTreeChanged } from '../watcher.ts';
 import { sendError } from '../http.ts';
@@ -29,6 +39,10 @@ import {
   remapKeywordFilesForDisplay,
   remapSearchHitsForDisplay,
 } from '../search-display.ts';
+import {
+  normalizeTranscriptionLanguage,
+  type ConfiguredTranscriptionBlock,
+} from '../../shared/transcription.ts';
 
 const log = logger('routes/indexing');
 
@@ -100,7 +114,11 @@ function requireExistingFileInFolder(folderRoot: string, rel: string): string {
   return abs;
 }
 
-export function reprocessFileInFolder(relPath: string, folderName?: string): 'conversion' | 'index' {
+export function reprocessFileInFolder(
+  relPath: string,
+  folderName?: string,
+  options: { language?: string } = {},
+): 'conversion' | 'index' {
   const rel = typeof relPath === 'string' ? relPath.trim() : '';
   if (!rel) {
     const err = new Error('path required');
@@ -112,34 +130,26 @@ export function reprocessFileInFolder(relPath: string, folderName?: string): 'co
 
   const abs = requireExistingFileInFolder(folderRoot, rel);
   const sourcePath = sourcePathForAbs(abs);
-  const isPdf = /\.pdf$/i.test(rel);
-  const isImage = isImageFile(rel);
-  const isDocx = isDocxFile(rel);
   if (isConversionPending(sourcePath)) {
     // A manual retry promotes queued work; running work is non-preemptive.
     promoteConversion(sourcePath, 'interactive');
-    return isPdf || isImage || isDocx ? 'conversion' : 'index';
+    return isConvertibleSource(rel) ? 'conversion' : 'index';
+  }
+
+  const reprocess = reprocessConvertibleSource(abs, rel, {
+    ...(isAudioFile(rel) ? { language: normalizeLanguageOverride(options.language) } : {}),
+  });
+  if (reprocess.status === 'blocked') {
+    const err = new Error(audioReprocessBlockMessage(reprocess.block));
+    (err as any).status = 409;
+    (err as any).code = 'TRANSCRIPTION_NOT_READY';
+    throw err;
+  }
+  if (reprocess.status === 'queued') {
+    return 'conversion';
   }
 
   clearRecord(sourcePath);
-  if (isPdf) {
-    const { notePath: staleNote, bundleDir: staleBundle } = derivedPathsForPdf(abs);
-    try { fs.rmSync(staleNote, { force: true }); } catch { /* no stale to remove */ }
-    try { fs.rmSync(staleBundle, { recursive: true, force: true }); } catch { /* no bundle */ }
-    maybeConvertPdf(abs, { urgency: 'interactive' });
-    return 'conversion';
-  }
-  if (isImage) {
-    try { fs.rmSync(derivedNotePathForImage(abs), { force: true }); } catch { /* no stale */ }
-    maybeConvertImage(abs, { urgency: 'interactive' });
-    return 'conversion';
-  }
-  if (isDocx) {
-    try { fs.rmSync(derivedHtmlPathForDocx(abs), { force: true }); } catch { /* no stale */ }
-    maybeConvertDocx(abs, { urgency: 'interactive' });
-    return 'conversion';
-  }
-
   void syncFolderNow(folderRoot, { reason: `manual reprocess ${rel}` })
     .then((result) => {
       if (!result.cancelled) noteTreeChanged();
@@ -150,25 +160,53 @@ export function reprocessFileInFolder(relPath: string, folderName?: string): 'co
   return 'index';
 }
 
-function prepareDocxInFolder(relPath: string, folderName?: string): void {
+function audioReprocessBlockMessage(block: ConfiguredTranscriptionBlock): string {
+  if (block.reason === 'runtime-unavailable') return `local transcription runtime is unavailable: ${block.error}`;
+  if (block.reason === 'model-verifying') return `the ${block.modelId} transcription model is still being verified`;
+  if (block.reason === 'model-not-installed') return `download the ${block.modelId} transcription model before reprocessing`;
+  if (block.reason === 'model-unavailable') return `the ${block.modelId} transcription model is unavailable${block.error ? `: ${block.error}` : ''}`;
+  return `the ${block.providerId} transcription provider is unavailable`;
+}
+
+async function cancelFilePreparationInFolder(relPath: string, folderName?: string): Promise<boolean> {
   const rel = typeof relPath === 'string' ? relPath.trim() : '';
   if (!rel) {
     const err = new Error('path required');
     (err as any).status = 400;
     throw err;
   }
-  if (!isDocxFile(rel)) {
-    const err = new Error('only DOCX files require interactive preview preparation');
-    (err as any).status = 415;
-    throw err;
-  }
-
   const { folderRoot } = requireRequestFolder(folderName?.trim() || undefined);
   const abs = requireExistingFileInFolder(folderRoot, rel);
   const sourcePath = sourcePathForAbs(abs);
-  if (!promoteConversion(sourcePath, 'interactive')) {
-    maybeConvertDocx(abs, { urgency: 'interactive' });
+  if (isAudioFile(rel)) return cancelAudioPreparation(sourcePath);
+  const cancelled = await cancelConversionAndWait(sourcePath, 'user-request');
+  if (cancelled) markCancelled(sourcePath);
+  return cancelled;
+}
+
+function prepareConvertibleInFolder(relPath: string, folderName?: string): void {
+  const rel = typeof relPath === 'string' ? relPath.trim() : '';
+  if (!rel) {
+    const err = new Error('path required');
+    (err as any).status = 400;
+    throw err;
   }
+  const { folderRoot } = requireRequestFolder(folderName?.trim() || undefined);
+  const abs = requireExistingFileInFolder(folderRoot, rel);
+  if (!prepareConvertibleSource(abs, rel)) {
+    const err = new Error('only DOCX and audio files require interactive preparation');
+    (err as any).status = 415;
+    throw err;
+  }
+}
+
+function normalizeLanguageOverride(value: unknown): string | undefined {
+  if (value == null || value === '') return undefined;
+  const normalized = normalizeTranscriptionLanguage(value);
+  if (normalized) return normalized;
+  const err = new Error('language must be `auto` or a language code');
+  (err as any).status = 400;
+  throw err;
 }
 
 export function mount(app: express.Express): void {
@@ -176,7 +214,7 @@ export function mount(app: express.Express): void {
   // at interactive priority (or promote the existing queued task).
   app.post('/api/files/prepare', (req, res) => {
     try {
-      prepareDocxInFolder(req.body?.path, parseFolderParam(req.body?.folder));
+      prepareConvertibleInFolder(req.body?.path, parseFolderParam(req.body?.folder));
       res.json({ ok: true });
     } catch (err: unknown) {
       sendError(res, err);
@@ -236,12 +274,12 @@ export function mount(app: express.Express): void {
       // Daemon hits arrive as absolute paths; translate fileName back to
       // folder-relative for the sidebar (which only knows the current
       // folder). Then `displayPathForHit` rewrites a derived note to its
-      // source PDF/image (or drops an orphan) so a hidden `.md` never
-      // shows — PdfPreview/ImagePreview pick up the chunk text from
+      // source PDF/image/audio file (or drops an orphan) so hidden derived
+      // text never shows — the corresponding viewer picks up chunk text from
       // pendingHighlight and jump to the matching passage.
       const out = remapSearchHitsForDisplay(
         hits
-          .filter((hit) => !isConversionTextUnavailable(hit.fileName))
+          .filter((hit) => !isConversionTextUnavailable(hit.fileName) && !isAudioTranscriptTextUnavailable(hit.fileName))
           .map((h) => {
             const rel = filesystemPath.relative(root, h.fileName);
             return rel == null ? null : { ...h, fileName: rel };
@@ -335,7 +373,7 @@ export function mount(app: express.Express): void {
   });
 
   // File reprocess: take a folder-relative path and clear its durable
-  // failure row. PDF/image/DOCX sources also clear stale final derived
+  // failure row. PDF/image/DOCX/audio sources also clear stale final derived
   // artifacts and re-run extraction; directly readable files schedule a
   // reconcile so the index is rebuilt from source.
   app.post('/api/files/reprocess', (req, res) => {
@@ -344,8 +382,21 @@ export function mount(app: express.Express): void {
       const targetFolder = typeof req.body?.folder === 'string' && req.body.folder.trim()
         ? req.body.folder.trim()
         : undefined;
-      const mode = reprocessFileInFolder(rel, targetFolder);
+      const mode = reprocessFileInFolder(rel, targetFolder, { language: req.body?.language });
       res.json({ ok: true, mode });
+    } catch (err: unknown) {
+      sendError(res, err);
+    }
+  });
+
+  app.post('/api/files/cancel-preparation', async (req, res) => {
+    try {
+      const rel = typeof req.body?.path === 'string' ? req.body.path.trim() : '';
+      const targetFolder = typeof req.body?.folder === 'string' && req.body.folder.trim()
+        ? req.body.folder.trim()
+        : undefined;
+      const cancelled = await cancelFilePreparationInFolder(rel, targetFolder);
+      res.json({ ok: true, cancelled });
     } catch (err: unknown) {
       sendError(res, err);
     }

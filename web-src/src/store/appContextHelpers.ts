@@ -22,7 +22,10 @@ export function shallowEqualPreparationFailures(
   if (a === b) return true;
   if (a.length !== b.length) return false;
   return a.every((f, i) =>
-    f.path === b[i].path && f.attempts === b[i].attempts && f.lastError === b[i].lastError,
+    f.path === b[i].path
+      && f.attempts === b[i].attempts
+      && f.lastError === b[i].lastError
+      && f.status === b[i].status,
   );
 }
 
@@ -38,9 +41,14 @@ export function shallowEqualConversionProgress(
     const bv = b[key];
     if (!bv || av.phase !== bv.phase) return false;
     if (av.phase === 'extracting' && bv.phase === 'extracting') {
-      return av.currentPage === bv.currentPage;
+      return av.currentPage === bv.currentPage
+        && av.completedUnits === bv.completedUnits
+        && av.totalUnits === bv.totalUnits;
     }
-    if (av.phase === 'queued' && bv.phase === 'queued') {
+    if (
+      (av.phase === 'queued' || av.phase === 'yielded')
+      && bv.phase === av.phase
+    ) {
       return av.lane === bv.lane && av.tasksAhead === bv.tasksAhead;
     }
     return true;

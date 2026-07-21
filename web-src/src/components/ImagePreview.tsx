@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, errorMessage, versionedAssetUrl } from '../api';
+import { preparationWaitCopy } from '../preparation-copy.ts';
 import { useApp } from '../store/AppContext';
 import { getPreparationFailure } from '../store/fileReadiness';
 
@@ -50,9 +51,9 @@ export function ImagePreview({ name }: { name: string }) {
   const conversionProgress = state.conversionProgress[name];
   const preparationStatus = !failure && conversionProgress
     ? conversionProgress.phase === 'queued'
-      ? conversionProgress.tasksAhead > 0
-        ? `Waiting for searchable text · ${conversionProgress.tasksAhead} heavy-lane task${conversionProgress.tasksAhead === 1 ? '' : 's'} ahead`
-        : 'Waiting for searchable text…'
+      ? preparationWaitCopy('searchable-text', conversionProgress.tasksAhead)
+      : conversionProgress.phase === 'yielded'
+        ? preparationWaitCopy('searchable-text', conversionProgress.tasksAhead)
       : conversionProgress.phase === 'indexing'
         ? 'Indexing searchable text…'
         : 'Reading image text…'

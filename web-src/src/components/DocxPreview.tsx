@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, assetBaseUrl, errorMessage, versionedAssetUrl } from '../api';
+import { preparationWaitCopy } from '../preparation-copy.ts';
 import { useIframeDropForward } from '../hooks/useIframeDropForward';
 import { previewClickHandler } from '../lib/previewIframe';
 import { useApp } from '../store/AppContext';
@@ -35,9 +36,9 @@ export function DocxPreview({ name }: { name: string }) {
   const progress = state.conversionProgress[name];
   const preparationStatus = progress
     ? progress.phase === 'queued'
-      ? progress.tasksAhead > 0
-        ? `Preparing search · ${progress.tasksAhead} light-lane task${progress.tasksAhead === 1 ? '' : 's'} ahead`
-        : 'Preparing searchable text…'
+      ? preparationWaitCopy('searchable-text', progress.tasksAhead)
+      : progress.phase === 'yielded'
+        ? preparationWaitCopy('searchable-text', progress.tasksAhead)
       : progress.phase === 'indexing'
         ? 'Indexing searchable text…'
         : 'Preparing searchable text…'

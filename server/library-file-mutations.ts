@@ -1,8 +1,8 @@
 import { getApiKey } from './app-config.ts';
-import { cancelConversion } from './conversion.ts';
+import { queueConvertibleSource } from './conversion-dispatch.ts';
 import { clearRecord } from './conversion-status.ts';
 import { deleteDerivedForSource } from './derived-store.ts';
-import { inFlightFileOperationError } from './file-operation-guard.ts';
+import { prepareFileOperation } from './file-operation-guard.ts';
 import { saveFileContent } from './file-save.ts';
 import {
   deleteFile,
@@ -14,8 +14,7 @@ import {
 } from './files.ts';
 import { filesystemPath } from './filesystem-path.ts';
 import { runWithFolderRoot } from './folder.ts';
-import { detectFormat, detectViewerFormat, isImageFile } from './format.ts';
-import { maybeConvertImage } from './image.ts';
+import { detectFormat, detectViewerFormat, isConvertibleSource } from './format.ts';
 import { contentSizeError } from './indexable.ts';
 import {
   normalizeLibraryFilePath,
@@ -25,9 +24,7 @@ import {
 import { readLibraryFile } from './library-file-reader.ts';
 import { applyRenamePlan, planRenameLinks, type RenameEntry } from './links.ts';
 import { errorMessage, logger } from './log.ts';
-import { maybeConvertPdf } from './pdf.ts';
 import { indexer } from './state.ts';
-import { maybeConvertDocx } from './docx.ts';
 
 const log = logger('library-file-mutations');
 
@@ -53,7 +50,7 @@ export async function editLibraryFile(
   if (!oldText) throw routeError('old_text must not be empty', 400);
   const current = await readLibraryFile(rawPath);
   if (current.derived) {
-    throw routeError('edit_file cannot edit derived PDF/DOCX text; create or edit a Markdown/HTML source file instead', 415, 'UNSUPPORTED_FORMAT');
+    throw routeError('edit_file cannot edit derived PDF/DOCX/audio text; create or edit a Markdown/HTML source file instead', 415, 'UNSUPPORTED_FORMAT');
   }
   const count = countOccurrences(current.content, oldText);
   if (count === 0) throw routeError('old_text not found', 409, 'EDIT_MISMATCH');
@@ -97,15 +94,14 @@ export async function moveLibraryFile(
     if (newFormat !== oldFormat) {
       throw routeError(`new_path must keep a ${oldFormat} extension`, 400);
     }
-    const inFlightError = inFlightFileOperationError(oldTarget.folderRel, 'rename');
-    if (inFlightError) throw routeError(inFlightError.body.error, inFlightError.status, inFlightError.body.code);
-    const viewerOnly = !oldStructuredFormat && (oldFormat === 'pdf' || oldFormat === 'image' || oldFormat === 'docx');
+    const viewerOnly = !oldStructuredFormat && isConvertibleSource(oldTarget.folderRel);
     const content = viewerOnly ? null : readText(oldTarget.folderRel);
     if (!viewerOnly && content == null) throw routeError('not found', 404);
     if (viewerOnly && !pathExists(oldTarget.folderRel)) throw routeError('not found', 404);
     if (pathExists(newTarget.folderRel) && !isSameExistingPath(oldTarget.folderRel, newTarget.folderRel)) {
       throw routeError('target exists', 409);
     }
+    await prepareFileOperation(oldTarget.folderRel);
 
     const oldDerivedArtifacts = derivedArtifactsForSource(oldTarget.folderRel);
     const renames: RenameEntry[] = [{ kind: 'file', old: oldTarget.folderRel, new: newTarget.folderRel }];
@@ -121,7 +117,6 @@ export async function moveLibraryFile(
     let indexWarning: string | undefined;
     try {
       if (viewerOnly) {
-        cancelConversion(oldTarget.abs);
         clearRecord(oldTarget.abs);
         clearRecord(newTarget.abs);
         try { deleteDerivedForSource(oldTarget.abs); } catch (err: unknown) {
@@ -140,9 +135,9 @@ export async function moveLibraryFile(
           });
         }
         try {
-          if (oldFormat === 'pdf') maybeConvertPdf(newTarget.abs);
-          else if (isImageFile(newTarget.folderRel)) maybeConvertImage(newTarget.abs);
-          else if (oldFormat === 'docx') maybeConvertDocx(newTarget.abs);
+          if (!queueConvertibleSource(newTarget.abs, newTarget.folderRel)) {
+            throw new Error(`no conversion owner for ${oldFormat} source`);
+          }
         } catch (err: unknown) {
           log.warn(`library move: conversion kickoff failed for ${newTarget.abs}: ${errorMessage(err)}`);
         }
@@ -184,11 +179,9 @@ export async function moveLibraryFile(
 export async function deleteLibraryFile(rawPath: unknown): Promise<{ path: string; alreadyGone: boolean }> {
   const target = normalizeLibraryFilePath(rawPath);
   return runWithFolderRoot(target.folderRoot, async () => {
-    const inFlightError = inFlightFileOperationError(target.folderRel, 'delete');
-    if (inFlightError) throw routeError(inFlightError.body.error, inFlightError.status, inFlightError.body.code);
+    await prepareFileOperation(target.folderRel);
     const derivedArtifacts = derivedArtifactsForSource(target.folderRel);
     const removed = deleteFile(target.folderRel);
-    cancelConversion(target.abs);
     try { deleteDerivedForSource(target.abs); }
     catch (err: unknown) { log.warn(`library delete: derived cleanup failed for ${target.abs}: ${errorMessage(err)}`); }
     try { clearRecord(target.abs); }

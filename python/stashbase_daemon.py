@@ -363,6 +363,48 @@ def _patch_milvus_manifest_windows_replace(*, force: bool = False) -> bool:
     return True
 
 
+def _patch_mfs_local_query_snapshot() -> None:
+    """Read local Milvus Lite result sets from one storage snapshot.
+
+    MFS's ``_query_all`` uses pymilvus ``query_iterator``, whose cursor is
+    the last primary key in each response. That contract assumes every page
+    is globally primary-key ordered. The bundled local Milvus Lite adapter
+    returns rows in immutable-segment order instead, so a collection with
+    more than one 1,000-row page can silently omit later segments whose keys
+    sort before the previous page's cursor. Index status then reports stored
+    files as pending and reconcile embeds them again.
+
+    Local Milvus Lite supports an unbounded scalar query. Use that single
+    snapshot for MFS's collect-all operations; broad callers request only
+    narrow bookkeeping fields, while full-row callers are source-scoped.
+    Keep MFS's native iterator for remote Milvus URIs.
+    """
+    try:
+        from mfs.store import MilvusStore  # type: ignore
+    except ImportError:
+        return
+    if getattr(MilvusStore._query_all, "__stashbase_local_snapshot__", False):
+        return
+
+    original = MilvusStore._query_all
+
+    def _query_all(  # noqa: ANN001
+        self, filter_expr, output_fields, batch_size=1000,
+    ):
+        uri = str(getattr(self._config, "uri", ""))
+        if uri.startswith(("http://", "https://", "tcp://", "unix://")):
+            return original(self, filter_expr, output_fields, batch_size)
+        self.connect()
+        return self.client.query(
+            collection_name=self._config.collection_name,
+            filter=filter_expr,
+            output_fields=output_fields,
+        )
+
+    _query_all.__stashbase_local_snapshot__ = True  # type: ignore[attr-defined]
+    MilvusStore._query_all = _query_all
+
+
 def _patch_scanner_blake3() -> None:
     """Make MFS's ``Scanner.compute_file_hash`` use BLAKE3, not SHA256.
 
@@ -556,6 +598,7 @@ class StashbaseStore:
         store = MilvusStore(config, dim)
         _patch_inverted_index_skip()
         _patch_milvus_manifest_windows_replace()
+        _patch_mfs_local_query_snapshot()
         try:
             store.connect()
         except Exception as err:
@@ -701,11 +744,10 @@ def _hash_text(text: str) -> str:
 def _flush_store(store) -> None:
     """Make successful writes visible to immediate scan/status queries.
 
-    Milvus Lite can acknowledge an upsert before a following query_iterator
-    observes the rows. Sync's I2 check intentionally asks status right after
-    writing, so flush after committed inserts/updates and keep failures
-    non-fatal: the write already succeeded, and later flushes/reopens may
-    still make it visible.
+    Milvus Lite can acknowledge an upsert before a following scalar query
+    observes the rows. Flush after committed inserts/updates and keep failures
+    non-fatal: the write already succeeded, and later flushes/reopens may still
+    make it visible.
     """
     client = getattr(store, "client", None)
     config = getattr(store, "_config", None)

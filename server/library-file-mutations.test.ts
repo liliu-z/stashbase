@@ -18,6 +18,7 @@ test('MCP library mutations work outside an active folder and enforce versions',
   const originalEnv = new Map(isolatedEnvNames.map((name) => [name, process.env[name]]));
   let clearCurrentFolder: (() => void) | undefined;
   let closeStateDb: (() => void) | undefined;
+  let closeIndexer: (() => Promise<void>) | undefined;
   let server: HttpServer | undefined;
 
   t.after(async () => {
@@ -25,6 +26,7 @@ test('MCP library mutations work outside an active folder and enforce versions',
       await new Promise<void>((resolve) => server?.close(() => resolve()));
     }
     clearCurrentFolder?.();
+    await closeIndexer?.();
     closeStateDb?.();
     for (const [name, value] of originalEnv) {
       if (value === undefined) delete process.env[name];
@@ -45,15 +47,20 @@ test('MCP library mutations work outside an active folder and enforce versions',
     libraryRoutes,
     mcpRoutes,
     stateDb,
+    derivedStore,
+    state,
   ] = await Promise.all([
     import('express'),
     import('./folder.ts'),
     import('./routes/library-files.ts'),
     import('./routes/mcp-http.ts'),
     import('./state-db.ts'),
+    import('./derived-store.ts'),
+    import('./state.ts'),
   ]);
   clearCurrentFolder = folder.clearCurrentFolder;
   closeStateDb = stateDb.closeStateDb;
+  closeIndexer = () => state.indexer.close();
 
   const root = path.join(testHome, 'Library Folder');
   const source = path.join(root, 'Drafts', 'Note.md');
@@ -121,6 +128,25 @@ test('MCP library mutations work outside an active folder and enforce versions',
   const deleted = await callTool(base, token, 'delete_file', { path: target });
   assert.equal(deleted.alreadyGone, false);
   assert.equal(fs.existsSync(target), false);
+
+  const audioSource = path.join(root, 'Recordings', 'meeting.wav');
+  const audioTarget = path.join(root, 'Archive', 'meeting.wav');
+  fs.mkdirSync(path.dirname(audioSource), { recursive: true });
+  fs.writeFileSync(audioSource, Buffer.from([0x52, 0x49, 0x46, 0x46, 0xff, 0x00, 0x80]));
+  const staleAudioNote = derivedStore.derivedNoteFor(audioSource);
+  const staleAudioTranscript = derivedStore.derivedTranscriptFor(audioSource);
+  fs.mkdirSync(path.dirname(staleAudioNote), { recursive: true });
+  fs.writeFileSync(staleAudioNote, 'stale transcript');
+  fs.writeFileSync(staleAudioTranscript, '{}');
+
+  const movedAudio = await callTool(base, token, 'move_file', {
+    path: audioSource,
+    new_path: audioTarget,
+  });
+  assert.equal(movedAudio.path, audioTarget.replace(/\\/g, '/'));
+  assert.deepEqual(fs.readFileSync(audioTarget), Buffer.from([0x52, 0x49, 0x46, 0x46, 0xff, 0x00, 0x80]));
+  assert.equal(fs.existsSync(staleAudioNote), false);
+  assert.equal(fs.existsSync(staleAudioTranscript), false);
   assert.equal(folder.getCurrentFolder(), null);
 });
 

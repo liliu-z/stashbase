@@ -11,6 +11,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { logger, errorMessage } from './log.ts';
+import { normalizeTranscriptionLanguage } from '../shared/transcription.ts';
+import type { LocalTranscriptionModelId } from '../shared/transcription.ts';
+import transcriptionToolchain from '../native/transcription/toolchain.json' with { type: 'json' };
 
 const log = logger('app-config');
 
@@ -29,6 +32,7 @@ export interface RecentFolder {
  *  config plumbing reads clearly and a future provider re-introduction
  *  has an obvious seam. */
 export type EmbedderProvider = 'openai';
+export type TranscriptionModelId = LocalTranscriptionModelId;
 
 export interface AppConfigFile {
   /** NOTE: the legacy `folderHome` field is no longer read or written — the
@@ -62,6 +66,17 @@ export interface AppConfigFile {
     token?: string;
     dockerAccess?: boolean;
     dockerPort?: number;
+  };
+  /** Local audio-transcription preferences. Model weights themselves live
+   *  under AppData and are managed explicitly from Settings. */
+  transcription?: {
+    /** Provider ids are registry keys; only whisper.cpp is registered in the
+     * current product, while the persisted shape does not assume local-only
+     * inference. */
+    providerId?: string;
+    modelId?: string;
+    /** Whisper language code or `auto`. */
+    language?: string;
   };
 }
 
@@ -145,6 +160,44 @@ export function setApiKey(key: string | undefined): void {
  *  "which provider" in info payloads don't need to special-case. */
 export function getEmbedderProvider(): EmbedderProvider {
   return 'openai';
+}
+
+export interface TranscriptionPreferences {
+  providerId: string;
+  modelId: string;
+  language: string;
+}
+
+const TRANSCRIPTION_MODEL_IDS = new Set<TranscriptionModelId>(['tiny', 'base', 'small']);
+
+export function getTranscriptionPreferences(): TranscriptionPreferences {
+  const raw = readAppConfig().transcription;
+  const providerId = typeof raw?.providerId === 'string' && raw.providerId.trim()
+    ? raw.providerId.trim()
+    : transcriptionToolchain.providerId;
+  const modelId = typeof raw?.modelId === 'string' && raw.modelId.trim()
+    ? raw.modelId.trim()
+    : 'small';
+  const language = normalizeTranscriptionLanguage(raw?.language) ?? 'auto';
+  return { providerId, modelId, language };
+}
+
+export function setTranscriptionPreferences(next: Partial<TranscriptionPreferences>): TranscriptionPreferences {
+  const current = getTranscriptionPreferences();
+  const providerId = next.providerId?.trim() || current.providerId;
+  const modelId = next.modelId ?? current.modelId;
+  if (!providerId) throw new Error('transcription provider id is required');
+  if (providerId === transcriptionToolchain.providerId && !TRANSCRIPTION_MODEL_IDS.has(modelId as TranscriptionModelId)) {
+    throw new Error(`unsupported transcription model: ${modelId}`);
+  }
+  const language = next.language === undefined
+    ? current.language
+    : normalizeTranscriptionLanguage(next.language);
+  if (!language) throw new Error('transcription language must be `auto` or a language code');
+  const cfg = readAppConfig();
+  cfg.transcription = { providerId, modelId, language };
+  writeAppConfigStrict(cfg);
+  return { providerId, modelId, language };
 }
 
 /** One-time upgrade from the very first global-embedder schema, when

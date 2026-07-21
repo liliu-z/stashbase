@@ -12,6 +12,7 @@ import {
 // worker for both dev and the packaged build, unlike a bare `?url`.
 import PdfWorker from '../lib/pdfWorker?worker';
 import { api, errorMessage, versionedAssetUrl } from '../api';
+import { preparationWaitCopy } from '../preparation-copy.ts';
 import { useApp } from '../store/AppContext';
 import { getFileReadiness } from '../store/fileReadiness';
 import {
@@ -94,9 +95,9 @@ export function PdfPreview({ name, showConversionBanner = true }: { name: string
       ? {
           kind: 'working' as const,
           text: conversionProgress.phase === 'queued'
-            ? conversionProgress.tasksAhead > 0
-              ? `Waiting for searchable text · ${conversionProgress.tasksAhead} heavy-lane task${conversionProgress.tasksAhead === 1 ? '' : 's'} ahead`
-              : 'Waiting for searchable text…'
+            ? preparationWaitCopy('searchable-text', conversionProgress.tasksAhead)
+            : conversionProgress.phase === 'yielded'
+              ? preparationWaitCopy('searchable-text', conversionProgress.tasksAhead)
             : conversionProgress.phase === 'indexing'
               ? 'Indexing searchable text…'
               : conversionProgress.currentPage

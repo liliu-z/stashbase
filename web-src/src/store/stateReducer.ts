@@ -366,6 +366,8 @@ export function reducer(s: State, a: Action): State {
       return { ...s, pendingSemanticNames: a.names };
     case 'PENDING_CONVERSIONS':
       return { ...s, pendingConversions: a.paths };
+    case 'BLOCKED_CONVERSIONS':
+      return { ...s, blockedConversions: a.paths };
     case 'CONVERSION_PROGRESS':
       return { ...s, conversionProgress: a.progress };
     case 'CONVERSION_SCHEDULER_STATE':

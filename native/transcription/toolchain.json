@@ -1,0 +1,15 @@
+{
+  "providerId": "whisper.cpp",
+  "whisperCppVersion": "1.9.1",
+  "whisperCppCommit": "f049fff95a089aa9969deb009cdd4892b3e74916",
+  "ggmlNative": false,
+  "ggmlBlas": false,
+  "ffmpegVersion": "8.1.2",
+  "ffmpegSha256": "464beb5e7bf0c311e68b45ae2f04e9cc2af88851abb4082231742a74d97b524c",
+  "ffmpegLicense": "LGPL-2.1-or-later",
+  "opusVersion": "1.6.1",
+  "opusSha256": "6ffcb593207be92584df15b32466ed64bbec99109f007c82205f0194572411a1",
+  "macosDeploymentTarget": "12.0",
+  "linuxGlibcBaseline": "2.35",
+  "linuxGlibcxxBaseline": "3.4.30"
+}

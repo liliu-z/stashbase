@@ -3,7 +3,10 @@
  * Runtime dependencies stay browser-safe and free of React side effects.
  */
 import type { FileMeta } from '../api';
+import { VIEWABLE_FILE_EXTENSION_ALTERNATION } from '../../../shared/file-formats.ts';
 import type { ChatTab, State, Tab } from './state';
+
+const VIEWABLE_EXTENSION_RE = new RegExp(`\\.(${VIEWABLE_FILE_EXTENSION_ALTERNATION})$`, 'i');
 
 /** Sidebar side-panel resize bounds (px), shared by the reducer and the
  *  drag handle. The 44px activity rail is *not* part of this — it always
@@ -117,7 +120,7 @@ function splitPath(path: string): { parent: string; base: string } {
 }
 
 export function renamedFilePath(oldName: string, newBaseName: string): string {
-  const extMatch = oldName.match(/\.(md|markdown|html|htm|pdf|png|jpe?g|webp|docx)$/i);
+  const extMatch = oldName.match(VIEWABLE_EXTENSION_RE);
   const ext = extMatch ? extMatch[0] : '';
   const lastSlash = oldName.lastIndexOf('/');
   const dir = lastSlash >= 0 ? oldName.slice(0, lastSlash + 1) : '';

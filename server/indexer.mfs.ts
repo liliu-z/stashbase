@@ -83,7 +83,8 @@ function prepareForIndex(filePath: string, content: string): {
     // in-memory "targeted optimization" that turns <h1-6> into `#`
     // headings + flattened body. Done here at feed time (not materialized
     // to a hidden .md) because the transform is pure-regex / near-free and
-    // the .html already covers viewing. Unstructured sources (pdf/image),
+    // the .html already covers viewing. Unstructured sources
+    // (PDF/image/DOCX/audio),
     // by contrast, are extracted to a hidden `.md` on disk because their
     // conversion is expensive and worth caching.
     const { plaintext } = analyzeHtml(content);

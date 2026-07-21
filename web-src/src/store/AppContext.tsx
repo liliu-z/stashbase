@@ -361,7 +361,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const folderPathAtStart = stateRef.current.folderPath;
     const name = tab.file.name;
     try {
-      if (tab.file.format === 'pdf' || tab.file.format === 'image' || tab.file.format === 'docx') {
+      if (
+        tab.file.format === 'pdf'
+        || tab.file.format === 'image'
+        || tab.file.format === 'docx'
+        || tab.file.format === 'audio'
+      ) {
         const stat = await api.statFile(name);
         if (stateRef.current.folderPath !== folderPathAtStart) return;
         const latestActive = getActiveTab(stateRef.current);
@@ -408,13 +413,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // An inactive binary tab can miss a watcher refresh while another tab is
-  // visible. Re-stat it whenever it becomes active so PDF/image/DOCX viewers
+  // visible. Re-stat it whenever it becomes active so binary viewers
   // never reuse source bytes from before an external replacement.
   const versionRefreshTab = getActiveTab(state);
   const activeBinaryName = versionRefreshTab?.file
     && (versionRefreshTab.file.format === 'pdf'
       || versionRefreshTab.file.format === 'image'
-      || versionRefreshTab.file.format === 'docx')
+      || versionRefreshTab.file.format === 'docx'
+      || versionRefreshTab.file.format === 'audio')
     ? versionRefreshTab.file.name
     : null;
   const activeBinaryTabId = activeBinaryName ? versionRefreshTab?.id ?? null : null;

@@ -1,4 +1,5 @@
 import { useCallback, type MutableRefObject } from 'react';
+import { AUDIO_SOURCE_EXTENSION_ALTERNATION } from '../../../shared/file-formats.ts';
 import { api, ApiError } from '../api';
 import type { EditorHandle, EditorSession } from './actionTypes';
 import {
@@ -10,6 +11,7 @@ import { getActiveTab, type Action, type PendingHighlight, type State } from './
 import type { ToastOptions } from './useFeedbackActions';
 
 const AUTOSAVE_DEBOUNCE_MS = 1200;
+const AUDIO_SOURCE_RE = new RegExp(`\\.(${AUDIO_SOURCE_EXTENSION_ALTERNATION})$`, 'i');
 
 type Dispatch = (action: Action) => void;
 type Toast = (message: string, opts?: ToastOptions) => string;
@@ -32,6 +34,10 @@ interface DocumentActionDependencies {
 function isDocxName(name: string): boolean {
   const base = name.replace(/\\/g, '/').split('/').pop() ?? name;
   return /\.docx$/i.test(base) && !base.startsWith('~$') && !base.startsWith('.~');
+}
+
+function isAudioName(name: string): boolean {
+  return AUDIO_SOURCE_RE.test(name);
 }
 
 /** Owns editor persistence, document loading, and tab navigation semantics. */
@@ -161,6 +167,20 @@ export function useDocumentActions(
         .then(() => refreshIndexState(folder || undefined))
         .catch((err: unknown) => {
           console.warn('[docx] interactive preparation request failed:', err);
+        });
+    } else if (isAudioName(name)) {
+      try {
+        const stat = await api.statFile(name);
+        body = { name, format: 'audio' as const, content: '', version: stat.version };
+      } catch (err: unknown) {
+        dispatch({ type: 'SAVE_STATUS', status: { text: err instanceof Error ? err.message : String(err), cls: 'error' } });
+        return;
+      }
+      const folder = opts.expectedFolder ?? state.current.folderPath;
+      void api.prepareAudio(name, { folder: folder || undefined })
+        .then(() => refreshIndexState(folder || undefined))
+        .catch((err: unknown) => {
+          console.warn('[audio] interactive preparation request failed:', err);
         });
     } else if (/\.(png|jpe?g|webp)$/i.test(name)) {
       try {

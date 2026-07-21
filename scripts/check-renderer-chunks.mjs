@@ -11,6 +11,7 @@ const expectedEntries = [
   'src/components/MarkdownPreview.tsx',
   'src/components/PdfPreview.tsx',
   'src/components/DocxPreview.tsx',
+  'src/components/AudioPreview.tsx',
   'src/components/CodeEditor.tsx',
 ];
 

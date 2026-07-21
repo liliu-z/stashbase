@@ -1,6 +1,6 @@
 import { api } from '../api';
 import { useApp } from '../store/AppContext';
-import { getPreparationFailure } from '../store/fileReadiness';
+import { getPreparationProblem } from '../store/fileReadiness';
 import { Menu, type MenuItem } from './Menu';
 
 /** Drag-import veil. Visibility flows from the global drag handler in
@@ -26,7 +26,7 @@ export function ContextMenu() {
   // allowing any failed source file to ask the server to rebuild its
   // searchable representation.
   const preparationFailure = kind === 'file'
-    ? getPreparationFailure(state, target)
+    ? getPreparationProblem(state, target)
     : undefined;
   const canReprocess = Boolean(preparationFailure);
 

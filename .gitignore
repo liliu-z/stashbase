@@ -12,6 +12,8 @@ models/
 python/runtime/
 python/sidecar.nosync/
 python/sidecar/
+native/transcription/build.nosync/
+native/transcription/sidecar.nosync/
 *.log
 .DS_Store
 dev-docs/

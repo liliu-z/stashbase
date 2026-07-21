@@ -102,6 +102,29 @@ export function derivedHtmlFor(sourceAbs: string): string {
   return path.join(derivedDir(), `${derivedKey(sourceAbs)}.html`);
 }
 
+/** Structured transcript JSON for an audio source. The Markdown text layer
+ *  remains `derivedNoteFor(sourceAbs)`; this file drives timestamped preview. */
+export function derivedTranscriptFor(sourceAbs: string): string {
+  return path.join(derivedDir(), `${derivedKey(sourceAbs)}.transcript.json`);
+}
+
+/** Resumable per-chunk audio transcription checkpoints. */
+export function derivedAudioWorkFor(sourceAbs: string): string {
+  return path.join(derivedDir(), `${derivedKey(sourceAbs)}.audio-work`);
+}
+
+/** Browser-compatible fallback audio generated only when direct playback
+ *  fails. It is app-owned derived state, never placed beside the source. */
+export function derivedAudioPreviewFor(sourceAbs: string): string {
+  return path.join(derivedDir(), `${derivedKey(sourceAbs)}.preview.webm`);
+}
+
+/** Source signature for the browser-compatible playback fallback. The media
+ * file alone cannot prove freshness because source mtimes can move backwards. */
+export function derivedAudioPreviewMetadataFor(sourceAbs: string): string {
+  return path.join(derivedDir(), `${derivedKey(sourceAbs)}.preview.json`);
+}
+
 function derivedTextPathFor(sourceAbs: string, ext: '.md' | '.html'): string {
   return ext === '.html' ? derivedHtmlFor(sourceAbs) : derivedNoteFor(sourceAbs);
 }
@@ -164,6 +187,10 @@ export function deleteDerivedForSource(sourceAbs: string): DerivedCleanupStats {
   const removals = [
     rmDerivedArtifact(derivedNoteFor(sourceAbs)),
     rmDerivedArtifact(derivedHtmlFor(sourceAbs)),
+    rmDerivedArtifact(derivedTranscriptFor(sourceAbs)),
+    rmDerivedArtifact(derivedAudioWorkFor(sourceAbs)),
+    rmDerivedArtifact(derivedAudioPreviewFor(sourceAbs)),
+    rmDerivedArtifact(derivedAudioPreviewMetadataFor(sourceAbs)),
     rmDerivedArtifact(derivedBundleFor(sourceAbs)),
     rmDerivedArtifact(derivedBatchesFor(sourceAbs)),
   ];

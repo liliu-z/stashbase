@@ -14,7 +14,8 @@
 - 📄 Turn PDFs, including scans, into Markdown.
 - 📝 Convert DOCX files into derived HTML for preview and Agent reading.
 - 🖼️ Pull searchable text out of images with OCR.
-- 🔎 Index Markdown, HTML, PDFs, DOCX files, and images for semantic and keyword search.
+- 🎙️ Transcribe audio locally with whisper.cpp and keep timestamped text searchable.
+- 🔎 Index Markdown, HTML, PDFs, DOCX files, images, and audio for semantic and keyword search.
 - 🤖 Let Claude, Codex, and other MCP clients search the same local library.
 
 Your folders remain the source of truth; StashBase adds a rebuildable retrieval layer on top.
@@ -37,7 +38,7 @@ Curious about StashBase but not sure what to try first? Open this repo's `design
 
 ## 💡 Try It
 
-StashBase currently ships for **macOS (Apple Silicon)**, **Linux (x86_64 Debian/Ubuntu)**, and **Windows (x64)**.
+StashBase currently ships for **macOS 12+ (Apple Silicon)**, **Linux (x86_64 Debian 12+ / Ubuntu 22.04+)**, and **Windows (x64)**.
 
 ### macOS
 
@@ -63,8 +64,9 @@ Download the latest `StashBase-*-win-x64.exe` installer from [Releases](https://
 
 1. Open an existing local folder, or create a new one from the native folder picker.
 2. Add an OpenAI API key when prompted if you want semantic search. Without a key, files still open and keyword search still works.
-3. Connect Claude, Codex, or another MCP client from **Settings -> MCP**.
-4. Ask the Agent to search or use your local files.
+3. To transcribe audio, download a model from **Settings -> Transcription**: Tiny is about 74 MiB, Base 141 MiB, and Small 465 MiB. Small is selected by default; processing stays local and has no per-minute API fee. Transcription can be cancelled or reprocessed from the audio view.
+4. Connect Claude, Codex, or another MCP client from **Settings -> MCP**.
+5. Ask the Agent to search or use your local files.
 
 Your library is opt-in: only folders you open in StashBase are indexed. You can remove a folder from the library at any time; StashBase clears its index but never deletes the folder from disk.
 
@@ -85,8 +87,9 @@ Some local formats are awkward for Agents to read directly. StashBase keeps the 
 | PDF | Original PDF stays on disk | Converted to derived Markdown |
 | DOCX | Original DOCX stays on disk | Converted to derived HTML |
 | Images | Original image stays on disk | OCR text extracted for search |
+| Audio | Original audio stays on disk | Transcribed locally to timestamped Markdown |
 
-PDFs and DOCX files are different from HTML and images: for text reading, Agents use the derived Markdown or HTML. For HTML and images, the original file remains the primary reading object; the derived text is mainly for search.
+For PDF, DOCX, and audio, Agents read the derived text while the original remains the visible source file. Audio plays directly when supported and gets a local compatible preview otherwise. Large drag imports stream to disk instead of being held in renderer memory. See [architecture](design-docs/architecture.md) for the format data paths.
 
 ### Index
 
@@ -96,6 +99,7 @@ StashBase builds semantic and keyword search over:
 - PDF-derived Markdown
 - DOCX-derived HTML
 - OCR text from images
+- audio transcript Markdown
 
 Search results point back to the user-visible source file, not hidden app data.
 
@@ -208,14 +212,15 @@ It is mainly a convenience layer:
 Local files are the source of truth.
 
 ```text
-~/.stashbase/config.json          # app-level config: library folders, embedder key, HTTP MCP settings
+~/.stashbase/config.json          # app-level config, including transcription preferences
 
 <folder>/
   paper.pdf                       # user file
 
-<appData>/derived.nosync/         # derived Markdown and extracted assets
+<appData>/derived.nosync/         # derived text, assets, transcript work, audio previews
+<appData>/models/whisper/         # explicitly downloaded local speech models
 <appData>/vector-store.nosync/    # Milvus Lite vector store
-<appData>/folders/.../state/      # conversion failures and local app state
+<appData>/state/state.db          # conversion failures and local app state
 ```
 
 Removing a folder from the library clears StashBase's app-owned state for that folder. It does not delete the folder or its files from disk.
@@ -284,7 +289,7 @@ Early alpha.
 Supported today:
 
 - macOS arm64
-- Linux x86_64 Debian/Ubuntu
+- Linux x86_64 Debian 12+ / Ubuntu 22.04+
 - Windows x64
 
 Reasonably stable:

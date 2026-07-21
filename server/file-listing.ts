@@ -1,11 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { LEGACY_DERIVED_SOURCE_EXTENSION_ALTERNATION } from '../shared/file-formats.ts';
 import { decodeEntities } from './html.ts';
 import { onSwitch } from './folder.ts';
 import { detectFormat, detectViewerFormat, isDerivedNoteName, type FileFormat, type ViewerFormat } from './format.ts';
 import { isCloudPlaceholderName, isIndexExcludedDirName, shouldIndexFilePath } from './indexable.ts';
 import { normalizeFolderRelativePath } from './folder-relative-path.ts';
 import { folderRoot, resolveSafe } from './file-paths.ts';
+
+const LEGACY_DERIVED_SOURCE_RE = new RegExp(`^(.+)\\.(${LEGACY_DERIVED_SOURCE_EXTENSION_ALTERNATION})$`, 'i');
+const LEGACY_DERIVED_STEM_RE = new RegExp(`\\.(${LEGACY_DERIVED_SOURCE_EXTENSION_ALTERNATION})$`, 'i');
 
 export interface FileEntry {
   /** Folder-relative POSIX path (e.g. `topic/note.md`). */
@@ -66,7 +70,7 @@ export function listFilesAndFolders(): FolderListing {
     let entry: Pick<FileEntry, 'heading' | 'snippet' | 'imported_at'>;
     if (cached && cached.mtimeMs === st.mtimeMs) {
       entry = { heading: cached.heading, snippet: cached.snippet, imported_at: cached.imported_at };
-    } else if (format === 'pdf' || format === 'image' || format === 'docx') {
+    } else if (format === 'pdf' || format === 'image' || format === 'docx' || format === 'audio') {
       const imported_at = st.mtime.toISOString();
       previewCache.set(full, { mtimeMs: st.mtimeMs, heading: '', snippet: '', imported_at });
       entry = { heading: '', snippet: '', imported_at };
@@ -141,7 +145,7 @@ function walk(
     if (!e.isFile()) continue;
     const m = e.name.match(/^(.+)\.(md|markdown|html|htm|pdf)$/i);
     if (m) noteStems.add(m[1]);
-    const src = e.name.match(/^(.+)\.(pdf|png|jpe?g|webp|docx)$/i);
+    const src = e.name.match(LEGACY_DERIVED_SOURCE_RE);
     if (src) legacyDerivedStems.add(src[1]);
   }
   for (const e of entries) {
@@ -170,7 +174,7 @@ function isLegacyDerivedNoteName(name: string, sourceStems: Set<string>): boolea
   const m = name.match(/^\.([^/]+)\.(md|markdown|html|htm)$/i);
   if (!m) return false;
   const stem = m[1];
-  if (/\.(pdf|png|jpe?g|webp|docx)$/i.test(stem)) return false;
+  if (LEGACY_DERIVED_STEM_RE.test(stem)) return false;
   return sourceStems.has(stem);
 }
 

@@ -21,6 +21,7 @@ import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from 'node:chil
 import { INDEX_EXCLUDED_DIRS, MAX_INDEXABLE_BYTES } from './indexable.ts';
 import { NOTE_EXTS } from './format.ts';
 import { EventEmitter } from 'node:events';
+import { CONVERTIBLE_SOURCE_EXTENSIONS } from '../shared/file-formats.ts';
 import { existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
@@ -241,12 +242,12 @@ class MfsDaemon extends EventEmitter {
           max_indexable_bytes: MAX_INDEXABLE_BYTES,
           include_extensions: [
             ...NOTE_EXTS.map((e) => `.${e}`),
-            // Convertible sources (PDF/image/DOCX) are TRACKED by the disk walk so
+            // Convertible sources (PDF/image/DOCX/audio) are TRACKED by the disk walk so
             // their index entry — whose content is the app-data derived note,
             // indexed under the source path — isn't orphan-deleted, and so
             // scan_diff detects source changes. The daemon only lists/hashes
             // them; the markdown content is pushed by the conversion path.
-            '.pdf', '.png', '.jpg', '.jpeg', '.webp', '.docx',
+            ...CONVERTIBLE_SOURCE_EXTENSIONS.map((extension) => `.${extension}`),
           ],
         }).catch((err) => log.warn(
           `set_rules failed — daemon binary may predate rule push, indexing rules can drift ` +

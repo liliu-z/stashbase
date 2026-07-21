@@ -18,9 +18,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { discoverNewDocx, indexFreshDocx } from './docx.ts';
-import { discoverNewImages, indexFreshImage } from './image.ts';
-import { discoverNewPdfs, indexFreshPdf } from './pdf.ts';
+import { discoverConvertibleSources, indexFreshConvertibleSource } from './conversion-dispatch.ts';
 import { getApiKey } from './app-config.ts';
 import type { Indexer } from './indexer.ts';
 import { logger, errorMessage } from './log.ts';
@@ -155,9 +153,7 @@ async function deleteStaleRenameSource(
 }
 
 function discoverConvertedSources(root: string): void {
-  discoverNewPdfs(root);
-  discoverNewImages(root);
-  discoverNewDocx(root);
+  discoverConvertibleSources(root);
 }
 
 function cleanupRemovedSource(sourcePath: string): void {
@@ -166,6 +162,15 @@ function cleanupRemovedSource(sourcePath: string): void {
   try { clearRecord(sourcePath); } catch { /* best-effort */ }
   try { deleteDerivedForSource(sourcePath); } catch (err: unknown) {
     log.warn(`removed-source cleanup failed for ${sourcePath}: ${errorMessage(err)}`);
+  }
+}
+
+function invalidateModifiedConvertedSource(sourcePath: string): void {
+  if (!isConvertibleSource(sourcePath)) return;
+  try { cancelConversion(sourcePath); } catch { /* best-effort */ }
+  try { clearRecord(sourcePath); } catch { /* best-effort */ }
+  try { deleteDerivedForSource(sourcePath); } catch (err: unknown) {
+    log.warn(`modified-source invalidation failed for ${sourcePath}: ${errorMessage(err)}`);
   }
 }
 
@@ -209,7 +214,7 @@ export async function syncIndex(indexer: Indexer, root: string, opts: SyncOption
   // root … set an OpenAI API key" and a whole-folder import would flood
   // the log with one failure per file. Conversion discovery still
   // runs so PDFs/images can produce AppData derived text for keyword search
-  // and future reindex.
+    // and future reindex.
   if (!getApiKey()) {
     cleanupMissingConvertedSources(root);
     discoverConvertedSources(root);
@@ -222,6 +227,10 @@ export async function syncIndex(indexer: Indexer, root: string, opts: SyncOption
   const failed: { name: string; error: string }[] = [];
   const excludedRemoved = await removeExcludedIndexedFiles(indexer, root, failed);
   cleanupMissingConvertedSources(root);
+  // scan_diff is content-hash based. Invalidate converted output for every
+  // byte-level modification before freshness/discovery checks, even when a
+  // sync tool preserved source size and mtime.
+  for (const sourcePath of diff.modified) invalidateModifiedConvertedSource(sourcePath);
 
   const deletedCandidates = diff.deleted.filter((sourcePath) => !isLiveConvertedIndexRow(root, sourcePath));
 
@@ -405,11 +414,7 @@ async function indexFreshConvertedSources(
     const folderRel = folderRelOf(root, sourcePath);
     if (folderRel == null || !isConvertibleSource(folderRel)) continue;
     try {
-      const indexed = /\.pdf$/i.test(folderRel)
-        ? await indexFreshPdf(sourcePath)
-        : /\.docx$/i.test(folderRel)
-          ? await indexFreshDocx(sourcePath)
-          : await indexFreshImage(sourcePath);
+      const indexed = await indexFreshConvertibleSource(sourcePath, folderRel);
       if (indexed) done.push(sourcePath);
     } catch (err: unknown) {
       failed.push({ name: sourcePath, error: errorMessage(err) });

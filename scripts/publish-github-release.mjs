@@ -187,7 +187,10 @@ if (!skipBuild) {
   run(process.execPath, [path.join(root, 'scripts', 'package-unsigned.mjs')]);
 }
 if (!skipSmoke && process.platform === 'darwin') {
-  run(process.execPath, [path.join(root, 'scripts', 'smoke-packaged-server.mjs')]);
+  run(process.execPath, [
+    path.join(root, 'scripts', 'smoke-packaged-server.mjs'),
+    '--require-transcription',
+  ]);
 }
 
 const artifacts = listArtifacts();

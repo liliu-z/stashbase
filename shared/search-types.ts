@@ -2,7 +2,7 @@
  *  vocabulary between the renderer (chips) and the server (extension
  *  mapping); the category → extension mapping itself stays in
  *  `server/format.ts` next to the other extension knowledge. */
-export const SEARCH_TYPE_CATEGORIES = ['notes', 'pdf', 'image', 'docx'] as const;
+export const SEARCH_TYPE_CATEGORIES = ['notes', 'pdf', 'image', 'docx', 'audio'] as const;
 
 export type SearchTypeCategory = (typeof SEARCH_TYPE_CATEGORIES)[number];
 

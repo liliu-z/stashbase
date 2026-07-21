@@ -3,6 +3,7 @@ import type { State } from './state';
 
 export interface FileReadiness {
   preparationFailure: PreparationFailure | undefined;
+  preparationCancellation: PreparationFailure | undefined;
 }
 
 export function preparationFailureMatchesTarget(failurePath: string, target: string): boolean {
@@ -13,12 +14,30 @@ export function preparationFailureMatchesTarget(failurePath: string, target: str
   return failurePath === `${dir}.${base}.md`;
 }
 
-export function getPreparationFailure(s: State, path: string): PreparationFailure | undefined {
+type PreparationState = Pick<State, 'preparationFailures'>;
+
+export function getPreparationProblem(s: PreparationState, path: string): PreparationFailure | undefined {
   return s.preparationFailures.find((f) => preparationFailureMatchesTarget(f.path, path));
 }
 
-export function getFileReadiness(s: State, path: string): FileReadiness {
+export function getPreparationFailure(s: PreparationState, path: string): PreparationFailure | undefined {
+  const problem = getPreparationProblem(s, path);
+  return problem?.status === 'cancelled' ? undefined : problem;
+}
+
+export function getPreparationCancellation(s: PreparationState, path: string): PreparationFailure | undefined {
+  const problem = getPreparationProblem(s, path);
+  return problem?.status === 'cancelled' ? problem : undefined;
+}
+
+export function getFileReadiness(s: PreparationState, path: string): FileReadiness {
   return {
     preparationFailure: getPreparationFailure(s, path),
+    preparationCancellation: getPreparationCancellation(s, path),
   };
+}
+
+/** Folder-level status uses the same semantics as file rows. */
+export function hasAggregatePreparationFailure(failures: PreparationFailure[]): boolean {
+  return failures.some((failure) => failure.status !== 'cancelled');
 }

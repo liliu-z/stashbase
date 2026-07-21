@@ -56,9 +56,9 @@ export interface ChatTab {
 
 export interface OpenFile {
   name: string;
-  format: 'md' | 'html' | 'pdf' | 'image' | 'docx';
+  format: 'md' | 'html' | 'pdf' | 'image' | 'docx' | 'audio';
   /** Last on-disk content — diff target for the autosave path. Empty
-   *  string for binary files (PDF / image / DOCX; the viewer loads them
+   *  string for binary files (PDF / image / DOCX / audio; the viewer loads them
    *  directly from `/asset/*`). */
   content: string;
   /** Opaque server-side file version used to reject stale autosaves
@@ -114,6 +114,11 @@ export interface PendingHighlight {
   startLine?: number;
   endLine?: number;
   chunkText: string;
+  /** Exact timestamped transcript line for audio keyword hits. Other viewers
+   *  keep using chunkText as the find-bar query. */
+  audioSeekText?: string;
+  /** Exact millisecond position supplied by an audio keyword hit. */
+  audioSeekMs?: number;
   openFindBar?: boolean;
   pdfPage?: number;
 }
@@ -240,6 +245,10 @@ export interface State {
   /** Folder-relative paths of PDF/image/DOCX conversions that are queued or
    *  running. Kept for search-readiness accounting and refresh timing. */
   pendingConversions: string[];
+  /** Folder-relative convertible sources whose preparation cannot be queued
+   *  until setup is resolved. Separate from pending so the UI never implies
+   *  that these files will become searchable without user action. */
+  blockedConversions: string[];
   /** Current per-file conversion state for the active folder, including
    *  queued lane position and running extractor progress. */
   conversionProgress: Record<string, ConversionProgress>;
@@ -366,6 +375,7 @@ export const initialState: State = {
   chatTabRecencyByAgent: {},
   pendingSemanticNames: new Set(),
   pendingConversions: [],
+  blockedConversions: [],
   conversionProgress: {},
   conversionRevision: 0,
   conversionVersions: {},
@@ -452,6 +462,7 @@ export type Action =
   | { type: 'SELECT_PATH'; path: string }
   | { type: 'PENDING_SEMANTIC_NAMES'; names: Set<string> }
   | { type: 'PENDING_CONVERSIONS'; paths: string[] }
+  | { type: 'BLOCKED_CONVERSIONS'; paths: string[] }
   | { type: 'CONVERSION_PROGRESS'; progress: Record<string, ConversionProgress> }
   | { type: 'CONVERSION_SCHEDULER_STATE'; revision: number; versions: Record<string, number> }
   | { type: 'SAVE_STATUS'; status: SaveStatus }
