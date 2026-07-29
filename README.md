@@ -3,34 +3,30 @@
 **Turn local files into searchable context for Agents.**
 
 [![Website](https://img.shields.io/badge/website-stashbase.ai-0a66c2.svg)](https://stashbase.ai)
+[![Release](https://img.shields.io/github/v/release/liliu-z/stashbase?label=release)](https://github.com/liliu-z/stashbase/releases/latest)
 [![Status](https://img.shields.io/badge/status-early%20alpha-orange.svg)](#status)
-[![Node](https://img.shields.io/badge/node-%3E%3D22.12-brightgreen.svg)](https://nodejs.org/)
-[![Powered by mfs](https://img.shields.io/badge/powered%20by-mfs-0891b2.svg)](https://github.com/zilliztech/mfs)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-support%20%26%20chat-5865F2.svg?logo=discord&logoColor=white)](https://discord.gg/zsRZH4PTq9)
 
 📂 Open a folder in StashBase to make it searchable by Agents:
 
-- 📄 Turn PDFs, including scans, into Markdown.
-- 📝 Convert DOCX files into derived HTML for preview and Agent reading.
-- 🖼️ Pull searchable text out of images with OCR.
-- 🎙️ Transcribe audio locally with whisper.cpp and keep timestamped text searchable.
-- 🔎 Index Markdown, HTML, PDFs, DOCX files, images, and audio for semantic and keyword search.
-- 🤖 Let Claude, Codex, and other MCP clients search the same local library.
+- 📄 **Prepare files:** extract searchable text from PDFs, DOCX files, images, audio, and video.
+- 🔎 **Search & index:** find relevant context by meaning, not just matching keywords.
+- 🤖 **Connect Agents:** keep context shared across Claude, Codex, and other MCP clients.
 
-Your folders remain the source of truth; StashBase adds a rebuildable retrieval layer on top.
+Your folders remain the source of truth; StashBase adds a search index that can be rebuilt from them.
 
 That is the core idea:
 
 ```text
-Local files -> Convert -> Index -> Retrieve -> MCP -> Agents
+Local files -> Prepare -> Index -> Retrieve -> MCP -> Agents
 ```
 
 ---
 
 ## 🚀 Demo
 
-Curious about StashBase but not sure what to try first? Open this repo's `design-docs/` folder in StashBase and ask the built-in Agent how the project is designed.
+Open this repo in StashBase and ask the built-in Agent: **How is this project designed?**
 
 ![StashBase demo: opening local design docs and asking the Agent about architecture and product direction](assets/readme/demo.gif)
 
@@ -38,13 +34,17 @@ Curious about StashBase but not sure what to try first? Open this repo's `design
 
 ## 💡 Try It
 
-StashBase currently ships for **macOS 12+ (Apple Silicon)**, **Linux (x86_64 Debian 12+ / Ubuntu 22.04+)**, and **Windows (x64)**.
+StashBase primarily supports **macOS 12+ (Apple Silicon)** and **Windows 10+ (x64)**. A community-supported Linux build is also available for **x86_64 Debian 12+ / Ubuntu 22.04+**.
 
 ### macOS
 
 ```bash
 brew install --cask liliu-z/stashbase/stashbase
 ```
+
+### Windows
+
+Download the latest `StashBase-*-win-x64.exe` installer from [Releases](https://github.com/liliu-z/stashbase/releases), then run it.
 
 ### Linux
 
@@ -54,17 +54,13 @@ Download the latest `StashBase-*-linux-amd64.deb` asset from [Releases](https://
 sudo dpkg -i ./StashBase-*-linux-amd64.deb
 ```
 
-### Windows
-
-Download the latest `StashBase-*-win-x64.exe` installer from [Releases](https://github.com/liliu-z/stashbase/releases), then run it.
-
 ### First Run
 
-> Don't have an OpenAI API key? Join our [Discord](https://discord.gg/zsRZH4PTq9) and ask for a test key.
+> Don't have an OpenAI API key? Keyword search still works. Join our [Discord](https://discord.gg/zsRZH4PTq9) to ask about evaluation access.
 
 1. Open an existing local folder, or create a new one from the native folder picker.
-2. Add an OpenAI API key when prompted if you want semantic search. Without a key, files still open and keyword search still works.
-3. To transcribe audio, download a model from **Settings -> Transcription**: Tiny is about 74 MiB, Base 141 MiB, and Small 465 MiB. Small is selected by default; processing stays local and has no per-minute API fee. Transcription can be cancelled or reprocessed from the audio view.
+2. Add an OpenAI API key when prompted if you want semantic search.
+3. To transcribe audio or video, download a model from **Settings -> Transcription**: Tiny is about 74 MiB, Base 141 MiB, and Small 465 MiB. Small is selected by default; processing stays local and has no per-minute API fee. Transcription can be cancelled or reprocessed while viewing the file.
 4. Connect Claude, Codex, or another MCP client from **Settings -> MCP**.
 5. Ask the Agent to search or use your local files.
 
@@ -74,11 +70,11 @@ Your library is opt-in: only folders you open in StashBase are indexed. You can 
 
 ## What It Does
 
-StashBase has two main jobs.
+StashBase has two core jobs: prepare files and index their contents.
 
-### Convert
+### Prepare
 
-Some local formats are awkward for Agents to read directly. StashBase keeps the original files in place and creates derived text only where it helps search or Agent reading.
+Some formats need preparation before their contents can be searched. StashBase keeps the original files in place and creates derived text only where needed for search and Agent access.
 
 | Format | Source file | Search / Agent text |
 |---|---|---|
@@ -87,9 +83,9 @@ Some local formats are awkward for Agents to read directly. StashBase keeps the 
 | PDF | Original PDF stays on disk | Converted to derived Markdown |
 | DOCX | Original DOCX stays on disk | Converted to derived HTML |
 | Images | Original image stays on disk | OCR text extracted for search |
-| Audio | Original audio stays on disk | Transcribed locally to timestamped Markdown |
+| Audio and video | Original media stays on disk | Audio track transcribed locally to timestamped Markdown |
 
-For PDF, DOCX, and audio, Agents read derived text while the original remains the visible source file. Audio plays directly when supported and gets a local compatible preview otherwise. Large drag imports stream to disk instead of being held in renderer memory. See [Architecture](design-docs/architecture.md) and [Preparation](design-docs/design/preparation.md) for the product and system contracts.
+For PDF, DOCX, audio, and video, Agents read derived text while the original remains the visible source file. Audio and video play directly when supported; otherwise, StashBase creates a compatible local playback version. Large drag imports stream to disk instead of being held in renderer memory. See [Architecture](design-docs/architecture.md) and [Preparation](design-docs/design/preparation.md) for the product and system contracts.
 
 ### Index
 
@@ -99,7 +95,7 @@ StashBase builds semantic and keyword search over:
 - PDF-derived Markdown
 - DOCX-derived HTML
 - OCR text from images
-- audio transcript Markdown
+- timestamped transcripts from audio and video
 
 Search results point back to the user-visible source file, not hidden app data.
 
@@ -134,61 +130,7 @@ These helpers are for Agent clients that run in a sandbox and cannot directly ac
 
 The normal path is **Settings -> MCP**. StashBase can write the MCP config for supported clients or copy the stdio snippet for clients that manage config themselves.
 
-The packaged MCP command is generated at:
-
-```text
-~/.stashbase/bin/stashbase-mcp
-%USERPROFILE%\.stashbase\bin\stashbase-mcp.cmd  # Windows
-```
-
-Manual examples:
-
-#### Claude Code
-
-```bash
-claude mcp add stashbase -- ~/.stashbase/bin/stashbase-mcp
-# Windows:
-claude mcp add stashbase -- %USERPROFILE%\.stashbase\bin\stashbase-mcp.cmd
-```
-
-#### Claude Desktop
-
-In `~/Library/Application Support/Claude/claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "stashbase": {
-      "command": "/Users/YOUR_USER/.stashbase/bin/stashbase-mcp"
-    }
-  }
-}
-```
-
-#### Codex CLI
-
-In `~/.codex/config.toml`:
-
-```toml
-[mcp_servers.stashbase]
-command = "/Users/YOUR_USER/.stashbase/bin/stashbase-mcp"
-# Windows:
-command = "C:\\Users\\YOUR_USER\\.stashbase\\bin\\stashbase-mcp.cmd"
-```
-
-#### URL-based clients (Streamable HTTP)
-
-Server-side clients that cannot spawn a local process can use Streamable HTTP. Open **Settings -> MCP -> URL access** to copy the current URL and bearer token. Requests send:
-
-```text
-Authorization: Bearer <token shown in Settings>
-```
-
-Same-machine access uses `http://127.0.0.1:8090/mcp` and stays on loopback. Docker access is disabled by default. Enabling it in Settings opens a separate token-gated, MCP-only listener at `http://host.docker.internal:8091/mcp` by default; disable Docker access first to choose another port in Settings. No other StashBase API is exposed on that port. Docker Desktop or the host firewall must allow the selected port. Native Linux Docker Engine also needs `--add-host=host.docker.internal:host-gateway` (or the equivalent Compose `extra_hosts` entry). Browser-page clients are intentionally unsupported by the Origin/CORS boundary.
-
-The token is stored in `~/.stashbase/config.json`, shown and rotated only through Settings, and checked on every request. The endpoint is stateless JSON-RPC over POST; rotating the token immediately invalidates the old value.
-
-Restart the client after changing MCP config.
+For manual stdio setup, URL-based clients, Docker access, ports, CORS boundaries, and token rotation, see [Advanced MCP configuration](docs/mcp-configuration.md).
 
 ---
 
@@ -200,7 +142,7 @@ The panel uses the same library and MCP server as external clients. It does not 
 
 It is mainly a convenience layer:
 
-- cwd is set to the current folder
+- sessions run in the current folder
 - tool calls and file edits can be reviewed in the app
 - sessions stay in the Agent CLI's normal storage
 - external clients can use the same context through MCP
@@ -217,7 +159,7 @@ Local files are the source of truth.
 <folder>/
   paper.pdf                       # user file
 
-<appData>/derived.nosync/         # derived text, assets, transcript work, audio previews
+<appData>/derived.nosync/         # derived text, assets, transcript work, media previews
 <appData>/models/whisper/         # explicitly downloaded local speech models
 <appData>/vector-store.nosync/    # Milvus Lite vector store
 <appData>/state/state.db          # conversion failures and local app state
@@ -257,10 +199,10 @@ pnpm electron
 # Development mode
 pnpm dev
 
-# Build distributable apps
-pnpm dist
-pnpm dist:win
-pnpm dist:linux
+# Build a distributable app for your platform
+pnpm dist        # macOS
+pnpm dist:win    # Windows
+pnpm dist:linux  # Linux
 
 # Optional: include the local PDF/OCR extractor sidecar
 pnpm build:python-extract-sidecar
@@ -269,18 +211,8 @@ pnpm build:python-extract-sidecar
 Before opening a PR:
 
 ```bash
-pnpm exec tsc --noEmit
-pnpm test:python
-pnpm build
+pnpm check
 ```
-
-Debugging:
-
-- Renderer logs: **View -> Toggle Developer Tools**
-- Packaged-app server logs: `~/Library/Logs/StashBase/`
-- Useful env vars: `STASHBASE_LOG=debug`, `STASHBASE_PYTHON=/path/to/python`, `STASHBASE_BUILD_EXTRACT=1`
-
-API keys are configured in Settings, not environment variables.
 
 ---
 
@@ -288,28 +220,31 @@ API keys are configured in Settings, not environment variables.
 
 Early alpha.
 
-Supported today:
+Primary support:
 
 - macOS arm64
+- Windows 10+ x64
+
+Community-supported:
+
 - Linux x86_64 Debian 12+ / Ubuntu 22.04+
-- Windows x64
 
 Reasonably stable:
 
 - Local folder library model
 - Markdown preview with accessible footnotes, plus HTML, PDF, and image handling
-- PDF extraction and image OCR, with persisted failures and retry
+- PDF extraction, image OCR, and local audio and video transcription, with persisted failures and retry
 - Semantic and keyword search
 - MCP server and client connectors
 - Bounded file helpers for sandboxed Agents
 - Built-in Claude Code / Codex panel
 
-Still evolving:
+### Where We Need Help
 
-- Agent panel polish
-- Search filters and ranking controls
-- Long-running conversion and recovery edge cases
-- Packaging polish across platforms
+- [Agent panel polish](https://github.com/liliu-z/stashbase/issues?q=is%3Aissue+is%3Aopen+label%3A%22area%3A+agent-panel%22)
+- [Search filters and ranking controls](https://github.com/liliu-z/stashbase/issues?q=is%3Aissue+is%3Aopen+label%3A%22area%3A+search%22)
+- [Long-running conversion and recovery edge cases](https://github.com/liliu-z/stashbase/issues?q=is%3Aissue+is%3Aopen+label%3A%22area%3A+preparation%22)
+- [Packaging polish across platforms](https://github.com/liliu-z/stashbase/issues?q=is%3Aissue+is%3Aopen+label%3A%22area%3A+packaging%22)
 
 ---
 
@@ -317,16 +252,12 @@ Still evolving:
 
 Small focused PRs are preferred. Open an issue before larger changes so scope and direction can be discussed first.
 
+Not sure where to start? Open [`design-docs/`](design-docs/) in StashBase and ask the Agent—or just ask us.
+
 See [CONTRIBUTING.md](CONTRIBUTING.md) for local development, validation, and release-maintainer notes.
 
 ---
 
 ## About
 
-Built by Li Liu.
-
-I work on [Milvus](https://github.com/milvus-io/milvus) at [Zilliz](https://zilliz.com), where I have spent the last few years building vector retrieval infrastructure for AI systems.
-
-Coding with Agents already feels fluid inside IDEs. Local knowledge still does not.
-
-StashBase is my attempt at the missing layer: local-file infrastructure that makes personal documents, notes, papers, and AI outputs continuously retrievable across Agent workflows.
+StashBase is an independent open-source project built by [Li Liu](https://github.com/liliu-z), who works on [Milvus](https://github.com/milvus-io/milvus) at [Zilliz](https://zilliz.com). It applies years of experience in vector retrieval to making local files searchable across Agent workflows.
