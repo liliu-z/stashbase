@@ -39,6 +39,7 @@ import { useFileActions } from './useFileActions';
 import { useFindActions } from './useFindActions';
 import { useFolderActions } from './useFolderActions';
 import { useSearchActions } from './useSearchActions';
+import { createFolderMutationQueue } from '../folderTransition';
 
 interface ElectronLifecycleBridge {
   onPrepareContextRelease?: (
@@ -229,6 +230,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveInFlight = useRef<Promise<boolean> | null>(null);
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Both user navigation and stale-binding recovery mutate the server-side
+  // folder context for this window. One queue preserves their ordering.
+  const folderMutations = useRef(createFolderMutationQueue());
   const editorRef = useRef<EditorHandle | null>(null);
   // Race protection for `runSearch`: every call bumps this counter and
   // remembers its own value; an older request's response is dropped
@@ -457,6 +461,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       importConversionGrace,
       importIndexGrace,
       keyBackfillGrace,
+      folderMutations,
     },
     {
       loadFiles,
@@ -533,6 +538,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       importConversionGrace,
       importIndexGrace,
       keyBackfillGrace,
+      folderMutations,
     },
     {
       flushSave,

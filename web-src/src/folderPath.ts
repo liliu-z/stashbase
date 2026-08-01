@@ -35,9 +35,14 @@ export async function rebindFolderIfStillInLibrary<
   operations: {
     getLibrary: () => Promise<Library>;
     openFolder: (path: string) => Promise<Opened>;
+    /** Re-check ownership after the library read and before issuing a
+     * recovery mutation. A newer navigation may have started while the read
+     * was in flight. */
+    shouldContinue?: () => boolean;
   },
 ): Promise<{ library: Library; opened: Opened | null }> {
   const library = await operations.getLibrary();
   if (!isFolderStillInLibrary(folder, library)) return { library, opened: null };
+  if (operations.shouldContinue && !operations.shouldContinue()) return { library, opened: null };
   return { library, opened: await operations.openFolder(folder) };
 }

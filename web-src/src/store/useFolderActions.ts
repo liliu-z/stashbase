@@ -1,7 +1,7 @@
-import { useCallback, useRef, type MutableRefObject } from 'react';
+import { useCallback, type MutableRefObject } from 'react';
 import { api } from '../api';
 import { folderRefsEqual, isAbsoluteFolderRef } from '../folderPath';
-import { createFolderMutationQueue } from '../folderTransition';
+import type { FolderMutationQueue } from '../folderTransition';
 import type { EditorHandle } from './actionTypes';
 import type { Action, LibraryFolderStatus, State } from './state';
 import type { ToastOptions } from './useFeedbackActions';
@@ -19,6 +19,7 @@ interface FolderActionRefs {
   importConversionGrace: MutableRefObject<Map<string, number>>;
   importIndexGrace: MutableRefObject<Map<string, number>>;
   keyBackfillGrace: MutableRefObject<Map<string, number>>;
+  folderMutations: MutableRefObject<FolderMutationQueue>;
 }
 
 interface FolderActionDependencies {
@@ -63,7 +64,7 @@ export function useFolderActions(
     refreshIndexState,
     toast,
   } = dependencies;
-  const folderMutations = useRef(createFolderMutationQueue()).current;
+  const { folderMutations } = refs;
 
   const resetFolderScopedState = useCallback(() => {
     const previous = state.current;
@@ -162,7 +163,7 @@ export function useFolderActions(
       throw new Error('Current file could not be saved. Resolve the save error before switching folders.');
     }
     const generation = ++openGeneration.current;
-    const opened = await folderMutations.run(() => api.openFolder(path));
+    const opened = await folderMutations.current.run(() => api.openFolder(path));
     const current = opened.current;
     if (!current || generation !== openGeneration.current) return;
     void refreshRecent().catch((err) => {
@@ -179,7 +180,7 @@ export function useFolderActions(
       throw new Error('Current file could not be saved. Resolve the save error before switching folders.');
     }
     const generation = ++openGeneration.current;
-    const opened = await folderMutations.run(() => api.openFolderByName(name, {
+    const opened = await folderMutations.current.run(() => api.openFolderByName(name, {
       create: opts?.create,
       exclusiveCreate: opts?.exclusiveCreate,
     }));
@@ -204,7 +205,7 @@ export function useFolderActions(
       homeDir: state.current.homeDir,
     });
     try {
-      await folderMutations.run(() => api.closeFolder());
+      await folderMutations.current.run(() => api.closeFolder());
     } catch (err: unknown) {
       toast(
         'Could not close the current folder: ' + (err instanceof Error ? err.message : String(err)),

@@ -1,6 +1,7 @@
 import { useCallback, type MutableRefObject } from 'react';
 import { api, ApiError } from '../api';
 import { rebindFolderIfStillInLibrary } from '../folderPath';
+import type { FolderMutationQueue } from '../folderTransition';
 import {
   filterGuiSemanticHits,
   shallowEqualConversionProgress,
@@ -34,6 +35,7 @@ interface SearchActionRefs {
   importConversionGrace: MutableRefObject<Map<string, number>>;
   importIndexGrace: MutableRefObject<Map<string, number>>;
   keyBackfillGrace: MutableRefObject<Map<string, number>>;
+  folderMutations: MutableRefObject<FolderMutationQueue>;
 }
 
 interface SearchActionDependencies {
@@ -78,6 +80,7 @@ export function useSearchActions(
     importConversionGrace,
     importIndexGrace,
     keyBackfillGrace,
+    folderMutations,
     lastTreeVersion,
     openGeneration: openGen,
     pollTimer,
@@ -296,7 +299,7 @@ export function useSearchActions(
       }
       if (err instanceof ApiError && err.status === 412) {
         let latestLibrary: Awaited<ReturnType<typeof api.getFolder>> | null = null;
-        if (folderPathAtStart && openGenAtStart === openGen.current) {
+        if (folderPathAtStart && stillTargetFolder()) {
           try {
             // Server restart / dev tsx reload drops the in-memory
             // window → folder binding while the renderer still has the
@@ -305,8 +308,20 @@ export function useSearchActions(
             // removing the folder from the library.
             const recovery = await rebindFolderIfStillInLibrary(folderPathAtStart, {
               getLibrary: api.getFolder,
-              openFolder: api.openFolder,
+              shouldContinue: stillTargetFolder,
+              // Recovery and user navigation mutate the same server-side
+              // window context. Sharing the queue means a newer open either
+              // prevents this stale recovery from starting or is the final
+              // binding after a recovery that was already in flight.
+              openFolder: (path) => folderMutations.current.run(() => {
+                if (!stillTargetFolder()) throw new Error('stale folder recovery');
+                return api.openFolder(path);
+              }),
             });
+            if (!stillTargetFolder()) {
+              scheduleNextPoll(nextDelay);
+              return;
+            }
             latestLibrary = recovery.library;
             if (!recovery.opened) {
               throw new Error('folder was removed from the library');
@@ -327,9 +342,17 @@ export function useSearchActions(
               return;
             }
           } catch {
+            if (!stillTargetFolder()) {
+              scheduleNextPoll(nextDelay);
+              return;
+            }
             // Folder was deleted/renamed, or the server is still not ready.
             // Drop through to the hard reset below.
           }
+        }
+        if (!stillTargetFolder()) {
+          scheduleNextPoll(nextDelay);
+          return;
         }
         // A current committed folder could not be rebound (it was removed,
         // renamed, or the server is still unavailable). Clear every

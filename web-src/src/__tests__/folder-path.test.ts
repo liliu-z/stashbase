@@ -46,3 +46,21 @@ test('context recovery never reopens a folder removed by another window', async 
   assert.equal(opens, 0);
   assert.equal(result.opened, null);
 });
+
+test('context recovery does not issue an old folder open after navigation changes during its library read', async () => {
+  let resolveLibrary!: (library: { recent: { path: string }[] }) => void;
+  const library = new Promise<{ recent: { path: string }[] }>((resolve) => { resolveLibrary = resolve; });
+  let opens = 0;
+  const recovery = rebindFolderIfStillInLibrary('/notes', {
+    getLibrary: async () => library,
+    shouldContinue: () => false,
+    openFolder: async () => {
+      opens += 1;
+      return { current: { path: '/notes' } };
+    },
+  });
+  resolveLibrary({ recent: [{ path: '/notes' }] });
+  const result = await recovery;
+  assert.equal(opens, 0);
+  assert.equal(result.opened, null);
+});

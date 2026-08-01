@@ -433,7 +433,7 @@ Representative failure:
 Current contract:
 
 - Opening a folder establishes renderer folder identity and hides Welcome before `/api/files`, file order, or `/api/index-status` finish.
-- Active-folder index polling starts only after that renderer identity is committed. Every poll response, including `NO_FOLDER`, is fenced by both the committed folder path and the navigation generation, so a Welcome-era or superseded response cannot cancel a newer successful open.
+- Active-folder index polling starts only after that renderer identity is committed. Every poll response, including `NO_FOLDER`, is fenced by both the committed folder path and the navigation generation, so a Welcome-era or superseded response cannot cancel a newer successful open. Rebind recovery rechecks that fence after every await and shares the window's folder-mutation queue with user navigation, so an old recovery cannot restore an obsolete server binding.
 - Folder-switch side effects such as index sync and Agent-session cleanup are scheduled after the open-folder response, so they cannot turn navigation into a failed request.
 - Folder-sync queue cleanup consumes rejected promises; an indexer or daemon startup failure records an index warning but must not exit the Node server.
 - Going Home resets renderer folder state and shows Welcome before the server-side close request returns.
