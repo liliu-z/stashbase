@@ -45,6 +45,29 @@ interface SearchActionDependencies {
   toast: Toast;
 }
 
+/**
+ * Index status belongs to a committed renderer folder, not merely to a server
+ * window context. A folder open has a short interval where the server has
+ * accepted the new folder but the renderer has not committed its identity
+ * yet. Requiring both the path and navigation generation prevents an older
+ * Welcome-era poll from treating that interval as its own and undoing it.
+ */
+export function isCurrentIndexStatusPoll({
+  folderPathAtStart,
+  currentFolderPath,
+  openGenerationAtStart,
+  currentOpenGeneration,
+}: {
+  folderPathAtStart: string;
+  currentFolderPath: string;
+  openGenerationAtStart: number;
+  currentOpenGeneration: number;
+}): boolean {
+  return Boolean(folderPathAtStart)
+    && folderPathAtStart === currentFolderPath
+    && openGenerationAtStart === currentOpenGeneration;
+}
+
 /** Owns search requests, index-status polling, and sync progress state. */
 export function useSearchActions(
   refs: SearchActionRefs,
@@ -93,9 +116,17 @@ export function useSearchActions(
     const explicitFolderPath = folderPathOverride?.trim() || undefined;
     const folderPathAtStart = explicitFolderPath ?? stateRef.current.folderPath;
     const openGenAtStart = openGen.current;
-    const stillTargetFolder = () =>
-      stateRef.current.folderPath === folderPathAtStart
-      || (explicitFolderPath != null && openGenAtStart === openGen.current);
+    // Welcome owns its own per-library-folder status polling. Do not send an
+    // active-folder request until this renderer has committed a folder: a
+    // late NO_FOLDER response from Welcome must never cancel an in-flight
+    // folder open.
+    if (!folderPathAtStart) return;
+    const stillTargetFolder = () => isCurrentIndexStatusPoll({
+      folderPathAtStart,
+      currentFolderPath: stateRef.current.folderPath,
+      openGenerationAtStart: openGenAtStart,
+      currentOpenGeneration: openGen.current,
+    });
     try {
       const s = await api.indexStatus(folderPathAtStart || undefined);
       if (!stillTargetFolder()) {
@@ -300,9 +331,11 @@ export function useSearchActions(
             // Drop through to the hard reset below.
           }
         }
-        // No folder open (e.g. just went home). Clear every folder-scoped
-        // indicator so a stale banner from the previous folder doesn't
-        // bleed into the welcome / next-folder view.
+        // A current committed folder could not be rebound (it was removed,
+        // renamed, or the server is still unavailable). Clear every
+        // folder-scoped indicator before returning this renderer to Welcome.
+        // `stillTargetFolder()` above excludes Welcome-era and superseded
+        // polls, so this invalidation cannot discard a newer folder open.
         syncGen.current += 1;
         openGen.current += 1;
         dispatch({ type: 'PENDING_SEMANTIC_NAMES', names: new Set() });
@@ -314,27 +347,25 @@ export function useSearchActions(
         dispatch({ type: 'PREPARATION_FAILURES', failures: [] });
         dispatch({ type: 'SYNC_RUNNING', running: false });
         lastTreeVersion.current = -1;
-        if (stateRef.current.folderPath) {
-          // Another window may have deleted/closed the folder. The server
-          // has already cleared this window's current-folder context; make
-          // the renderer match instead of leaving a stale tree open.
-          dispatch({ type: 'TABS_RESET' });
-          dispatch({ type: 'CHAT_TABS_RESET' });
-          dispatch({ type: 'FILTER', q: '' });
-          dispatch({ type: 'SEARCH_CLEAR' });
-          dispatch({ type: 'ACTIVE_FOLDER', path: '' });
-          dispatch({ type: 'FILE_ORDER_LOADED', order: {} });
-          dispatch({ type: 'FILES_LOADED', files: [], folders: [], folder: '', folderPath: '' });
-          dispatch({
-            type: 'WELCOME_SHOW',
-            recent: latestLibrary?.recent ?? [],
-            homeDir: latestLibrary?.homeDir,
-          });
-          if (!latestLibrary) {
-            void api.getFolder()
-              .then((j) => dispatch({ type: 'WELCOME_SHOW', recent: j.recent ?? [], homeDir: j.homeDir }))
-              .catch(() => { /* welcome can stay empty until bootstrap/focus */ });
-          }
+        // Another window may have deleted/closed the folder. The server has
+        // already cleared this window's current-folder context; make the
+        // renderer match instead of leaving a stale tree open.
+        dispatch({ type: 'TABS_RESET' });
+        dispatch({ type: 'CHAT_TABS_RESET' });
+        dispatch({ type: 'FILTER', q: '' });
+        dispatch({ type: 'SEARCH_CLEAR' });
+        dispatch({ type: 'ACTIVE_FOLDER', path: '' });
+        dispatch({ type: 'FILE_ORDER_LOADED', order: {} });
+        dispatch({ type: 'FILES_LOADED', files: [], folders: [], folder: '', folderPath: '' });
+        dispatch({
+          type: 'WELCOME_SHOW',
+          recent: latestLibrary?.recent ?? [],
+          homeDir: latestLibrary?.homeDir,
+        });
+        if (!latestLibrary) {
+          void api.getFolder()
+            .then((j) => dispatch({ type: 'WELCOME_SHOW', recent: j.recent ?? [], homeDir: j.homeDir }))
+            .catch(() => { /* welcome can stay empty until bootstrap/focus */ });
         }
       }
     }
