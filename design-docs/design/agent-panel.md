@@ -59,6 +59,9 @@ context, not a separate AI workspace.
   while the fresh Agent session reconnects, so users can observe or refine the
   setting. The current model and effort choices remain visually prominent using
   the active application theme.
+- The composer can inspect and select a runtime-owned skill for one prompt.
+  This compact choice never installs or edits skills, and ordinary prompts
+  retain each runtime's implicit skill matching.
 - The panel complements external MCP clients; it does not replace the
   bring-your-own-agent direction.
 

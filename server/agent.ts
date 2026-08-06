@@ -55,7 +55,7 @@ import { agentCliEnv, agentCliNeedsShell, commandDir, resolveAgentCli } from './
 import { ensureClaudeBridgeFile } from './agent-rules.ts';
 import { noteTreeChanged } from './watcher.ts';
 import { isAgentAccessMode, reportAgentRuntimeFailure, type AgentAccessMode } from './agent-contract.ts';
-import type { AgentClientEvent, AgentModel, AgentServerEvent } from './agent-contract.ts';
+import type { AgentClientEvent, AgentModel, AgentServerEvent, AgentSkill } from './agent-contract.ts';
 import { detectViewerFormat } from './format.ts';
 import { isAgentReadableDerivedTextReady } from './library-file-reader.ts';
 
@@ -72,6 +72,12 @@ function resolveClaudeBinary(): string | null {
 function missingClaudeMessage(): string {
   return 'Claude CLI not found. Install Claude Code or set STASHBASE_CLAUDE_BIN to the claude executable.';
 }
+
+export function claudeSkillsFromCommands(commands: Array<{ name: string; description: string }>): AgentSkill[] {
+  return commands.filter((command) => command.name.trim()).map((command) => ({ id: command.name, name: command.name, description: command.description || 'Claude Code skill' }));
+}
+
+export function claudeSkillPrompt(prompt: string, skill?: AgentSkill): string { return skill ? `/${skill.name} ${prompt}` : prompt; }
 
 /** Map the Shared Agent Contract's Access value to the native Claude SDK
  * permission mode. Keep the validation at this adapter boundary so callers
@@ -245,6 +251,9 @@ class AgentSession {
    *  client so the history dropdown can mark this session active. */
   private sessionId: string | null = null;
   private models: AgentModel[] = [];
+  private skills: AgentSkill[] = [];
+  private skillsGeneration = 0;
+  private commandsChanged = false;
 
   constructor(
     private ws: WebSocket,
@@ -349,6 +358,7 @@ class AgentSession {
     }
     await this.publishModels();
     this.send({ t: 'ready' });
+    void this.refreshSkills();
     void this.pump();
   }
 
@@ -403,6 +413,7 @@ class AgentSession {
     if (msg.type === 'system' && msg.subtype === 'init' && msg.model) {
       this.send(claudeActiveModelEvent(this.models, msg.model));
     }
+    if (msg.type === 'system' && msg.subtype === 'commands_changed') this.setSkills(msg.commands, true);
     switch (msg.type) {
       case 'stream_event': {
         // Partial deltas → typewriter streaming for text + thinking.
@@ -498,14 +509,17 @@ class AgentSession {
       case 'prompt': {
         const body = typeof msg.text === 'string' ? msg.text : '';
         if (!body.trim()) return;
+        const selected = msg.skill && typeof msg.skill.id === 'string' ? this.skills.find((skill) => skill.id === msg.skill!.id) : undefined;
+        if (msg.skill && !selected) { this.send({ t: 'error', message: 'That Claude skill is no longer available. Refresh skills and try again.' }); this.send({ t: 'turn-end', isError: true }); return; }
         this.send({ t: 'turn-start' });
         this.input.push({
           type: 'user',
-          message: { role: 'user', content: body },
+          message: { role: 'user', content: claudeSkillPrompt(body, selected) },
           parent_tool_use_id: null,
         } as SDKUserMessage);
         break;
       }
+      case 'skills-refresh': void this.refreshSkills(); break;
       case 'permission-reply': {
         const id = typeof msg.id === 'string' ? msg.id : '';
         const p = this.pending.get(id);
@@ -541,6 +555,19 @@ class AgentSession {
         this.dispose();
         break;
     }
+  }
+
+  private async refreshSkills(): Promise<void> {
+    this.send({ t: 'skills', skills: [], loading: true });
+    if (this.commandsChanged) { this.send({ t: 'skills', skills: this.skills }); return; }
+    const generation = this.skillsGeneration;
+    try { const commands = await this.q?.supportedCommands() ?? []; if (!this.commandsChanged && generation === this.skillsGeneration) this.setSkills(commands); }
+    catch (err: unknown) { if (!this.commandsChanged && generation === this.skillsGeneration) this.send({ t: 'skills', skills: [], error: `Could not load Claude skills: ${errorMessage(err)}` }); }
+  }
+
+  private setSkills(commands: Array<{ name: string; description: string }>, changed = false): void {
+    if (changed) this.commandsChanged = true;
+    this.skills = claudeSkillsFromCommands(commands); this.skillsGeneration += 1; this.send({ t: 'skills', skills: this.skills });
   }
 
   private send(obj: AgentServerEvent): void {

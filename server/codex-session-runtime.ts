@@ -13,6 +13,7 @@ import {
   reportAgentRuntimeFailure,
   type AgentAccessMode,
   type AgentModel,
+  type AgentSkill,
   type AgentClientEvent,
   type AgentServerEvent,
 } from './agent-contract.ts';
@@ -42,6 +43,9 @@ import { errorMessage, logger } from './log.ts';
 import { noteTreeChanged } from './watcher.ts';
 
 const log = logger('codex-agent');
+
+interface CodexResolvedSkill extends AgentSkill { path: string }
+function codexSkillInput(prompt: string, skill?: CodexResolvedSkill): JsonObject[] { return [{ type: 'text', text: skill ? `$${skill.name} ${prompt}` : prompt, text_elements: [] }, ...(skill ? [{ type: 'skill', name: skill.name, path: skill.path }] : [])]; }
 
 interface PendingApproval {
   requestId: JsonRpcId;
@@ -80,6 +84,10 @@ export class CodexSession {
   private selectedModel: string | undefined;
   private activeModel: string | undefined;
   private models: AgentModel[] = [];
+  private skills: CodexResolvedSkill[] = [];
+  private skillIds = new Map<string, string>();
+  private nextSkillId = 0;
+  private skillsRefreshGeneration = 0;
 
   readonly windowId: string;
 
@@ -125,6 +133,7 @@ export class CodexSession {
       if (this.resumeThreadId) await this.ensureThread();
       this.ready = true;
       this.send({ t: 'ready' });
+      void this.refreshSkills();
     } catch (err: unknown) {
       this.send({ t: 'error', message: errorMessage(err) });
       this.finish();
@@ -219,9 +228,12 @@ export class CodexSession {
         const body = typeof msg.text === 'string' ? msg.text : '';
         const titleHint = typeof msg.titleHint === 'string' ? msg.titleHint : '';
         if (!body.trim()) return;
-        void this.runTurn(body, titleHint);
+        const skill = msg.skill && typeof msg.skill.id === 'string' ? this.skills.find((candidate) => candidate.id === msg.skill!.id) : undefined;
+        if (msg.skill && !skill) { this.send({ t: 'error', message: 'That Codex skill is no longer available. Refresh skills and try again.' }); this.send({ t: 'turn-end', isError: true }); return; }
+        void this.runTurn(body, titleHint, skill);
         break;
       }
+      case 'skills-refresh': void this.refreshSkills(true); break;
       case 'steer': {
         const id = typeof msg.id === 'string' ? msg.id : '';
         const body = typeof msg.text === 'string' ? msg.text : '';
@@ -261,7 +273,7 @@ export class CodexSession {
     }
   }
 
-  private async runTurn(prompt: string, titleHint = ''): Promise<void> {
+  private async runTurn(prompt: string, titleHint = '', skill?: CodexResolvedSkill): Promise<void> {
     if (this.closed) return;
     if (!this.ready || !this.cwd) {
       this.send({ t: 'error', message: 'Codex is not ready yet.' });
@@ -286,7 +298,7 @@ export class CodexSession {
         cwd: this.cwd,
         ...codexEffortOption(this.effort),
         ...(override ? { model: override } : {}),
-        input: [{ type: 'text', text: prompt, text_elements: [] }],
+        input: codexSkillInput(prompt, skill),
       }) as Promise<JsonObject>;
       let result: JsonObject;
       try {
@@ -325,6 +337,30 @@ export class CodexSession {
         this.send({ t: 'turn-end', isError: !(err instanceof CodexTurnCancelledError) });
       }
     }
+  }
+
+  private async refreshSkills(forceReload = false): Promise<void> {
+    if (!this.cwd || this.closed) return;
+    const generation = ++this.skillsRefreshGeneration;
+    this.send({ t: 'skills', skills: [], loading: true });
+    try {
+      await this.ensureAppServer();
+      const result = await this.request('skills/list', { cwds: [this.cwd], ...(forceReload ? { forceReload: true } : {}) }) as JsonObject;
+      const rows = Array.isArray(result.data) ? result.data : [];
+      const row = rows.find((value) => value && typeof value === 'object' && stringValue((value as JsonObject).cwd) === this.cwd) as JsonObject | undefined;
+      if (this.closed || generation !== this.skillsRefreshGeneration) return;
+      this.skills = (Array.isArray(row?.skills) ? row!.skills : []).flatMap((value) => {
+        if (!value || typeof value !== 'object') return [];
+        const raw = value as JsonObject;
+        if (raw.enabled === false) return [];
+        const name = stringValue(raw.name), path = stringValue(raw.path), scope = typeof raw.scope === 'string' ? raw.scope : JSON.stringify(raw.scope ?? '');
+        if (!name || !path) return [];
+        const key = `${scope}\0${path}`;
+        let id = this.skillIds.get(key); if (!id) { id = `skill-${++this.nextSkillId}`; this.skillIds.set(key, id); }
+        return [{ id, name, path, description: stringValue(raw.description) || 'Codex skill' }];
+      });
+      this.send({ t: 'skills', skills: this.skills.map(({ id, name, description }) => ({ id, name, description })) });
+    } catch (err: unknown) { if (!this.closed && generation === this.skillsRefreshGeneration) this.send({ t: 'skills', skills: [], error: `Could not load Codex skills: ${errorMessage(err)}` }); }
   }
 
   /** `model/list` is the source of truth, including custom providers and
@@ -651,6 +687,9 @@ export class CodexSession {
         break;
       case 'turn/completed':
         this.onTurnCompleted(params);
+        break;
+      case 'skills/changed':
+        void this.refreshSkills(true);
         break;
       case 'error':
         this.onErrorNotification(params);

@@ -20,6 +20,7 @@ const SHARED_PANEL_CAPABILITIES = {
   modes: true,
   effort: true,
   models: true,
+  skills: true,
 } as const;
 
 export const BUILT_IN_AGENT_ADAPTERS: readonly AgentAdapter[] = [

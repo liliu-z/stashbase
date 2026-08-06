@@ -44,6 +44,16 @@ export interface AgentCapabilities {
   models: boolean;
   steering: boolean;
   titleHint: boolean;
+  skills: true;
+}
+
+/** A runtime-owned workflow surfaced by the compact composer picker. The
+ * renderer deliberately never receives native invocation details. */
+export interface AgentSkill {
+  /** Opaque runtime-scoped identity; never a filesystem path. */
+  id: string;
+  name: string;
+  description: string;
 }
 
 export interface AgentConnectionOptions {
@@ -66,7 +76,8 @@ export interface AgentModel {
 /** The stable panel wire protocol. Adapters may translate native events,
  * but they must only emit this transcript and lifecycle vocabulary. */
 export type AgentClientEvent =
-  | { t: 'prompt'; text: string; titleHint?: string }
+  | { t: 'prompt'; text: string; titleHint?: string; skill?: { id: string } }
+  | { t: 'skills-refresh' }
   | { t: 'steer'; id: string; text: string }
   | { t: 'permission-reply'; id: string; allow: boolean; always?: boolean }
   | { t: 'interrupt' }
@@ -75,6 +86,7 @@ export type AgentClientEvent =
 
 export type AgentServerEvent =
   | { t: 'ready' }
+  | { t: 'skills'; skills: AgentSkill[]; loading?: boolean; error?: string }
   | { t: 'session-id'; id: string }
   | { t: 'session-title'; title: string }
   | { t: 'models'; models: AgentModel[]; activeModel?: string; fallback?: string }

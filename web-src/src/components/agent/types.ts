@@ -9,6 +9,7 @@ export type ToolStatus = 'running' | 'awaiting' | 'done' | 'error' | 'denied';
  * object URL while composing; restored sessions use a constrained local
  * preview URL. The agent only receives `path`, never either preview URL. */
 export interface Attachment { path: string; name: string; dims?: string; previewUrl?: string }
+export interface AgentSkill { id: string; name: string; description: string }
 
 export interface ToolBlock {
   kind: 'tool';

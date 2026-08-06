@@ -18,7 +18,8 @@ import { baseName } from './attachments';
 import { changedEffortSelection, effortLabel, effortMenuState, effortOptions } from './effortMenuState';
 import { MentionComposer, type MentionComposerHandle, type MentionQuery } from './MentionComposer';
 import { rankMentionSuggestions } from './mentionRanking';
-import type { AgentModel, Attachment, EffortLevel, PermMode } from './types';
+import type { AgentModel, AgentSkill, Attachment, EffortLevel, PermMode } from './types';
+import { skillMenuState } from './skillMenuState';
 import { modelMenuLabel } from './modelState';
 
 const MODES: { id: PermMode; label: string; desc: string; Icon: typeof HandIcon }[] = [
@@ -183,9 +184,14 @@ function ModelMenu({ selectedModel, activeModel, models, locked, disabled, resum
   );
 }
 
+function SkillsMenu({ skills, selected, loading, error, disabled, onPick, onClear, onRefresh }: { skills: AgentSkill[]; selected: AgentSkill | null; loading: boolean; error: string | null; disabled: boolean; onPick: (skill: AgentSkill) => void; onClear: () => void; onRefresh: () => void }) {
+  const [open, setOpen] = useState(false); const state = skillMenuState({ loading, skills, error });
+  return <MenuTrigger isOpen={open} onOpenChange={setOpen}><Button className="agent-mode-btn" isDisabled={disabled}><ClipboardListIcon className="agent-mode-icon" />{selected?.name ?? 'Skills'}<ChevronDownIcon className="agent-mode-chevron" /></Button><Popover className="agent-mode-menu" placement="top end"><div className="agent-mode-menu-head"><span>Skills</span></div>{state.kind !== 'ready' ? <div className="agent-skills-state" role="status"><span>{state.message}</span>{state.kind !== 'loading' && <Button onPress={onRefresh}>Refresh</Button>}</div> : <Menu aria-label="Available skills" onAction={(key) => { const skill = skills.find((item) => item.id === String(key)); if (skill) { onPick(skill); setOpen(false); } }}>{skills.map((skill) => <MenuItem key={skill.id} id={skill.id} className="agent-mode-opt" textValue={skill.name}><span className="agent-mode-opt-text"><span className="agent-mode-opt-title">{skill.name}</span><span className="agent-mode-opt-desc">{skill.description}</span></span>{selected?.id === skill.id && <CheckIcon className="agent-mode-opt-check" />}</MenuItem>)}</Menu>}{selected && <Button onPress={() => { onClear(); setOpen(false); }}>Clear selected skill</Button>}</Popover></MenuTrigger>;
+}
+
 export function AgentComposer({
   phase, disabled, turnActive, active, mode, onSetMode, effort, onSetEffort,
-  effortLocked, supportedEfforts, selectedModel, activeModel, models, modelLocked, modelNotice, resumedSession, onSetModel, attachments, uploading, agentShortName, showModeMenu, showEffortMenu, showModelMenu, onPickFiles, onPasteImages, onFocusChange, onRemoveAttachment, onSend, onStop,
+  effortLocked, supportedEfforts, selectedModel, activeModel, models, modelLocked, modelNotice, resumedSession, onSetModel, skills, selectedSkill, skillsLoading, skillsError, onPickSkill, onClearSkill, onRefreshSkills, attachments, uploading, agentShortName, showModeMenu, showEffortMenu, showModelMenu, onPickFiles, onPasteImages, onFocusChange, onRemoveAttachment, onSend, onStop,
 }: {
   phase: 'connecting' | 'live' | 'closed';
   disabled: boolean;
@@ -204,6 +210,7 @@ export function AgentComposer({
   modelNotice: string | null;
   resumedSession: boolean;
   onSetModel: (model?: string) => void;
+  skills: AgentSkill[]; selectedSkill: AgentSkill | null; skillsLoading: boolean; skillsError: string | null; onPickSkill: (skill: AgentSkill) => void; onClearSkill: () => void; onRefreshSkills: () => void;
   attachments: Attachment[];
   uploading: boolean;
   agentShortName: string;
@@ -424,6 +431,7 @@ export function AgentComposer({
               onSetEffort={onSetEffort}
             />
           )}
+          <SkillsMenu skills={skills} selected={selectedSkill} loading={skillsLoading} error={skillsError} disabled={disabled} onPick={onPickSkill} onClear={onClearSkill} onRefresh={onRefreshSkills} />
           {turnActive ? (
             <Button className="agent-send stop" aria-label="Stop agent" onPress={onStop}>
               <StopIcon />

@@ -25,7 +25,7 @@ import { MessageList, type QueuedTurnPreview } from './agent/AgentMessages';
 import { baseName, mergeAttachments, readImageDims } from './agent/attachments';
 import { agentConnectionUrl } from './agent/connectionUrl';
 import { applyModelEvent, modelMenuLocked, modelMenuVisible, type ModelControlState } from './agent/modelState';
-import type { Attachment, Block, EffortLevel, PermMode, ServerEvent, ToolBlock } from './agent/types';
+import type { AgentSkill, Attachment, Block, EffortLevel, PermMode, ServerEvent, ToolBlock } from './agent/types';
 
 let blockSeq = 0;
 const nextId = () => `b${++blockSeq}`;
@@ -38,6 +38,7 @@ interface QueuedPrompt {
   text: string;
   attachments: Attachment[];
   titleHint?: string;
+  skill?: AgentSkill;
   status: 'waiting' | 'steering' | 'steered';
 }
 
@@ -45,6 +46,7 @@ interface PromptToSend {
   text: string;
   attachments: Attachment[];
   titleHint?: string;
+  skill?: AgentSkill;
   appendBlock: boolean;
   clearAttachments?: boolean;
 }
@@ -118,6 +120,10 @@ export function AgentView({
   const idRef = useRef(id); idRef.current = id;
   const titleRef = useRef(title); titleRef.current = title;
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [skills, setSkills] = useState<AgentSkill[]>([]);
+  const [selectedSkill, setSelectedSkill] = useState<AgentSkill | null>(null);
+  const [skillsLoading, setSkillsLoading] = useState(true);
+  const [skillsError, setSkillsError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const readyRef = useRef(false);
   const toolNamesRef = useRef<Map<string, string>>(new Map());
@@ -337,6 +343,10 @@ export function AgentView({
           return next;
         });
         break;
+      case 'skills':
+        setSkills(ev.skills); setSkillsLoading(ev.loading === true); setSkillsError(ev.error ?? null);
+        setSelectedSkill((selected) => selected && ev.skills.some((skill) => skill.id === selected.id) ? selected : null);
+        break;
       case 'session-title':
         if (isDefaultChatTitle(titleRef.current)) {
           const t = ev.title.trim();
@@ -493,15 +503,16 @@ export function AgentView({
 
   function send(text: string) {
     const atts = attachments;
+    const skill = selectedSkill ?? undefined;
     const titleHint = capabilities?.titleHint && isDefaultChatTitle(titleRef.current) ? text : undefined;
     if (turnActiveRef.current) {
       const id = nextId();
-      queuedPromptsRef.current.push({ id, text, attachments: atts, titleHint, status: 'waiting' });
+      queuedPromptsRef.current.push({ id, text, attachments: atts, titleHint, skill, status: 'waiting' });
       setQueuedTurns(queuePreview());
       setAttachments([]);
       return;
     }
-    void sendPromptNow({ text, attachments: atts, titleHint, appendBlock: true, clearAttachments: true });
+    void sendPromptNow({ text, attachments: atts, titleHint, skill, appendBlock: true, clearAttachments: true }); setSelectedSkill(null);
   }
 
   function runNextQueuedPrompt() {
@@ -541,6 +552,7 @@ export function AgentView({
     text,
     attachments: atts,
     titleHint,
+    skill,
     appendBlock,
     clearAttachments = false,
   }: PromptToSend) {
@@ -565,6 +577,7 @@ export function AgentView({
         t: 'prompt',
         text: wire,
         ...(titleHint ? { titleHint } : {}),
+        ...(skill ? { skill: { id: skill.id } } : {}),
       }));
       if (clearAttachments) clearComposerAttachments();
     } catch (err) {
@@ -900,6 +913,8 @@ export function AgentView({
         resumedSession={modelControl.resumedSession}
         supportedEfforts={supportedEfforts}
         onSetModel={changeModel}
+        skills={skills} selectedSkill={selectedSkill} skillsLoading={skillsLoading} skillsError={skillsError}
+        onPickSkill={setSelectedSkill} onClearSkill={() => setSelectedSkill(null)} onRefreshSkills={() => wsRef.current?.send(JSON.stringify({ t: 'skills-refresh' }))}
         showModeMenu={capabilities?.modes === true}
         showEffortMenu={capabilities?.effort === true}
         showModelMenu={modelMenuVisible(capabilities?.models === true, modelControl.models)}
