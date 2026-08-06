@@ -54,6 +54,7 @@ export function CrepeDocument({ tabId, name, content, readOnly, active }: {
   const headingSnapshotRef = useRef<HeadingSnapshot | null>(null);
   const [headings, setHeadings] = useState<DocumentHeading[]>([]);
   const [activeHeading, setActiveHeading] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
   nameRef.current = name;
   contentRef.current = content;
   readOnlyRef.current = readOnly;
@@ -99,6 +100,7 @@ export function CrepeDocument({ tabId, name, content, readOnly, active }: {
     }));
     editor.create().then(() => {
       if (disposed) return;
+      setReady(true);
       editorRef.current = editor;
       refreshDocumentDom(host, nameRef.current);
       updateHeadings();
@@ -110,6 +112,7 @@ export function CrepeDocument({ tabId, name, content, readOnly, active }: {
       }
     }).catch((error: unknown) => {
       console.error('[markdown] failed to create Crepe editor:', error);
+      setReady(true);
       actions.toast('Could not open the Markdown editor.', { level: 'error' });
     });
 
@@ -218,40 +221,36 @@ export function CrepeDocument({ tabId, name, content, readOnly, active }: {
     );
     actions.registerFindController(controller);
     return () => actions.registerFindController(null);
-  }, [actions, active]);
+  }, [actions]);
 
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
-    const blockRemoteImageUrl = (event: Event) => {
-      const input = event.target as HTMLInputElement | null;
+    const blockRemoteImageUrl = (e: Event) => {
+      const input = e.target as HTMLElement;
       if (!input?.matches('.image-edit .link-input-area')) return;
-      input.value = '';
-      event.stopPropagation();
+      const confirm = input.closest('.image-edit')?.querySelector('.confirm') as HTMLElement | null;
+      if (!confirm) return;
+      const onClick = (e2: MouseEvent) => {
+        const target = e2.target as HTMLElement | null;
+        if (!target?.closest) return;
+        if (target.closest('.image-edit .link-input-area')) return;
+        const anchor = (target.closest('.image-edit')?.querySelector('.link-input-area') as HTMLInputElement | null)?.value;
+        if (!anchor) return;
+        if (/^https?:\/\//.test(anchor)) {
+          e2.preventDefault();
+          e2.stopPropagation();
+          actions.toast('Local images only — paste a file into the editor or upload via the image button.', { level: 'info' });
+        }
+      };
+      host.addEventListener('click', onClick, { capture: true });
+      Promise.resolve().then(() => host.removeEventListener('click', onClick, { capture: true }));
     };
     host.addEventListener('input', blockRemoteImageUrl, true);
-    const onClick = (event: MouseEvent) => {
-      const target = event.target as Element | null;
-      if (!target?.closest) return;
-      const image = target.closest('img') as HTMLImageElement | null;
-      if (image) {
-        event.preventDefault();
-        window.postMessage({ type: 'stashbase-preview-image', src: image.currentSrc || image.src, alt: image.alt || '' }, window.location.origin);
-        return;
-      }
-      const anchor = target.closest('a') as HTMLAnchorElement | null;
+    const onClick = (e: MouseEvent) => {
+      const anchor = (e.target as HTMLElement | null)?.closest('a[href]');
       if (!anchor) return;
-      // Markdown links are untrusted input. Take ownership before routing the
-      // explicitly allowed targets so ignored schemes never reach the browser.
-      event.preventDefault();
-      const link = resolveMilkdownLink(anchor.getAttribute('href') ?? '', nameRef.current);
-      if (link.kind === 'anchor') {
-        host.querySelector<HTMLElement>(`#${CSS.escape(link.id)}`)?.scrollIntoView({ block: 'start' });
-      } else if (link.kind === 'note') {
-        void actions.navigateTo(link.path, link.anchor);
-      } else if (link.kind === 'external') {
-        window.postMessage({ type: 'stashbase-open-external', href: link.href }, window.location.origin);
-      }
+      resolveMilkdownLink(anchor.getAttribute('href') ?? '', nameRef.current, actions);
     };
     host.addEventListener('click', onClick);
     return () => {
@@ -276,7 +275,12 @@ export function CrepeDocument({ tabId, name, content, readOnly, active }: {
     if (applyChunkHighlight(host.ownerDocument, pendingHighlight.chunkText, host)) actions.consumePendingHighlight();
   }, [actions, content, pendingHighlight]);
 
-  return <div ref={hostRef} className={'crepe-shell' + (readOnly ? ' crepe-readonly' : '')} data-tab-id={tabId} hidden={!active} />;
+  return (
+    <div className="crepe-container">
+      <div ref={hostRef} className={'crepe-shell' + (readOnly ? ' crepe-readonly' : '') + (!ready ? ' crepe-loading' : '')} data-tab-id={tabId} hidden={!active} />
+      {active && !ready && <div className="crepe-loading-text doc-loading">Opening document…</div>}
+    </div>
+  );
 }
 
 async function uploadLocalImage(file: File, noteName: string): Promise<string> {
