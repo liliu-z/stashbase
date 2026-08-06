@@ -129,6 +129,7 @@ export function reducer(s: State, a: Action): State {
           saveStatus: { text: '', cls: '' },
           pendingAnchor: null,
           pendingHighlight: null,
+          pdfPage: undefined,
           // Only touch `preview` when explicitly asked — in-place anchor
           // nav reuses the same tab and must keep its existing
           // preview/pinned status.
@@ -499,5 +500,7 @@ export function reducer(s: State, a: Action): State {
       return { ...s, find: { ...s.find, open: false, current: 0, total: 0 } };
     case 'FIND_SET':
       return { ...s, find: { ...s.find, ...a.patch } };
+    case 'PDF_PAGE':
+      return patchActiveTab(s, { pdfPage: a.page });
   }
 }
