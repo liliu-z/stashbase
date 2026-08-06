@@ -102,6 +102,10 @@ export interface Tab {
    *  dispatches PENDING_HIGHLIGHT_CLEAR. Cleared automatically when
    *  the user navigates to a different file. */
   pendingHighlight: PendingHighlight | null;
+  /** Last-viewed PDF page for this tab, so switching away and back to a
+   *  PDF tab restores the reader to the same page instead of resetting to
+   *  page 1. Undefined = no stored position (open at page 1). */
+  pdfPage?: number;
   saveStatus: SaveStatus;
 }
 
@@ -490,4 +494,7 @@ export type Action =
   | { type: 'NEW_FOLDER_INPUT'; open: boolean }
   | { type: 'FIND_OPEN' }
   | { type: 'FIND_CLOSE' }
-  | { type: 'FIND_SET'; patch: Partial<State['find']> };
+  | { type: 'FIND_SET'; patch: Partial<State['find']> }
+  /** Persist the active tab's last-viewed PDF page so the viewer can
+   *  restore the reading position on remount (tab switch). */
+  | { type: 'PDF_PAGE'; page: number };
