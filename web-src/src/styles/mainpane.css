@@ -234,6 +234,11 @@
     /* The CrepeBuilder document is the sole Markdown surface. It adopts the
      StashBase palette instead of its package-default paper theme; the slash
      menu and contextual block controls keep authoring discoverable. */
+    .crepe-container { position: relative; min-height: 160px; height: 100%; }
+    .crepe-shell.crepe-loading { visibility: hidden; }
+    .crepe-loading-text { position: absolute; top: 0; left: 0; right: 0; }
+    .crepe-error-text { color: var(--error, #c0392b); }
+
     .crepe-shell,
     /* Milkdown's frame stylesheet assigns its own variables directly on
        `.milkdown`. This bridge intentionally has higher specificity so
