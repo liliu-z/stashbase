@@ -66,14 +66,14 @@ const PDFJS_ASSET_BASE = '/pdfjs-assets';
  *      the chunk text so the PDF jumps to the same passage.
  */
 export function PdfPreview({ name, showConversionBanner = true }: { name: string; showConversionBanner?: boolean }) {
-  const { state, actions, activeTab } = useApp();
+  const { state, actions, activeTab, dispatch } = useApp();
   const pendingHighlight = activeTab?.pendingHighlight ?? null;
   const containerRef = useRef<HTMLDivElement | null>(null);
   const currentRef = useRef({ folderPath: state.folderPath, name });
   currentRef.current = { folderPath: state.folderPath, name };
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null);
   const [numPages, setNumPages] = useState(0);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(activeTab?.pdfPage ?? 1);
   const [scale, setScale] = useState(1);
   const [autoFit, setAutoFit] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -136,6 +136,20 @@ export function PdfPreview({ name, showConversionBanner = true }: { name: string
     setCurrentPage(targetPage);
   }
 
+  // Persist the current page to the tab model so switching away and back
+  // restores the same reading position. Only dispatch for valid pages
+  // (loaded PDF) and skip the initial mount — the loaded page is already
+  // set via the initial state.
+  const firstPageRef = useRef(true);
+  useEffect(() => {
+    if (firstPageRef.current) {
+      firstPageRef.current = false;
+      return;
+    }
+    if (numPages <= 0) return;
+    dispatch({ type: 'PDF_PAGE', page: currentPage });
+  }, [currentPage, numPages, dispatch]);
+
   function fitScale(): number {
     const viewportWidth = containerRef.current?.clientWidth ?? 0;
     const pageWidth = pageMetrics?.width ?? 0;
@@ -151,7 +165,11 @@ export function PdfPreview({ name, showConversionBanner = true }: { name: string
     setError(null);
     setDoc(null);
     setNumPages(0);
-    setCurrentPage(1);
+    // Restore the tab's stored page on remount (tab switch); falls back to
+    // page 1 for a fresh file. The reducer clears `pdfPage` via FILE_OPEN
+    // when a *new* file replaces a preview tab, so a genuinely new document
+    // still opens at page 1.
+    setCurrentPage(activeTab?.pdfPage ?? 1);
     setPageMetrics(null);
     setScale(1);
     setAutoFit(true);
