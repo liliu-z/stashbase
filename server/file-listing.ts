@@ -152,12 +152,22 @@ function scanDirectory(dir: string, prefix: string): ScanResult {
     acceptedEntries.push(e);
   }
 
-  // If there are no accepted entries, this folder is physically empty.
-  if (acceptedEntries.length === 0) {
+  // Only an actually empty directory is retained as user-created structure.
+  // A directory whose entries are all excluded/generated is not physically
+  // empty and must not reappear as a misleading empty folder in the tree.
+  if (entries.length === 0) {
     return {
       isKept: true,
       files: [],
       folders: prefix ? [{ path: prefix }] : [],
+      unsupportedFiles: { sourceCode: 0, other: 0, otherExtensions: {} },
+    };
+  }
+  if (acceptedEntries.length === 0) {
+    return {
+      isKept: false,
+      files: [],
+      folders: [],
       unsupportedFiles: { sourceCode: 0, other: 0, otherExtensions: {} },
     };
   }

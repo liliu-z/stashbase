@@ -90,3 +90,73 @@ test('file-listing scan and classification', async () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+test('containers with only excluded entries are not treated as physically empty', () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-listing-excluded-test-'));
+
+  try {
+    fs.mkdirSync(path.join(tempDir, 'vendor-only', 'node_modules'), { recursive: true });
+    fs.writeFileSync(path.join(tempDir, 'vendor-only', 'node_modules', 'index.js'), 'ignored');
+    fs.mkdirSync(path.join(tempDir, 'git-only', '.git'), { recursive: true });
+    fs.writeFileSync(path.join(tempDir, 'git-only', '.git', 'config'), 'ignored');
+    fs.mkdirSync(path.join(tempDir, 'build-only', 'dist'), { recursive: true });
+    fs.writeFileSync(path.join(tempDir, 'build-only', 'dist', 'bundle.js'), 'ignored');
+
+    setCurrentFolder(tempDir);
+    const result = listFilesAndFolders();
+
+    assert.deepEqual(result.folders, []);
+    assert.deepEqual(result.unsupportedFiles, {
+      sourceCode: 0,
+      other: 0,
+      otherExtensions: [],
+    });
+  } finally {
+    clearCurrentFolder();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('physically empty descendants retain their ancestor path', () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-listing-empty-test-'));
+
+  try {
+    fs.mkdirSync(path.join(tempDir, 'parent', 'empty-child'), { recursive: true });
+    setCurrentFolder(tempDir);
+
+    assert.deepEqual(listFilesAndFolders().folders, [
+      { path: 'parent' },
+      { path: 'parent/empty-child' },
+    ]);
+  } finally {
+    clearCurrentFolder();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('unsupported classification is case-insensitive and extension summaries are stable', () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-listing-case-test-'));
+
+  try {
+    fs.writeFileSync(path.join(tempDir, 'UPPER.TS'), 'ignored');
+    fs.writeFileSync(path.join(tempDir, 'DockerFile'), 'ignored');
+    fs.writeFileSync(path.join(tempDir, 'one.CSV'), 'ignored');
+    fs.writeFileSync(path.join(tempDir, 'two.zip'), 'ignored');
+    fs.writeFileSync(path.join(tempDir, 'three.ZIP'), 'ignored');
+    fs.writeFileSync(path.join(tempDir, 'LICENSE'), 'ignored');
+    setCurrentFolder(tempDir);
+
+    assert.deepEqual(listFilesAndFolders().unsupportedFiles, {
+      sourceCode: 2,
+      other: 4,
+      otherExtensions: [
+        { extension: '.zip', count: 2 },
+        { extension: '.csv', count: 1 },
+        { extension: 'no extension', count: 1 },
+      ],
+    });
+  } finally {
+    clearCurrentFolder();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
