@@ -19,6 +19,7 @@ import type {
   UnsupportedFileSummary,
 } from '../api';
 import type { SearchTypeCategory } from '../../../shared/search-types.ts';
+import type { UnsupportedNoticeCategories } from '../unsupportedFiles';
 
 export {
   CHAT_MAX_WIDTH,
@@ -176,7 +177,7 @@ export interface State {
   files: FileMeta[];
   folders: FolderMeta[];
   unsupportedFiles?: UnsupportedFileSummary;
-  unsupportedModalOpen?: boolean;
+  unsupportedModal: UnsupportedNoticeCategories | null;
 
   /** Manual sidebar ordering — map of `parentPath` → ordered list of
    *  child basenames. Empty map = use default (folders-first +
@@ -349,7 +350,7 @@ export const initialState: State = {
   files: [],
   folders: [],
   unsupportedFiles: undefined,
-  unsupportedModalOpen: false,
+  unsupportedModal: null,
   fileOrder: {},
   tabs: [],
   recentFilePaths: [],
@@ -500,4 +501,5 @@ export type Action =
   | { type: 'FIND_OPEN' }
   | { type: 'FIND_CLOSE' }
   | { type: 'FIND_SET'; patch: Partial<State['find']> }
-  | { type: 'UNSUPPORTED_MODAL'; open: boolean };
+  | { type: 'UNSUPPORTED_MODAL_OPEN'; categories: UnsupportedNoticeCategories }
+  | { type: 'UNSUPPORTED_MODAL_CLOSE' };

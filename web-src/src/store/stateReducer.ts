@@ -19,6 +19,7 @@ import {
   remapOnePath,
   rememberChatTab,
 } from './stateHelpers';
+import { retainAvailableUnsupportedNotice } from '../unsupportedFiles';
 
 export function reducer(s: State, a: Action): State {
   switch (a.type) {
@@ -62,6 +63,9 @@ export function reducer(s: State, a: Action): State {
     case 'FILES_LOADED': {
       const folderPath = a.folderPath ?? (a.folder ? s.folderPath : '');
       const folderChanged = folderPath !== s.folderPath;
+      const unsupportedModal = folderChanged
+        ? null
+        : retainAvailableUnsupportedNotice(s.unsupportedModal, a.unsupportedFiles);
       return {
         ...s,
         files: a.files,
@@ -69,6 +73,7 @@ export function reducer(s: State, a: Action): State {
         folder: a.folder,
         folderPath,
         unsupportedFiles: a.unsupportedFiles,
+        unsupportedModal,
         ...(folderChanged
           ? {
               activeSidebarView: 'files' as const,
@@ -83,7 +88,6 @@ export function reducer(s: State, a: Action): State {
               // filters are per-folder session state too.
               searchScope: null,
               searchTypes: [],
-              unsupportedModalOpen: false,
             }
           : {}),
       };
@@ -511,7 +515,9 @@ export function reducer(s: State, a: Action): State {
       return { ...s, find: { ...s.find, open: false, current: 0, total: 0 } };
     case 'FIND_SET':
       return { ...s, find: { ...s.find, ...a.patch } };
-    case 'UNSUPPORTED_MODAL':
-      return { ...s, unsupportedModalOpen: a.open };
+    case 'UNSUPPORTED_MODAL_OPEN':
+      return { ...s, unsupportedModal: a.categories };
+    case 'UNSUPPORTED_MODAL_CLOSE':
+      return { ...s, unsupportedModal: null };
   }
 }

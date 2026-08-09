@@ -17,7 +17,10 @@ import { ModalShell } from './ModalShell';
 import { SearchPanel } from './SearchPanel';
 import { api, errorMessage } from '../api';
 import { FILE_MIME } from '../dragMime';
+import { formatUnsupportedExtensions, unsupportedNoticeForDetails } from '../unsupportedFiles';
 import { useEffect, useRef, useState, type DragEvent } from 'react';
+import { Button } from './ui/button';
+import { StatusMessage } from './ui/status';
 
 interface ElectronBridge {
   openFolderDialog?: (opts?: {
@@ -346,17 +349,6 @@ function FolderFoldToggle() {
   );
 }
 
-function formatExtensions(otherExtensions: Array<{ extension: string; count: number }>): string {
-  const list = otherExtensions.map((e) => e.extension);
-  const top3 = list.slice(0, 3);
-  const remaining = list.length - 3;
-  let base = top3.join(', ');
-  if (remaining > 0) {
-    base += ` and ${remaining} more format${remaining === 1 ? '' : 's'}`;
-  }
-  return base;
-}
-
 function UnsupportedFilesCallout() {
   const { state, dispatch } = useApp();
   const { sourceCode = 0, other = 0, otherExtensions = [] } = state.unsupportedFiles || {};
@@ -386,7 +378,7 @@ function UnsupportedFilesCallout() {
     );
   } else if (showOther) {
     title = 'Some file formats are hidden';
-    const extList = formatExtensions(otherExtensions);
+    const extList = formatUnsupportedExtensions(otherExtensions);
     body = (
       <>
         {other} unsupported files ({extList}) are not shown or indexed.
@@ -394,10 +386,16 @@ function UnsupportedFilesCallout() {
     );
   }
 
+  function openDetails() {
+    const categories = unsupportedNoticeForDetails(state.unsupportedFiles);
+    if (categories) dispatch({ type: 'UNSUPPORTED_MODAL_OPEN', categories });
+  }
+
   return (
-    <div className="unsupported-files-banner">
+    <StatusMessage className="mx-3 mb-2 mt-1 flex items-start gap-2 rounded-ui px-2.5 py-2 text-xs text-muted">
       <svg
-        style={{ width: '16px', height: '16px', flexShrink: 0, marginTop: '2px', color: 'var(--muted)' }}
+        aria-hidden="true"
+        className="mt-0.5 size-4 shrink-0 text-muted"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -405,19 +403,21 @@ function UnsupportedFilesCallout() {
       >
         <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
-      <div className="unsupported-files-banner-copy">
-        <div className="unsupported-files-banner-title">{title}</div>
-        <div style={{ fontSize: '11px', opacity: 0.9 }}>
+      <div className="min-w-0 flex-1">
+        <div className="mb-0.5 font-semibold text-foreground">{title}</div>
+        <div className="text-xs opacity-90">
           {body}
-          <button
+          <Button
             type="button"
-            className="unsupported-files-details-btn"
-            onClick={() => dispatch({ type: 'UNSUPPORTED_MODAL', open: true })}
+            variant="link"
+            size="xs"
+            className="ml-1 inline-flex h-auto p-0 align-baseline text-accent"
+            onClick={openDetails}
           >
             Details
-          </button>
+          </Button>
         </div>
       </div>
-    </div>
+    </StatusMessage>
   );
 }

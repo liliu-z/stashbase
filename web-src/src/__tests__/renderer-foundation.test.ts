@@ -106,6 +106,7 @@ test('shared overlays own loading modality, popup positioning, and focus return'
     'web-src/src/components/SettingsModal.tsx',
     'web-src/src/components/AlertConfirmModal.tsx',
     'web-src/src/components/ClipboardImportModal.tsx',
+    'web-src/src/components/UnsupportedFilesModal.tsx',
   ]) {
     const source = read(file);
     assert.match(source, /useOverlayLayer/);
@@ -115,6 +116,15 @@ test('shared overlays own loading modality, popup positioning, and focus return'
   const loadingStatus = read('web-src/src/components/ui/status.tsx');
   assert.match(loadingStatus, /dialog\.showModal\(\)/);
   assert.match(loadingStatus, /if \(isTopmost\) onCancel\(\)/);
+
+  const unsupportedGate = read('web-src/src/components/UnsupportedFilesModal.tsx');
+  assert.match(unsupportedGate, /lazyWithRetry\(\(\) => import\('\.\/ManagedUnsupportedFilesModal'\)\)/);
+  assert.match(unsupportedGate, /type: 'UNSUPPORTED_MODAL_CLOSE'/);
+  assert.match(unsupportedGate, /putOnboarding\(onboardingPatchForNotice\(confirmedCategories\)\)/);
+  const unsupportedModal = read('web-src/src/components/ManagedUnsupportedFilesModal.tsx');
+  assert.match(unsupportedModal, /\.\/ui\/button/);
+  assert.match(unsupportedModal, /onCancel=\{onCancel\}/);
+  assert.match(unsupportedModal, /onClick=\{onConfirm\}/);
 
   const popover = read('web-src/src/components/ui/popover.tsx');
   assert.match(popover, /<PopoverPrimitive\.Positioner[\s\S]*side=\{side\}/);

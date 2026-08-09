@@ -358,8 +358,5 @@ export function useDocumentActions(
     selectFileWithHighlight,
     toggleEditMode,
     updateTabPdfPage,
-    setUnsupportedModalOpen: (open: boolean) => {
-      dispatch({ type: 'UNSUPPORTED_MODAL', open });
-    },
   };
 }

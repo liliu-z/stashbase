@@ -157,8 +157,8 @@ export function FileTree() {
     if (total > 0) {
       return (
         <div className="empty-list">
-          <div style={{ fontWeight: 600, color: 'var(--fg)', marginBottom: '4px' }}>No supported files found</div>
-          <div style={{ fontSize: '11px', opacity: 0.8, lineHeight: 1.4 }}>
+          <div className="mb-1 font-semibold text-foreground">No supported files found</div>
+          <div className="text-xs leading-snug opacity-80">
             StashBase found {total} file{total === 1 ? '' : 's'} in this folder, but none can currently be displayed or indexed. Nothing on disk was changed.
           </div>
         </div>

@@ -25,6 +25,7 @@ import { ImageLightbox } from './components/ImageLightbox';
 import { ClipboardImportModal, type ClipboardOffer } from './components/ClipboardImportModal';
 import { CascadePromptModal } from './components/CascadePromptModal';
 import { AlertConfirmModal } from './components/AlertConfirmModal';
+import { UnsupportedFilesModalGate } from './components/UnsupportedFilesModal';
 import { Toasts } from './components/Toasts';
 import { ChatLaunchButtons } from './components/ChatLaunchButtons';
 import { SettingsPortal, openSettings } from './components/SettingsModal';
@@ -61,9 +62,6 @@ import {
 } from './workspaceLayout';
 
 const LazyChatPane = lazyWithRetry(() => import('./components/ChatPane').then((mod) => ({ default: mod.ChatPane })));
-const LazyUnsupportedFilesModalGate = lazyWithRetry(() =>
-  import('./components/UnsupportedFilesModal').then((mod) => ({ default: mod.UnsupportedFilesModalGate })),
-);
 
 /**
  * Top-level shell. Wraps everything in <AppProvider> (the single
@@ -377,9 +375,7 @@ function AppBody() {
         />
       )}
       <CascadePromptModal />
-      <Suspense fallback={null}>
-        <LazyUnsupportedFilesModalGate />
-      </Suspense>
+      <UnsupportedFilesModalGate />
       <AlertConfirmModal />
       <Toasts />
       {!state.welcomeVisible && <EmbedderRequireKeyGate />}

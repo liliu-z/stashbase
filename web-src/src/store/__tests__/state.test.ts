@@ -347,7 +347,7 @@ test('FILES_LOADED captures unsupportedFiles and folder change resets modal stat
     otherExtensions: [{ extension: '.zip', count: 1 }],
   };
 
-  let state = reducer(freshState({ unsupportedModalOpen: true }), {
+  let state = reducer(freshState({ unsupportedModal: { sourceCode: true, other: true } }), {
     type: 'FILES_LOADED',
     files: [],
     folders: [],
@@ -368,13 +368,48 @@ test('FILES_LOADED captures unsupportedFiles and folder change resets modal stat
   });
 
   assert.equal(state.unsupportedFiles, undefined);
-  assert.equal(state.unsupportedModalOpen, false);
+  assert.equal(state.unsupportedModal, null);
 });
 
-test('UNSUPPORTED_MODAL toggle action updates state', () => {
-  let state = reducer(freshState(), { type: 'UNSUPPORTED_MODAL', open: true });
-  assert.equal(state.unsupportedModalOpen, true);
+test('unsupported modal tracks the categories being explained', () => {
+  let state = reducer(freshState(), {
+    type: 'UNSUPPORTED_MODAL_OPEN',
+    categories: { sourceCode: false, other: true },
+  });
+  assert.deepEqual(state.unsupportedModal, { sourceCode: false, other: true });
 
-  state = reducer(state, { type: 'UNSUPPORTED_MODAL', open: false });
-  assert.equal(state.unsupportedModalOpen, false);
+  state = reducer(state, { type: 'UNSUPPORTED_MODAL_CLOSE' });
+  assert.equal(state.unsupportedModal, null);
+});
+
+test('FILES_LOADED closes or narrows an open unsupported notice as counts change', () => {
+  let state = freshState({
+    folder: 'notes',
+    folderPath: '/notes',
+    unsupportedModal: { sourceCode: true, other: true },
+  });
+
+  state = reducer(state, {
+    type: 'FILES_LOADED',
+    files: [],
+    folders: [],
+    folder: 'notes',
+    folderPath: '/notes',
+    unsupportedFiles: {
+      sourceCode: 0,
+      other: 1,
+      otherExtensions: [{ extension: '.zip', count: 1 }],
+    },
+  });
+  assert.deepEqual(state.unsupportedModal, { sourceCode: false, other: true });
+
+  state = reducer(state, {
+    type: 'FILES_LOADED',
+    files: [],
+    folders: [],
+    folder: 'notes',
+    folderPath: '/notes',
+    unsupportedFiles: undefined,
+  });
+  assert.equal(state.unsupportedModal, null);
 });

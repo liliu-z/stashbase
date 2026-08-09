@@ -61,7 +61,6 @@ export interface ActiveFolderWorkspace {
   consumePendingHighlight: () => void;
   toggleEditMode: () => Promise<void>;
   updateTabPdfPage: (tabId: string, page: number) => void;
-  setUnsupportedModalOpen: (open: boolean) => void;
   newNote: () => Promise<void>;
   newFolder: (path: string) => Promise<void>;
   deleteFile: (name: string) => Promise<void>;
@@ -269,7 +268,6 @@ export function useActiveFolderWorkspace(
     documents.selectFileWithHighlight,
     documents.toggleEditMode,
     documents.updateTabPdfPage,
-    documents.setUnsupportedModalOpen,
     files.deleteFile,
     files.deleteFolder,
     files.moveFile,

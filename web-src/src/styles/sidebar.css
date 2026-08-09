@@ -1455,44 +1455,12 @@
       padding: 0 1px;
       border-radius: 2px;
     }
+    .keyword-truncated {
+      color: var(--muted);
+      font-size: calc(11px * var(--ui-scale));
+      padding: 2px 10px 2px 16px;
+      cursor: default;
+    }
     .keyword-truncated:hover {
       background: transparent;
     }
-
-    .unsupported-files-banner {
-      display: flex;
-      align-items: flex-start;
-      gap: 8px;
-      margin: 4px 12px 8px;
-      padding: 8px 10px;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      background: var(--bg);
-      font-size: calc(11.5px * var(--ui-scale));
-      line-height: 1.4;
-      color: var(--muted);
-    }
-    .unsupported-files-banner-title {
-      font-weight: 600;
-      color: var(--fg);
-      margin-bottom: 2px;
-    }
-    .unsupported-files-banner-copy {
-      flex: 1;
-      min-width: 0;
-    }
-    .unsupported-files-details-btn {
-      border: 0;
-      background: transparent;
-      color: var(--accent);
-      font-weight: 600;
-      cursor: pointer;
-      padding: 0;
-      text-decoration: underline;
-      display: inline;
-      margin-left: 2px;
-    }
-    .unsupported-files-details-btn:hover {
-      text-decoration: none;
-    }
-
