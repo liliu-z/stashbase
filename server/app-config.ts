@@ -129,6 +129,82 @@ export interface OnboardingPreferences {
   unsupportedFormatsNoticeVersion?: number;
 }
 
+const ONBOARDING_PREFERENCE_KEYS = new Set<keyof OnboardingPreferences>([
+  'sourceCodeNoticeVersion',
+  'unsupportedFormatsNoticeVersion',
+]);
+
+function onboardingPreferenceError(message: string): Error {
+  const error = new Error(message) as Error & { code: string; status: number };
+  error.code = 'BAD_REQUEST';
+  error.status = 400;
+  return error;
+}
+
+export function normalizeOnboardingPreferences(value: unknown): OnboardingPreferences {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const raw = value as Record<string, unknown>;
+  const normalized: OnboardingPreferences = {};
+  for (const key of ONBOARDING_PREFERENCE_KEYS) {
+    const version = raw[key];
+    if (Number.isSafeInteger(version) && (version as number) >= 0) {
+      normalized[key] = version as number;
+    }
+  }
+  return normalized;
+}
+
+function parseOnboardingPreferencePatch(value: unknown): Partial<OnboardingPreferences> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw onboardingPreferenceError('onboarding preferences must be an object');
+  }
+  const raw = value as Record<string, unknown>;
+  for (const key of Object.keys(raw)) {
+    if (!ONBOARDING_PREFERENCE_KEYS.has(key as keyof OnboardingPreferences)) {
+      throw onboardingPreferenceError(`unsupported onboarding preference: ${key}`);
+    }
+  }
+  const patch: Partial<OnboardingPreferences> = {};
+  for (const key of ONBOARDING_PREFERENCE_KEYS) {
+    if (!(key in raw)) continue;
+    const version = raw[key];
+    if (!Number.isSafeInteger(version) || (version as number) < 0) {
+      throw onboardingPreferenceError(`${key} must be a non-negative integer`);
+    }
+    patch[key] = version as number;
+  }
+  return patch;
+}
+
+export interface OnboardingPreferencesStore {
+  get(): OnboardingPreferences;
+  set(next: unknown): OnboardingPreferences;
+}
+
+/** Reads may fail open so the explanation remains eligible. Writes must start
+ * from a strict read: an acknowledgement must never replace unrelated config
+ * when the single app config is malformed or inaccessible. */
+export function createOnboardingPreferencesStore(io: {
+  read(): AppConfigFile;
+  readStrict(): AppConfigFile;
+  write(config: AppConfigFile): void;
+}): OnboardingPreferencesStore {
+  return {
+    get: () => normalizeOnboardingPreferences(io.read().onboarding),
+    set(next) {
+      const patch = parseOnboardingPreferencePatch(next);
+      const config = io.readStrict();
+      const updated = {
+        ...normalizeOnboardingPreferences(config.onboarding),
+        ...patch,
+      };
+      config.onboarding = updated;
+      io.write(config);
+      return updated;
+    },
+  };
+}
+
 export function readAppConfigStrict(): AppConfigFile {
   try {
     const raw = fs.readFileSync(CONFIG_FILE, 'utf8');
@@ -357,18 +433,16 @@ export function migrateLegacyEmbedderConfig(): void {
   log.info('migrated legacy embedder.openaiKey into active embedder config');
 }
 
+const onboardingPreferences = createOnboardingPreferencesStore({
+  read: readAppConfig,
+  readStrict: readAppConfigStrict,
+  write: writeAppConfigStrict,
+});
+
 export function getOnboardingPreferences(): OnboardingPreferences {
-  return readAppConfig().onboarding ?? {};
+  return onboardingPreferences.get();
 }
 
-export function setOnboardingPreferences(next: Partial<OnboardingPreferences>): OnboardingPreferences {
-  const cfg = readAppConfig();
-  const current = cfg.onboarding ?? {};
-  const updated = {
-    ...current,
-    ...next,
-  };
-  cfg.onboarding = updated;
-  writeAppConfigStrict(cfg);
-  return updated;
+export function setOnboardingPreferences(next: unknown): OnboardingPreferences {
+  return onboardingPreferences.set(next);
 }

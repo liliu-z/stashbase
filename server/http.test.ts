@@ -4,6 +4,7 @@ import { runWithWindowId } from './folder.ts';
 import { requireFolder, validateEmbedderKey } from './http.ts';
 import {
   createAppearancePreferencesStore,
+  createOnboardingPreferencesStore,
   normalizeAppearancePreferences,
   type AppConfigFile,
 } from './app-config.ts';
@@ -35,6 +36,64 @@ test('appearance preferences default safely and persist bounded presets', () => 
     uiScale: 'default',
     readingTextSize: 'default',
   });
+});
+
+test('onboarding acknowledgement preserves unrelated config and normalizes persisted versions', () => {
+  let config: AppConfigFile = {
+    recentFolders: [{ path: '/notes', openedAt: '2026-08-09T00:00:00.000Z' }],
+    apiKey: 'secret',
+    onboarding: {
+      sourceCodeNoticeVersion: 1,
+      unsupportedFormatsNoticeVersion: Number.NaN,
+    },
+  };
+  const store = createOnboardingPreferencesStore({
+    read: () => structuredClone(config),
+    readStrict: () => structuredClone(config),
+    write: (next) => { config = structuredClone(next); },
+  });
+
+  assert.deepEqual(store.get(), { sourceCodeNoticeVersion: 1 });
+  assert.deepEqual(store.set({ unsupportedFormatsNoticeVersion: 1 }), {
+    sourceCodeNoticeVersion: 1,
+    unsupportedFormatsNoticeVersion: 1,
+  });
+  assert.deepEqual(config.recentFolders, [{ path: '/notes', openedAt: '2026-08-09T00:00:00.000Z' }]);
+  assert.equal(config.apiKey, 'secret');
+});
+
+test('onboarding acknowledgement fails closed when strict config read fails', () => {
+  let writes = 0;
+  const store = createOnboardingPreferencesStore({
+    read: () => ({}),
+    readStrict: () => { throw new Error('malformed config'); },
+    write: () => { writes += 1; },
+  });
+
+  assert.throws(
+    () => store.set({ sourceCodeNoticeVersion: 1 }),
+    /malformed config/,
+  );
+  assert.equal(writes, 0);
+});
+
+test('onboarding acknowledgement rejects unknown or invalid preference values', () => {
+  let strictReads = 0;
+  const store = createOnboardingPreferencesStore({
+    read: () => ({}),
+    readStrict: () => { strictReads += 1; return {}; },
+    write: () => {},
+  });
+
+  assert.throws(
+    () => store.set({ sourceCodeNoticeVersion: '1' }),
+    /sourceCodeNoticeVersion must be a non-negative integer/,
+  );
+  assert.throws(
+    () => store.set({ futureNotice: 1 }),
+    /unsupported onboarding preference: futureNotice/,
+  );
+  assert.equal(strictReads, 0);
 });
 
 test('folder-explicit preparation routes work without an open window folder', async () => {
