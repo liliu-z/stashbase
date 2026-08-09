@@ -135,6 +135,12 @@ inside a loaded surface, while the native-modal loading adapter preserves the
 same modality during chunk loading. Feature code must gate close intent through
 the layer result rather than add document-level Escape listeners.
 
+The unsupported-files notice keeps its gate and overlay ownership in the
+initial shell while lazy-loading only the managed dialog body. Renderer state
+records the exact source/other categories being explained. Escape or backdrop
+dismissal is session-only; the primary action persists versioned acknowledgement
+for only those categories through the server-owned app-config route.
+
 Quick Open is a renderer-only active-folder navigation surface. It ranks the
 already visible source-file list and accepts through `selectFile`; it must not
 bypass that action's save guard, folder-generation check, or preview-tab
@@ -257,7 +263,7 @@ Deleting derived state may require re-conversion or re-embedding, but it should 
 
 ## 3.2 App Config
 
-`~/.stashbase/config.json` is the only persistent StashBase app config file. It stores user-level configuration such as the folders in the local library, optional folder descriptions, the OpenAI API key, the HTTP MCP bearer token, Docker-access preference and port, the selected transcription provider/model/language, user-wide appearance presets, and first-run seed state. Settings is the management surface for credentials, local transcription models, and appearance. Appearance values must recover to the System/default presets when absent or malformed, remain bounded to theme, UI scale, and reading-text size, and update every open renderer window immediately; arbitrary color, font, spacing, or layout overrides are not supported. Config writes use owner-only file and directory modes on POSIX; Windows uses the user's profile ACL rather than POSIX mode bits.
+`~/.stashbase/config.json` is the only persistent StashBase app config file. It stores user-level configuration such as the folders in the local library, optional folder descriptions, the OpenAI API key, the HTTP MCP bearer token, Docker-access preference and port, the selected transcription provider/model/language, user-wide appearance presets, versioned onboarding acknowledgements, and first-run seed state. Settings is the management surface for credentials, local transcription models, and appearance. Appearance values must recover to the System/default presets when absent or malformed, remain bounded to theme, UI scale, and reading-text size, and update every open renderer window immediately; arbitrary color, font, spacing, or layout overrides are not supported. Onboarding reads may fail open to keep explanations eligible, but acknowledgement writes require a strict read and preserve every unrelated config field. Config writes use owner-only file and directory modes on POSIX; Windows uses the user's profile ACL rather than POSIX mode bits.
 
 MCP client configuration is not stored in StashBase config. The Settings UI calls the server over HTTP; the server writes the target client's own config file when one-click setup is supported and generates the platform launcher command (`~/.stashbase/bin/stashbase-mcp` on macOS/Linux, `%USERPROFILE%\.stashbase\bin\stashbase-mcp.cmd` on Windows).
 

@@ -246,6 +246,7 @@ Renames and moves retain absolute source spelling and use comparison identity fo
 | Agent rules files | User filesystem (`AGENTS.md`, `CLAUDE.md`) | Yes | Are they created only when missing, never overwritten, and treated as ordinary visible Markdown source files? |
 | Library membership | `~/.stashbase/config.json` `recentFolders` | Yes | Does this represent searchable membership, not just MRU? |
 | Folder descriptions | `~/.stashbase/config.json` | Yes | Are they treated as orientation metadata, not indexed source content? |
+| Onboarding acknowledgement versions | `~/.stashbase/config.json` `onboarding` | Yes | Does cancellation stay session-only, and can a malformed config block acknowledgement without losing unrelated settings? |
 | Transcription model/language preferences | `~/.stashbase/config.json` | Yes | Do preference changes leave complete transcripts intact and avoid treating a missing model as a failure? |
 | Downloaded speech models | AppData `models/whisper` | Rebuildable | Are downloads explicit, atomic, size/checksum verified, and managed only through Settings? |
 | Derived text/assets | AppData | Rebuildable | Can stale or partial artifacts be mistaken for completion? |

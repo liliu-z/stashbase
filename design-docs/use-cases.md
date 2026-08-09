@@ -148,6 +148,11 @@ them into a new storage model. PDFs, DOCX files, images, audio, and video gain
 searchable representations while the original files remain visible in their
 existing locations.
 
+Source code and unsupported document/data formats remain unchanged on disk but
+stay outside the Files and search surfaces. The folder view explains that
+boundary, counts the hidden categories, and avoids presenting unsupported-only
+subtrees as mysteriously empty imported folders.
+
 The user can search for “Why did this project reject PostgreSQL?” or “Which
 papers compared these two methods?” without remembering the original wording.
 Results point back to the source files, making it easy to check the surrounding
