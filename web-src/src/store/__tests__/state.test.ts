@@ -487,3 +487,28 @@ test('UNSUPPORTED_MODAL toggle action updates state', () => {
   state = reducer(state, { type: 'UNSUPPORTED_MODAL', open: false });
   assert.equal(state.unsupportedModalOpen, false);
 });
+
+test('FILE_OPEN with isExternal sets outOfFolder and external properties', () => {
+  let state = reducer(freshState(), {
+    type: 'FILE_OPEN',
+    body: {
+      name: 'ext.md',
+      format: 'md',
+      content: 'hello',
+      isExternal: true,
+      isReadOnly: true,
+      grantId: 'grant-123',
+      absolutePath: '/tmp/ext.md',
+    },
+  });
+
+  const tab = state.tabs[0];
+  assert.equal(tab.file?.name, 'ext.md');
+  assert.equal(tab.file?.folder, undefined);
+  assert.equal(tab.file?.isExternal, true);
+  assert.equal(tab.file?.isReadOnly, true);
+  assert.equal(tab.file?.grantId, 'grant-123');
+  assert.equal(tab.file?.absolutePath, '/tmp/ext.md');
+  assert.equal(tab.editMode, false);
+  assert.deepEqual(state.recentFilePaths, []);
+});
