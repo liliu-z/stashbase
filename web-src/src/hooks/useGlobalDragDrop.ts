@@ -20,8 +20,9 @@ import { useApp } from '../store/AppContext';
  *
  * Returns the boolean veil-visibility flag for `<DropVeil>` to read.
  */
-export function useGlobalDragDrop(): boolean {
+export function useGlobalDragDrop(): { hot: boolean; activeZone: 'sidebar' | 'main' | null } {
   const [veilHot, setVeilHot] = useState(false);
+  const [activeZone, setActiveZone] = useState<'sidebar' | 'main' | null>(null);
   const { actions } = useApp();
   const dragDepth = useRef(0);
   const hotRef = useRef(false);
@@ -44,6 +45,7 @@ export function useGlobalDragDrop(): boolean {
       hotRef.current = false;
       dropTargetFolder.current = '';
       setVeilHot(false);
+      setActiveZone(null);
       clearDropHighlights();
     }
     // The chat panel (AgentView) manages its own file drops — files
@@ -59,6 +61,10 @@ export function useGlobalDragDrop(): boolean {
       dragDepth.current += 1;
       hotRef.current = true;
       setVeilHot(true);
+
+      const tgt = e.target instanceof Element ? e.target : null;
+      const isSidebar = tgt && !!tgt.closest('.sidebar');
+      setActiveZone(isSidebar ? 'sidebar' : 'main');
     }
     function onDragLeave() {
       dragDepth.current = Math.max(0, dragDepth.current - 1);
@@ -79,6 +85,13 @@ export function useGlobalDragDrop(): boolean {
       if (e.dataTransfer && !acceptsKnowledgeBaseDrop(e.dataTransfer)) return;
       e.preventDefault();
       const tgt = e.target instanceof Element ? e.target : null;
+      const isSidebar = tgt && !!tgt.closest('.sidebar');
+      const nextZone = isSidebar ? 'sidebar' : 'main';
+      setActiveZone(nextZone);
+      if (e.dataTransfer) {
+        e.dataTransfer.dropEffect = isSidebar ? 'copy' : 'link';
+      }
+
       const folderEl = tgt?.closest('.tree-row.folder') as HTMLElement | null;
       const headEl = !folderEl ? (tgt?.closest('#sideHead') as HTMLElement | null) : null;
       const newTarget = folderEl?.dataset?.path ?? '';
@@ -95,6 +108,8 @@ export function useGlobalDragDrop(): boolean {
     async function onDrop(e: DragEvent) {
       if (inChatPanel(e)) { hideVeil(); return; } // panel handles its own drop
       e.preventDefault();
+      const tgt = e.target instanceof Element ? e.target : null;
+      const isSidebar = tgt && !!tgt.closest('.sidebar');
       const targetDir = dropTargetFolder.current;
       hideVeil();
 
@@ -111,19 +126,56 @@ export function useGlobalDragDrop(): boolean {
         const entry = items[i].webkitGetAsEntry?.();
         if (entry) entries.push(entry);
       }
-      const collected: { file: File; relPath: string }[] = [];
-      for (const entry of entries) {
-        await walkEntry(entry, '', collected);
+
+      if (isSidebar) {
+        const collected: { file: File; relPath: string }[] = [];
+        for (const entry of entries) {
+          await walkEntry(entry, '', collected);
+        }
+        if (collected.length) await actions.upload(collected, targetDir);
+      } else {
+        const files: File[] = [];
+        let hasDirectories = false;
+        for (const entry of entries) {
+          if (entry.isFile) {
+            const file = await new Promise<File>((res, rej) =>
+              (entry as FileSystemFileEntry).file(res, rej),
+            );
+            files.push(file);
+          } else if (entry.isDirectory) {
+            hasDirectories = true;
+          }
+        }
+        if (hasDirectories) {
+          actions.toast('Directories cannot be opened temporarily; drop folders onto the Files sidebar to import them.', { level: 'warning' });
+        }
+        if (files.length > 0) {
+          await actions.openExternalFiles(files);
+        }
       }
-      if (collected.length) await actions.upload(collected, targetDir);
     }
 
     async function onIframeDrop(e: Event) {
       const { entries } = (e as CustomEvent<{ entries: FileSystemEntry[] }>).detail;
       hideVeil();
-      const collected: { file: File; relPath: string }[] = [];
-      for (const entry of entries) await walkEntry(entry, '', collected);
-      if (collected.length) await actions.upload(collected, '');
+      const files: File[] = [];
+      let hasDirectories = false;
+      for (const entry of entries) {
+        if (entry.isFile) {
+          const file = await new Promise<File>((res, rej) =>
+            (entry as FileSystemFileEntry).file(res, rej),
+          );
+          files.push(file);
+        } else if (entry.isDirectory) {
+          hasDirectories = true;
+        }
+      }
+      if (hasDirectories) {
+        actions.toast('Directories cannot be opened temporarily; drop folders onto the Files sidebar to import them.', { level: 'warning' });
+      }
+      if (files.length > 0) {
+        await actions.openExternalFiles(files);
+      }
     }
 
     window.addEventListener('dragenter', onDragEnter);
@@ -144,7 +196,7 @@ export function useGlobalDragDrop(): boolean {
     };
   }, [actions]);
 
-  return veilHot;
+  return { hot: veilHot, activeZone };
 }
 
 async function walkEntry(

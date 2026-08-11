@@ -63,8 +63,8 @@ export function App() {
 }
 
 function AppBody() {
-  const veilHot = useGlobalDragDrop();
-  const { state, dispatch } = useApp();
+  const { hot: veilHot, activeZone } = useGlobalDragDrop();
+  const { state, actions, dispatch } = useApp();
   const { previewImage, closePreviewImage } = usePreviewMessages();
   const { clipboardOffer, saveClipboardOffer, dismissClipboardOffer } = useClipboardImageOffer();
   const initialFolderPending = useRef(new URLSearchParams(window.location.search).has('folder'));
@@ -131,6 +131,18 @@ function AppBody() {
     // late boot push could clobber the harness's registration.
     if (state.booted) document.body.dataset.bootSettled = '1';
   }, [state.booted, state.folderPath]);
+  useEffect(() => {
+    const bridge = (window as { electron?: any }).electron;
+    if (!bridge) return;
+    bridge.notifyRendererReadyForNativeFiles?.();
+    return bridge.onOpenExternalFiles?.((paths: string[]) => {
+      void (async () => {
+        for (const filePath of paths) {
+          await actions.openExternalFilePath(filePath);
+        }
+      })();
+    });
+  }, [actions]);
   // macOS fullscreen toggles the `is-fullscreen` body class so the sidebar
   // can drop its traffic-light drag zone. That's owned entirely by the
   // preload (registered before page load, so it catches the initial state
@@ -177,7 +189,12 @@ function AppBody() {
           </LazyLoadBoundary>
         )}
       </div>
-      <DropVeil hot={veilHot} />
+      <DropVeil
+        hot={veilHot}
+        activeZone={activeZone}
+        sidebarWidth={state.sidebarWidth}
+        sidebarCollapsed={state.sidebarCollapsed}
+      />
       {state.ctxMenu && (
         <LazyLoadBoundary
           className="fixed z-1200 rounded-md bg-popover p-2 text-sm text-popover-foreground shadow-elevation"
