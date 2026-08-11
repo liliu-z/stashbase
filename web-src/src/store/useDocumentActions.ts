@@ -20,6 +20,15 @@ const cancelTimeout = (timer: ReturnType<typeof setTimeout>) => clearTimeout(tim
 type Dispatch = (action: Action) => void;
 type Toast = (message: string, opts?: ToastOptions) => string;
 
+interface ElectronBridge {
+  getPathForFile: (file: File) => string;
+  registerPreviewGrant: (filePath: string) => Promise<
+    | { isInternal: true; relPath: string }
+    | { isInternal: false; grantId: string; name: string; format: 'md' | 'html' | 'pdf' | 'image' | 'docx' | 'audio'; absolutePath: string }
+  >;
+  revokePreviewGrant: (grantId: string) => Promise<boolean>;
+}
+
 interface DocumentActionRefs {
   state: MutableRefObject<State>;
   editor: MutableRefObject<EditorHandle | null>;
@@ -352,8 +361,13 @@ export function useDocumentActions(
 
   const closeTab = useCallback(async (id: string) => {
     const currentState = state.current;
+    const tab = currentState.tabs.find((t) => t.id === id);
     if (currentState.activeTabId === id && editor.current && !(await flushSave())) return;
     dispatch({ type: 'CLOSE_TAB', id });
+    if (tab?.file?.isExternal && tab.file.grantId) {
+      const bridge = (window as { electron?: ElectronBridge }).electron;
+      void bridge?.revokePreviewGrant(tab.file.grantId);
+    }
   }, [dispatch, editor, flushSave, state]);
 
   const closeActiveTab = useCallback(async () => {
@@ -458,6 +472,63 @@ export function useDocumentActions(
     editor.current = handle;
   }, [editor]);
 
+  const openExternalFilePath = useCallback(async (filePath: string) => {
+    try {
+      const bridge = (window as { electron?: ElectronBridge }).electron;
+      if (!bridge) throw new Error('Electron bridge not available');
+      
+      const result = await bridge.registerPreviewGrant(filePath);
+      if (result.isInternal) {
+        await selectFile(result.relPath);
+      } else {
+        const existing = state.current.tabs.find(
+          (t) => t.file?.isExternal && t.file.absolutePath === result.absolutePath
+        );
+        if (existing) {
+          if (state.current.activeTabId !== existing.id) {
+            dispatch({ type: 'ACTIVATE_TAB', id: existing.id });
+          }
+          return;
+        }
+
+        const body = {
+          name: result.name,
+          format: result.format,
+          content: '',
+          version: 'transient',
+          isExternal: true,
+          isReadOnly: true,
+          grantId: result.grantId,
+          absolutePath: result.absolutePath,
+        };
+
+        if (result.format === 'md' || result.format === 'html') {
+          const contentResult = await api.getExternalFileText(result.grantId);
+          body.content = contentResult.content;
+        }
+
+        dispatch({
+          type: 'FILE_OPEN',
+          body,
+          newTab: true,
+        });
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast(`Could not open external file: ${msg}`, { level: 'error' });
+    }
+  }, [dispatch, selectFile, state, toast]);
+
+  const openExternalFiles = useCallback(async (files: File[]) => {
+    for (const file of files) {
+      const bridge = (window as { electron?: ElectronBridge }).electron;
+      const filePath = bridge?.getPathForFile(file);
+      if (filePath) {
+        await openExternalFilePath(filePath);
+      }
+    }
+  }, [openExternalFilePath]);
+
   const updateTabPdfPage = useCallback((tabId: string, page: number) => {
     dispatch({ type: 'TAB_PDF_PAGE', id: tabId, page });
   }, [dispatch]);
@@ -476,6 +547,8 @@ export function useDocumentActions(
     consumePendingHighlight,
     consumePendingScroll,
     flushSave,
+    openExternalFilePath,
+    openExternalFiles,
     navigateTo,
     newTab,
     openInNewTab,

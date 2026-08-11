@@ -50,6 +50,7 @@ import { closeStateDb } from './state-db.ts';
 import { requireFolder, withWindowContext } from './http.ts';
 import { mount as mountWindowContextRoutes } from './routes/window-context.ts';
 import { mountInternalShutdownRoute } from './routes/internal-shutdown.ts';
+import { mountInternalGrantsRoute } from './routes/internal-grants.ts';
 import { mount as mountLibraryRoutes } from './routes/library.ts';
 import { mount as mountEmbedderRoutes } from './routes/embedder.ts';
 import { mount as mountAppearanceRoutes } from './routes/appearance.ts';
@@ -269,6 +270,8 @@ mountInternalShutdownRoute(app, {
   shutdown: () => { void shutdown('Electron request'); },
 });
 
+mountInternalGrantsRoute(app, process.env.STASHBASE_SHUTDOWN_TOKEN ?? '');
+
 // Static layer is mounted before the API routes for renderer bundle
 // requests, but data routes must bypass it entirely. In packaged asar
 // builds, serve-static can still issue directory-normalisation redirects
@@ -285,6 +288,8 @@ if (!DEV_VITE) {
         req.path.startsWith('/asset/') ||
         req.path === '/asset-audio-preview' ||
         req.path.startsWith('/asset-audio-preview/') ||
+        req.path === '/asset-preview-grant' ||
+        req.path.startsWith('/asset-preview-grant/') ||
         req.path === '/mcp'
       ) {
         return next();

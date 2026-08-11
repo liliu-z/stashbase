@@ -97,6 +97,10 @@ export interface OpenFile {
    *  selection / recents / pruning flows, and every fetch they cause must
    *  carry this folder explicitly. Undefined for ordinary tabs. */
   folder?: string;
+  isExternal?: boolean;
+  isReadOnly?: boolean;
+  grantId?: string;
+  absolutePath?: string;
 }
 
 export interface CtxMenu {
@@ -410,7 +414,7 @@ export type Action =
    *  since a sidebar click opens a persistent tab. Omitting `newTab`
    *  replaces the active tab in place (blank-tab reuse, back/forward,
    *  in-place anchor nav). */
-  | { type: 'FILE_OPEN'; body: FileBody; newTab?: boolean; libraryFolder?: string }
+  | { type: 'FILE_OPEN'; body: FileBody & { isExternal?: boolean; isReadOnly?: boolean; grantId?: string; absolutePath?: string }; newTab?: boolean; libraryFolder?: string }
   | { type: 'FILE_PATCH'; patch: Partial<OpenFile> }
   | { type: 'DOCUMENT_DIRTY'; dirty: boolean }
   | { type: 'PRUNE_MISSING_FILE_TABS'; names: string[] }

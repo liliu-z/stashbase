@@ -4,7 +4,7 @@
  * `window.electron`. Only what the renderer actually needs goes here —
  * never the raw ipcRenderer.
  */
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 const { windowIdFromArgv } = require('./multi-window.cjs');
 
 const windowId = windowIdFromArgv(process.argv);
@@ -129,4 +129,16 @@ contextBridge.exposeInMainWorld('electron', {
   /** While the Agent composer owns focus, pasted images become temporary
    * chat context instead of candidates for library import. */
   setAgentComposerFocused: (focused) => ipcRenderer.send('clipboard:setAgentComposerFocused', focused === true),
+  /** Get absolute path for file from sandboxed renderer drop. */
+  getPathForFile: (file) => webUtils.getPathForFile(file),
+  registerPreviewGrant: (filePath) => ipcRenderer.invoke('grant:register', filePath),
+  revokePreviewGrant: (grantId) => ipcRenderer.invoke('grant:revoke', grantId),
+  onOpenExternalFiles: (handler) => {
+    const wrapped = (_event, paths) => {
+      if (Array.isArray(paths)) handler(paths);
+    };
+    ipcRenderer.on('window:open-external-files', wrapped);
+    return () => ipcRenderer.removeListener('window:open-external-files', wrapped);
+  },
+  notifyRendererReadyForNativeFiles: () => ipcRenderer.send('renderer:ready-for-native-files'),
 });

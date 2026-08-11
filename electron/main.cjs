@@ -173,6 +173,108 @@ registerBugReportReviewIpc({
 
 const APP_CONFIG_FILE = path.join(os.homedir(), '.stashbase', 'config.json');
 
+const VIEWABLE_FILE_EXTENSIONS = new Set([
+  'md', 'markdown', 'html', 'htm', 'pdf',
+  'png', 'jpg', 'jpeg', 'webp', 'docx',
+  'mp3', 'wav', 'm4a', 'flac', 'ogg', 'opus', 'aac', 'aiff', 'aif',
+  'mp4', 'mov', 'm4v', 'webm', 'mkv', 'avi'
+]);
+
+function getFileFormat(filePath) {
+  const ext = path.extname(filePath).toLowerCase().slice(1);
+  if (ext === 'md' || ext === 'markdown') return 'md';
+  if (ext === 'html' || ext === 'htm') return 'html';
+  if (ext === 'pdf') return 'pdf';
+  if (ext === 'docx') return 'docx';
+  if (['png', 'jpg', 'jpeg', 'webp'].includes(ext)) return 'image';
+  return 'audio';
+}
+
+const activePreviewGrants = new Map();
+const pendingFilesToOpen = [];
+const rendererReadyWindows = new Set();
+
+function sendInternalPost(requestPath, bodyObj) {
+  return new Promise((resolve) => {
+    const bodyStr = JSON.stringify(bodyObj);
+    const req = http.request(
+      {
+        host: SERVER_HOST,
+        port: SERVER_PORT,
+        path: requestPath,
+        method: 'POST',
+        headers: {
+          'x-stashbase-shutdown-token': SERVER_SHUTDOWN_TOKEN,
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(bodyStr),
+        },
+        timeout: 1000,
+      },
+      (res) => {
+        resolve({ statusCode: res.statusCode });
+      }
+    );
+    req.on('error', () => resolve({ statusCode: 500 }));
+    req.on('timeout', () => {
+      req.destroy();
+      resolve({ statusCode: 504 });
+    });
+    req.write(bodyStr);
+    req.end();
+  });
+}
+
+function sendInternalDelete(requestPath) {
+  return new Promise((resolve) => {
+    const req = http.request(
+      {
+        host: SERVER_HOST,
+        port: SERVER_PORT,
+        path: requestPath,
+        method: 'DELETE',
+        headers: {
+          'x-stashbase-shutdown-token': SERVER_SHUTDOWN_TOKEN,
+        },
+        timeout: 1000,
+      },
+      (res) => {
+        resolve({ statusCode: res.statusCode });
+      }
+    );
+    req.on('error', () => resolve({ statusCode: 500 }));
+    req.on('timeout', () => {
+      req.destroy();
+      resolve({ statusCode: 504 });
+    });
+    req.end();
+  });
+}
+
+function getFilePathsFromArgs(argv) {
+  const filePaths = [];
+  const startIndex = app.isPackaged ? 1 : 2;
+  for (let i = startIndex; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg.startsWith('-')) continue;
+    if (arg.startsWith(WINDOW_ID_ARG_PREFIX)) continue;
+    try {
+      const absPath = path.resolve(arg);
+      if (fs.existsSync(absPath)) {
+        const st = fs.statSync(absPath);
+        if (st.isFile()) {
+          const ext = path.extname(absPath).toLowerCase().slice(1);
+          if (VIEWABLE_FILE_EXTENSIONS.has(ext)) {
+            filePaths.push(absPath);
+          }
+        }
+      }
+    } catch (err) {
+      // Ignore invalid paths
+    }
+  }
+  return filePaths;
+}
+
 function shellQuote(value) {
   return `'${String(value).replace(/'/g, `'\\''`)}'`;
 }
@@ -847,9 +949,16 @@ async function createWindow(initialFolder) {
     rendererFlush.cancel(webContentsId);
     rendererFlushReadinessByWebContents.delete(webContentsId);
     bugReports.discardUnreviewedDraftsForSource(webContentsId);
+    rendererReadyWindows.delete(webContentsId);
     mainWindows.delete(win);
     windowRegistry.remove(windowId);
     releaseWindowContext(windowId);
+    for (const [grantId, grant] of activePreviewGrants) {
+      if (grant.windowId === windowId) {
+        activePreviewGrants.delete(grantId);
+        void sendInternalDelete(`/api/internal/grants/${encodeURIComponent(grantId)}`);
+      }
+    }
     if (lastMainWindow === win) {
       lastMainWindow = [...mainWindows].find((candidate) => isLiveMainWindow(candidate)) ?? null;
     }
@@ -1112,6 +1221,89 @@ ipcMain.on('clipboard:setAgentComposerFocused', (event, focused) => {
   else agentComposerFocusedContents.delete(event.sender.id);
 });
 
+function getLastMainWindow() {
+  const focused = BrowserWindow.getFocusedWindow();
+  const win = isLiveMainWindow(focused)
+    ? focused
+    : isLiveMainWindow(lastMainWindow)
+      ? lastMainWindow
+      : [...mainWindows].find((candidate) => isLiveMainWindow(candidate));
+  return isLiveMainWindow(win) ? win : null;
+}
+
+function handleNativeFileOpenRequest(filePath) {
+  const win = getLastMainWindow();
+  if (win && rendererReadyWindows.has(win.webContents.id)) {
+    win.webContents.send('window:open-external-files', [filePath]);
+  } else {
+    pendingFilesToOpen.push(filePath);
+  }
+}
+
+app.on('open-file', (event, filePath) => {
+  event.preventDefault();
+  handleNativeFileOpenRequest(filePath);
+});
+
+ipcMain.handle('grant:register', async (event, filePath) => {
+  const senderWindow = BrowserWindow.fromWebContents(event.sender);
+  const windowId = windowRegistry.idForWindow(senderWindow);
+  if (!windowId || typeof filePath !== 'string') throw new Error('Invalid arguments');
+
+  const canonicalPath = path.resolve(filePath);
+  if (!fs.existsSync(canonicalPath)) throw new Error('File does not exist');
+  const st = fs.statSync(canonicalPath);
+  if (!st.isFile()) throw new Error('Not a file');
+
+  const ext = path.extname(canonicalPath).toLowerCase().slice(1);
+  if (!VIEWABLE_FILE_EXTENSIONS.has(ext)) {
+    throw new Error(`Unsupported file type: .${ext}`);
+  }
+
+  const activeFolder = windowRegistry.folderForWindowId(windowId);
+  if (activeFolder) {
+    const relative = path.relative(activeFolder, canonicalPath);
+    const isInternal = !relative.startsWith('..') && !path.isAbsolute(relative);
+    if (isInternal) {
+      return { isInternal: true, relPath: relative.replace(/\\/g, '/') };
+    }
+  }
+
+  const grantId = crypto.randomUUID();
+  const format = getFileFormat(canonicalPath);
+  const name = path.basename(canonicalPath);
+
+  activePreviewGrants.set(grantId, { windowId, filePath: canonicalPath });
+
+  await sendInternalPost('/api/internal/grants', { grantId, windowId, filePath: canonicalPath });
+
+  return {
+    isInternal: false,
+    grantId,
+    name,
+    format,
+    absolutePath: canonicalPath,
+  };
+});
+
+ipcMain.handle('grant:revoke', async (event, grantId) => {
+  if (typeof grantId !== 'string') return false;
+  activePreviewGrants.delete(grantId);
+  await sendInternalDelete(`/api/internal/grants/${encodeURIComponent(grantId)}`);
+  return true;
+});
+
+ipcMain.on('renderer:ready-for-native-files', (event) => {
+  const webContentsId = event.sender.id;
+  rendererReadyWindows.add(webContentsId);
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win && pendingFilesToOpen.length > 0) {
+    const paths = [...pendingFilesToOpen];
+    pendingFilesToOpen.length = 0;
+    win.webContents.send('window:open-external-files', paths);
+  }
+});
+
 const initialWindowFlight = createSingleFlight(() => app.whenReady().then(() => createWindow()));
 
 function focusOAuthReturn() {
@@ -1169,8 +1361,15 @@ if (!hasSingleInstanceLock) {
     // A malformed or unsupported stashbase: URL must not fall through to the
     // ordinary second-launch focus/create behavior.
     if (protocolLaunch === 'inert') return;
-    if (!focusLastMainWindow()) {
-      void initialWindowFlight.run().then(() => { focusLastMainWindow(); });
+    const filePaths = getFilePathsFromArgs(argv);
+    if (filePaths.length > 0) {
+      for (const filePath of filePaths) {
+        handleNativeFileOpenRequest(filePath);
+      }
+    } else {
+      if (!focusLastMainWindow()) {
+        void initialWindowFlight.run().then(() => { focusLastMainWindow(); });
+      }
     }
   });
 
@@ -1201,6 +1400,10 @@ if (!hasSingleInstanceLock) {
       console.warn(`[electron] MCP wrapper refresh failed: ${err && err.message ? err.message : err}`);
     }
     installApplicationMenu();
+    const startupFiles = getFilePathsFromArgs(process.argv);
+    for (const filePath of startupFiles) {
+      pendingFilesToOpen.push(filePath);
+    }
     await initialWindowFlight.run();
     if (initialProtocolLaunch === 'oauth-return') focusOAuthReturn();
   });

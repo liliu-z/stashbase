@@ -90,11 +90,15 @@ export function reducer(s: State, a: Action): State {
         content: a.body.content,
         version: a.body.version,
         ...(a.libraryFolder ? { folder: a.libraryFolder } : {}),
+        ...(a.body.isExternal ? { isExternal: true } : {}),
+        ...(a.body.isReadOnly ? { isReadOnly: true } : {}),
+        ...(a.body.grantId ? { grantId: a.body.grantId } : {}),
+        ...(a.body.absolutePath ? { absolutePath: a.body.absolutePath } : {}),
       };
       // Out-of-folder tabs are strictly read-only viewers: never Live
       // Editing, never the tree's focused row, never in the folder-local
       // recents (Quick Open would resolve the rel name in the wrong folder).
-      const outOfFolder = Boolean(a.libraryFolder);
+      const outOfFolder = Boolean(a.libraryFolder) || Boolean(file.isExternal);
       const liveEditing = file.format === 'md' && !outOfFolder;
       // New-tab mode (the normal sidebar open, or `+` then a click):
       // create a fresh tab and load into it. Without `newTab` the file

@@ -132,7 +132,7 @@ export function TabStrip() {
               aria-controls="document-panel"
               tabIndex={isActive ? 0 : -1}
               draggable
-              title={t.file ? (t.file.folder ? `${t.file.folder}/${t.file.name}` : t.file.name) : 'Empty tab'}
+              title={t.file ? (t.file.isExternal ? t.file.absolutePath : (t.file.folder ? `${t.file.folder}/${t.file.name}` : t.file.name)) : 'Empty tab'}
               onClick={() => { void actions.activateTab(t.id); }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {

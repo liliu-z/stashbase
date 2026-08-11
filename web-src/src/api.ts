@@ -348,6 +348,8 @@ export const api = {
     send<SessionInfo>('PATCH', agentSessionBase(agent) + '/' + encodeURIComponent(id) + sessionScopeQuery(scope), { title }),
   deleteSession: (id: string, agent: 'claude' | 'codex' = 'claude', scope?: SessionScopeParams) =>
     send<Record<string, never>>('DELETE', agentSessionBase(agent) + '/' + encodeURIComponent(id) + sessionScopeQuery(scope)),
+  getExternalFileText: (grantId: string): Promise<{ content: string }> =>
+    getJson<{ content: string }>(`/api/grant/${encodeURIComponent(grantId)}/text`),
 };
 
 function agentSessionBase(agent: 'claude' | 'codex'): string {
@@ -383,7 +385,10 @@ export function assetUrl(name: string, folder?: string): string {
   return assetScopePrefix('/asset/', folder) + encodePath(name);
 }
 
-export function versionedAssetUrl(name: string, version: string, folder?: string): string {
+export function versionedAssetUrl(name: string, version: string, folder?: string, grantId?: string): string {
+  if (grantId) {
+    return `/asset-preview-grant/${encodeURIComponent(grantId)}?v=${encodeURIComponent(version)}`;
+  }
   const url = assetUrl(name, folder);
   const sep = url.includes('?') ? '&' : '?';
   return `${url}${sep}v=${encodeURIComponent(version)}`;

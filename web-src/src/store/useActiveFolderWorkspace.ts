@@ -62,6 +62,8 @@ export interface ActiveFolderWorkspace {
   scheduleSave: () => void;
   flushSave: () => Promise<boolean>;
   registerEditor: (handle: EditorHandle | null) => void;
+  openExternalFilePath: (filePath: string) => Promise<void>;
+  openExternalFiles: (files: File[]) => Promise<void>;
 }
 
 interface WorkspaceDependencies {

@@ -180,6 +180,9 @@ function createWindowRegistry({ platform = process.platform } = {}) {
         .filter((record) => record.folderKey === wanted)
         .map((record) => record.win);
     },
+    folderForWindowId(windowId) {
+      return records.get(windowId)?.folderKey ?? null;
+    },
   };
 }
 

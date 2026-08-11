@@ -89,6 +89,13 @@ export function MainPane({ workspaceHidden = false }: { workspaceHidden?: boolea
           </Button>
         </StatusMessage>
       )}
+      {cur?.isExternal && (
+        <StatusMessage tone="info" className="z-5 flex min-h-8 shrink-0 items-center gap-2.5 rounded-none border-x-0 border-t-0 px-3.5 py-1.5 bg-pane-accent border-border-accent">
+          <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+            <span className="font-semibold text-foreground">External File</span> — Read-only. Sourced from <span className="font-mono" title={cur.absolutePath}>{cur.absolutePath}</span>
+          </span>
+        </StatusMessage>
+      )}
       {/* Content host for every viewer (iframe preview / split editor).
         * Single-cell grid because a Chromium quirk: when an iframe with
         * `position: absolute; inset: 0` sits inside a flex child, its
@@ -228,7 +235,7 @@ export function MainPane({ workspaceHidden = false }: { workspaceHidden?: boolea
         </div>
       )}
       <FindBar />
-      {cur && (cur.format === 'md' || cur.format === 'json') && !cur.folder && (
+      {cur && (cur.format === 'md' || cur.format === 'json') && !cur.folder && !cur.isExternal && (
         /* Floating actions in the main pane's top-right — sits below the
          * tab strip (unconditionally present whenever there's an open
          * file, so a fixed offset is safe). The edit toggle lives here on
@@ -265,7 +272,7 @@ export function MainPane({ workspaceHidden = false }: { workspaceHidden?: boolea
         // so we don't waste a row on viewer chrome. The out-of-folder
         // banner (min-h-8) pushes the slot down when present.
         <div
-          className={'pointer-events-none absolute right-3.5 left-3.5 z-5 flex items-center justify-stretch gap-2 ' + (outOfFolder ? 'top-[76px]' : 'top-11')}
+          className={'pointer-events-none absolute right-3.5 left-3.5 z-5 flex items-center justify-stretch gap-2 ' + ((outOfFolder || cur.isExternal) ? 'top-[76px]' : 'top-11')}
           id="pdf-chrome-slot"
         />
       )}

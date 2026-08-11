@@ -101,6 +101,8 @@ export interface AppActions {
    *  shortcuts (`⌘W`) and UI buttons that don't have a tab id handy. */
   closeActiveTab: () => Promise<void>;
   activateTab: (id: string) => Promise<void>;
+  openExternalFilePath: (filePath: string) => Promise<void>;
+  openExternalFiles: (files: File[]) => Promise<void>;
   /** Cross-file link nav: open `name` (with optional anchor) and push a
    *  new entry into the back/forward stack. Used by preview iframes
    *  forwarding `<a>` clicks. */
@@ -330,6 +332,60 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const sameDocument = (file: { name: string; folder?: string } | null | undefined) =>
       !!file && file.name === name && file.folder === libraryFolder;
     try {
+      if (tab.file.isExternal) {
+        const grantId = tab.file.grantId!;
+        try {
+          if (
+            tab.file.format === 'pdf'
+            || tab.file.format === 'image'
+            || tab.file.format === 'docx'
+            || tab.file.format === 'audio'
+          ) {
+            const response = await fetch(`/asset-preview-grant/${encodeURIComponent(grantId)}`, { method: 'HEAD' });
+            if (!response.ok) throw new Error('Unavailable');
+            return;
+          }
+          const body = await api.getExternalFileText(grantId);
+          if (stateRef.current.folderPath !== folderPathAtStart) return;
+          const latestActive = getActiveTab(stateRef.current);
+          if (!latestActive?.file?.isExternal || latestActive.file.grantId !== grantId) return;
+
+          if (opts.force) {
+            dispatch({
+              type: 'FILE_OPEN',
+              body: {
+                name: latestActive.file.name,
+                format: latestActive.file.format,
+                content: body.content,
+                version: 'transient',
+                isExternal: true,
+                isReadOnly: true,
+                grantId,
+                absolutePath: latestActive.file.absolutePath,
+              },
+            });
+            dispatch({ type: 'SAVE_STATUS', status: { text: 'Reloaded from disk', cls: 'saved' } });
+            return;
+          }
+          if (body.content === latestActive.file.content) return;
+          dispatch({
+            type: 'FILE_PATCH',
+            patch: { content: body.content },
+          });
+        } catch {
+          if (stateRef.current.folderPath !== folderPathAtStart) return;
+          const latestActive = getActiveTab(stateRef.current);
+          if (latestActive?.file?.isExternal && latestActive.file.grantId === tab.file.grantId) {
+            if (latestActive.file.format === 'md' || latestActive.file.format === 'html') {
+              dispatch({
+                type: 'FILE_PATCH',
+                patch: { content: '⚠️ This external file is no longer available.' }
+              });
+            }
+          }
+        }
+        return;
+      }
       if (
         tab.file.format === 'pdf'
         || tab.file.format === 'image'
@@ -409,6 +465,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     openLibraryFile: workspace.openLibraryFile,
     openInNewTab: workspace.openInNewTab, newTab: workspace.newTab, closeTab: workspace.closeTab,
     closeActiveTab: workspace.closeActiveTab, activateTab: workspace.activateTab,
+    openExternalFilePath: workspace.openExternalFilePath, openExternalFiles: workspace.openExternalFiles,
     navigateTo: workspace.navigateTo, consumePendingScroll: workspace.consumePendingScroll,
     consumePendingHighlight: workspace.consumePendingHighlight,
     updateTabPdfPage: workspace.updateTabPdfPage,
