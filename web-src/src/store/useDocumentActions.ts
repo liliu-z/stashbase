@@ -488,6 +488,7 @@ export function useDocumentActions(
           if (state.current.activeTabId !== existing.id) {
             dispatch({ type: 'ACTIVATE_TAB', id: existing.id });
           }
+          void bridge.revokePreviewGrant(result.grantId);
           return;
         }
 

@@ -187,6 +187,7 @@ function getFileFormat(filePath) {
   if (ext === 'pdf') return 'pdf';
   if (ext === 'docx') return 'docx';
   if (['png', 'jpg', 'jpeg', 'webp'].includes(ext)) return 'image';
+  if (['mp4', 'mov', 'm4v', 'webm', 'mkv', 'avi'].includes(ext)) return 'video';
   return 'audio';
 }
 
@@ -211,6 +212,7 @@ function sendInternalPost(requestPath, bodyObj) {
         timeout: 1000,
       },
       (res) => {
+        res.resume(); // drain body to free the socket
         resolve({ statusCode: res.statusCode });
       }
     );
@@ -238,6 +240,7 @@ function sendInternalDelete(requestPath) {
         timeout: 1000,
       },
       (res) => {
+        res.resume(); // drain body to free the socket
         resolve({ statusCode: res.statusCode });
       }
     );
