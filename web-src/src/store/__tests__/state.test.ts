@@ -511,4 +511,22 @@ test('FILE_OPEN with isExternal sets outOfFolder and external properties', () =>
   assert.equal(tab.file?.absolutePath, '/tmp/ext.md');
   assert.equal(tab.editMode, false);
   assert.deepEqual(state.recentFilePaths, []);
+
+  // EDIT_MODE must be rejected for external tabs
+  const stateAfterEditMode = reducer(state, { type: 'EDIT_MODE', on: true });
+  assert.equal(stateAfterEditMode.tabs[0].editMode, false);
+
+  // PRUNE_MISSING_FILE_TABS must not remove external tabs
+  const stateAfterPrune = reducer(state, { type: 'PRUNE_MISSING_FILE_TABS', names: [] });
+  assert.equal(stateAfterPrune.tabs.length, 1);
+  assert.equal(stateAfterPrune.tabs[0].id, tab.id);
+
+  // REMAP_PATHS must not rename external tabs
+  const stateAfterRemap = reducer(state, { type: 'REMAP_PATHS', from: 'ext.md', to: 'renamed.md', kind: 'file' });
+  assert.equal(stateAfterRemap.tabs[0].file?.name, 'ext.md');
+
+  // ACTIVATE_TAB must not leak into recentFilePaths or sidebar selectedPath
+  const stateAfterActivate = reducer(state, { type: 'ACTIVATE_TAB', id: tab.id });
+  assert.deepEqual(stateAfterActivate.recentFilePaths, []);
+  assert.equal(stateAfterActivate.selectedPath, '');
 });

@@ -13,6 +13,7 @@ const {
   buildElectronSmokeArgs,
   classifyProtocolLaunch,
   createApplicationMenuTemplate,
+  createNativeOpenQueueCoordinator,
   createRendererFlushCoordinator,
   createRendererFlushReadiness,
   createSingleFlight,
@@ -514,4 +515,43 @@ test('preload reads and bounds the main-process window identity', () => {
     windowIdFromArgv([`${WINDOW_ID_ARG_PREFIX}${'x'.repeat(200)}`]).length,
     128,
   );
+});
+
+test('native-open queue coordinator isolates queues per target window and handles startup files', () => {
+  const coordinator = createNativeOpenQueueCoordinator();
+  const sentWin1 = [];
+  const sentWin2 = [];
+
+  // Cold startup file arrived before any window exists
+  coordinator.handleStartupFiles(['/path/to/startup.md']);
+
+  // Window 1 is created: attach startup files to it
+  coordinator.attachStartupFilesToWindow(101);
+  assert.deepEqual(coordinator.getPending(101), ['/path/to/startup.md']);
+
+  // Queue a file specifically for Window 2 (not ready yet)
+  coordinator.queueFilesForWindow(102, ['/path/to/target-win2.pdf'], (paths) => sentWin2.push(...paths));
+  assert.deepEqual(coordinator.getPending(102), ['/path/to/target-win2.pdf']);
+  assert.deepEqual(sentWin2, []);
+
+  // Window 1 announces ready: drains ONLY Window 1's queue
+  coordinator.markReady(101, (paths) => sentWin1.push(...paths));
+  assert.deepEqual(sentWin1, ['/path/to/startup.md']);
+  assert.deepEqual(coordinator.getPending(101), []);
+  assert.deepEqual(sentWin2, []); // Window 2's queue was untouched!
+
+  // Window 2 announces ready: drains Window 2's queue
+  coordinator.markReady(102, (paths) => sentWin2.push(...paths));
+  assert.deepEqual(sentWin2, ['/path/to/target-win2.pdf']);
+  assert.deepEqual(coordinator.getPending(102), []);
+
+  // While Window 1 is ready, subsequent files send immediately
+  coordinator.queueFilesForWindow(101, ['/path/to/live.docx'], (paths) => sentWin1.push(...paths));
+  assert.deepEqual(sentWin1, ['/path/to/startup.md', '/path/to/live.docx']);
+
+  // Cleanup removes readiness and any pending
+  coordinator.cleanup(101);
+  coordinator.cleanup(102);
+  assert.equal(coordinator.isReady(101), false);
+  assert.equal(coordinator.isReady(102), false);
 });

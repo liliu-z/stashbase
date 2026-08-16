@@ -4,16 +4,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import express from 'express';
 import { mountInternalGrantsRoute } from './internal-grants.ts';
-import { runWithWindowId } from '../folder.ts';
+import { withWindowContext } from '../http.ts';
 
 test('internal preview grants API lifecycle', async () => {
   const app = express();
   app.use(express.json());
-
-  app.use((req, res, next) => {
-    const winId = req.header('x-stashbase-window-id') || 'default';
-    runWithWindowId(winId, next);
-  });
+  app.use(withWindowContext);
 
   const testToken = 'test-token-12345';
   mountInternalGrantsRoute(app, testToken);
@@ -75,6 +71,15 @@ test('internal preview grants API lifecycle', async () => {
     const text = await resAssetCorrect.text();
     assert.equal(text, '# Grant Content\nHello World');
 
+    // Test browser-style subresource loading via __window/ in URL path (no x-stashbase-window-id header)
+    const resWindowPathWrong = await fetch(`${baseUrl}/asset-preview-grant/__window/win-wrong/${grantId}`);
+    assert.equal(resWindowPathWrong.status, 403);
+
+    const resWindowPathCorrect = await fetch(`${baseUrl}/asset-preview-grant/__window/${windowId}/${grantId}`);
+    assert.equal(resWindowPathCorrect.status, 200);
+    const textWindowPath = await resWindowPathCorrect.text();
+    assert.equal(textWindowPath, '# Grant Content\nHello World');
+
     const resRevokeFail = await fetch(`${baseUrl}/api/internal/grants/${grantId}`, {
       method: 'DELETE',
     });
@@ -91,6 +96,64 @@ test('internal preview grants API lifecycle', async () => {
     });
     assert.equal(resAfterRevoke.status, 404);
 
+    // Non-existent path registration rejected with 400
+    const resNonExistent = await fetch(`${baseUrl}/api/internal/grants`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-stashbase-shutdown-token': testToken,
+      },
+      body: JSON.stringify({ grantId: 'fake-id', windowId, filePath: '/tmp/does-not-exist-12345.md' }),
+    });
+    assert.equal(resNonExistent.status, 400);
+
+    // Symlink repointing test: registering a valid file then replacing with a symlink to another destination
+    const validTargetFile = path.resolve('/tmp/test-grant-valid-target.md');
+    const secretFile = path.resolve('/tmp/test-grant-secret.md');
+    const symlinkPath = path.resolve('/tmp/test-grant-symlink.md');
+
+    fs.writeFileSync(validTargetFile, 'Valid Target Content', 'utf8');
+    fs.writeFileSync(secretFile, 'Secret Unauthorized Content', 'utf8');
+    fs.symlinkSync(validTargetFile, symlinkPath);
+
+    try {
+      const symGrantId = 'symlink-grant-id';
+      // Register with canonical target
+      const resSymReg = await fetch(`${baseUrl}/api/internal/grants`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-stashbase-shutdown-token': testToken,
+        },
+        body: JSON.stringify({ grantId: symGrantId, windowId, filePath: symlinkPath }),
+      });
+      assert.equal(resSymReg.status, 200);
+
+      // Successfully read through canonical target
+      const resSymRead = await fetch(`${baseUrl}/api/grant/${symGrantId}/text`, {
+        headers: { 'x-stashbase-window-id': windowId },
+      });
+      assert.equal(resSymRead.status, 200);
+      const symBody = await resSymRead.json() as { content: string };
+      assert.equal(symBody.content, 'Valid Target Content');
+
+      // Now repoint the target file to the secret file (or replace the registered canonical file with a symlink)
+      fs.unlinkSync(validTargetFile);
+      fs.symlinkSync(secretFile, validTargetFile);
+
+      // Reading must now be rejected with 403 because realpath !== grant.filePath
+      const resSymExploit = await fetch(`${baseUrl}/api/grant/${symGrantId}/text`, {
+        headers: { 'x-stashbase-window-id': windowId },
+      });
+      assert.equal(resSymExploit.status, 403);
+
+      const resAssetSymExploit = await fetch(`${baseUrl}/asset-preview-grant/__window/${windowId}/${symGrantId}`);
+      assert.equal(resAssetSymExploit.status, 403);
+    } finally {
+      fs.rmSync(validTargetFile, { force: true });
+      fs.rmSync(secretFile, { force: true });
+      fs.rmSync(symlinkPath, { force: true });
+    }
   } finally {
     fs.rmSync(tempFile, { force: true });
     await new Promise<void>((resolve) => server.close(() => resolve()));
