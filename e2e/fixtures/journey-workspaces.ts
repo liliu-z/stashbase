@@ -4,6 +4,7 @@ import type { AppFixture } from '../support/fixtures.ts';
 
 export const JOURNEY_MARKDOWN = 'Journey Markdown.md';
 export const JOURNEY_JSON = 'raw-data.json';
+export const JOURNEY_CSV = 'table-data.csv';
 export const CROSS_FOLDER_NOTE = 'Cross Folder Result.md';
 export const EXACT_SEARCH_PHRASE = 'orchid regression phrase 7319';
 export const JOURNEY_HTML = 'read-only.html';
@@ -128,6 +129,7 @@ export function seedJourneyWorkspaces(fixture: AppFixture): void {
     '',
   ].join('\n'));
   write(path.join(projectA, JOURNEY_JSON), '{\r\n  "fixture": "raw journey",\r\n  "editable": true\r\n}\r\n');
+  write(path.join(projectA, JOURNEY_CSV), '\uFEFFid,name,role\r\n101,Alice,engineer\r\n102,Bob,designer\r\n');
   write(path.join(projectB, CROSS_FOLDER_NOTE), [
     '# Cross Folder Result',
     '',

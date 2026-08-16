@@ -14,7 +14,12 @@ import {
   openLibraryFolder,
   saveStatus,
 } from '../support/locators.ts';
-import { JOURNEY_JSON, JOURNEY_MARKDOWN, seedJourneyWorkspaces } from '../fixtures/journey-workspaces.ts';
+import {
+  JOURNEY_CSV,
+  JOURNEY_JSON,
+  JOURNEY_MARKDOWN,
+  seedJourneyWorkspaces,
+} from '../fixtures/journey-workspaces.ts';
 import { openedExternalUrls, stubExternalBrowser } from './journey-helpers.ts';
 
 const FRONTMATTER = '---\ntitle: Journey fixture\ntags:\n  - regression\n---\n';
@@ -169,6 +174,63 @@ test('JSON opens as a source-preserving tree and invalid source remains editable
     await app.page.getByRole('button', { name: 'Switch to Reading View' }).click();
     await expect(source).toHaveAttribute('contenteditable', 'false');
     await expect(source).toContainText('malformed tail');
+    app.errors.assertNone();
+  } finally {
+    await app?.close();
+    await fixture.cleanup();
+  }
+});
+
+test('CSV displays tabular data by default, toggles Source mode, and preserves BOM and CRLF across editing', async ({}, testInfo) => {
+  const fixture = await createAppFixture({ membership: 'one-folder' });
+  seedJourneyWorkspaces(fixture);
+  const sourceFile = path.join(fixture.workspaces.projectA, JOURNEY_CSV);
+  let app: LaunchedApp | undefined;
+  try {
+    app = await launchApp(fixture, testInfo);
+    await stubExternalBrowser(app.electron);
+    await openLibraryFolder(app.page, 'project-alpha');
+    await dismissEmbeddingKeyPrompt(app.page);
+    await fileTreeRow(app.page, JOURNEY_CSV).click();
+
+    const region = app.page.getByRole('region', { name: 'CSV document' });
+    await expect(region).toBeVisible();
+    await expect(region.getByRole('button', { name: 'Table', exact: true })).toHaveAttribute('aria-pressed', 'true');
+
+    // Switch to Source mode
+    await region.getByRole('button', { name: 'Source', exact: true }).click();
+    const source = region.locator('.cm-content');
+    await expect(source).toBeVisible();
+    await expect(source).toContainText('101,Alice,engineer');
+    await expect(source).toHaveAttribute('contenteditable', 'false');
+
+    // Switch to Live Editing mode
+    await app.page.getByRole('button', { name: 'Switch to Live Editing' }).click();
+    await expect(source).toHaveAttribute('contenteditable', 'true');
+    await source.click();
+    await app.page.keyboard.press(process.platform === 'darwin' ? 'Meta+ArrowDown' : 'Control+End');
+    await app.page.keyboard.insertText('\n103,Charlie,manager');
+
+    await expect(saveStatus(app.page)).toBeVisible();
+    await expect.poll(() => fs.readFileSync(sourceFile, 'utf8')).toContain('103,Charlie,manager');
+    const diskContent = fs.readFileSync(sourceFile, 'utf8');
+    expect(diskContent.startsWith('\uFEFF')).toBe(true);
+    expect(diskContent.includes('\r\n')).toBe(true);
+
+    // Switch back to Table mode
+    await region.getByRole('button', { name: 'Table', exact: true }).click();
+    await expect(region.getByRole('button', { name: 'Table', exact: true })).toHaveAttribute('aria-pressed', 'true');
+
+    // Test invalid CSV unclosed quote disables Table mode
+    await region.getByRole('button', { name: 'Source', exact: true }).click();
+    await source.click();
+    await app.page.keyboard.press(process.platform === 'darwin' ? 'Meta+ArrowDown' : 'Control+End');
+    await app.page.keyboard.insertText('\n"unclosed quote line');
+    await expect(saveStatus(app.page)).toBeVisible();
+    await expect.poll(() => fs.readFileSync(sourceFile, 'utf8')).toContain('unclosed quote line');
+    await expect(region.getByRole('button', { name: 'Table', exact: true })).toBeDisabled();
+    await expect(region).toContainText(/Unclosed quote detected/u);
+
     app.errors.assertNone();
   } finally {
     await app?.close();

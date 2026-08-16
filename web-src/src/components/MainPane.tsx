@@ -24,6 +24,7 @@ const LazyPdfPreview = lazyWithRetry(() => import('./PdfPreview').then((mod) => 
 const LazyDocxPreview = lazyWithRetry(() => import('./DocxPreview').then((mod) => ({ default: mod.DocxPreview })));
 const LazyAudioPreview = lazyWithRetry(() => import('./AudioPreview').then((mod) => ({ default: mod.AudioPreview })));
 const LazyJsonDocument = lazyWithRetry(() => import('./JsonDocument').then((mod) => ({ default: mod.JsonDocument })));
+const LazyCsvDocument = lazyWithRetry(() => import('./CsvDocument').then((mod) => ({ default: mod.CsvDocument })));
 
 /**
  * Right rail. Layout from top to bottom:
@@ -185,6 +186,19 @@ export function MainPane({ workspaceHidden = false }: { workspaceHidden?: boolea
             </Suspense>
           </LazyLoadBoundary>
         )}
+        {cur && cur.format === 'csv' && (
+          <LazyLoadBoundary className={VIEWER_LOADING_CLASS} label="CSV document" resetKey={resourceResetKey}>
+            <Suspense fallback={<div className={VIEWER_LOADING_CLASS}>Opening CSV…</div>}>
+              <LazyCsvDocument
+                key={activeTab?.id ?? cur.name}
+                tabId={activeTab?.id ?? ''}
+                content={cur.content}
+                readOnly={!editMode}
+                active
+              />
+            </Suspense>
+          </LazyLoadBoundary>
+        )}
         {cur && !editMode && cur.format === 'html' && (
           <HtmlPreview name={cur.name} />
         )}
@@ -228,7 +242,7 @@ export function MainPane({ workspaceHidden = false }: { workspaceHidden?: boolea
         </div>
       )}
       <FindBar />
-      {cur && (cur.format === 'md' || cur.format === 'json') && !cur.folder && (
+      {cur && (cur.format === 'md' || cur.format === 'json' || cur.format === 'csv') && !cur.folder && (
         /* Floating actions in the main pane's top-right — sits below the
          * tab strip (unconditionally present whenever there's an open
          * file, so a fixed offset is safe). The edit toggle lives here on

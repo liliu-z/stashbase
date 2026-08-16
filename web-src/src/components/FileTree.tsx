@@ -349,7 +349,7 @@ function FileRow({
   siblings,
 }: {
   path: string;
-  format: 'md' | 'html' | 'json' | 'pdf' | 'image' | 'docx' | 'audio';
+  format: FileGlyphFormat;
   depth: number;
   paddingLeft: number;
   parent: string;
@@ -585,12 +585,19 @@ function NewFolderInput({ parentPath, depth }: { parentPath: string; depth: numb
  *  blue) and it made the sidebar the loudest surface in the app — a hue per
  *  row is exactly the repeated-element case the colour budget rules out.
  *  The silhouette and its letterform carry the format instead. */
-export type FileGlyphFormat = 'md' | 'html' | 'json' | 'pdf' | 'image' | 'docx' | 'audio';
+export type FileGlyphFormat = 'md' | 'html' | 'json' | 'csv' | 'pdf' | 'image' | 'docx' | 'audio';
 
 export function FileTypeIcon({ format }: { format: FileGlyphFormat }) {
   if (format === 'image') {
     return (
       <svg viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M158.66,219.56A8,8,0,0,1,152,232H24a8,8,0,0,1-6.73-12.33l36-56a8,8,0,0,1,13.46,0l9.76,15.18,20.85-31.29a8,8,0,0,1,13.32,0ZM216,88V216a16,16,0,0,1-16,16h-8a8,8,0,0,1,0-16h8V96H152a8,8,0,0,1-8-8V40H56v88a8,8,0,0,1-16,0V40A16,16,0,0,1,56,24h96a8,8,0,0,1,5.66,2.34l56,56A8,8,0,0,1,216,88Zm-56-8h28.69L160,51.31Z"/></svg>
+    );
+  }
+  if (format === 'csv') {
+    return (
+      <svg viewBox="0 0 256 256" fill="currentColor" aria-hidden="true">
+        <path d="M44,120H212a4,4,0,0,0,4-4V88a8,8,0,0,0-2.34-5.66l-56-56A8,8,0,0,0,152,24H56A16,16,0,0,0,40,40v76A4,4,0,0,0,44,120ZM152,44l44,44H152ZM80,180a36,36,0,0,1-36,36A36.08,36.08,0,0,1,12.78,198.8,8,8,0,0,1,26.11,189.6,20.08,20.08,0,0,0,44,200a20,20,0,0,0,0-40,20.08,20.08,0,0,0-17.89,10.4,8,8,0,0,1-13.33-9.2A36,36,0,0,1,80,180Zm64-16a8,8,0,0,0-8-8H104a8,8,0,0,0-8,8v12a8,8,0,0,0,8,8h24v8H104a8,8,0,0,0,0,16h24a24,24,0,0,0,24-24v-12a8,8,0,0,0-8-8H120v-8h24A8,8,0,0,0,144,164Zm96,0a8,8,0,0,0-7.39-4.94h-2.22a8,8,0,0,0-7.39,4.94L200,210.66,176.61,164a8,8,0,0,0-7.39-4.94h-2.22A8,8,0,0,0,160,164a8.27,8.27,0,0,0,.61,3.06l32,64a8,8,0,0,0,14.78,0l32-64A8.27,8.27,0,0,0,240,164Z"/>
+      </svg>
     );
   }
   if (format === 'pdf') {

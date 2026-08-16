@@ -241,6 +241,7 @@
     "@codemirror/language-data": "^6.5.2",
     "@codemirror/state": "^6.6.0",
     "@codemirror/view": "^6.42.1",
+    "@glideapps/glide-data-grid": "^6.0.3",
     "@lezer/highlight": "^1.2.3",
     "@milkdown/crepe": "^7.21.3",
     "@milkdown/kit": "^7.21.3",

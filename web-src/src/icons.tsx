@@ -454,3 +454,19 @@ export function CubeLogoIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+export function TableIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <path d="M224,48H32A16,16,0,0,0,16,64V192a16,16,0,0,0,16,16H224a16,16,0,0,0,16-16V64A16,16,0,0,0,224,48Zm0,16V96H160V64ZM144,64V96H112V64ZM96,64V96H32V64ZM32,112H96v32H32Zm80,0h32v32H112Zm112,0v32H160V112ZM32,160H96v32H32Zm80,32V160h32v32Zm112,0H160V160h64v32Z"/>
+    </Icon>
+  );
+}
+
+export function WarningIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <path d="M236.8,188,148.8,36a24,24,0,0,0-41.6,0L19.2,188A23.68,23.68,0,0,0,40,224H216a23.68,23.68,0,0,0,20.8-36ZM120,104a8,8,0,0,1,16,0v40a8,8,0,0,1-16,0Zm8,88a12,12,0,1,1,12-12A12,12,0,0,1,128,192Z"/>
+    </Icon>
+  );
+}

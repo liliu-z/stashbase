@@ -20,6 +20,8 @@ const expectedEntries = [
   'src/components/CrepeDocument.tsx',
   'src/components/JsonDocument.tsx',
   'src/components/json/JsonTreeView.tsx',
+  'src/components/CsvDocument.tsx',
+  'src/components/csv/CsvTableView.tsx',
   'src/components/PdfPreview.tsx',
   'src/components/DocxPreview.tsx',
   'src/components/AudioPreview.tsx',
