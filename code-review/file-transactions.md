@@ -35,12 +35,12 @@
 - Text versions are hashes of complete source bytes, not mtimes.
 - Renderer saves and Agent/MCP writes use the same version authority.
 - A byte-identical save is a no-op and retains the current version.
-- Markdown and JSON persistence preserves supported BOM and line-ending
+- Markdown, JSON, and CSV persistence preserves supported BOM and line-ending
   conventions without manufacturing unrelated source changes.
-- JSON Tree operations enter this same save path as minimal source patches.
-  They preserve untouched whitespace, property order, escape spelling, numeric
-  lexemes, and trailing-newline state; no whole-document serializer is a save
-  authority.
+- JSON Tree and CSV Table operations enter this same save path as minimal source
+  patches. They preserve untouched whitespace, property order, escape spelling,
+  numeric lexemes, custom delimiters, quoting styles, leading zeros, and
+  trailing-newline state; no whole-document serializer is a save authority.
 - A `FILE_CHANGED` conflict must never automatically retry without
   `baseVersion`. The dirty editor buffer and newer disk source both remain
   recoverable until an explicit reload, merge, or overwrite decision.

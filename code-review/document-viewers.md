@@ -18,6 +18,10 @@
 - Direct preview and durable preparation are independent. A direct DOCX view
   may succeed while searchable extraction is pending or failed; neither state
   may falsely complete the other.
+- Transient external files open with a temporary preview grant scoped strictly
+  to the requesting window identity. They are read-only, out-of-folder, and
+  stay out of library indexing and preparation pipelines. Browser-loaded grant
+  assets carry the window context in their URL path prefix (`/asset-preview-grant/__window/<windowId>/<grantId>`).
 
 ## Trust Boundary
 

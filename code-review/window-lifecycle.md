@@ -29,8 +29,13 @@ after readiness, a save failure or timeout keeps the window open.
 - Native close awaits the current renderer save barrier before retiring the
   identity. Retirement installs a bounded tombstone so an in-flight open
   request cannot recreate a ghost binding.
-- Closing one window releases only that window's folder and Agent state. Shared
-  server, daemon, settings, MCP, and other windows remain live.
+- Closing one window releases only that window's folder and Agent state,
+  revokes all active preview grants registered for it, and cleans up its
+  pending native-open queue. Shared server, daemon, settings, MCP, and other
+  windows remain live.
+- Native file open requests (OS open-file events, CLI arguments, second-instance launches)
+  are queued per target window identity (`webContents.id`) rather than drained globally,
+  ensuring cold startup and focused windows receive only their targeted files.
 - Removing a library folder flushes every window showing it, commits membership
   removal, and broadcasts the transition. Recovery may rebind only if durable
   membership still contains the folder.

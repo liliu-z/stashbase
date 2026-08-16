@@ -9,9 +9,9 @@ the source remains the durable object shared with other tools and Agents.
 
 This area owns document tabs and format-appropriate reading or editing
 experiences. Together with the Workspace area, it forms the Document
-Workbench. It includes Markdown, source-authoritative JSON, HTML, PDF, DOCX,
-images, audio, and supported video containers. Preparation and indexing are
-separate areas.
+Workbench. It includes Markdown, source-authoritative JSON, CSV tabular data,
+HTML, PDF, DOCX, images, audio, and supported video containers. Preparation and
+indexing are separate areas.
 
 StashBase is not an unrestricted browser, a script host, a pixel-perfect Word
 editor, a media editor, or a proprietary document format.
@@ -39,6 +39,12 @@ editor, a media editor, or a proprietary document format.
   duplicate-key, or bounded-out JSON explains why Tree mode is unavailable and
   remains editable and saveable as source. Saving preserves BOM, line endings,
   untouched whitespace, escapes, order, numeric lexemes, and trailing newline.
+- Valid CSV tabular data opens as an interactive virtualized table by default;
+  Source mode exposes the exact live text. Cell and row edits apply minimal span
+  patches preserving untouched BOM, CRLF/LF line endings, custom delimiters,
+  quoting styles, leading zeros, and ragged shapes without whole-file serialization.
+  Over-limit or malformed CSV explains why Table mode is unavailable and remains
+  editable and saveable as source.
 - HTML is viewed as source content; the current compatibility preview executes
   local document scripts in a same-origin iframe. PDF uses its source document
   in the native preview surface with page, zoom, fit, and session position
@@ -61,8 +67,8 @@ editor, a media editor, or a proprietary document format.
   and unsaved content.
 - Parsing or preview failure keeps the source identity visible and offers a
   truthful recovery path.
-- A structured JSON view is a controller over source text, never a second
-  document model or persistence path.
+- Structured JSON and CSV views are controllers over source text, never second
+  document models or persistence paths.
 - Rendering untrusted document content never grants application privileges or
   loads arbitrary remote resources.
 
