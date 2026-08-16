@@ -8,7 +8,8 @@
 export const MARKDOWN_NOTE_EXTENSIONS = ['md', 'markdown'] as const;
 export const HTML_NOTE_EXTENSIONS = ['html', 'htm'] as const;
 export const NOTE_EXTENSIONS = [...MARKDOWN_NOTE_EXTENSIONS, ...HTML_NOTE_EXTENSIONS] as const;
-export const STRUCTURED_DATA_EXTENSIONS = ['json'] as const;
+export const CSV_DATA_EXTENSIONS = ['csv'] as const;
+export const STRUCTURED_DATA_EXTENSIONS = ['json', ...CSV_DATA_EXTENSIONS] as const;
 export const DIRECT_TEXT_EXTENSIONS = [
   ...NOTE_EXTENSIONS,
   ...STRUCTURED_DATA_EXTENSIONS,

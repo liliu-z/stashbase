@@ -61,19 +61,26 @@ forwarding, and script confinement.
   nodes before keyboard users enter a selected node's edit actions, and closing
   an edit returns focus to that node. Search-result highlights select and reveal
   a matching Tree node; an unrepresentable source range switches to the visible
-  Source editor before selection. Both views save through
-  [File Transactions](file-transactions.md).
+- CSV source text is authoritative. Valid CSV opens in an interactive Table
+  mode powered by virtualized canvas rendering; other input or over-limit CSV
+  stays openable and saveable in Source mode with an actionable reason. Cell
+  edits, row insertions, row deletions, and rectangular paste patch minimal
+  source spans without serializing the document. The virtualized Table viewer
+  supports keyboard zoom (Ctrl + + / Ctrl + - / Ctrl + 0) and pointer zoom
+  (Ctrl + mouse wheel), scaling headers, cells, text, and markers in sync while
+  unscaling manual column resizes for stable session widths. Both views save
+  through [File Transactions](file-transactions.md).
 
 ## Implementation Map
 
 | Role | Stable entry points |
 |---|---|
 | Viewer dispatch | `web-src/src/components/MainPane.tsx` |
-| Primary viewers | `PdfPreview.tsx`, `DocxPreview.tsx`, `HtmlPreview.tsx`, `ImagePreview.tsx`, `ImageLightbox.tsx`, `AudioPreview.tsx`, `JsonDocument.tsx`, and the lazy `json/JsonTreeView.tsx` controller |
+| Primary viewers | `PdfPreview.tsx`, `DocxPreview.tsx`, `HtmlPreview.tsx`, `ImagePreview.tsx`, `ImageLightbox.tsx`, `AudioPreview.tsx`, `JsonDocument.tsx`, `json/JsonTreeView.tsx`, `CsvDocument.tsx`, and the lazy `csv/CsvTableView.tsx` controller |
 | Preview-control Modules | `web-src/src/components/audio/`, `web-src/src/components/findIframe.ts`, `previewChunkHighlight.ts`, `pdfText.ts`, `pdfFindController.ts`, `web-src/src/lib/previewIframe.ts`, and `previewMessages.ts` |
 | Worker/Sanitizer Seam | `web-src/src/workers/docxPreview.worker.ts`, `shared/html-sanitization.ts` |
 | Server asset/preparation Adapters | `/asset` and `/derived-asset` routes, `server/docx.ts`, media preparation Modules |
-| Focused evidence | `web-src/src/__tests__/pdf-text.test.ts`, `audio-playback.test.ts`, `audio-transcript.test.ts`, `json-document.test.ts`, `json-source-model.test.ts`, plus `e2e/journeys/formats-media.spec.ts` and `markdown-json.spec.ts` |
+| Focused evidence | `web-src/src/__tests__/pdf-text.test.ts`, `audio-playback.test.ts`, `audio-transcript.test.ts`, `json-document.test.ts`, `json-source-model.test.ts`, `csv-document.test.ts`, `csv-source-model.test.ts`, plus `e2e/journeys/formats-media.spec.ts` and `markdown-json.spec.ts` |
 
 ## Validation
 

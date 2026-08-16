@@ -39,6 +39,13 @@ editor, a media editor, or a proprietary document format.
   duplicate-key, or bounded-out JSON explains why Tree mode is unavailable and
   remains editable and saveable as source. Saving preserves BOM, line endings,
   untouched whitespace, escapes, order, numeric lexemes, and trailing newline.
+- Valid CSV opens in an interactive, virtualized Table view by default;
+  Source mode exposes the exact raw text. Explicit editing enables in-cell edits,
+  row insertions, row deletions, and rectangular paste that patch minimal source
+  spans without serializing the document. Invalid or bounded-out CSV explains
+  why Table mode is unavailable and remains editable and saveable as source.
+  Saving preserves BOM, line endings, delimiters, quotes, leading zeros, and
+  ragged rows.
 - HTML is viewed as source content; the current compatibility preview executes
   local document scripts in a same-origin iframe. PDF uses its source document
   in the native preview surface with page, zoom, fit, and session position

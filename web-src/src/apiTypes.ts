@@ -40,7 +40,7 @@ export interface AppearancePreferences {
  *  in the renderer, while its searchable/Agent-readable text and preview
  *  fallback live in AppData-derived HTML. This type is therefore wider than
  *  the server's editable text format on purpose. */
-export type FileFormat = 'md' | 'html' | 'json' | 'pdf' | 'image' | 'docx' | 'audio';
+export type FileFormat = 'md' | 'html' | 'json' | 'csv' | 'pdf' | 'image' | 'docx' | 'audio';
 
 export interface ApiKeySaveResult {
   hasKey: true;
