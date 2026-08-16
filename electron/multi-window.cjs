@@ -361,11 +361,65 @@ function createRendererFlushReadiness() {
   };
 }
 
+function createNativeOpenQueueCoordinator() {
+  const pendingByWebContents = new Map();
+  const readyWebContents = new Set();
+  const pendingStartupFiles = [];
+
+  return {
+    queueFilesForWindow(webContentsId, filePaths, sendFn) {
+      if (!Array.isArray(filePaths) || filePaths.length === 0) return;
+      if (readyWebContents.has(webContentsId)) {
+        sendFn(filePaths);
+      } else {
+        const list = pendingByWebContents.get(webContentsId) ?? [];
+        list.push(...filePaths);
+        pendingByWebContents.set(webContentsId, list);
+      }
+    },
+    handleStartupFiles(filePaths) {
+      if (Array.isArray(filePaths)) {
+        pendingStartupFiles.push(...filePaths);
+      }
+    },
+    attachStartupFilesToWindow(webContentsId) {
+      if (pendingStartupFiles.length === 0) return;
+      const files = [...pendingStartupFiles];
+      pendingStartupFiles.length = 0;
+      const list = pendingByWebContents.get(webContentsId) ?? [];
+      list.push(...files);
+      pendingByWebContents.set(webContentsId, list);
+    },
+    markReady(webContentsId, sendFn) {
+      readyWebContents.add(webContentsId);
+      const pending = pendingByWebContents.get(webContentsId);
+      if (pending && pending.length > 0) {
+        pendingByWebContents.delete(webContentsId);
+        sendFn(pending);
+      }
+    },
+    cleanup(webContentsId) {
+      readyWebContents.delete(webContentsId);
+      pendingByWebContents.delete(webContentsId);
+    },
+    resetReadiness(webContentsId) {
+      readyWebContents.delete(webContentsId);
+    },
+    isReady(webContentsId) {
+      return readyWebContents.has(webContentsId);
+    },
+    getPending(webContentsId) {
+      return pendingByWebContents.get(webContentsId) ?? [];
+    },
+  };
+}
+
 module.exports = {
   WINDOW_ID_ARG_PREFIX,
   buildElectronSmokeArgs,
   classifyProtocolLaunch,
   createApplicationMenuTemplate,
+  createNativeOpenQueueCoordinator,
   createRendererFlushCoordinator,
   createRendererFlushReadiness,
   createSingleFlight,

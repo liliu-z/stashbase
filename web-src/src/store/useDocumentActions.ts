@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, type MutableRefObject } from 'react';
 import { AUDIO_SOURCE_EXTENSION_ALTERNATION } from '../../../shared/file-formats.ts';
 import { api, ApiError } from '../api';
+import { electronBridge } from '../electronBridge';
 import { folderRefsEqual } from '../folderPath';
 import { basename } from '../lib/paths';
 import type { EditorHandle } from './actionTypes';
@@ -19,15 +20,6 @@ const cancelTimeout = (timer: ReturnType<typeof setTimeout>) => clearTimeout(tim
 
 type Dispatch = (action: Action) => void;
 type Toast = (message: string, opts?: ToastOptions) => string;
-
-interface ElectronBridge {
-  getPathForFile: (file: File) => string;
-  registerPreviewGrant: (filePath: string) => Promise<
-    | { isInternal: true; relPath: string }
-    | { isInternal: false; grantId: string; name: string; format: 'md' | 'html' | 'pdf' | 'image' | 'docx' | 'audio'; absolutePath: string }
-  >;
-  revokePreviewGrant: (grantId: string) => Promise<boolean>;
-}
 
 interface DocumentActionRefs {
   state: MutableRefObject<State>;
@@ -96,9 +88,9 @@ export function useDocumentActions(
       const folderPathAtSave = state.current.folderPath;
       const handle = editor.current;
       if (!currentFile || !handle) return true;
-      // Out-of-folder tabs are read-only; a PUT would write a same-named
+      // Out-of-folder or external tabs are read-only; a PUT would write a same-named
       // file into the ACTIVE folder.
-      if (currentFile.folder) return true;
+      if (currentFile.folder || currentFile.isExternal || currentFile.isReadOnly) return true;
       if (!tabAtStart?.dirty) return true;
       const content = handle.getValue();
       // If the state mirror still shows the version the last accepted save
@@ -365,8 +357,8 @@ export function useDocumentActions(
     if (currentState.activeTabId === id && editor.current && !(await flushSave())) return;
     dispatch({ type: 'CLOSE_TAB', id });
     if (tab?.file?.isExternal && tab.file.grantId) {
-      const bridge = (window as { electron?: ElectronBridge }).electron;
-      void bridge?.revokePreviewGrant(tab.file.grantId);
+      const bridge = electronBridge();
+      void bridge?.revokePreviewGrant?.(tab.file.grantId);
     }
   }, [dispatch, editor, flushSave, state]);
 
@@ -457,9 +449,9 @@ export function useDocumentActions(
   const toggleEditMode = useCallback(async () => {
     const tab = getActiveTab(state.current);
     if (!tab?.file) return;
-    // Out-of-folder tabs never edit — their save path would write into
+    // Out-of-folder or external tabs never edit — their save path would write into
     // the ACTIVE folder.
-    if (tab.file.folder) return;
+    if (tab.file.folder || tab.file.isExternal || tab.file.isReadOnly) return;
     if (tab.editMode) {
       if (!(await flushSave())) return;
       dispatch({ type: 'EDIT_MODE', on: false });
@@ -472,15 +464,18 @@ export function useDocumentActions(
     editor.current = handle;
   }, [editor]);
 
-  const openExternalFilePath = useCallback(async (filePath: string) => {
+  const openExternalFilePath = useCallback(async (filePath: string, opts?: { suppressToast?: boolean }) => {
+    let grantIdToRevokeOnFailure: string | null = null;
     try {
-      const bridge = (window as { electron?: ElectronBridge }).electron;
-      if (!bridge) throw new Error('Electron bridge not available');
+      const bridge = electronBridge();
+      if (!bridge?.registerPreviewGrant) throw new Error('Electron bridge not available');
       
       const result = await bridge.registerPreviewGrant(filePath);
       if (result.isInternal) {
         await selectFile(result.relPath);
+        return { ok: true as const };
       } else {
+        grantIdToRevokeOnFailure = result.grantId;
         const existing = state.current.tabs.find(
           (t) => t.file?.isExternal && t.file.absolutePath === result.absolutePath
         );
@@ -488,8 +483,8 @@ export function useDocumentActions(
           if (state.current.activeTabId !== existing.id) {
             dispatch({ type: 'ACTIVATE_TAB', id: existing.id });
           }
-          void bridge.revokePreviewGrant(result.grantId);
-          return;
+          void bridge.revokePreviewGrant?.(result.grantId);
+          return { ok: true as const };
         }
 
         const body = {
@@ -503,7 +498,7 @@ export function useDocumentActions(
           absolutePath: result.absolutePath,
         };
 
-        if (result.format === 'md' || result.format === 'html') {
+        if (result.format === 'md' || result.format === 'html' || result.format === 'json') {
           const contentResult = await api.getExternalFileText(result.grantId);
           body.content = contentResult.content;
         }
@@ -513,22 +508,46 @@ export function useDocumentActions(
           body,
           newTab: true,
         });
+        return { ok: true as const };
       }
     } catch (err: unknown) {
+      if (grantIdToRevokeOnFailure) {
+        const bridge = electronBridge();
+        void bridge?.revokePreviewGrant?.(grantIdToRevokeOnFailure);
+      }
       const msg = err instanceof Error ? err.message : String(err);
-      toast(`Could not open external file: ${msg}`, { level: 'error' });
+      if (!opts?.suppressToast) {
+        toast(`Could not open external file: ${msg}`, { level: 'error' });
+      }
+      return { ok: false as const, error: msg };
     }
   }, [dispatch, selectFile, state, toast]);
 
   const openExternalFiles = useCallback(async (files: File[]) => {
+    const bridge = electronBridge();
+    let failedCount = 0;
+    let lastError = '';
+
     for (const file of files) {
-      const bridge = (window as { electron?: ElectronBridge }).electron;
-      const filePath = bridge?.getPathForFile(file);
-      if (filePath) {
-        await openExternalFilePath(filePath);
+      const filePath = bridge?.getPathForFile?.(file);
+      if (!filePath) {
+        failedCount++;
+        lastError = 'Could not determine file path';
+        continue;
+      }
+      const res = await openExternalFilePath(filePath, { suppressToast: true });
+      if (!res.ok) {
+        failedCount++;
+        lastError = res.error;
       }
     }
-  }, [openExternalFilePath]);
+
+    if (failedCount === 1) {
+      toast(`Could not open external file: ${lastError}`, { level: 'error' });
+    } else if (failedCount > 1) {
+      toast(`${failedCount} unsupported files could not be opened`, { level: 'error' });
+    }
+  }, [openExternalFilePath, toast]);
 
   const updateTabPdfPage = useCallback((tabId: string, page: number) => {
     dispatch({ type: 'TAB_PDF_PAGE', id: tabId, page });

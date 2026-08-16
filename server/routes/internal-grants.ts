@@ -37,8 +37,13 @@ export function mountInternalGrantsRoute(
     if (typeof grantId !== 'string' || typeof windowId !== 'string' || typeof filePath !== 'string') {
       return res.status(400).json({ error: 'invalid payload' });
     }
-    serverPreviewGrants.set(grantId, { windowId, filePath });
-    res.json({ ok: true });
+    try {
+      const canonical = fs.realpathSync(filePath);
+      serverPreviewGrants.set(grantId, { windowId, filePath: canonical });
+      res.json({ ok: true });
+    } catch {
+      return res.status(400).json({ error: 'invalid file path' });
+    }
   });
 
   // Revoke a grant
@@ -56,11 +61,15 @@ export function mountInternalGrantsRoute(
     if (!grant) return res.status(404).end();
 
     const reqWindowId = currentWindowId();
-    if (grant.windowId !== reqWindowId) {
+    if (!reqWindowId || grant.windowId !== reqWindowId) {
       return res.status(403).json({ error: 'forbidden' });
     }
 
     try {
+      const real = fs.realpathSync(grant.filePath);
+      if (real !== grant.filePath) {
+        return res.status(403).json({ error: 'forbidden' });
+      }
       const content = fs.readFileSync(grant.filePath, 'utf8');
       res.json({ content });
     } catch (err: unknown) {
@@ -69,16 +78,30 @@ export function mountInternalGrantsRoute(
   });
 
   // Serve transient file assets
-  app.get('/asset-preview-grant/:grantId', (req, res) => {
-    const grant = getGrant(req.params.grantId);
+  app.get('/asset-preview-grant/*', (req, res) => {
+    const rawPath = (req.params as Record<string, string | undefined>)[0] ?? '';
+    const windowPrefixMatch = rawPath.match(/^__window\/[^/]+\/(.+)$/);
+    const grantId = windowPrefixMatch ? windowPrefixMatch[1] : rawPath;
+
+    const grant = getGrant(grantId);
     if (!grant) return res.status(404).end();
 
     const reqWindowId = currentWindowId();
-    if (grant.windowId !== reqWindowId) {
+    if (!reqWindowId || grant.windowId !== reqWindowId) {
       return res.status(403).end();
     }
 
     const abs = grant.filePath;
+    try {
+      if (!fs.existsSync(abs)) return res.status(404).end();
+      const real = fs.realpathSync(abs);
+      if (real !== abs) {
+        return res.status(403).end();
+      }
+    } catch {
+      return res.status(404).end();
+    }
+
     const ext = path.extname(abs).toLowerCase();
 
     if (ext === '.html' || ext === '.htm') {

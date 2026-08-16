@@ -387,7 +387,7 @@ export function assetUrl(name: string, folder?: string): string {
 
 export function versionedAssetUrl(name: string, version: string, folder?: string, grantId?: string): string {
   if (grantId) {
-    return `/asset-preview-grant/${encodeURIComponent(grantId)}?v=${encodeURIComponent(version)}`;
+    return `${assetWindowPrefix('/asset-preview-grant/')}${encodeURIComponent(grantId)}?v=${encodeURIComponent(version)}`;
   }
   const url = assetUrl(name, folder);
   const sep = url.includes('?') ? '&' : '?';

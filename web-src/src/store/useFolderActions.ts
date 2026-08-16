@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, type MutableRefObject } from 'react';
 import { api, type FolderState } from '../api';
+import { electronBridge } from '../electronBridge';
 import { folderRefsEqual, isAbsoluteFolderRef } from '../folderPath';
 import { createFolderMutationQueue } from '../folderTransition';
 import type { EditorHandle } from './actionTypes';
@@ -131,6 +132,14 @@ export function useFolderActions(
     importIndexGrace.current.clear();
     keyBackfillGrace.current.clear();
     folderContextPath.current = '';
+    const bridge = electronBridge();
+    if (bridge?.revokePreviewGrant) {
+      for (const t of state.current.tabs) {
+        if (t.file?.isExternal && t.file.grantId) {
+          void bridge.revokePreviewGrant(t.file.grantId);
+        }
+      }
+    }
     // Chat tabs survive a folder SWITCH (agent sessions are folder-bound
     // server-side); they reset only when the window loses its folder
     // context — see folderScopedReset.ts.

@@ -1,4 +1,5 @@
 import type { ClipboardOffer } from './components/ClipboardImportModal';
+import type { FileFormat } from './apiTypes';
 
 /** The renderer-visible surface of `electron/preload.cjs`. One declaration
  * for the whole renderer — feature code must not re-declare partial copies
@@ -30,6 +31,18 @@ export interface ElectronBridge {
   markClipboardHandled?: (hash: string) => void;
   markCurrentClipboardImageHandled?: () => void;
   setAgentComposerFocused?: (focused: boolean) => void;
+  registerPreviewGrant?: (filePath: string) => Promise<{
+    isInternal: boolean;
+    relPath: string;
+    grantId: string;
+    name: string;
+    format: FileFormat;
+    absolutePath: string;
+  }>;
+  revokePreviewGrant?: (grantId: string) => Promise<boolean>;
+  getPathForFile?: (file: File) => string;
+  onOpenExternalFiles?: (handler: (filePaths: string[]) => void) => (() => void);
+  notifyRendererReadyForNativeFiles?: () => void;
 }
 
 /** The preload bridge, or undefined outside Electron (browser dev shell). */

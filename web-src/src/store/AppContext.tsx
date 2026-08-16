@@ -15,6 +15,7 @@ import {
 import {
   api,
   ApiError,
+  versionedAssetUrl,
 } from '../api';
 import {
   getActiveTab,
@@ -101,7 +102,7 @@ export interface AppActions {
    *  shortcuts (`⌘W`) and UI buttons that don't have a tab id handy. */
   closeActiveTab: () => Promise<void>;
   activateTab: (id: string) => Promise<void>;
-  openExternalFilePath: (filePath: string) => Promise<void>;
+  openExternalFilePath: (filePath: string, opts?: { suppressToast?: boolean }) => Promise<{ ok: boolean; error?: string } | void>;
   openExternalFiles: (files: File[]) => Promise<void>;
   /** Cross-file link nav: open `name` (with optional anchor) and push a
    *  new entry into the back/forward stack. Used by preview iframes
@@ -341,7 +342,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
             || tab.file.format === 'docx'
             || tab.file.format === 'audio'
           ) {
-            const response = await fetch(`/asset-preview-grant/${encodeURIComponent(grantId)}`, { method: 'HEAD' });
+            const url = versionedAssetUrl(tab.file.name, tab.file.version ?? '', undefined, grantId);
+            const response = await fetch(url, { method: 'HEAD' });
             if (!response.ok) throw new Error('Unavailable');
             return;
           }
@@ -376,7 +378,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           if (stateRef.current.folderPath !== folderPathAtStart) return;
           const latestActive = getActiveTab(stateRef.current);
           if (latestActive?.file?.isExternal && latestActive.file.grantId === tab.file.grantId) {
-            if (latestActive.file.format === 'md' || latestActive.file.format === 'html') {
+            if (latestActive.file.format === 'md' || latestActive.file.format === 'html' || latestActive.file.format === 'json') {
               dispatch({
                 type: 'FILE_PATCH',
                 patch: { content: '⚠️ This external file is no longer available.' }

@@ -42,7 +42,7 @@ export function MainPane({ workspaceHidden = false }: { workspaceHidden?: boolea
   const saveStatus = activeTab?.saveStatus ?? { text: '', cls: '' };
   const hasTabs = state.tabs.length > 0;
   const emptyTab = !!activeTab && !cur;
-  const resourceResetKey = cur ? `${cur.folder ?? ''}:${cur.name}:${cur.version ?? ''}` : undefined;
+  const resourceResetKey = cur ? `${cur.folder ?? ''}:${cur.grantId ?? ''}:${cur.name}:${cur.version ?? ''}` : undefined;
   // Out-of-folder tab (a library search hit viewed without switching the
   // window's folder): a quiet identity banner with the one escape hatch —
   // open that folder in its own window.
@@ -162,14 +162,14 @@ export function MainPane({ workspaceHidden = false }: { workspaceHidden?: boolea
               <LazyLoadBoundary
                 className={VIEWER_LOADING_CLASS}
                 label="Markdown document"
-                resetKey={`${file.folder ?? ''}:${file.name}:${file.version ?? ''}`}
+                resetKey={`${file.folder ?? ''}:${file.grantId ?? ''}:${file.name}:${file.version ?? ''}`}
               >
                 <Suspense fallback={<div className={VIEWER_LOADING_CLASS} role="status">Opening document…</div>}>
                   <LazyCrepeDocument
                     tabId={tab.id}
                     name={file.name}
                     content={file.content}
-                    readOnly={!tab.editMode}
+                    readOnly={!tab.editMode || Boolean(file.isReadOnly) || Boolean(file.isExternal)}
                     active={active}
                     dirty={tab.dirty}
                     folder={file.folder}
@@ -186,19 +186,19 @@ export function MainPane({ workspaceHidden = false }: { workspaceHidden?: boolea
                 key={activeTab?.id ?? cur.name}
                 tabId={activeTab?.id ?? ''}
                 content={cur.content}
-                readOnly={!editMode}
+                readOnly={!editMode || Boolean(cur.isReadOnly) || Boolean(cur.isExternal)}
                 active
               />
             </Suspense>
           </LazyLoadBoundary>
         )}
         {cur && !editMode && cur.format === 'html' && (
-          <HtmlPreview name={cur.name} />
+          <HtmlPreview key={activeTab?.id} name={cur.name} />
         )}
         {cur && cur.format === 'docx' && (
           <LazyLoadBoundary className={VIEWER_CENTERED_LOADING_CLASS} label="document preview" resetKey={resourceResetKey}>
             <Suspense fallback={<div className={VIEWER_CENTERED_LOADING_CLASS}>Opening document…</div>}>
-              <LazyDocxPreview name={cur.name} />
+              <LazyDocxPreview key={activeTab?.id} name={cur.name} />
             </Suspense>
           </LazyLoadBoundary>
         )}
@@ -216,12 +216,12 @@ export function MainPane({ workspaceHidden = false }: { workspaceHidden?: boolea
         )}
         {cur && cur.format === 'image' && (
           // Images, like PDFs, are binary — no edit mode.
-          <ImagePreview name={cur.name} />
+          <ImagePreview key={activeTab?.id} name={cur.name} />
         )}
         {cur && cur.format === 'audio' && (
           <LazyLoadBoundary className={VIEWER_PADDED_LOADING_CLASS} label="audio preview" resetKey={resourceResetKey}>
             <Suspense fallback={<div className={VIEWER_PADDED_LOADING_CLASS}>Opening audio…</div>}>
-              <LazyAudioPreview name={cur.name} />
+              <LazyAudioPreview key={activeTab?.id} name={cur.name} />
             </Suspense>
           </LazyLoadBoundary>
         )}

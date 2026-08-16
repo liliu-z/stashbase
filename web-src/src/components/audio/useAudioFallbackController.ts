@@ -6,8 +6,9 @@ export function useAudioFallbackController(input: {
   folder: string;
   directSrc: string;
   fallbackSrc: string;
+  enabled?: boolean;
 }) {
-  const { name, folder, directSrc, fallbackSrc } = input;
+  const { name, folder, directSrc, fallbackSrc, enabled = true } = input;
   const [playbackSrc, setPlaybackSrc] = useState(directSrc);
   const [usingFallback, setUsingFallback] = useState(false);
   const [preparing, setPreparing] = useState(false);
@@ -80,6 +81,10 @@ export function useAudioFallbackController(input: {
   }
 
   function markUnplayable() {
+    if (!enabled) {
+      setError('This external media file could not be played in the browser.');
+      return;
+    }
     if (!usingFallback) {
       void prepare();
     } else if (!preparing) {

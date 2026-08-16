@@ -8,6 +8,7 @@
  */
 import type {
   FileBody,
+  FileFormat,
   FileMeta,
   FolderMeta,
   PreparationFailure,
@@ -83,7 +84,7 @@ export interface PendingChatResume {
 
 export interface OpenFile {
   name: string;
-  format: 'md' | 'html' | 'json' | 'pdf' | 'image' | 'docx' | 'audio';
+  format: FileFormat;
   /** Last on-disk content — diff target for the autosave path. Empty
    *  string for binary files (PDF / image / DOCX / audio; the viewer loads them
    *  directly from `/asset/*`). */

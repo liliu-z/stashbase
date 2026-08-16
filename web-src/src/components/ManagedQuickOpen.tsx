@@ -36,8 +36,8 @@ export default function ManagedQuickOpen({
   const commandContext = {
     hasFolder: Boolean(state.folder),
     hasActiveTab: Boolean(state.activeTabId),
-    // Out-of-folder tabs are read-only — keep Toggle Editing off the palette.
-    activeFileIsMarkdown: activeTab?.file?.format === 'md' && !activeTab.file.folder,
+    // Out-of-folder or external tabs are read-only — keep Toggle Editing off the palette.
+    activeFileIsMarkdown: activeTab?.file?.format === 'md' && !activeTab.file.folder && !activeTab.file.isExternal && !activeTab.file.isReadOnly,
   };
   const fileItems = useMemo(
     () => rankQuickOpen(paths, route.provider === 'files' ? route.query : '', recentPaths),

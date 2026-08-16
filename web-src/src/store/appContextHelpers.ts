@@ -73,8 +73,8 @@ export function keywordFindCaseSensitive(query: string, caseStrict: boolean): bo
 }
 
 /** True when the tab holds the ACTIVE folder's file `name`. Out-of-folder
- *  tabs (`file.folder` set) are a different document even under the same
- *  rel name, so they never match. */
+ *  or external tabs (`file.folder` set or `file.isExternal` set) are a
+ *  different document even under the same rel name, so they never match. */
 export function isFolderFileTab(t: { file: State['tabs'][number]['file'] }, name: string): boolean {
-  return t.file?.name === name && !t.file.folder;
+  return t.file?.name === name && !t.file.folder && !t.file.isExternal;
 }

@@ -24,10 +24,12 @@ export function DocxPreview({ name }: { name: string }) {
   const { state, actions, activeTab } = useApp();
   const pendingAnchor = activeTab?.pendingAnchor ?? null;
   const pendingHighlight = activeTab?.pendingHighlight ?? null;
+  const isExternal = activeTab?.file?.name === name && Boolean(activeTab.file.isExternal);
   const sourceVersion = activeTab?.file?.name === name ? activeTab.file.version ?? '' : '';
   // Out-of-folder tab: fetch source bytes + resolve embedded assets against
   // the file's own member folder.
   const sourceFolder = activeTab?.file?.name === name ? activeTab.file.folder : undefined;
+  const sourceGrantId = activeTab?.file?.name === name ? activeTab.file.grantId : undefined;
   const frameRef = useRef<HTMLIFrameElement | null>(null);
   const loadedHtmlRef = useRef('');
   const findAtMount = useLatestRef(state.find);
@@ -36,8 +38,8 @@ export function DocxPreview({ name }: { name: string }) {
   const [directFailed, setDirectFailed] = useState(false);
   const [retryBusy, setRetryBusy] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
-  const failure = getPreparationFailure(state, name);
-  const progress = state.conversionProgress[name];
+  const failure = isExternal ? null : getPreparationFailure(state, name);
+  const progress = isExternal ? null : state.conversionProgress[name];
   const preparationStatus = progress
     ? progress.phase === 'queued'
       ? preparationWaitCopy('searchable-text', progress.tasksAhead)
@@ -68,7 +70,7 @@ export function DocxPreview({ name }: { name: string }) {
 
     void (async () => {
       try {
-        const response = await fetch(versionedAssetUrl(name, sourceVersion, sourceFolder), { signal: controller.signal });
+        const response = await fetch(versionedAssetUrl(name, sourceVersion, sourceFolder, sourceGrantId), { signal: controller.signal });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const arrayBuffer = await response.arrayBuffer();
         worker = new Worker(new URL('../workers/docxPreview.worker.ts', import.meta.url), { type: 'module' });
@@ -90,7 +92,7 @@ export function DocxPreview({ name }: { name: string }) {
       controller.abort();
       worker?.terminate();
     };
-  }, [name, sourceVersion, sourceFolder]);
+  }, [name, sourceVersion, sourceFolder, sourceGrantId]);
 
   useEffect(() => {
     if (!html) return;
@@ -223,7 +225,13 @@ export function DocxPreview({ name }: { name: string }) {
       ) : null}
       <div className="relative min-h-0 flex-1 overflow-hidden bg-white">
         {directFailed ? (
-          <HtmlPreview name={name} derived />
+          isExternal ? (
+            <div className="grid h-full place-items-center p-6 text-center text-sm text-muted-foreground">
+              This external Word document could not be previewed directly.
+            </div>
+          ) : (
+            <HtmlPreview name={name} derived />
+          )
         ) : html ? (
           <iframe
             ref={frameRef}

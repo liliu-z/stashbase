@@ -62,7 +62,7 @@ export interface ActiveFolderWorkspace {
   scheduleSave: () => void;
   flushSave: () => Promise<boolean>;
   registerEditor: (handle: EditorHandle | null) => void;
-  openExternalFilePath: (filePath: string) => Promise<void>;
+  openExternalFilePath: (filePath: string, opts?: { suppressToast?: boolean }) => Promise<{ ok: boolean; error?: string } | void>;
   openExternalFiles: (files: File[]) => Promise<void>;
 }
 

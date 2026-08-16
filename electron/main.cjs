@@ -33,6 +33,7 @@ const {
   WINDOW_ID_ARG_PREFIX,
   classifyProtocolLaunch,
   createApplicationMenuTemplate,
+  createNativeOpenQueueCoordinator,
   createRendererFlushCoordinator,
   createRendererFlushReadiness,
   createSingleFlight,
@@ -174,7 +175,7 @@ registerBugReportReviewIpc({
 const APP_CONFIG_FILE = path.join(os.homedir(), '.stashbase', 'config.json');
 
 const VIEWABLE_FILE_EXTENSIONS = new Set([
-  'md', 'markdown', 'html', 'htm', 'pdf',
+  'md', 'markdown', 'html', 'htm', 'json', 'csv', 'pdf',
   'png', 'jpg', 'jpeg', 'webp', 'docx',
   'mp3', 'wav', 'm4a', 'flac', 'ogg', 'opus', 'aac', 'aiff', 'aif',
   'mp4', 'mov', 'm4v', 'webm', 'mkv', 'avi'
@@ -184,16 +185,29 @@ function getFileFormat(filePath) {
   const ext = path.extname(filePath).toLowerCase().slice(1);
   if (ext === 'md' || ext === 'markdown') return 'md';
   if (ext === 'html' || ext === 'htm') return 'html';
+  if (ext === 'json') return 'json';
+  if (ext === 'csv') return 'csv';
   if (ext === 'pdf') return 'pdf';
   if (ext === 'docx') return 'docx';
   if (['png', 'jpg', 'jpeg', 'webp'].includes(ext)) return 'image';
-  if (['mp4', 'mov', 'm4v', 'webm', 'mkv', 'avi'].includes(ext)) return 'video';
-  return 'audio';
+  if (['mp3', 'wav', 'm4a', 'flac', 'ogg', 'opus', 'aac', 'aiff', 'aif', 'mp4', 'mov', 'm4v', 'webm', 'mkv', 'avi'].includes(ext)) return 'audio';
+  return null;
+}
+
+function canonicalizeFilePath(rawPath) {
+  if (typeof rawPath !== 'string' || !rawPath) return null;
+  try {
+    const real = fs.realpathSync(rawPath);
+    const st = fs.statSync(real);
+    if (st.isFile()) return real;
+  } catch {
+    // Path does not exist or is not accessible
+  }
+  return null;
 }
 
 const activePreviewGrants = new Map();
-const pendingFilesToOpen = [];
-const rendererReadyWindows = new Set();
+const nativeOpenQueue = createNativeOpenQueueCoordinator();
 
 function sendInternalPost(requestPath, bodyObj) {
   return new Promise((resolve) => {
@@ -260,19 +274,12 @@ function getFilePathsFromArgs(argv) {
     const arg = argv[i];
     if (arg.startsWith('-')) continue;
     if (arg.startsWith(WINDOW_ID_ARG_PREFIX)) continue;
-    try {
-      const absPath = path.resolve(arg);
-      if (fs.existsSync(absPath)) {
-        const st = fs.statSync(absPath);
-        if (st.isFile()) {
-          const ext = path.extname(absPath).toLowerCase().slice(1);
-          if (VIEWABLE_FILE_EXTENSIONS.has(ext)) {
-            filePaths.push(absPath);
-          }
-        }
+    const canonical = canonicalizeFilePath(arg);
+    if (canonical) {
+      const ext = path.extname(canonical).toLowerCase().slice(1);
+      if (VIEWABLE_FILE_EXTENSIONS.has(ext)) {
+        filePaths.push(canonical);
       }
-    } catch (err) {
-      // Ignore invalid paths
     }
   }
   return filePaths;
@@ -917,6 +924,7 @@ async function createWindow(initialFolder) {
   const webContentsId = win.webContents.id;
   const rendererFlushReadiness = createRendererFlushReadiness();
   rendererFlushReadinessByWebContents.set(webContentsId, rendererFlushReadiness);
+  nativeOpenQueue.attachStartupFilesToWindow(webContentsId);
   mainWindows.add(win);
   windowRegistry.add(windowId, win, initialFolder);
   lastMainWindow = win;
@@ -924,6 +932,9 @@ async function createWindow(initialFolder) {
     lastMainWindow = win;
     offerClipboardImage(win);
     startClipboardPolling();
+  });
+  win.on('blur', () => {
+    stopClipboardPolling();
   });
   win.on('close', (event) => {
     if (approvedWindowCloses.has(win) || !rendererFlushReadiness.shouldRequest()) return;
@@ -952,7 +963,7 @@ async function createWindow(initialFolder) {
     rendererFlush.cancel(webContentsId);
     rendererFlushReadinessByWebContents.delete(webContentsId);
     bugReports.discardUnreviewedDraftsForSource(webContentsId);
-    rendererReadyWindows.delete(webContentsId);
+    nativeOpenQueue.cleanup(webContentsId);
     mainWindows.delete(win);
     windowRegistry.remove(windowId);
     releaseWindowContext(windowId);
@@ -994,7 +1005,11 @@ async function createWindow(initialFolder) {
   }
   win.on('enter-full-screen', pushFullscreen);
   win.on('leave-full-screen', pushFullscreen);
+  win.webContents.on('did-start-loading', () => {
+    nativeOpenQueue.resetReadiness(webContentsId);
+  });
   win.webContents.on('did-finish-load', () => {
+    nativeOpenQueue.resetReadiness(webContentsId);
     rendererFlushReadiness.markDocumentLoaded();
     pushFullscreen();
   });
@@ -1226,20 +1241,31 @@ ipcMain.on('clipboard:setAgentComposerFocused', (event, focused) => {
 
 function getLastMainWindow() {
   const focused = BrowserWindow.getFocusedWindow();
-  const win = isLiveMainWindow(focused)
-    ? focused
-    : isLiveMainWindow(lastMainWindow)
-      ? lastMainWindow
-      : [...mainWindows].find((candidate) => isLiveMainWindow(candidate));
-  return isLiveMainWindow(win) ? win : null;
+  if (isLiveMainWindow(focused) && !pendingWindowCloses.has(focused)) return focused;
+  if (isLiveMainWindow(lastMainWindow) && !pendingWindowCloses.has(lastMainWindow)) return lastMainWindow;
+  return [...mainWindows].find((win) => isLiveMainWindow(win) && !pendingWindowCloses.has(win)) ?? null;
+}
+
+function queueFilesForWindow(win, filePaths) {
+  if (!win || !isLiveMainWindow(win) || !Array.isArray(filePaths) || filePaths.length === 0) return;
+  nativeOpenQueue.queueFilesForWindow(win.webContents.id, filePaths, (paths) => {
+    if (!win.isDestroyed()) win.webContents.send('window:open-external-files', paths);
+  });
 }
 
 function handleNativeFileOpenRequest(filePath) {
+  const canonical = canonicalizeFilePath(filePath);
+  if (!canonical) return;
+  const ext = path.extname(canonical).toLowerCase().slice(1);
+  if (!VIEWABLE_FILE_EXTENSIONS.has(ext)) return;
   const win = getLastMainWindow();
-  if (win && rendererReadyWindows.has(win.webContents.id)) {
-    win.webContents.send('window:open-external-files', [filePath]);
+  if (win) {
+    queueFilesForWindow(win, [canonical]);
   } else {
-    pendingFilesToOpen.push(filePath);
+    nativeOpenQueue.handleStartupFiles([canonical]);
+    if (app.isReady()) {
+      void initialWindowFlight.run().then(() => { focusLastMainWindow(); });
+    }
   }
 }
 
@@ -1253,10 +1279,8 @@ ipcMain.handle('grant:register', async (event, filePath) => {
   const windowId = windowRegistry.idForWindow(senderWindow);
   if (!windowId || typeof filePath !== 'string') throw new Error('Invalid arguments');
 
-  const canonicalPath = path.resolve(filePath);
-  if (!fs.existsSync(canonicalPath)) throw new Error('File does not exist');
-  const st = fs.statSync(canonicalPath);
-  if (!st.isFile()) throw new Error('Not a file');
+  const canonicalPath = canonicalizeFilePath(filePath);
+  if (!canonicalPath) throw new Error('File does not exist');
 
   const ext = path.extname(canonicalPath).toLowerCase().slice(1);
   if (!VIEWABLE_FILE_EXTENSIONS.has(ext)) {
@@ -1265,7 +1289,13 @@ ipcMain.handle('grant:register', async (event, filePath) => {
 
   const activeFolder = windowRegistry.folderForWindowId(windowId);
   if (activeFolder) {
-    const relative = path.relative(activeFolder, canonicalPath);
+    let canonicalFolder = null;
+    try {
+      canonicalFolder = fs.realpathSync(activeFolder);
+    } catch {
+      canonicalFolder = path.resolve(activeFolder);
+    }
+    const relative = path.relative(canonicalFolder, canonicalPath);
     const isInternal = !relative.startsWith('..') && !path.isAbsolute(relative);
     if (isInternal) {
       return { isInternal: true, relPath: relative.replace(/\\/g, '/') };
@@ -1274,11 +1304,18 @@ ipcMain.handle('grant:register', async (event, filePath) => {
 
   const grantId = crypto.randomUUID();
   const format = getFileFormat(canonicalPath);
+  if (!format) {
+    throw new Error(`Unsupported file type: .${ext}`);
+  }
   const name = path.basename(canonicalPath);
 
   activePreviewGrants.set(grantId, { windowId, filePath: canonicalPath });
 
-  await sendInternalPost('/api/internal/grants', { grantId, windowId, filePath: canonicalPath });
+  const res = await sendInternalPost('/api/internal/grants', { grantId, windowId, filePath: canonicalPath });
+  if (res.statusCode !== 200) {
+    activePreviewGrants.delete(grantId);
+    throw new Error('Failed to register preview grant on server');
+  }
 
   return {
     isInternal: false,
@@ -1291,20 +1328,19 @@ ipcMain.handle('grant:register', async (event, filePath) => {
 
 ipcMain.handle('grant:revoke', async (event, grantId) => {
   if (typeof grantId !== 'string') return false;
+  const senderWindow = BrowserWindow.fromWebContents(event.sender);
+  const windowId = windowRegistry.idForWindow(senderWindow);
+  const grant = activePreviewGrants.get(grantId);
+  if (grant && (!windowId || grant.windowId !== windowId)) return false;
   activePreviewGrants.delete(grantId);
   await sendInternalDelete(`/api/internal/grants/${encodeURIComponent(grantId)}`);
   return true;
 });
 
 ipcMain.on('renderer:ready-for-native-files', (event) => {
-  const webContentsId = event.sender.id;
-  rendererReadyWindows.add(webContentsId);
-  const win = BrowserWindow.fromWebContents(event.sender);
-  if (win && pendingFilesToOpen.length > 0) {
-    const paths = [...pendingFilesToOpen];
-    pendingFilesToOpen.length = 0;
-    win.webContents.send('window:open-external-files', paths);
-  }
+  nativeOpenQueue.markReady(event.sender.id, (paths) => {
+    event.sender.send('window:open-external-files', paths);
+  });
 });
 
 const initialWindowFlight = createSingleFlight(() => app.whenReady().then(() => createWindow()));
@@ -1366,8 +1402,13 @@ if (!hasSingleInstanceLock) {
     if (protocolLaunch === 'inert') return;
     const filePaths = getFilePathsFromArgs(argv);
     if (filePaths.length > 0) {
-      for (const filePath of filePaths) {
-        handleNativeFileOpenRequest(filePath);
+      const win = getLastMainWindow();
+      if (win) {
+        focusWindow(win);
+        queueFilesForWindow(win, filePaths);
+      } else {
+        nativeOpenQueue.handleStartupFiles(filePaths);
+        void initialWindowFlight.run().then(() => { focusLastMainWindow(); });
       }
     } else {
       if (!focusLastMainWindow()) {
@@ -1404,9 +1445,7 @@ if (!hasSingleInstanceLock) {
     }
     installApplicationMenu();
     const startupFiles = getFilePathsFromArgs(process.argv);
-    for (const filePath of startupFiles) {
-      pendingFilesToOpen.push(filePath);
-    }
+    nativeOpenQueue.handleStartupFiles(startupFiles);
     await initialWindowFlight.run();
     if (initialProtocolLaunch === 'oauth-return') focusOAuthReturn();
   });

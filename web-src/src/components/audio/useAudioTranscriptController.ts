@@ -7,8 +7,8 @@ interface AudioTarget {
   version: string;
 }
 
-export function useAudioTranscriptController(input: AudioTarget & { conversionRevision: number }) {
-  const { name, folder, version, conversionRevision } = input;
+export function useAudioTranscriptController(input: AudioTarget & { conversionRevision: number; enabled?: boolean }) {
+  const { name, folder, version, conversionRevision, enabled = true } = input;
   const [state, setState] = useState<AudioTranscriptState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [retryBusy, setRetryBusy] = useState(false);
@@ -25,6 +25,11 @@ export function useAudioTranscriptController(input: AudioTarget & { conversionRe
   }, [name, folder, version]);
 
   useEffect(() => {
+    if (!enabled) {
+      setState(null);
+      setError(null);
+      return;
+    }
     setState(null);
     setError(null);
     let cancelled = false;

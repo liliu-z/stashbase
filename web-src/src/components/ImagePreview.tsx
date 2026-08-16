@@ -41,9 +41,14 @@ const clampScale = (v: number) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, v));
 
 export function ImagePreview({ name }: { name: string }) {
   const { state, activeTab } = useApp();
+  const isExternal = activeTab?.file?.name === name && Boolean(activeTab.file.isExternal);
   const sourceVersion = activeTab?.file?.name === name ? activeTab.file.version ?? '' : '';
   const sourceFolder = activeTab?.file?.name === name ? activeTab.file.folder : undefined;
-  const src = useMemo(() => versionedAssetUrl(name, sourceVersion, sourceFolder), [name, sourceVersion, sourceFolder]);
+  const sourceGrantId = activeTab?.file?.name === name ? activeTab.file.grantId : undefined;
+  const src = useMemo(
+    () => versionedAssetUrl(name, sourceVersion, sourceFolder, sourceGrantId),
+    [name, sourceVersion, sourceFolder, sourceGrantId],
+  );
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const currentRef = useLatestRef({ folderPath: state.folderPath, name });
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
@@ -57,8 +62,8 @@ export function ImagePreview({ name }: { name: string }) {
   const [retryError, setRetryError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState(false);
   const alt = basename(name);
-  const failure = getPreparationFailure(state, name);
-  const conversionProgress = state.conversionProgress[name];
+  const failure = isExternal ? null : getPreparationFailure(state, name);
+  const conversionProgress = isExternal ? null : state.conversionProgress[name];
   const preparationStatus = !failure && conversionProgress
     ? conversionProgress.phase === 'queued'
       ? preparationWaitCopy('searchable-text', conversionProgress.tasksAhead)

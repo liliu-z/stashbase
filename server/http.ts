@@ -85,6 +85,8 @@ function assetWindowIdFromPath(reqPath: string): string | undefined {
     ? '/asset-audio-preview/__window/'
     : reqPath.startsWith('/asset-derived/__window/')
     ? '/asset-derived/__window/'
+    : reqPath.startsWith('/asset-preview-grant/__window/')
+    ? '/asset-preview-grant/__window/'
     : reqPath.startsWith('/asset/__window/')
       ? '/asset/__window/'
       : null;

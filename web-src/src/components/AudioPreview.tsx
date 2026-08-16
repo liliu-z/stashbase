@@ -22,12 +22,17 @@ import { StatusMessage } from './ui/status';
 
 export function AudioPreview({ name }: { name: string }) {
   const { state, activeTab, actions } = useApp();
+  const isExternal = activeTab?.file?.name === name && Boolean(activeTab.file.isExternal);
   const version = activeTab?.file?.name === name ? activeTab.file.version ?? '' : '';
   // Out-of-folder tab: every URL and prepare/transcript request must carry
   // the file's own member folder instead of the window's.
   const sourceFolder = activeTab?.file?.name === name ? activeTab.file.folder : undefined;
+  const sourceGrantId = activeTab?.file?.name === name ? activeTab.file.grantId : undefined;
   const requestFolder = sourceFolder ?? state.folderPath;
-  const directSrc = useMemo(() => versionedAssetUrl(name, version, sourceFolder), [name, version, sourceFolder]);
+  const directSrc = useMemo(
+    () => versionedAssetUrl(name, version, sourceFolder, sourceGrantId),
+    [name, version, sourceFolder, sourceGrantId],
+  );
   const fallbackSrc = useMemo(() => audioPreviewAssetUrl(name, version, sourceFolder), [name, version, sourceFolder]);
   const [positionMs, setPositionMs] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -37,18 +42,20 @@ export function AudioPreview({ name }: { name: string }) {
     folder: requestFolder,
     directSrc,
     fallbackSrc,
+    enabled: !isExternal,
   });
   const transcription = useAudioTranscriptController({
     name,
     folder: requestFolder,
     version,
     conversionRevision: state.conversionRevision,
+    enabled: !isExternal,
   });
 
   useEffect(() => {
     setPositionMs(0);
-    playbackPositionRef.current.setSourceIdentity(JSON.stringify([requestFolder, name, version]));
-  }, [name, requestFolder, version]);
+    playbackPositionRef.current.setSourceIdentity(JSON.stringify([requestFolder, name, version, sourceGrantId]));
+  }, [name, requestFolder, version, sourceGrantId]);
 
   useEffect(() => {
     const highlight = activeTab?.pendingHighlight;
@@ -139,7 +146,7 @@ export function AudioPreview({ name }: { name: string }) {
               </span>
             )}
           </div>
-          {(transcription.state?.status === 'ready' || transcription.state?.status === 'failed' || transcription.state?.status === 'cancelled') && (
+          {!isExternal && (transcription.state?.status === 'ready' || transcription.state?.status === 'failed' || transcription.state?.status === 'cancelled') && (
             <div className="flex items-center gap-1.5">
               <Select
                 value={transcription.retryLanguage}
@@ -154,17 +161,20 @@ export function AudioPreview({ name }: { name: string }) {
               </Button>
             </div>
           )}
-          {transcription.state?.status === 'pending' && (
+          {!isExternal && transcription.state?.status === 'pending' && (
             <Button variant="outline" size="sm" disabled={transcription.cancelBusy} onClick={() => { void transcription.cancel(); }}>
               {transcription.cancelBusy ? 'Cancelling…' : 'Cancel'}
             </Button>
           )}
         </div>
 
-        {transcription.error && (
+        {isExternal && (
+          <div className={`${emptyStateClass} row-start-3`}>Transcripts are only generated for library files.</div>
+        )}
+        {!isExternal && transcription.error && (
           <StatusMessage tone="error" className={TRANSCRIPT_STATE_CLASS}>{transcription.error}</StatusMessage>
         )}
-        {!transcription.error && statusCopy && (
+        {!isExternal && !transcription.error && statusCopy && (
           <StatusMessage
             tone={transcription.state?.status === 'failed' ? 'error' : 'info'}
             role="status"
@@ -177,10 +187,10 @@ export function AudioPreview({ name }: { name: string }) {
             )}
           </StatusMessage>
         )}
-        {transcript && transcript.segments.length === 0 && (
+        {!isExternal && transcript && transcript.segments.length === 0 && (
           <div className={`${emptyStateClass} row-start-3`}>No speech was detected.</div>
         )}
-        {transcript && transcript.segments.length > 0 && (
+        {!isExternal && transcript && transcript.segments.length > 0 && (
           <div className="row-start-3 grid min-h-0 content-start gap-0.5 overflow-auto">
             {transcript.segments.map((segment) => (
               <button

@@ -24,7 +24,7 @@ import {
  *  rel name would otherwise highlight an unrelated same-named row of the
  *  ACTIVE folder's tree. */
 function selectablePath(tab: Tab | null | undefined): string {
-  return tab?.file && !tab.file.folder ? tab.file.name : '';
+  return tab?.file && !tab.file.folder && !tab.file.isExternal ? tab.file.name : '';
 }
 
 export function reducer(s: State, a: Action): State {
@@ -159,7 +159,7 @@ export function reducer(s: State, a: Action): State {
       // legitimately absent from it and must never be pruned by it.
       const stale = new Set(
         s.tabs
-          .filter((t) => t.file && !t.file.folder && !t.dirty && !names.has(t.file.name))
+          .filter((t) => t.file && !t.file.folder && !t.file.isExternal && !t.dirty && !names.has(t.file.name))
           .map((t) => t.id),
       );
       if (stale.size === 0) return s;
@@ -192,7 +192,7 @@ export function reducer(s: State, a: Action): State {
       const tabs = s.tabs.map((t) => {
         // Renames happen in the active folder; an out-of-folder tab's disk
         // file did not move even when its rel name collides.
-        if (!t.file || t.file.folder) return t;
+        if (!t.file || t.file.folder || t.file.isExternal) return t;
         const nextName = remapOnePath(t.file.name, a.from, a.to, a.kind);
         return nextName === t.file.name ? t : { ...t, file: { ...t.file, name: nextName } };
       });
@@ -246,7 +246,7 @@ export function reducer(s: State, a: Action): State {
       return {
         ...s,
         activeTabId: a.id,
-        recentFilePaths: target.file && !target.file.folder
+        recentFilePaths: target.file && !target.file.folder && !target.file.isExternal
           ? rememberRecentFile(s.recentFilePaths, target.file.name)
           : s.recentFilePaths,
         editorHistory: rememberActivatedTab(s.editorHistory, a.id),
@@ -258,9 +258,9 @@ export function reducer(s: State, a: Action): State {
     case 'EDIT_MODE': {
       const tab = getActiveTab(s);
       if (!tab) return s;
-      // Out-of-folder tabs are read-only: their save path would write a
+      // Out-of-folder or external tabs are read-only: their save path would write a
       // same-named file into the ACTIVE folder.
-      if (a.on && tab.file?.folder) return s;
+      if (a.on && (tab.file?.folder || tab.file?.isExternal || tab.file?.isReadOnly)) return s;
       return patchActiveTab(s, {
         editMode: a.on,
         saveStatus: a.on ? tab.saveStatus : { text: '', cls: '' },

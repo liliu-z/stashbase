@@ -349,7 +349,7 @@ function FileRow({
   siblings,
 }: {
   path: string;
-  format: 'md' | 'html' | 'json' | 'pdf' | 'image' | 'docx' | 'audio';
+  format: FileGlyphFormat;
   depth: number;
   paddingLeft: number;
   parent: string;

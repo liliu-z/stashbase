@@ -83,12 +83,14 @@ export function PdfPreview({ name, showConversionBanner = true }: { name: string
   const [retryStarted, setRetryStarted] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
   const [pageHighlight, setPageHighlight] = useState<PdfPageHighlight | null>(null);
+  const isExternal = activeTab?.file?.name === name && Boolean(activeTab.file.isExternal);
+  const effectiveShowConversionBanner = showConversionBanner && !isExternal;
   const readiness = getFileReadiness(state, name);
   const failure = readiness.preparationFailure;
   const conversionProgress = state.conversionProgress[name];
 
   function getChromeStatus(): { kind: 'error' | 'working'; text: string } | null {
-    if (failure && showConversionBanner) {
+    if (failure && effectiveShowConversionBanner) {
       return {
         kind: 'error',
         text: retryError
@@ -96,7 +98,7 @@ export function PdfPreview({ name, showConversionBanner = true }: { name: string
           : 'This PDF is not searchable. Reprocess it to try again.',
       };
     }
-    if (!showConversionBanner || !conversionProgress) return null;
+    if (!effectiveShowConversionBanner || !conversionProgress) return null;
     if (conversionProgress.phase === 'queued' || conversionProgress.phase === 'yielded') {
       return { kind: 'working', text: preparationWaitCopy('searchable-text', conversionProgress.tasksAhead) };
     }
@@ -110,6 +112,8 @@ export function PdfPreview({ name, showConversionBanner = true }: { name: string
   }
   const chromeStatus = getChromeStatus();
   const retryInProgress = retryBusy || retryStarted;
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   // Sampled page 1 viewport at 1× scale. Used as the per-page
   // placeholder height so the lazy-rendered pages reserve the
   // correct layout slot up front — without this, scrolling to a
@@ -123,9 +127,10 @@ export function PdfPreview({ name, showConversionBanner = true }: { name: string
   // re-fetches the binary instead of the stale 404 / failed body.
   const sourceVersion = activeTab?.file?.name === name ? activeTab.file.version ?? '' : '';
   const sourceFolder = activeTab?.file?.name === name ? activeTab.file.folder : undefined;
+  const sourceGrantId = activeTab?.file?.name === name ? activeTab.file.grantId : undefined;
   const fileUrl = useMemo(
-    () => versionedAssetUrl(name, sourceVersion, sourceFolder),
-    [name, sourceVersion, sourceFolder],
+    () => versionedAssetUrl(name, sourceVersion, sourceFolder, sourceGrantId),
+    [name, sourceVersion, sourceFolder, sourceGrantId],
   );
 
   /** Single scroll owner for every jump-the-viewer path: page jumps, chunk-
@@ -469,7 +474,7 @@ export function PdfPreview({ name, showConversionBanner = true }: { name: string
         status={chromeStatus}
         retryLabel={retryInProgress ? 'Reprocessing…' : 'Reprocess'}
         retryDisabled={retryInProgress}
-        onRetry={failure && showConversionBanner ? onRetry : undefined}
+        onRetry={failure && effectiveShowConversionBanner ? onRetry : undefined}
         onFit={() => {
           setAutoFit(true);
           setScale(fitScale());
