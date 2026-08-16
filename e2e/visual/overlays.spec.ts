@@ -73,6 +73,7 @@ test('cross-folder exact search keeps grouped result identity visible', async ({
     await expect(search.getByRole('option', { name: /Journey Markdown\.md/ })).toBeVisible();
     await expect(search.getByRole('option', { name: /Cross Folder Result\.md/ })).toBeVisible();
 
+    await page.waitForTimeout(500);
     await expectLinuxScreenshot(page, 'library-search-cross-folder.png');
   } finally {
     await visual.close();
