@@ -16,9 +16,23 @@ test('JSON is direct readable text without acquiring note or conversion behavior
   assert.equal(isConvertibleSource('data.json'), false);
 });
 
-test('JSON keeps its extension without regressing Markdown and HTML cross-format renames', () => {
+test('CSV is direct readable text without acquiring note or conversion behavior', () => {
+  assert.ok(STRUCTURED_DATA_EXTENSIONS.includes('csv'));
+  assert.ok(DIRECT_TEXT_EXTENSIONS.includes('csv'));
+  assert.ok(VIEWABLE_FILE_EXTENSIONS.includes('csv'));
+  assert.equal((NOTE_EXTENSIONS as readonly string[]).includes('csv'), false);
+  assert.equal(detectFormat('nested/table.CSV'), 'csv');
+  assert.equal(detectFormat('C:\\Library\\nested\\table.CsV'), 'csv');
+  assert.equal(isNoteName('table.csv'), false);
+  assert.equal(matchNoteStem('table.csv'), null);
+  assert.equal(isConvertibleSource('table.csv'), false);
+});
+
+test('JSON and CSV keep their extensions without regressing Markdown and HTML cross-format renames', () => {
   assert.equal(hasCompatibleRenameExtension('json', 'json', 'renamed.JSON'), true);
   assert.equal(hasCompatibleRenameExtension('json', 'json', 'renamed.html'), false);
+  assert.equal(hasCompatibleRenameExtension('csv', 'csv', 'renamed.CSV'), true);
+  assert.equal(hasCompatibleRenameExtension('csv', 'csv', 'renamed.json'), false);
   assert.equal(hasCompatibleRenameExtension('md', 'md', 'renamed.html'), true);
   assert.equal(hasCompatibleRenameExtension('html', 'html', 'renamed.md'), true);
 });

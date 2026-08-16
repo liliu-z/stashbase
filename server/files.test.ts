@@ -10,7 +10,7 @@ import {
   IMAGE_SOURCE_EXTENSIONS,
   PDF_EXTENSIONS,
 } from '../shared/file-formats.ts';
-import { saveFileContent, validateEditableFileWrite } from './file-save.ts';
+import { friendlyIndexError, saveFileContent, validateEditableFileWrite } from './file-save.ts';
 import { detectViewerFormat, isConvertibleSource } from './format.ts';
 import { runWithFolderRoot } from './folder.ts';
 import {
@@ -238,4 +238,25 @@ test('folder rename scan includes legacy derived notes for stale index cleanup',
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('friendlyIndexError translates raw embedding API errors correctly', () => {
+  // Test HTTP 401/403 status codes
+  const err401 = { status: 401, message: 'Unauthorized access' };
+  assert.match(friendlyIndexError(err401), /API key is invalid or expired/i);
+
+  const err403 = { statusCode: 403, message: 'Forbidden access' };
+  assert.match(friendlyIndexError(err403), /API key is invalid or expired/i);
+
+  // Test HTTP 429 status code
+  const err429 = { status: 429, message: 'Too many requests' };
+  assert.match(friendlyIndexError(err429), /Rate limit reached/i);
+
+  // Test OpenAI-style Error code wrapper parsing
+  const errRawOai = new Error("Error code: 400 - {'error': {'message': 'Invalid model selection.', 'code': 400}}");
+  assert.equal(friendlyIndexError(errRawOai), 'Invalid model selection.');
+
+  // Test standard fallback
+  const errFallback = new Error('Some random network error');
+  assert.equal(friendlyIndexError(errFallback), 'Some random network error');
 });

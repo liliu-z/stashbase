@@ -26,6 +26,7 @@ import {
   AUDIO_SOURCE_EXTENSIONS,
   AUDIO_SOURCE_EXTENSION_ALTERNATION,
   CONVERTIBLE_SOURCE_EXTENSION_ALTERNATION,
+  CSV_DATA_EXTENSIONS,
   DOCX_EXTENSIONS,
   DOCX_EXTENSION_ALTERNATION,
   HTML_NOTE_EXTENSIONS,
@@ -40,7 +41,7 @@ import {
 import { SEARCH_TYPE_CATEGORIES, type SearchTypeCategory } from '../shared/search-types.ts';
 
 /** Directly readable text formats — indexed directly (the file is the source). */
-export type FileFormat = 'md' | 'html' | 'json';
+export type FileFormat = 'md' | 'html' | 'json' | 'csv';
 
 /** Everything the renderer can open in the file tree: the structured
  *  note formats plus the convertible binaries (pdf, image) that are
@@ -60,7 +61,8 @@ const NOTE_FORMATS: Array<{ exts: readonly string[]; format: FileFormat }> = [
 
 const DIRECT_TEXT_FORMATS: Array<{ exts: readonly string[]; format: FileFormat }> = [
   ...NOTE_FORMATS,
-  { exts: STRUCTURED_DATA_EXTENSIONS, format: 'json' },
+  { exts: ['json'], format: 'json' },
+  { exts: CSV_DATA_EXTENSIONS, format: 'csv' },
 ];
 
 /** Every note extension (no leading dot), e.g. `['md','markdown','html','htm']`.

@@ -3,7 +3,7 @@ import { queueConvertibleSource } from './conversion-dispatch.ts';
 import { clearRecord } from './conversion-status.ts';
 import { deleteDerivedForSource } from './derived-store.ts';
 import { prepareFileOperation } from './file-operation-guard.ts';
-import { saveFileContent } from './file-save.ts';
+import { friendlyIndexError, saveFileContent } from './file-save.ts';
 import {
   deleteFile,
   derivedArtifactsForSource,
@@ -200,7 +200,7 @@ export async function moveLibraryFile(
       await indexer.deleteFile(oldTarget.abs).catch((cleanupErr) => {
         log.warn(`library move: stale-source cleanup failed for ${oldTarget.abs}: ${errorMessage(cleanupErr)}`);
       });
-      indexWarning = `Moved, but AI Index update failed: ${errorMessage(err)}`;
+      indexWarning = `Moved, but AI Index update failed: ${friendlyIndexError(err)}`;
     }
     return {
       oldPath: oldTarget.abs,

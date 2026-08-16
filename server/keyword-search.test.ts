@@ -143,7 +143,7 @@ test('packaged ripgrep path prefers app.asar.unpacked when present', () => {
 test('search type categories map to source extensions', () => {
   assert.deepEqual(searchExtensionsForTypes(['pdf']), ['.pdf']);
   assert.deepEqual(searchExtensionsForTypes(['notes']), ['.md', '.markdown', '.html', '.htm']);
-  assert.deepEqual(searchExtensionsForTypes(['data']), ['.json']);
+  assert.deepEqual(searchExtensionsForTypes(['data']), ['.json', '.csv']);
   assert.deepEqual(searchExtensionsForTypes(['docx', 'docx']), ['.docx']);
   assert.deepEqual(
     searchExtensionsForTypes(['audio']),

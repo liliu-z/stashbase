@@ -216,6 +216,7 @@ test('audio preview cache uses an exact source signature and rejects mid-convers
     assert.equal(media.previews, 1, 'metadata-only changes reuse a content-identical preview');
 
     const originalMtime = fs.statSync(source).mtime;
+    fs.unlinkSync(source);
     fs.writeFileSync(source, 'replac');
     fs.utimesSync(source, originalMtime, originalMtime);
     await previewPipeline.prepare(source);

@@ -86,9 +86,10 @@ export function hasCompatibleRenameExtension(
   requestedName: string,
 ): boolean {
   if (!oldStructuredFormat) return detectViewerFormat(requestedName) === oldFormat;
-  return oldStructuredFormat === 'json'
-    ? detectFormat(requestedName) === 'json'
-    : detectFormat(requestedName) !== null;
+  if (oldStructuredFormat === 'json') return detectFormat(requestedName) === 'json';
+  if (oldStructuredFormat === 'csv') return detectFormat(requestedName) === 'csv';
+  const newFormat = detectFormat(requestedName);
+  return newFormat === 'md' || newFormat === 'html';
 }
 
 function renameTargetPath(oldName: string, requested: string): string {
