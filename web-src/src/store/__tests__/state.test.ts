@@ -87,7 +87,7 @@ test('Markdown opens in Live Editing while read-only formats remain out of edit 
     type: 'FILE_OPEN',
     body: { name: 'data.csv', format: 'csv', content: 'a,b\n1,2' },
   });
-  assert.equal(csv.tabs[0].editMode, true);
+  assert.equal(csv.tabs[0].editMode, false);
 });
 
 test('JSON persistent tabs, dirty retention, replacement, and folder isolation use the shared tab lifecycle', () => {

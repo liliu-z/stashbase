@@ -95,7 +95,7 @@ export function reducer(s: State, a: Action): State {
       // Editing, never the tree's focused row, never in the folder-local
       // recents (Quick Open would resolve the rel name in the wrong folder).
       const outOfFolder = Boolean(a.libraryFolder);
-      const liveEditing = (file.format === 'md' || file.format === 'csv') && !outOfFolder;
+      const liveEditing = file.format === 'md' && !outOfFolder;
       // New-tab mode (the normal sidebar open, or `+` then a click):
       // create a fresh tab and load into it. Without `newTab` the file
       // replaces the active tab's file (blank-tab reuse, back/forward,
