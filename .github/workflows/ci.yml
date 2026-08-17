@@ -62,8 +62,8 @@ jobs:
       - name: Test release CI gate
         run: pnpm test:release-gate
 
-      - name: Test macOS recovery installer
-        run: pnpm test:macos-recovery-installer
+      - name: Test macOS signing contract
+        run: pnpm test:macos-signing
 
       - name: Test application config and hosted account
         run: pnpm test:config
