@@ -39,7 +39,7 @@ semantic readiness.
 
 The initial renderer contains only window chrome and the minimum workspace
 shell. Feature surfaces that open on demand remain dynamic entries. The
-authoritative budget is `418 KiB` of initial static JavaScript, and the current
+authoritative budget is `423 KiB` of initial static JavaScript, and the current
 required dynamic-entry set lives in `scripts/check-renderer-chunks.mjs`.
 Change that list or budget only when the ownership of eager shell behavior
 changes, never to make an accidental dependency pass.
@@ -74,9 +74,15 @@ Run `pnpm test:e2e:smoke` for launch/navigation/save behavior and
 journeys. Use `pnpm test:e2e:visual` only for representative composition
 changes.
 
-Related journeys: [J01](../design-docs/user-journeys.md#j01-launch-into-a-usable-workspace),
+Related journeys: [J01](../design-docs/user-journeys.md#j01-complete-onboarding-and-reach-first-value),
 [J02](../design-docs/user-journeys.md#j02-add-and-open-a-folder), and
-[J03](../design-docs/user-journeys.md#j03-read-and-edit-source-documents).
+[J03](../design-docs/user-journeys.md#j03-read-and-edit-source-documents), plus
+[J05](../design-docs/user-journeys.md#j05-search-and-open-source-evidence) for
+search presentation and result navigation, and
+[J10](../design-docs/user-journeys.md#j10-turn-a-local-project-into-durable-agent-assisted-work)
+for the complete cross-surface loop, and
+[J11](../design-docs/user-journeys.md#j11-turn-a-conversation-into-a-project)
+for project registration and originating-window entry.
 Related contracts: [Window Lifecycle](window-lifecycle.md),
 [File Transactions](file-transactions.md), [Agent Panel](agent-panel.md), and
 [UI Regression Testing](ui-regression-testing.md).

@@ -104,6 +104,77 @@ export function managedCodexInstallerHome(): string {
   return path.join(managedAgentRuntimeRoot('codex'), 'installer-home');
 }
 
+export function managedCodexReleasesDir(): string {
+  return path.join(managedCodexInstallerHome(), 'packages', 'standalone', 'releases');
+}
+
+function codexReleaseTargets(): string[] {
+  // The provider installer detects the OS architecture independently. An x64
+  // Electron build can therefore launch PowerShell on Windows ARM64 and
+  // receive the native aarch64 package, so discovery must accept either
+  // provider-owned target for the current OS.
+  if (process.platform === 'win32') {
+    return ['aarch64-pc-windows-msvc', 'x86_64-pc-windows-msvc'];
+  }
+  if (process.platform === 'darwin') {
+    return ['aarch64-apple-darwin', 'x86_64-apple-darwin'];
+  }
+  if (process.platform === 'linux') {
+    return ['aarch64-unknown-linux-gnu', 'x86_64-unknown-linux-gnu'];
+  }
+  return [];
+}
+
+function managedCodexReleaseExecutableCandidates(executableName: string): string[] {
+  const targets = codexReleaseTargets();
+  if (targets.length === 0) return [];
+  const releasesDir = managedCodexReleasesDir();
+  let names: string[];
+  try {
+    names = fs.readdirSync(releasesDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .filter((name) => targets.some((target) => {
+        const suffix = `-${target}`;
+        return name.endsWith(suffix)
+          && /^\d+\.\d+\.\d+(?:-alpha(?:\.\d+){0,2}|-beta(?:\.\d+)?)?$/.test(name.slice(0, -suffix.length));
+      }));
+  } catch {
+    return [];
+  }
+  names.sort((left, right) => {
+    try {
+      return fs.statSync(path.join(releasesDir, right)).mtimeMs
+        - fs.statSync(path.join(releasesDir, left)).mtimeMs;
+    } catch {
+      return right.localeCompare(left);
+    }
+  });
+  return names.flatMap((name) => {
+    const releaseDir = path.join(releasesDir, name);
+    return [
+      path.join(releaseDir, 'bin', executableName),
+      path.join(releaseDir, executableName),
+    ];
+  });
+}
+
+function managedCodexExecutableCandidates(): string[] {
+  const executableName = process.platform === 'win32' ? 'codex.exe' : 'codex';
+  const standaloneCurrent = path.join(
+    managedCodexInstallerHome(),
+    'packages',
+    'standalone',
+    'current',
+  );
+  return [
+    path.join(managedCodexBinDir(), executableName),
+    path.join(standaloneCurrent, 'bin', executableName),
+    path.join(standaloneCurrent, executableName),
+    ...managedCodexReleaseExecutableCandidates(executableName),
+  ];
+}
+
 export function managedClaudeReleasesDir(): string {
   return path.join(managedAgentRuntimeRoot('claude'), 'releases');
 }
@@ -139,8 +210,7 @@ function readManagedClaudeManifest(): ManagedRuntimeManifest | null {
 
 export function managedAgentExecutable(id: ManagedAgentId): string | null {
   if (id === 'codex') {
-    const executable = path.join(managedCodexBinDir(), process.platform === 'win32' ? 'codex.exe' : 'codex');
-    return executableFile(executable) ? executable : null;
+    return managedCodexExecutableCandidates().find(executableFile) ?? null;
   }
   const manifest = readManagedClaudeManifest();
   if (!manifest) return null;

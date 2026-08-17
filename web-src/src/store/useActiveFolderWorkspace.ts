@@ -64,6 +64,9 @@ export interface ActiveFolderWorkspace {
   registerEditor: (handle: EditorHandle | null) => void;
   openExternalFilePath: (filePath: string, opts?: { suppressToast?: boolean }) => Promise<{ ok: boolean; error?: string } | void>;
   openExternalFiles: (files: File[]) => Promise<void>;
+  resolveConflictOverwrite: (tabId: string) => Promise<void>;
+  resolveConflictReload: (tabId: string) => Promise<void>;
+  resolveConflictMerge: (tabId: string) => Promise<void>;
 }
 
 interface WorkspaceDependencies {
@@ -141,14 +144,14 @@ export function useActiveFolderWorkspace(
   );
   const documents = useDocumentActions(
     { state: stateRef, editor, saveTimer, saveInFlight },
-    { loadFiles, refreshIndexState: search.refreshIndexState, toast, primeFind }, dispatch,
+    { loadFiles, refreshIndexState: search.refreshIndexState, toast, primeFind, askConfirm }, dispatch,
   );
   const files = useFileActions(
     { stateRef, saveTimer, importConversionGrace, importIndexGrace },
     { askCascadeForRename, askConfirm, flushSave: documents.flushSave, loadFiles, openInNewTab: documents.openInNewTab, refreshIndexState: search.refreshIndexState, toast }, dispatch,
   );
   const folders = useFolderActions(
-    { state: stateRef, folderContextPath, editor, openGeneration, openingFolderGeneration, syncGeneration, lastTreeVersion, importConversionGrace, importIndexGrace, keyBackfillGrace },
+    { state: stateRef, folderContextPath, openGeneration, openingFolderGeneration, syncGeneration, lastTreeVersion, importConversionGrace, importIndexGrace, keyBackfillGrace },
     { flushSave: documents.flushSave, loadFiles, loadFileOrder, markVisibleFilesPendingForSearch: search.markVisibleFilesPendingForSearch, refreshIndexState: search.refreshIndexState, toast }, dispatch,
   );
 

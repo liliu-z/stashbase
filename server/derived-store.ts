@@ -149,8 +149,6 @@ export function sourceForDerivedText(noteAbs: string): string | null {
     : null;
 }
 
-export const sourceForDerivedNote = sourceForDerivedText;
-
 /** Absolute path of the derived image bundle (`_files/`) for a source. */
 export function derivedBundleFor(sourceAbs: string): string {
   return path.join(derivedDir(), `${derivedKey(sourceAbs)}_files`);

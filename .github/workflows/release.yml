@@ -1,0 +1,159 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to release, for example v2.0.0
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  release-ci-gate:
+    permissions:
+      actions: read
+      contents: read
+    uses: ./.github/workflows/release-ci-gate.yml
+    with:
+      tag: ${{ startsWith(inputs.tag, 'v') && inputs.tag || format('v{0}', inputs.tag) }}
+
+  prepare-draft:
+    needs: release-ci-gate
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ startsWith(inputs.tag, 'v') && inputs.tag || format('v{0}', inputs.tag) }}
+
+      - name: Create an empty draft release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          release_tag="$INPUT_TAG"
+          case "$release_tag" in
+            v*) ;;
+            *) release_tag="v$release_tag" ;;
+          esac
+          expected="v$(node -p "require('./package.json').version")"
+          if [ "$release_tag" != "$expected" ]; then
+            echo "::error::release tag $release_tag does not match package.json version $expected"
+            exit 1
+          fi
+
+          if release_json="$(gh release view "$release_tag" --repo "$GITHUB_REPOSITORY" --json isDraft,assets 2>/dev/null)"; then
+            is_draft="$(printf '%s' "$release_json" | jq -r '.isDraft')"
+            asset_count="$(printf '%s' "$release_json" | jq '.assets | length')"
+            if [ "$is_draft" != "true" ] || [ "$asset_count" -ne 0 ]; then
+              echo "::error::Release $release_tag must be an empty draft. Delete an incomplete draft and rerun; versioned assets are immutable."
+              exit 1
+            fi
+          else
+            gh release create "$release_tag" \
+              --repo "$GITHUB_REPOSITORY" \
+              --verify-tag \
+              --draft \
+              --generate-notes \
+              --title "StashBase $release_tag"
+          fi
+
+          echo "tag=$release_tag" >> "$GITHUB_OUTPUT"
+
+  macos:
+    needs: prepare-draft
+    uses: ./.github/workflows/release-macos.yml
+    with:
+      tag: ${{ needs.prepare-draft.outputs.tag }}
+    secrets: inherit
+
+  windows:
+    needs: prepare-draft
+    uses: ./.github/workflows/release-windows.yml
+    with:
+      tag: ${{ needs.prepare-draft.outputs.tag }}
+    secrets: inherit
+
+  linux:
+    needs: prepare-draft
+    uses: ./.github/workflows/release-linux.yml
+    with:
+      tag: ${{ needs.prepare-draft.outputs.tag }}
+    secrets: inherit
+
+  publish-release:
+    needs: [prepare-draft, macos, windows, linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify the complete update set and publish atomically
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.prepare-draft.outputs.tag }}
+        run: |
+          release_json="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft,assets)"
+          test "$(printf '%s' "$release_json" | jq -r '.isDraft')" = "true" || { echo "::error::Release $RELEASE_TAG is already public"; exit 1; }
+          asset_names="$(printf '%s' "$release_json" | jq -r '.assets[].name')"
+          release_version="${RELEASE_TAG#v}"
+
+          require_asset() {
+            pattern="$1"
+            label="$2"
+            matched=false
+            while IFS= read -r asset_name; do
+              case "$asset_name" in
+                $pattern) matched=true; break ;;
+              esac
+            done <<< "$asset_names"
+            $matched || { echo "::error::Missing $label for $RELEASE_TAG"; exit 1; }
+          }
+
+          require_asset 'latest-mac.yml' 'macOS update metadata'
+          require_asset "StashBase-${release_version}-mac-*.dmg" 'macOS DMG'
+          require_asset "StashBase-${release_version}-mac-*.zip" 'macOS update archive'
+          require_asset 'latest.yml' 'Windows update metadata'
+          require_asset "StashBase-${release_version}-win-*.exe" 'Windows installer'
+          require_asset "StashBase-${release_version}-win-*.zip" 'Windows archive'
+          require_asset "StashBase-${release_version}-win-*.exe.blockmap" 'Windows blockmap'
+          require_asset 'latest-linux.yml' 'Linux update metadata'
+          require_asset "StashBase-${release_version}-linux-*.AppImage" 'Linux AppImage'
+          require_asset "StashBase-${release_version}-linux-*.deb" 'Linux Debian package'
+
+          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+
+  publish-homebrew:
+    needs: [prepare-draft, publish-release]
+    runs-on: macos-latest
+    env:
+      RELEASE_TAG: ${{ needs.prepare-draft.outputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+      HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Download the published DMG
+        run: |
+          mkdir -p release.nosync
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern '*-mac-*.dmg' --dir release.nosync
+
+      - name: Publish Homebrew cask
+        run: |
+          if [ -z "$HOMEBREW_TAP_TOKEN" ]; then
+            echo "::error::HOMEBREW_TAP_TOKEN secret is required to update liliu-z/homebrew-stashbase"
+            exit 1
+          fi
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          echo "HOMEBREW_TAP_GIT_URL=https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/liliu-z/homebrew-stashbase.git" >> "$GITHUB_ENV"
+          HOMEBREW_TAP_GIT_URL="https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/liliu-z/homebrew-stashbase.git" node scripts/publish-homebrew.mjs

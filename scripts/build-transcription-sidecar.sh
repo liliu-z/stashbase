@@ -203,7 +203,10 @@ OPUS_SRC="$SRC/opus-$OPUS_VERSION"
 download_checked \
   "$OPUS_ARCHIVE" \
   "$OPUS_SHA256" \
-  "https://downloads.xiph.org/releases/opus/opus-$OPUS_VERSION.tar.gz"
+  "https://downloads.xiph.org/releases/opus/opus-$OPUS_VERSION.tar.gz" \
+  "https://archive.mozilla.org/pub/opus/opus-$OPUS_VERSION.tar.gz" \
+  "https://distfiles.macports.org/opus/opus-$OPUS_VERSION.tar.gz" \
+  "https://gentoo.osuosl.org/distfiles/opus-$OPUS_VERSION.tar.gz"
 cmake -E remove_directory "$OPUS_SRC"
 tar -xzf "$OPUS_ARCHIVE" -C "$SRC"
 OPUS_BUILD="$BUILD/opus"
@@ -230,7 +233,9 @@ download_checked \
   "$FFMPEG_ARCHIVE" \
   "$FFMPEG_SHA256" \
   "https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.xz" \
-  "https://www.ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.xz"
+  "https://www.ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.xz" \
+  "https://distfiles.macports.org/ffmpeg/ffmpeg-$FFMPEG_VERSION.tar.xz" \
+  "https://gentoo.osuosl.org/distfiles/ffmpeg-$FFMPEG_VERSION.tar.xz"
 cmake -E remove_directory "$FFMPEG_SRC"
 tar -xJf "$FFMPEG_ARCHIVE" -C "$SRC"
 FFMPEG_BUILD="$BUILD/ffmpeg"

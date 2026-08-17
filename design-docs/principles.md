@@ -20,5 +20,8 @@ These are the stable rules used to evaluate product and technical decisions.
 7. **Useful before perfect** — Browsing, editing, and keyword retrieval should
    remain useful while preparation is incomplete or AI Index is
    unavailable.
-8. **Small, understandable surface** — New features must earn their place by
-   strengthening the local-file-to-agent-context loop.
+8. **Broad capability, few concepts** — AI can improve many parts of the
+   workflow, so capability breadth is welcome when it strengthens the same
+   local-file-to-agent-context loop. New work must reuse the product's source,
+   library, scope, permission, and recovery concepts rather than creating a
+   second world for users to understand.

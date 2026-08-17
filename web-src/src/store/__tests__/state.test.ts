@@ -530,3 +530,38 @@ test('FILE_OPEN with isExternal sets outOfFolder and external properties', () =>
   assert.deepEqual(stateAfterActivate.recentFilePaths, []);
   assert.equal(stateAfterActivate.selectedPath, '');
 });
+
+test('SET_CONFLICT and RESOLVE_CONFLICT_DISCARD reducer actions', () => {
+  let state = freshState();
+  state = reducer(state, {
+    type: 'FILE_OPEN',
+    body: { name: 'conflict.md', format: 'md', content: 'V1' },
+  });
+  const tabId = state.activeTabId!;
+
+  // Set conflict state
+  state = reducer(state, {
+    type: 'SET_CONFLICT',
+    id: tabId,
+    conflict: {
+      diskContent: 'V2',
+      diskVersion: 'version-v2',
+      editorContent: 'V1-edit',
+    },
+  });
+
+  assert.deepEqual(state.tabs[0].conflict, {
+    diskContent: 'V2',
+    diskVersion: 'version-v2',
+    editorContent: 'V1-edit',
+  });
+
+  // Resolve conflict by discarding changes
+  state = reducer(state, {
+    type: 'RESOLVE_CONFLICT_DISCARD',
+    id: tabId,
+  });
+
+  assert.equal(state.tabs[0].conflict, null);
+  assert.equal(state.tabs[0].dirty, false);
+});

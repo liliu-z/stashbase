@@ -109,7 +109,7 @@ export function AgentView({
   const runtime = state.agents.find((candidate) => candidate.id === agent);
   const runtimeUnavailable = runtime?.state === 'unavailable';
   const bootstrapPhase = runtime?.bootstrap?.phase ?? 'idle';
-  const bootstrapActive = bootstrapPhase === 'installing' || bootstrapPhase === 'configuring';
+  const bootstrapActive = bootstrapPhase === 'installing' || bootstrapPhase === 'authenticating' || bootstrapPhase === 'configuring';
   const bootstrapFailed = bootstrapPhase === 'failed';
   const runtimeBlocked = runtimeUnavailable || bootstrapActive || bootstrapFailed;
   const capabilities = runtime?.capabilities ?? meta.capabilities;
@@ -581,13 +581,26 @@ export function AgentView({
     }
   }
 
-  async function startRuntimeBootstrap() {
+  async function applyRuntimeAction(request: () => Promise<AgentsResponse>) {
     try {
-      const result = await api.bootstrapAgent(agent);
+      const result = await request();
       dispatch({ type: 'AGENTS_LOADED', agents: result.clis });
     } catch (error) {
       actions.toast(error instanceof Error ? error.message : String(error), { level: 'error' });
     }
+  }
+
+  function startRuntimeBootstrap() {
+    return applyRuntimeAction(() => api.prepareAgent(agent, 'bootstrap'));
+  }
+
+  function checkRuntime() {
+    return applyRuntimeAction(() => api.prepareAgent(agent, 'check'));
+  }
+
+  function loginToCodex() {
+    if (agent !== 'codex') return;
+    return applyRuntimeAction(() => api.prepareAgent(agent, 'login'));
   }
 
   /** Open a past session from the sidebar's History menu: paint its
@@ -1290,6 +1303,8 @@ export function AgentView({
           runtime={runtime}
           fallbackName={meta.name}
           onRetry={() => void startRuntimeBootstrap()}
+          onLogin={() => void loginToCodex()}
+          onRefresh={() => void checkRuntime()}
           onCopyInstall={copyInstallHint}
           onOpenMcpSetup={() => openSettings('mcp')}
         />
@@ -1301,7 +1316,7 @@ export function AgentView({
           runtime={runtime}
           fallbackName={meta.name}
           onInstall={() => void startRuntimeBootstrap()}
-          onRefresh={() => void refreshRuntimes()}
+          onRefresh={() => void checkRuntime()}
         />
       );
     }
@@ -1528,12 +1543,16 @@ function AgentRuntimeFailure({
   runtime,
   fallbackName,
   onRetry,
+  onLogin,
+  onRefresh,
   onCopyInstall,
   onOpenMcpSetup,
 }: {
   runtime: Agent;
   fallbackName: string;
   onRetry: () => void;
+  onLogin: () => void;
+  onRefresh: () => void;
   onCopyInstall: () => void;
   onOpenMcpSetup: () => void;
 }) {
@@ -1544,6 +1563,7 @@ function AgentRuntimeFailure({
     : presentation.manualAction === 'open-mcp-settings'
       ? onOpenMcpSetup
       : null;
+  const primaryAction = presentation.primaryAction === 'start-codex-login' ? onLogin : onRetry;
   return (
     <div className={runtimeCardWrapClass} role="alert">
       <div className={runtimeCardClass}>
@@ -1555,7 +1575,12 @@ function AgentRuntimeFailure({
               {presentation.manualLabel}
             </Button>
           )}
-          <Button className={buttonVariants({ variant: 'default', size: 'sm' })} onPress={onRetry}>
+          {runtime.bootstrap?.failure?.stage !== 'mcp' && (
+            <Button className={buttonVariants({ variant: 'outline', size: 'sm' })} onPress={onRefresh}>
+              Check again
+            </Button>
+          )}
+          <Button className={buttonVariants({ variant: 'default', size: 'sm' })} onPress={primaryAction}>
             {presentation.retryLabel}
           </Button>
         </div>

@@ -192,16 +192,6 @@ export function getFolderHome(): string {
   return filesystemPath.join(filesystemPath.absolute(os.homedir()), 'Documents/StashBase');
 }
 
-/** True if `absPath` lives anywhere inside the folder home (any depth); the
- *  folderHome itself doesn't qualify (it's the container, not "inside" it).
- *  Used when validating absolute paths against the default folder home. */
-export function isInsideFolderHome(absPath: string): boolean {
-  const root = getFolderHome();
-  const target = filesystemPath.absolute(absPath);
-  const rel = filesystemPath.relative(root, target);
-  return rel != null && rel !== '';
-}
-
 /** Validate a user-supplied folder name. Names must be a single,
  *  cross-platform-safe filename segment: no slashes, no dots-only, no
  *  leading/trailing dot, none of the Windows/FAT-reserved chars
@@ -498,22 +488,6 @@ export function clearFolderPath(absPath: string): void {
   }
 }
 
-export function replaceCurrentFolderPath(oldPath: string, newPath: string): void {
-  const cfg = readConfigStrict();
-  if (cfg.recentFolders?.length) {
-    cfg.recentFolders = cfg.recentFolders.map((r) => (
-      storedFolderPathEquals(r.path, oldPath) ? { ...r, path: newPath } : r
-    ));
-    writeConfigStrict(cfg);
-  }
-  for (const [windowId, value] of currentFolders.entries()) {
-    if (filesystemPath.equal(value, oldPath)) {
-      currentFolders.set(windowId, newPath);
-      notifyFolderSwitch(newPath, windowId);
-    }
-  }
-}
-
 /** Subscribe to folder switches. The listener receives the absolute path
  *  of the newly-current folder; fires after the switch is in place. */
 export function onSwitch(fn: (newRoot: string, windowId: string) => void): void {
@@ -531,8 +505,16 @@ export function getActiveFolders(): { windowId: string; path: string }[] {
 /** Returns recent folders, most-recent first. Filters out paths that no
  *  longer exist on disk so the Welcome list only shows one-click-openable
  *  folders. */
+function currentRecentFolder(value: RecentFolder): RecentFolder {
+  return {
+    path: value.path,
+    openedAt: value.openedAt,
+    ...(value.favorite === true ? { favorite: true } : {}),
+  };
+}
+
 export function getRecentFolders(): RecentFolder[] {
-  const all = readConfig().recentFolders ?? [];
+  const all = (readConfig().recentFolders ?? []).map(currentRecentFolder);
   // A Folder is openable from anywhere, so the only requirement is that it
   // still exists as a directory (handles a moved/deleted folder).
   return all.filter((v) => {
@@ -542,7 +524,7 @@ export function getRecentFolders(): RecentFolder[] {
 
 function pushRecent(absPath: string): void {
   const cfg = readConfigStrict();
-  const list = cfg.recentFolders ?? [];
+  const list = (cfg.recentFolders ?? []).map(currentRecentFolder);
   // Filter out the entry we're about to re-add (avoid dupes) AND
   // entries whose target folder no longer exists — keeps the persisted
   // recents from accumulating dead tmp dirs / deleted folders over
@@ -558,7 +540,11 @@ function pushRecent(absPath: string): void {
   const retainedPath = existing
     ? filesystemPath.absolute(existing.path)
     : filesystemPath.absolute(absPath);
-  filtered.unshift({ ...(existing ?? {}), path: retainedPath, openedAt: new Date().toISOString() });
+  filtered.unshift({
+    path: retainedPath,
+    openedAt: new Date().toISOString(),
+    ...(existing?.favorite === true ? { favorite: true } : {}),
+  });
   // No cap: this list IS the knowledge-base membership ("Your Folders"),
   // not a transient recency log. Opening a folder joins it; the only way
   // out is an explicit remove (`removeRecent`). A hard cap would silently
@@ -616,7 +602,7 @@ export function assertLibraryFolderAvailable(absPath: string): void {
 export function removeRecent(absPath: string): void {
   const target = filesystemPath.absolute(absPath);
   const cfg = readConfigStrict();
-  const list = cfg.recentFolders ?? [];
+  const list = (cfg.recentFolders ?? []).map(currentRecentFolder);
   const filtered = list.filter((v) => !storedFolderPathEquals(v.path, target));
   if (filtered.length === list.length) return;
   cfg.recentFolders = filtered;
@@ -629,10 +615,12 @@ export function removeRecent(absPath: string): void {
 export function setRecentFavorite(absPath: string, favorite: boolean): boolean {
   const target = filesystemPath.absolute(absPath);
   const cfg = readConfigStrict();
-  const entry = (cfg.recentFolders ?? []).find((v) => storedFolderPathEquals(v.path, target));
+  const list = (cfg.recentFolders ?? []).map(currentRecentFolder);
+  const entry = list.find((v) => storedFolderPathEquals(v.path, target));
   if (!entry) return false;
   if (favorite) entry.favorite = true;
   else delete entry.favorite;
+  cfg.recentFolders = list;
   writeConfigStrict(cfg);
   return true;
 }

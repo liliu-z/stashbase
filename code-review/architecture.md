@@ -160,3 +160,7 @@ changes also run `pnpm test:electron` and `pnpm test:electron:smoke`; renderer
 boundary changes run `pnpm build:web`. Add the exact suites from every focused
 contract crossed by the change. Use [Journey Coverage](journey-coverage.md)
 before adding broad E2E coverage.
+
+Related journey: [J09](../design-docs/user-journeys.md#j09-prepare-and-hand-off-a-bug-report)
+for the bug-report review process boundary. Other architectural changes use the
+focused journey routes in [Journey Coverage](journey-coverage.md).

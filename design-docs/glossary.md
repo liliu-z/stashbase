@@ -46,6 +46,31 @@ organizing documents across ordinary local folders. It combines the Workspace
 and Documents product areas. A **workspace** may still name the current window
 or folder context; it is not a competing name for the whole capability.
 
+## Format capability
+
+The user-observable operations available for one source format. Avoid the
+unqualified words `supported`, `readable`, and `writable` when the distinction
+matters. Use the narrow capability instead:
+
+- **Previewable** — the visible source opens in a format-appropriate Workbench
+  surface.
+- **Content-editable** — the source body can be changed through a named surface
+  and the shared versioned save boundary.
+- **Direct-text readable** — retrieval or an Agent reads useful text from the
+  source itself without durable Preparation.
+- **Prepared-text readable** — retrieval or an Agent reads only a current
+  derived representation produced by Preparation.
+- **Agent-readable** — a named built-in or external Agent surface can consume
+  the source or its current derived representation. Name the surface when
+  built-in attachment and external MCP behavior differ.
+- **File-mutable** — the visible source can be renamed, moved, or deleted. This
+  does not imply that its contents are editable.
+
+Creating a new text source, importing a binary source, previewing it, editing
+its contents, and mutating its file identity are separate capabilities. The
+canonical Shipping matrix lives in the
+[Documents area](design/documents.md#format-capability-matrix).
+
 ## Derived data
 
 Rebuildable text, assets, indexes, checkpoints, and status records that

@@ -14,21 +14,6 @@ export interface AgentCliSpec {
   logLabel: string;
 }
 
-const CLI_SEARCH_DIRS = [
-  path.join(os.homedir(), '.npm-global', 'bin'),
-  path.join(os.homedir(), '.local', 'bin'),
-  ...(process.platform === 'win32'
-    ? [
-        process.env.APPDATA ? path.join(process.env.APPDATA, 'npm') : '',
-        process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, 'npm') : '',
-      ]
-    : []),
-  '/opt/homebrew/bin',
-  '/usr/local/bin',
-  '/usr/bin',
-  '/bin',
-];
-
 const WINDOWS_EXECUTABLE_EXTENSIONS = new Set(['.com', '.exe', '.cmd', '.bat']);
 const LOGIN_SHELL_HIT_CACHE_MS = 5 * 60_000;
 const LOGIN_SHELL_MISS_CACHE_MS = 10_000;
@@ -60,10 +45,39 @@ function unique(items: string[]): string[] {
   return [...new Set(items.filter((item) => item.trim().length > 0))];
 }
 
+function environmentValue(env: NodeJS.ProcessEnv, name: string): string {
+  const key = Object.keys(env).find((candidate) => candidate.toLowerCase() === name.toLowerCase());
+  const value = key ? env[key] : undefined;
+  return typeof value === 'string' ? value : '';
+}
+
+export function agentCliSearchDirs(
+  platform: NodeJS.Platform = process.platform,
+  env: NodeJS.ProcessEnv = process.env,
+  home: string = os.homedir(),
+): string[] {
+  const join = platform === 'win32' ? path.win32.join : path.posix.join;
+  const dirs = [
+    join(home, '.npm-global', 'bin'),
+    join(home, '.local', 'bin'),
+  ];
+  if (platform === 'win32') {
+    const appData = environmentValue(env, 'APPDATA');
+    const localAppData = environmentValue(env, 'LOCALAPPDATA');
+    return unique([
+      ...dirs,
+      appData ? join(appData, 'npm') : '',
+      localAppData ? join(localAppData, 'npm') : '',
+      localAppData ? join(localAppData, 'Programs', 'OpenAI', 'Codex', 'bin') : '',
+    ]);
+  }
+  return unique([...dirs, '/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin']);
+}
+
 export function agentCliPath(extraDirs: string[] = [], basePath = process.env.PATH ?? ''): string {
   return unique([
     ...extraDirs,
-    ...CLI_SEARCH_DIRS,
+    ...agentCliSearchDirs(),
     ...basePath.split(path.delimiter),
   ]).join(path.delimiter);
 }

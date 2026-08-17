@@ -165,13 +165,6 @@ export async function validateEmbedderKey(
   }
 }
 
-export async function validateOpenAIKey(
-  key: string,
-  opts: { timeoutMs?: number } = {},
-): Promise<EmbedderKeyCheck> {
-  return validateEmbedderKey('openai', key, opts);
-}
-
 /** Open the OS file manager focused on the given absolute path. macOS
  *  `open -R` selects the file in Finder; Windows uses `explorer /select`;
  *  Linux falls back to opening the containing directory since most

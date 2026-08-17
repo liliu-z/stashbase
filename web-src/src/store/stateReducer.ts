@@ -434,6 +434,25 @@ export function reducer(s: State, a: Action): State {
       return { ...s, conversionRevision: a.revision, conversionVersions: a.versions };
     case 'SAVE_STATUS':
       return patchActiveTab(s, { saveStatus: a.status });
+    case 'SET_CONFLICT':
+      return {
+        ...s,
+        tabs: s.tabs.map((t) => (t.id === a.id ? { ...t, conflict: a.conflict } : t)),
+      };
+    case 'SET_CONFLICT_RESOLVING':
+      return {
+        ...s,
+        tabs: s.tabs.map((t) => (
+          t.id === a.id && t.conflict
+            ? { ...t, conflict: { ...t.conflict, resolving: a.resolving } }
+            : t
+        )),
+      };
+    case 'RESOLVE_CONFLICT_DISCARD':
+      return {
+        ...s,
+        tabs: s.tabs.map((t) => (t.id === a.id ? { ...t, conflict: null, dirty: false } : t)),
+      };
     case 'SYNC_RUNNING':
       return { ...s, syncRunning: a.running };
     case 'EMBEDDER_KEY_STATE':

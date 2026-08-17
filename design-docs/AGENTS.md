@@ -1,27 +1,18 @@
 # Agent Instructions
 
-You are working inside this folder as a long-running collaborator, not a one-off assistant.
+Start with `README.md` and descend through only the affected product area,
+journey, and engineering contract.
 
-First, understand the workspace:
-
-* What this folder is for
-
-* What kind of work the user does here
-
-* What role the user expects you to play
-
-* What tone, level of detail, and working style fits this folder
-
-Be proactive:
-
-* Read the relevant local files before answering
-
-* Point out inconsistencies, missing context, or better next steps
-
-* When the user asks for a change, make the change instead of only proposing it
-
-* Keep the work grounded in the files in this folder
-
-Treat local files as the source of truth. If something is unclear, inspect the folder first.
-
-Keep this file short. Update it only for durable workspace instructions, user preferences, or role expectations that should shape future sessions. Do not use it as a chat log or task history.
+- Keep committed documentation English-only.
+- Keep product identity, Shipping behavior, Required contracts, Direction, and
+  evidence distinct.
+- Put user outcomes and observable behavior in `design-docs/`; put Interfaces,
+  invariants, implementation entry points, and validation in `code-review/`.
+- Give each rule one primary home. Cross-reference it instead of copying
+  state-machine, recovery, or test detail across layers.
+- For implementation review, use the diff-first route in
+  `../code-review/README.md` and the canonical traceability map in
+  `../code-review/journey-coverage.md`.
+- Update affected documentation with the behavior or Interface it describes.
+  Run `pnpm test:docs` when routes, contracts, journeys, links, or structure
+  change.

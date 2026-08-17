@@ -62,6 +62,26 @@ function protocolPeer(child) {
   };
 }
 
+async function runFakeCodex(args) {
+  const child = spawn(EXECUTABLE, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+  let stdout = '';
+  let stderr = '';
+  child.stdout.on('data', (chunk) => { stdout += String(chunk); });
+  child.stderr.on('data', (chunk) => { stderr += String(chunk); });
+  const [code] = await once(child, 'close');
+  return { code, stdout, stderr };
+}
+
+test('fake Codex executable supports readiness and browser-login commands', async () => {
+  const status = await runFakeCodex(['login', 'status']);
+  assert.equal(status.code, 0, status.stderr);
+  assert.match(status.stdout, /Logged in/);
+
+  const login = await runFakeCodex(['login']);
+  assert.equal(login.code, 0, login.stderr);
+  assert.match(login.stdout, /browser login completed/);
+});
+
 test('fake Codex executable speaks the app-server lifecycle used by StashBase', async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-fake-codex-'));
   const cwd = path.join(root, 'workspace');
@@ -162,6 +182,27 @@ test('fake Codex executable speaks the app-server lifecycle used by StashBase', 
   const firstMathDelta = await peer.notification('item/agentMessage/delta', (params) => params.turnId === 'fake-turn-4');
   assert.equal(firstMathDelta.params.delta, String.raw`Streamed formula: \(x^2`);
   assert.equal((await peer.notification('turn/completed', (params) => params.turn?.id === 'fake-turn-4')).params.turn.status, 'completed');
+
+  peer.send({ id: 11, method: 'turn/start', params: {
+    threadId: 'fake-thread-1',
+    cwd: spawnedCwd,
+    input: [{ type: 'text', text: 'journey:j11 create project denied', text_elements: [] }],
+  } });
+  assert.equal((await peer.response(11)).result.turn.id, 'fake-turn-5');
+  await peer.notification('item/started', (params) => (
+    params.turnId === 'fake-turn-5'
+    && params.item?.type === 'mcpToolCall'
+    && params.item?.tool === 'create_project'
+  ));
+  const mcpApproval = await peer.request('mcpServer/elicitation/request');
+  assert.equal(mcpApproval.params.message, 'Allow Codex to create conversation-project?');
+  assert.deepEqual(mcpApproval.params._meta.tool_params, { name: 'conversation-project' });
+  peer.send({ id: mcpApproval.id, result: { action: 'decline', content: null, _meta: null } });
+  assert.equal((await peer.notification('item/completed', (params) => (
+    params.turnId === 'fake-turn-5' && params.item?.tool === 'create_project'
+  ))).params.item.status, 'failed');
+  assert.equal((await peer.notification('turn/completed', (params) => params.turn?.id === 'fake-turn-5')).params.turn.status, 'failed');
+  assert.equal(fs.existsSync(path.join(spawnedCwd, 'conversation-project')), false);
 
   child.kill('SIGTERM');
   await once(child, 'close');

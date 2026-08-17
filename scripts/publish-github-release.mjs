@@ -2,6 +2,8 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { findDraftReleaseByTag } from './github-release-api.mjs';
+import { assertMacUpdateArtifacts } from './update-artifact-contract.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
@@ -11,8 +13,7 @@ const args = new Set(process.argv.slice(2));
 const dryRun = args.has('--dry-run');
 const skipBuild = args.has('--skip-build');
 const skipSmoke = args.has('--skip-smoke');
-const draft = args.has('--draft');
-const prerelease = args.has('--prerelease');
+const requireDraft = args.has('--require-draft');
 const tag = `v${pkg.version}`;
 const repo = process.env.GITHUB_REPOSITORY || repositorySlug(pkg.repository?.url);
 const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
@@ -22,11 +23,12 @@ const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
 // extractor is not bundled" the first time a user opens a PDF. The flag is
 // opt-in for dev/local builds (the extractor adds ~450MB), but the release is
 // the one place where "complete" beats "lean", so force it on and make it
-// mandatory: the package build bundles it, package-unsigned asserts it, and
+// mandatory: the package build bundles it, package-desktop asserts it, and
 // the smoke test verifies it end-to-end. Both child processes below inherit
 // these via process.env.
 process.env.STASHBASE_BUILD_EXTRACT = '1';
 process.env.STASHBASE_REQUIRE_EXTRACT = '1';
+if (process.platform === 'darwin') process.env.STASHBASE_RELEASE_BUILD = '1';
 
 if (!repo) {
   throw new Error('Unable to determine GitHub repository. Set GITHUB_REPOSITORY=owner/repo.');
@@ -104,34 +106,20 @@ async function github(pathname, options = {}) {
   return text ? JSON.parse(text) : null;
 }
 
-async function getOrCreateRelease() {
-  const existing = await github(`/repos/${repo}/releases/tags/${encodeURIComponent(tag)}`);
-  if (existing) {
-    console.log(`[release] found ${existing.html_url}`);
-    return existing;
-  }
-
-  const created = await github(`/repos/${repo}/releases`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      tag_name: tag,
-      name: `${pkg.build?.productName || pkg.name} ${tag}`,
-      draft,
-      prerelease,
-      generate_release_notes: true,
-    }),
-  });
-  console.log(`[release] created ${created.html_url}`);
-  return created;
+async function getDraftRelease() {
+  const existing = await findDraftReleaseByTag({ request: github, repo, tag });
+  console.log(`[release] found ${existing.html_url}`);
+  return existing;
 }
 
 async function uploadArtifact(release, file) {
   const name = path.basename(file);
   const existing = release.assets?.find((asset) => asset.name === name);
   if (existing) {
-    await github(`/repos/${repo}/releases/assets/${existing.id}`, { method: 'DELETE' });
-    console.log(`[release] replaced ${name}`);
+    throw new Error(
+      `Release ${tag} already contains ${name}. Versioned assets are immutable; ` +
+        'delete the incomplete draft and restart the coordinated release.',
+    );
   }
 
   const size = fs.statSync(file).size;
@@ -158,33 +146,44 @@ async function uploadArtifact(release, file) {
   console.log(`[release] uploaded ${name}`);
 }
 
-function ghReleaseExists() {
+function ghReleaseInfo() {
   try {
-    execFileSync('gh', ['release', 'view', tag, '--repo', repo], { cwd: root, stdio: 'ignore' });
-    return true;
+    const output = execFileSync(
+      'gh',
+      ['release', 'view', tag, '--repo', repo, '--json', 'isDraft,assets'],
+      { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
+    );
+    return JSON.parse(output);
   } catch {
-    return false;
+    return null;
   }
 }
 
 function publishWithGh(artifacts) {
-  const title = `${pkg.build?.productName || pkg.name} ${tag}`;
+  const existing = ghReleaseInfo();
 
-  if (!ghReleaseExists()) {
-    const createArgs = ['release', 'create', tag, '--repo', repo, '--title', title, '--generate-notes'];
-    if (draft) createArgs.push('--draft');
-    if (prerelease) createArgs.push('--prerelease');
-    run('gh', createArgs);
-  } else {
-    console.log(`[release] found https://github.com/${repo}/releases/tag/${tag}`);
+  if (!existing) {
+    throw new Error(`Draft release ${tag} does not exist. Start the coordinated Release workflow.`);
   }
+  if (!existing.isDraft) {
+    throw new Error(`Release ${tag} must remain a draft while assets are uploaded.`);
+  }
+  const existingNames = new Set((existing.assets || []).map((asset) => asset.name));
+  const duplicate = artifacts.map((file) => path.basename(file)).find((name) => existingNames.has(name));
+  if (duplicate) {
+    throw new Error(
+      `Release ${tag} already contains ${duplicate}. Versioned assets are immutable; ` +
+        'delete the incomplete draft and restart the coordinated release.',
+    );
+  }
+  console.log(`[release] found https://github.com/${repo}/releases/tag/${tag}`);
 
-  run('gh', ['release', 'upload', tag, ...artifacts, '--repo', repo, '--clobber']);
+  run('gh', ['release', 'upload', tag, ...artifacts, '--repo', repo]);
   console.log(`[release] done https://github.com/${repo}/releases/tag/${tag}`);
 }
 
 if (!skipBuild) {
-  run(process.execPath, [path.join(root, 'scripts', 'package-unsigned.mjs')]);
+  run(process.execPath, [path.join(root, 'scripts', 'package-desktop.mjs')]);
 }
 if (!skipSmoke && process.platform === 'darwin') {
   run(process.execPath, [
@@ -192,11 +191,19 @@ if (!skipSmoke && process.platform === 'darwin') {
     '--require-transcription',
   ]);
 }
+if (process.platform === 'darwin') {
+  run(process.execPath, [
+    path.join(root, 'scripts', 'release-verify-mac.mjs'),
+    '--skip-build',
+    '--skip-smoke',
+  ]);
+}
 
 const artifacts = listArtifacts();
 if (artifacts.length === 0) {
   throw new Error(`No release artifacts found in ${releaseDir}.`);
 }
+if (process.platform === 'darwin') assertMacUpdateArtifacts(artifacts);
 
 console.log(`[release] ${repo} ${tag}`);
 for (const file of artifacts) {
@@ -206,6 +213,10 @@ for (const file of artifacts) {
 if (dryRun) {
   console.log(`[release] dry run: https://github.com/${repo}/releases/tag/${tag}`);
   process.exit(0);
+}
+
+if (!requireDraft) {
+  throw new Error('Real uploads must use --require-draft from the coordinated Release workflow.');
 }
 
 if (!token) {
@@ -219,7 +230,7 @@ if (!token) {
   process.exit(0);
 }
 
-const release = await getOrCreateRelease();
+const release = await getDraftRelease();
 for (const file of artifacts) {
   await uploadArtifact(release, file);
 }

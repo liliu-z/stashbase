@@ -7,6 +7,7 @@ import { signInWithStashBase } from '../accountOAuth';
 import { DISCORD_INVITE_URL, openExternalUrl } from '../lib/externalLink';
 import { openSettings } from './SettingsModal';
 import { hostedQuotaRemainingPercent, hostedQuotaResetLabel } from '../lib/hostedQuota';
+import { useDesktopUpdate } from '../hooks/useDesktopUpdate';
 import { Button } from './ui/button';
 import {
   Menu as AccountMenu,
@@ -27,6 +28,7 @@ export function SidebarAccountRow() {
   const [account, setAccount] = useState<HostedAccountState | null>(null);
   const [signingIn, setSigningIn] = useState(false);
   const [signInError, setSignInError] = useState<string | null>(null);
+  const { state: updateState, runPrimaryAction } = useDesktopUpdate();
 
   function refresh(refreshUsage = false) {
     api.getAccount(refreshUsage).then(setAccount).catch(() => { /* local server startup race */ });
@@ -44,6 +46,17 @@ export function SidebarAccountRow() {
   const monogram = email ? email.slice(0, 2).toUpperCase() : '';
   const quota = account?.quota;
   const remainingPercent = quota ? hostedQuotaRemainingPercent(quota) : null;
+  const showUpdate = updateState?.autoCheckEnabled === true
+    && typeof updateState.availableVersion === 'string';
+  const updateLabel = updateState?.phase === 'ready'
+    ? 'Install update'
+    : updateState?.phase === 'downloading'
+      ? `Downloading${updateState.percent === undefined ? '…' : ` ${updateState.percent}%`}`
+      : updateState?.phase === 'installing'
+        ? 'Installing…'
+        : updateState?.phase === 'error'
+          ? 'Retry update'
+          : 'Update';
 
   function signOut() {
     void api.signOutAccount()
@@ -145,31 +158,47 @@ export function SidebarAccountRow() {
         </MenuPortal>
       </AccountMenu>
 
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        aria-label="Join the StashBase Discord"
-        title="Join the StashBase Discord"
-        className="flex-none text-muted-foreground"
-        onClick={() => { openExternalUrl(DISCORD_INVITE_URL); }}
-      >
-        <DiscordIcon className="size-4" />
-      </Button>
-      {/* Report Bug — opens the desktop app's local review window, the same
-        * deliberate entry as Help → Report a Bug…. The flow lives in the
-        * Electron main process, so the browser dev shell keeps the dimmed
-        * placeholder. */}
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        disabled={!electronBridge()?.reportBug}
-        aria-label={electronBridge()?.reportBug ? 'Report a bug' : 'Report a bug (desktop app only)'}
-        title={electronBridge()?.reportBug ? 'Report a bug' : 'Report a bug (desktop app only)'}
-        className="flex-none text-muted-foreground"
-        onClick={() => { void electronBridge()?.reportBug?.(); }}
-      >
-        <BugIcon className="size-4" />
-      </Button>
+      {showUpdate ? (
+        <Button
+          variant="secondary"
+          size="xs"
+          disabled={updateState?.phase === 'downloading' || updateState?.phase === 'installing'}
+          aria-label={`${updateLabel} to StashBase ${updateState?.availableVersion}`}
+          title={`StashBase ${updateState?.availableVersion} is available`}
+          className="max-w-28 flex-none"
+          onClick={() => { void runPrimaryAction(); }}
+        >
+          <span className="truncate">{updateLabel}</span>
+        </Button>
+      ) : (
+        <>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Join the StashBase Discord"
+            title="Join the StashBase Discord"
+            className="flex-none text-muted-foreground"
+            onClick={() => { openExternalUrl(DISCORD_INVITE_URL); }}
+          >
+            <DiscordIcon className="size-4" />
+          </Button>
+          {/* Report Bug — opens the desktop app's local review window, the same
+            * deliberate entry as Help → Report a Bug…. The flow lives in the
+            * Electron main process, so the browser dev shell keeps the dimmed
+            * placeholder. */}
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            disabled={!electronBridge()?.reportBug}
+            aria-label={electronBridge()?.reportBug ? 'Report a bug' : 'Report a bug (desktop app only)'}
+            title={electronBridge()?.reportBug ? 'Report a bug' : 'Report a bug (desktop app only)'}
+            className="flex-none text-muted-foreground"
+            onClick={() => { void electronBridge()?.reportBug?.(); }}
+          >
+            <BugIcon className="size-4" />
+          </Button>
+        </>
+      )}
       <Button
         variant="ghost"
         size="icon-sm"

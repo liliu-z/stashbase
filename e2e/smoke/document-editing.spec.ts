@@ -41,7 +41,6 @@ test('user can create, edit, save, navigate away, relaunch, and reopen a note', 
     await app.page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
     await app.page.keyboard.insertText(NOTE_TEXT);
     await expect(editor).toContainText(NOTE_TEXT);
-    await expect(app.page.locator('main.main').getByText('Unsaved', { exact: true })).toBeVisible();
     await expect(saveStatus(app.page)).toBeVisible();
     await expect.poll(() => fs.readFileSync(noteFile, 'utf8')).toBe(NOTE_CONTENT);
 

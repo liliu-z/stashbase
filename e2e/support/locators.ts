@@ -117,6 +117,11 @@ export async function dismissEmbeddingKeyPrompt(
   // folder-scoped), so this can no longer cache per page. The launch harness
   // waits for the initial offer; later journey calls only dismiss a prompt
   // that is already visible and otherwise return immediately.
+  // `bootSettled` can precede the lazy prompt chunk on slower CI hosts. Its
+  // modal fallback owns pointer events, so wait for that boundary before
+  // deciding whether the real prompt exists.
+  await page.getByRole('dialog', { name: 'Getting things ready…', exact: true })
+    .waitFor({ state: 'hidden', timeout: 20_000 });
   const skip = page.getByRole('button', { name: 'Skip AI Index for now', exact: true });
   if (options.waitForOffer) {
     await skip.waitFor({ state: 'visible', timeout: 20_000 });

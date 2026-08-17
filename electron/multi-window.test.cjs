@@ -16,6 +16,7 @@ const {
   createNativeOpenQueueCoordinator,
   createRendererFlushCoordinator,
   createRendererFlushReadiness,
+  createSafeReloadCoordinator,
   createSingleFlight,
   createWindowRegistry,
   focusWindow,
@@ -213,6 +214,31 @@ test('macOS application menu keeps Cmd+W for tabs and uses Cmd+Shift+W for windo
   assert.equal(closeWindow.accelerator, 'Command+Shift+W');
 });
 
+test('application View menu has no reload bypass and exposes developer tools only in explicit Vite mode', () => {
+  const baseOptions = {
+    platform: 'darwin',
+    onNewWindow: () => {},
+    onCloseWindow: () => {},
+    onOpenExternal: () => {},
+  };
+  const shippingView = createApplicationMenuTemplate(baseOptions)
+    .find((item) => item.label === 'View');
+  const shippingRoles = shippingView.submenu.map((item) => item.role).filter(Boolean);
+
+  assert.deepEqual(shippingRoles, ['resetZoom', 'zoomIn', 'zoomOut', 'togglefullscreen']);
+  assert.equal(shippingRoles.includes('reload'), false);
+  assert.equal(shippingRoles.includes('forceReload'), false);
+  assert.equal(shippingRoles.includes('toggleDevTools'), false);
+
+  const developmentView = createApplicationMenuTemplate({
+    ...baseOptions,
+    includeDeveloperTools: true,
+  }).find((item) => item.label === 'View');
+  assert.equal(developmentView.submenu.some((item) => item.role === 'toggleDevTools'), true);
+  assert.equal(developmentView.submenu.some((item) => item.role === 'reload'), false);
+  assert.equal(developmentView.submenu.some((item) => item.role === 'forceReload'), false);
+});
+
 test('Help menu opens the shared links and is the last menu on both platforms', () => {
   const links = require('../shared/links.json');
   for (const platform of ['darwin', 'win32', 'linux']) {
@@ -316,6 +342,58 @@ test('window lifecycle input follows the platform menu mapping without stealing 
   );
   assert.equal(
     windowLifecycleShortcutAction({ ...ctrlShiftW, isAutoRepeat: true }, 'linux'),
+    null,
+  );
+  for (const platform of ['win32', 'linux']) {
+    assert.equal(
+      windowLifecycleShortcutAction({ ...ctrlShiftW, key: 'r', shift: false }, platform),
+      'block-reload',
+    );
+    assert.equal(
+      windowLifecycleShortcutAction({ ...ctrlShiftW, key: 'r' }, platform),
+      'block-reload',
+    );
+  }
+  assert.equal(
+    windowLifecycleShortcutAction({
+      ...ctrlShiftW,
+      key: 'r',
+      control: false,
+      meta: true,
+      shift: false,
+    }, 'darwin'),
+    'block-reload',
+  );
+  assert.equal(
+    windowLifecycleShortcutAction({ ...ctrlShiftW, key: 'r', shift: false, alt: true }, 'linux'),
+    null,
+  );
+  assert.equal(
+    windowLifecycleShortcutAction({
+      ...ctrlShiftW, key: 'r', shift: false, isAutoRepeat: true,
+    }, 'linux'),
+    'block-reload',
+  );
+  for (const platform of ['win32', 'linux']) {
+    for (const modifiers of [
+      { control: false, shift: false },
+      { control: false, shift: true },
+      { control: true, shift: false },
+    ]) {
+      assert.equal(
+        windowLifecycleShortcutAction({
+          ...ctrlShiftW,
+          key: 'F5',
+          ...modifiers,
+        }, platform),
+        'block-reload',
+      );
+    }
+  }
+  assert.equal(
+    windowLifecycleShortcutAction({
+      ...ctrlShiftW, key: 'F5', control: false, shift: false, meta: false,
+    }, 'darwin'),
     null,
   );
 });
@@ -483,6 +561,62 @@ test('renderer flush coordinator waits for the matching save acknowledgement', a
   assert.equal(coordinator.handleResponse(41, { requestId: 'wrong', ok: true }), false);
   assert.equal(coordinator.handleResponse(41, { requestId: 'request-1', ok: true }), true);
   assert.equal(await pending, true);
+});
+
+test('safe reload waits for save acknowledgement and coalesces simultaneous requests', async () => {
+  let releaseSave;
+  const save = new Promise((resolve) => { releaseSave = resolve; });
+  const calls = [];
+  const win = {
+    isDestroyed: () => false,
+    webContents: { id: 51, isDestroyed: () => false },
+  };
+  const coordinator = createSafeReloadCoordinator({
+    requestFlush: async (_win, reason) => {
+      calls.push(`flush:${reason}`);
+      return save;
+    },
+    reloadWindow: () => calls.push('reload'),
+  });
+
+  const first = coordinator.request(win, { saveBarrierReady: true });
+  const second = coordinator.request(win, { saveBarrierReady: true });
+  assert.equal(first, second);
+  assert.deepEqual(calls, ['flush:window-reload']);
+  releaseSave(true);
+  assert.deepEqual(await first, { reloaded: true, reason: null });
+  assert.deepEqual(calls, ['flush:window-reload', 'reload']);
+});
+
+test('safe reload blocks failed saves and requires confirmation without a save barrier', async () => {
+  const calls = [];
+  const win = {
+    isDestroyed: () => false,
+    webContents: { id: 52, isDestroyed: () => false },
+  };
+  let confirm = false;
+  const coordinator = createSafeReloadCoordinator({
+    requestFlush: async () => false,
+    confirmWithoutSaveBarrier: async () => confirm,
+    reloadWindow: () => calls.push('reload'),
+  });
+
+  assert.deepEqual(
+    await coordinator.request(win, { saveBarrierReady: true }),
+    { reloaded: false, reason: 'save-failed' },
+  );
+  assert.deepEqual(
+    await coordinator.request(win, { saveBarrierReady: false }),
+    { reloaded: false, reason: 'unconfirmed' },
+  );
+  assert.deepEqual(calls, []);
+
+  confirm = true;
+  assert.deepEqual(
+    await coordinator.request(win, { saveBarrierReady: false }),
+    { reloaded: true, reason: null },
+  );
+  assert.deepEqual(calls, ['reload']);
 });
 
 test('window close does not request a save acknowledgement before the renderer installs its handler', () => {

@@ -1,8 +1,12 @@
 name: Release Linux
 
 on:
-  release:
-    types: [published]
+  workflow_call:
+    inputs:
+      tag:
+        description: Release tag to attach the Linux assets to, for example v0.9.0
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       tag:
@@ -20,7 +24,7 @@ jobs:
       contents: read
     uses: ./.github/workflows/release-ci-gate.yml
     with:
-      tag: ${{ github.event_name == 'workflow_dispatch' && (startsWith(inputs.tag, 'v') && inputs.tag || format('v{0}', inputs.tag)) || github.event.release.tag_name }}
+      tag: ${{ startsWith(inputs.tag, 'v') && inputs.tag || format('v{0}', inputs.tag) }}
 
   linux-packages:
     needs: release-ci-gate
@@ -28,7 +32,7 @@ jobs:
     # also rejects symbols newer than toolchain.json's declared baseline.
     runs-on: ubuntu-22.04
     env:
-      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && (startsWith(inputs.tag, 'v') && inputs.tag || format('v{0}', inputs.tag)) || github.event.release.tag_name }}
+      RELEASE_TAG: ${{ startsWith(inputs.tag, 'v') && inputs.tag || format('v{0}', inputs.tag) }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -78,4 +82,12 @@ jobs:
       - name: Upload Linux packages to release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$RELEASE_TAG" release.nosync/*.deb release.nosync/*.AppImage --repo "$GITHUB_REPOSITORY" --clobber
+        run: |
+          test -s release.nosync/latest-linux.yml || { echo "::error::Missing latest-linux.yml update metadata"; exit 1; }
+          grep -q 'blockMapSize:' release.nosync/latest-linux.yml || { echo "::error::latest-linux.yml is missing embedded AppImage blockmap metadata"; exit 1; }
+          find release.nosync -maxdepth 1 -type f -name '*.deb' -size +0c -print -quit | grep -q . || { echo "::error::Missing Debian package"; exit 1; }
+          find release.nosync -maxdepth 1 -type f -name '*.AppImage' -size +0c -print -quit | grep -q . || { echo "::error::Missing AppImage"; exit 1; }
+          mapfile -t artifacts < <(find release.nosync -maxdepth 1 -type f \( -name '*.deb' -o -name '*.AppImage' -o -name '*.blockmap' -o -name '*.zsync' -o -name 'latest*.yml' \) -size +0c)
+          test "${#artifacts[@]}" -gt 0 || { echo "::error::No Linux release assets found"; exit 1; }
+          test "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')" = "true" || { echo "::error::Release $RELEASE_TAG must exist and remain a draft while assets are uploaded"; exit 1; }
+          gh release upload "$RELEASE_TAG" "${artifacts[@]}" --repo "$GITHUB_REPOSITORY"

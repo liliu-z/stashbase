@@ -24,6 +24,7 @@ const LazyPdfPreview = lazyWithRetry(() => import('./PdfPreview').then((mod) => 
 const LazyDocxPreview = lazyWithRetry(() => import('./DocxPreview').then((mod) => ({ default: mod.DocxPreview })));
 const LazyAudioPreview = lazyWithRetry(() => import('./AudioPreview').then((mod) => ({ default: mod.AudioPreview })));
 const LazyJsonDocument = lazyWithRetry(() => import('./JsonDocument').then((mod) => ({ default: mod.JsonDocument })));
+const LazyConflictResolver = lazyWithRetry(() => import('./ConflictResolver').then((mod) => ({ default: mod.ConflictResolver })));
 
 /**
  * Right rail. Layout from top to bottom:
@@ -159,38 +160,50 @@ export function MainPane({ workspaceHidden = false }: { workspaceHidden?: boolea
               className="markdown-tab-layer"
               hidden={!active}
             >
-              <LazyLoadBoundary
-                className={VIEWER_LOADING_CLASS}
-                label="Markdown document"
-                resetKey={`${file.folder ?? ''}:${file.grantId ?? ''}:${file.name}:${file.version ?? ''}`}
-              >
-                <Suspense fallback={<div className={VIEWER_LOADING_CLASS} role="status">Opening document…</div>}>
-                  <LazyCrepeDocument
-                    tabId={tab.id}
-                    name={file.name}
-                    content={file.content}
-                    readOnly={!tab.editMode || Boolean(file.isReadOnly) || Boolean(file.isExternal)}
-                    active={active}
-                    dirty={tab.dirty}
-                    folder={file.folder}
-                  />
+              {tab.conflict ? (
+                <Suspense fallback={<div className={VIEWER_LOADING_CLASS} role="status">Loading conflict view…</div>}>
+                  <LazyConflictResolver tabId={tab.id} />
                 </Suspense>
-              </LazyLoadBoundary>
+              ) : (
+                <LazyLoadBoundary
+                  className={VIEWER_LOADING_CLASS}
+                  label="Markdown document"
+                  resetKey={`${file.folder ?? ''}:${file.grantId ?? ''}:${file.name}:${file.version ?? ''}`}
+                >
+                  <Suspense fallback={<div className={VIEWER_LOADING_CLASS} role="status">Opening document…</div>}>
+                    <LazyCrepeDocument
+                      tabId={tab.id}
+                      name={file.name}
+                      content={file.content}
+                      readOnly={!tab.editMode || Boolean(file.isReadOnly) || Boolean(file.isExternal)}
+                      active={active}
+                      dirty={tab.dirty}
+                      folder={file.folder}
+                    />
+                  </Suspense>
+                </LazyLoadBoundary>
+              )}
             </div>
           );
         })}
         {cur && cur.format === 'json' && (
-          <LazyLoadBoundary className={VIEWER_LOADING_CLASS} label="JSON document" resetKey={resourceResetKey}>
-            <Suspense fallback={<div className={VIEWER_LOADING_CLASS}>Opening JSON…</div>}>
-              <LazyJsonDocument
-                key={activeTab?.id ?? cur.name}
-                tabId={activeTab?.id ?? ''}
-                content={cur.content}
-                readOnly={!editMode || Boolean(cur.isReadOnly) || Boolean(cur.isExternal)}
-                active
-              />
+          activeTab?.conflict ? (
+            <Suspense fallback={<div className={VIEWER_LOADING_CLASS} role="status">Loading conflict view…</div>}>
+              <LazyConflictResolver tabId={activeTab.id} />
             </Suspense>
-          </LazyLoadBoundary>
+          ) : (
+            <LazyLoadBoundary className={VIEWER_LOADING_CLASS} label="JSON document" resetKey={resourceResetKey}>
+              <Suspense fallback={<div className={VIEWER_LOADING_CLASS}>Opening JSON…</div>}>
+                <LazyJsonDocument
+                  key={activeTab?.id ?? cur.name}
+                  tabId={activeTab?.id ?? ''}
+                  content={cur.content}
+                  readOnly={!editMode || Boolean(cur.isReadOnly) || Boolean(cur.isExternal)}
+                  active
+                />
+              </Suspense>
+            </LazyLoadBoundary>
+          )
         )}
         {cur && !editMode && cur.format === 'html' && (
           <HtmlPreview key={activeTab?.id} name={cur.name} />
@@ -235,7 +248,7 @@ export function MainPane({ workspaceHidden = false }: { workspaceHidden?: boolea
         </div>
       )}
       <FindBar />
-      {cur && (cur.format === 'md' || cur.format === 'json') && !cur.folder && !cur.isExternal && (
+      {cur && (cur.format === 'md' || cur.format === 'json') && !cur.folder && !cur.isExternal && !activeTab?.conflict && (
         /* Floating actions in the main pane's top-right — sits below the
          * tab strip (unconditionally present whenever there's an open
          * file, so a fixed offset is safe). The edit toggle lives here on

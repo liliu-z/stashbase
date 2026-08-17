@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'release/**']
   pull_request:
 
 jobs:
@@ -50,6 +50,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Check test inventory wiring
+        run: pnpm test:inventory
+
       - name: Install Python sidecar dependencies
         run: pnpm setup:python
 
@@ -59,8 +62,14 @@ jobs:
       - name: Test release CI gate
         run: pnpm test:release-gate
 
-      - name: Test macOS recovery installer
-        run: pnpm test:macos-recovery-installer
+      - name: Test macOS signing contract
+        run: pnpm test:macos-signing
+
+      - name: Test optional Windows signing contract
+        run: pnpm test:windows-signing
+
+      - name: Test desktop update contracts
+        run: pnpm test:updates
 
       - name: Test application config and hosted account
         run: pnpm test:config

@@ -117,22 +117,15 @@ Extend it when the contract grows; never weaken it to land a change.
   global token layer; they never embed a fixed palette in the component.
   Content follows `--reading-font-size`, not the chrome scale, and may use its
   own serif/mono voices.
-- **State-machine and imperative-DOM hooks**: `.tree-row` family with
-  drag-drop and `format-*` signature colors, the `agent-turn*` family
-  (right-aligned user bubble + below-bubble actions), CodeMirror-created DOM
-  (`.agent-input`, mention popups), `input.flash-focus`,
-  `.pdf-page-highlight` + keyframes, spinner keyframes referenced by the
-  reduced-motion block.
+- **State-machine and imperative-DOM hooks**: tree drag/drop, Agent turns,
+  CodeMirror-created DOM, focus flashes, preview highlights, and keyframes that
+  cannot be expressed at the JSX call site.
 - **Style-free marker classes** kept as querySelector/behavior hooks only
   (e.g. `.agent-view`, `quick-open-veil`) — do not re-grow
   styling onto them.
 
-Small still-unmigrated stragglers (`.transcription-model-*`,
-`.clipboard-offer-preview`, preparation icons, and the JSON viewer chrome
-block `.json-document`/`.json-view-mode`/`.json-tree-*` in globals.css —
-its tokens are correct but the rules belong in JSX utilities) are pending,
-not exempt — migrate them when touching their components, deleting the
-rules in the same change.
+Unlisted feature rules are migration debt, not a new exemption. Move them to
+the owning JSX surface when touched and delete the old rule in the same change.
 
 ## Implementation Map
 

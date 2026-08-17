@@ -7,8 +7,14 @@
 
 `server/app-config.ts` is the single persistent app-config Module and the Node
 server is its only writer. Domain routes expose narrow Interfaces for
-appearance, onboarding, embedding, transcription, and MCP transport settings.
-Renderer panels are Adapters over those routes; they do not own durable truth.
+appearance, capture, onboarding, embedding, transcription, and MCP transport
+settings. Renderer panels are Adapters over those routes; they do not own
+durable truth.
+Ambient capture is fail-closed: app config owns the opt-in, while Electron main
+only executes the current clipboard-monitoring state.
+Automatic desktop update checks are default-on: app config owns the preference,
+while Electron main reads it through the local route and owns the release
+runtime. Manual checks remain available when automatic checks are disabled.
 
 Managed Agent runtimes, models, derived data, and caches live under AppData and
 are not app-config fields. The built-in Chat agents' own configuration files
@@ -58,12 +64,25 @@ access surface external clients copy from.
 - Read-modify-write helpers preserve unrelated config domains. Concurrent MCP
   listener transitions serialize and roll active exposure back if persistence
   fails.
+- Clipboard-image monitoring defaults off for missing, legacy, malformed, or
+  unreadable capture settings. The renderer enables Electron monitoring only
+  after reading an explicit persisted opt-in. Runtime refresh may offer only
+  in the requesting window when that window is actually focused; otherwise the
+  next focus event is the boundary. Turning it off stops polling and later
+  offers; accepting a resulting import remains a separate user action.
+- Automatic update checking defaults on for missing, legacy, or invalid update
+  settings. Turning it off cancels future scheduled checks without cancelling
+  a download already requested by the user. Enabling it refreshes Electron from
+  server-owned durable truth; an automatic check never grants download or
+  installation. Clicking Update explicitly grants the bounded
+  download/install/relaunch operation.
 - Migration is idempotent and loss-averse. Invalid legacy state must not erase
   a valid current value or silently select a different provider.
 - Updating configuration invalidates or reconciles only the dependent runtime:
-  appearance updates the renderer, embedding affects semantic readiness,
-  transcription affects preparation, and MCP HTTP settings affect the
-  listener. Ordinary browsing and exact search remain available on failure.
+  appearance updates the renderer, capture updates the Electron clipboard
+  monitor, update checks refresh the Electron update scheduler, embedding affects semantic readiness, transcription affects
+  preparation, and MCP HTTP settings affect the listener. Ordinary browsing
+  and exact search remain available on failure.
 
 ## Implementation Map
 
@@ -71,10 +90,12 @@ access surface external clients copy from.
 |---|---|
 | Persistent Interface | strict/fallback read and write plus domain getters/setters in `server/app-config.ts` |
 | Domain owners | `server/mcp-http-settings.ts`, `server/hosted-account.ts`, `server/hosted-embedding-broker.ts`, embedding and transcription configuration Modules |
-| HTTP Adapters | `server/routes/appearance.ts`, `onboarding.ts`, `account.ts`, `embedder.ts`, `transcription.ts`, `mcp.ts` |
-| Renderer Adapters | `web-src/src/components/SettingsModal.tsx`, `components/settings/AppearancePanel.tsx`, `EmbeddingPanel.tsx`, `TranscriptionPanel.tsx`, `McpAccessPanel.tsx`, `AgentRuntimePanel.tsx` |
+| HTTP Adapters | `server/routes/appearance.ts`, `capture.ts`, `updates.ts`, `onboarding.ts`, `account.ts`, `embedder.ts`, `transcription.ts`, `mcp.ts` |
+| Renderer Adapters | `web-src/src/components/SettingsModal.tsx`, `components/settings/GeneralPanel.tsx`, `AppearancePanel.tsx`, `EmbeddingPanel.tsx`, `TranscriptionPanel.tsx`, `McpAccessPanel.tsx`, `AgentRuntimePanel.tsx` |
+| Capture runtime Adapter | `web-src/src/hooks/useClipboardImageOffer.ts`, `electron/preload.cjs`, and the clipboard boundary in `electron/main.cjs` |
+| Update runtime Adapter | `electron/update-manager.cjs`, `electron/main.cjs`, `electron/preload.cjs`, and `web-src/src/hooks/useDesktopUpdate.ts` |
 | Appearance Adapter | `web-src/src/appearance.ts` |
-| Focused evidence | `server/app-config.test.ts`, `server/hosted-account.test.ts`, `server/__tests__/mcp-http-settings.test.ts`, `web-src/src/__tests__/appearance.test.ts`, `web-src/src/__tests__/embedding-auth.test.ts`, `e2e/smoke/settings.spec.ts` |
+| Focused evidence | `server/app-config.test.ts`, `server/hosted-account.test.ts`, `server/__tests__/mcp-http-settings.test.ts`, `electron/clipboard-watch-policy.test.cjs`, `electron/update-manager.test.cjs`, `web-src/src/__tests__/desktop-update-hook.test.ts`, `web-src/src/__tests__/appearance.test.ts`, `web-src/src/__tests__/embedding-auth.test.ts`, `e2e/smoke/settings.spec.ts`, and J04 in `e2e/journeys/preparation-capture.spec.ts` |
 
 ## Validation
 
@@ -85,15 +106,20 @@ pnpm typecheck
 pnpm test:config
 pnpm test:mcp
 pnpm test:renderer
+pnpm test:updates
 ```
 
-Run `pnpm test:e2e:smoke` for Settings navigation or persisted appearance.
+Run `pnpm test:e2e:smoke` for Settings navigation, persisted appearance, or
+native capture opt-in.
 Run the affected conversion, Agent, or MCP suite when a setting changes its
 runtime behavior. Never use a real credential in a fixture or diagnostic.
 
-Related journeys: [J01](../design-docs/user-journeys.md#j01-launch-into-a-usable-workspace),
+Related journeys: [J01](../design-docs/user-journeys.md#j01-complete-onboarding-and-reach-first-value),
 [J04](../design-docs/user-journeys.md#j04-prepare-a-hard-to-read-file),
+[J05](../design-docs/user-journeys.md#j05-search-and-open-source-evidence),
 [J06](../design-docs/user-journeys.md#j06-start-and-continue-an-agent-chat), and
-[J08](../design-docs/user-journeys.md#j08-connect-an-external-agent-through-mcp).
+[J08](../design-docs/user-journeys.md#j08-connect-an-external-agent-through-mcp),
+plus [J11](../design-docs/user-journeys.md#j11-turn-a-conversation-into-a-project)
+for the owned default project location.
 Related contracts: [MCP Access](mcp-access.md), [Agent Runtime](agent-runtime.md),
 and [Data Lifecycle](data-lifecycle.md).

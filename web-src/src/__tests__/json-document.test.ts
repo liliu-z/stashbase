@@ -253,6 +253,7 @@ function JsonPersistenceHarness({ control }: { control: { current: PersistenceCo
     {
       loadFiles: async () => [], refreshIndexState: async () => undefined,
       toast: () => 'toast', primeFind: () => undefined,
+      askConfirm: async () => true,
       scheduleAfter, cancelScheduled,
     },
     dispatch,
@@ -283,6 +284,7 @@ test('mounted JSON uses production dirty, debounce, conflict, in-flight, and clo
   const window = new Window({ url: 'http://localhost/' });
   const previous = installDomGlobals(window);
   const originalPutFile = api.putFile;
+  const originalGetFile = api.getFile;
   try {
     const host = window.document.createElement('div');
     window.document.body.appendChild(host);
@@ -317,6 +319,16 @@ test('mounted JSON uses production dirty, debounce, conflict, in-flight, and clo
     assert.equal(control.current!.state.current.tabs[0].dirty, false);
     assert.equal(control.current!.state.current.tabs[0].saveStatus.text, 'Saved');
 
+    await act(async () => {
+      cm!.dispatch({ changes: { from: cm!.state.doc.length, insert: ' ' } });
+      control.current!.dispatch({ type: 'DOCUMENT_DIRTY', dirty: false });
+      await Promise.resolve();
+      saved = await control.current!.actions.flushSave();
+    });
+    assert.equal(saved, true);
+    assert.equal(calls.length, 2, 'live editor content remains save authority before dirty state commits');
+    assert.equal(calls[1].version, 'v2');
+
     api.putFile = async () => { throw new Error('disk unavailable'); };
     await act(async () => {
       cm!.dispatch({ changes: { from: cm!.state.doc.length, insert: '\n' } });
@@ -328,15 +340,55 @@ test('mounted JSON uses production dirty, debounce, conflict, in-flight, and clo
     assert.match(control.current!.state.current.tabs[0].saveStatus.text, /Save failed: disk unavailable/u);
 
     let conflictAttempt = 0;
+    let rejectConflict!: (reason: unknown) => void;
+    const conflictSave = new Promise<never>((_resolve, reject) => { rejectConflict = reject; });
     api.putFile = async (_name, content) => {
       conflictAttempt++;
-      if (conflictAttempt === 1) throw new ApiError('changed on disk', 409, 'FILE_CHANGED');
+      if (conflictAttempt === 1) return conflictSave;
       return { content, version: 'after-conflict' };
     };
-    await act(async () => { saved = await control.current!.actions.flushSave(); });
-    assert.equal(saved, true);
-    assert.equal(conflictAttempt, 2, 'an unchanged live buffer retries a 409 without the stale version');
-    assert.equal(control.current!.state.current.tabs[0].file?.version, 'after-conflict');
+    api.getFile = async (_name) => {
+      return { name: 'data.json', format: 'json', content: '{"disk": true}', version: 'version-disk' };
+    };
+    let conflictPending!: Promise<boolean>;
+    await act(async () => {
+      conflictPending = control.current!.actions.flushSave();
+      await Promise.resolve();
+    });
+    const lateConflictEdit = ' typed while conflict request was in flight';
+    await act(async () => {
+      cm!.dispatch({ changes: { from: cm!.state.doc.length, insert: lateConflictEdit } });
+      await Promise.resolve();
+    });
+    const conflictError = new ApiError('changed on disk', 409, 'FILE_CHANGED');
+    await act(async () => {
+      rejectConflict(conflictError);
+      saved = await conflictPending;
+    });
+    assert.equal(saved, false);
+    assert.equal(conflictAttempt, 1, 'should not retry automatically');
+    assert.ok(control.current!.state.current.tabs[0].conflict, 'transitions to conflict state');
+    assert.equal(control.current!.state.current.tabs[0].conflict?.diskContent, '{"disk": true}');
+    assert.match(
+      control.current!.state.current.tabs[0].conflict?.editorContent ?? '',
+      new RegExp(lateConflictEdit),
+      'the conflict snapshot includes edits typed while the stale save was in flight',
+    );
+    assert.equal(
+      control.current!.state.current.tabs[0].conflict?.diskVersion,
+      'version-disk',
+      'content and version come from the same post-conflict disk read',
+    );
+
+    await act(async () => {
+      control.current!.actions.registerEditor(null);
+      saved = await control.current!.actions.flushSave();
+    });
+    assert.equal(saved, false, 'an unresolved conflict blocks context release after the editor unmounts');
+    await act(async () => {
+      await control.current!.actions.resolveConflictReload(control.current!.state.current.activeTabId!);
+      await Promise.resolve();
+    });
 
     let releaseFirst!: (value: { content: string; version: string }) => void;
     const firstSave = new Promise<{ content: string; version: string }>((resolve) => { releaseFirst = resolve; });
@@ -407,6 +459,189 @@ test('mounted JSON uses production dirty, debounce, conflict, in-flight, and clo
     await act(async () => root.unmount());
   } finally {
     api.putFile = originalPutFile;
+    api.getFile = originalGetFile;
+    restoreDomGlobals(previous);
+    window.close();
+  }
+});
+
+test('conflict resolution callbacks apply correct edits and state transitions', async () => {
+  const window = new Window({ url: 'http://localhost/' });
+  const previous = installDomGlobals(window);
+  const originalPutFile = api.putFile;
+  const originalGetFile = api.getFile;
+  try {
+    const host = window.document.createElement('div');
+    window.document.body.appendChild(host);
+    const root = createRoot(host as unknown as Element);
+    const control: { current: PersistenceControl | null } = { current: null };
+    const calls: Array<{ content: string; version?: string }> = [];
+    api.putFile = async (_name, content, version) => {
+      calls.push({ content, version });
+      return { content, version: 'overwritten-version' };
+    };
+
+    await act(async () => {
+      root.render(createElement(JsonPersistenceHarness, { control }));
+      await Promise.resolve();
+    });
+
+    const tabId = control.current!.state.current.activeTabId!;
+
+    control.current!.actions.registerEditor({
+      getValue: () => '{"mountNormalized": true}',
+      focus: () => undefined,
+    });
+    let untouchedFlush = false;
+    await act(async () => {
+      untouchedFlush = await control.current!.actions.flushSave();
+    });
+    assert.equal(untouchedFlush, true);
+    assert.equal(calls.length, 0, 'mount-time editor normalization is not a user edit or save authority');
+
+    // 1. Setup tab conflict state manually in reducer to test resolution callbacks
+    await act(async () => {
+      control.current!.dispatch({
+        type: 'SET_CONFLICT',
+        id: tabId,
+        conflict: {
+          diskContent: '{"disk": true}',
+          diskVersion: 'v-disk',
+          editorContent: '{"editor": true}',
+        },
+      });
+    });
+
+    // Verify setup
+    assert.ok(control.current!.state.current.tabs[0].conflict);
+
+    // 2. Test reload
+    await act(async () => {
+      await control.current!.actions.resolveConflictReload(tabId);
+    });
+    assert.equal(control.current!.state.current.tabs[0].conflict, null);
+    assert.equal(control.current!.state.current.tabs[0].dirty, false);
+    assert.equal(control.current!.state.current.tabs[0].file?.content, '{"disk": true}');
+    assert.equal(control.current!.state.current.tabs[0].file?.version, 'v-disk');
+
+    // 3. Reset conflict state and test overwrite
+    await act(async () => {
+      control.current!.dispatch({
+        type: 'SET_CONFLICT',
+        id: tabId,
+        conflict: {
+          diskContent: '{"disk": true}',
+          diskVersion: 'v-disk',
+          editorContent: '{"editor": true}',
+        },
+      });
+    });
+
+    let finishOverwrite!: (value: { content: string; version: string }) => void;
+    const overwriteResult = new Promise<{ content: string; version: string }>((resolve) => {
+      finishOverwrite = resolve;
+    });
+    api.putFile = async (_name, content, version) => {
+      calls.push({ content, version });
+      return overwriteResult;
+    };
+    let overwritePending!: Promise<void>;
+    await act(async () => {
+      overwritePending = control.current!.actions.resolveConflictOverwrite(tabId);
+      await Promise.resolve();
+    });
+    const resolvingConflict = control.current!.state.current.tabs[0].conflict as State['tabs'][number]['conflict'];
+    assert.equal(resolvingConflict?.resolving, true);
+    await act(async () => {
+      await Promise.all([
+        control.current!.actions.resolveConflictReload(tabId),
+        control.current!.actions.resolveConflictMerge(tabId),
+        control.current!.actions.resolveConflictOverwrite(tabId),
+        control.current!.actions.closeTab(tabId),
+      ]);
+    });
+    assert.ok(control.current!.state.current.tabs[0].conflict, 'the first decision owns the unresolved UI');
+    assert.equal(control.current!.state.current.tabs.length, 1, 'tab discard cannot overtake the owning decision');
+    assert.equal(calls.length, 1, 'competing conflict decisions cannot start another disk mutation');
+    await act(async () => {
+      finishOverwrite({ content: '{"editor": true}', version: 'overwritten-version' });
+      await overwritePending;
+    });
+    assert.equal(control.current!.state.current.tabs[0].conflict, null);
+    assert.equal(control.current!.state.current.tabs[0].dirty, false);
+    assert.equal(control.current!.state.current.tabs[0].file?.content, '{"editor": true}');
+    assert.equal(control.current!.state.current.tabs[0].file?.version, 'overwritten-version');
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].version, undefined, 'overwrite uses undefined base version to bypass mismatch checks');
+
+    // 4. A failed owner releases the conflict so another decision can proceed.
+    await act(async () => {
+      control.current!.dispatch({
+        type: 'SET_CONFLICT',
+        id: tabId,
+        conflict: {
+          diskContent: '{"diskAfterFailure": true}',
+          diskVersion: 'v-disk-after-failure',
+          editorContent: '{"editorAfterFailure": true}',
+        },
+      });
+    });
+    api.putFile = async () => { throw new Error('overwrite unavailable'); };
+    await act(async () => {
+      await control.current!.actions.resolveConflictOverwrite(tabId);
+    });
+    const failedConflict = control.current!.state.current.tabs[0].conflict as State['tabs'][number]['conflict'];
+    assert.ok(failedConflict, 'failed overwrite keeps both versions recoverable');
+    assert.equal(failedConflict?.resolving, false, 'failed overwrite releases the decision owner');
+    await act(async () => {
+      await control.current!.actions.resolveConflictReload(tabId);
+    });
+    assert.equal(control.current!.state.current.tabs[0].conflict, null, 'a later resolution can claim the conflict');
+    assert.equal(control.current!.state.current.tabs[0].file?.content, '{"diskAfterFailure": true}');
+
+    // 5. Reset conflict state and test merge
+    await act(async () => {
+      control.current!.dispatch({
+        type: 'SET_CONFLICT',
+        id: tabId,
+        conflict: {
+          diskContent: 'line1\ndisk\nline3',
+          diskVersion: 'v-disk',
+          editorContent: 'line1\neditor\nline3',
+        },
+      });
+    });
+
+    await act(async () => {
+      await control.current!.actions.resolveConflictMerge(tabId);
+    });
+    assert.equal(control.current!.state.current.tabs[0].conflict, null);
+    assert.equal(control.current!.state.current.tabs[0].dirty, true, 'merged state remains dirty');
+    const content: string = control.current!.state.current.tabs[0].file?.content ?? '';
+    assert.ok(content.includes('<<<<<<< Editor Version'));
+    assert.ok(content.includes('======='));
+    assert.ok(content.includes('>>>>>>> Disk Version'));
+
+    api.putFile = async (_name, savedContent, version) => {
+      calls.push({ content: savedContent, version });
+      return { content: savedContent, version: 'merged-version' };
+    };
+    control.current!.actions.registerEditor({
+      getValue: () => content,
+      focus: () => undefined,
+    });
+    let mergedSaved = false;
+    await act(async () => {
+      mergedSaved = await control.current!.actions.flushSave();
+    });
+    assert.equal(mergedSaved, true);
+    assert.equal(calls.at(-1)?.content, content, 'merged draft reaches the durable file');
+    assert.equal(calls.at(-1)?.version, 'v-disk', 'merge saves against the disk snapshot');
+
+    await act(async () => root.unmount());
+  } finally {
+    api.putFile = originalPutFile;
+    api.getFile = originalGetFile;
     restoreDomGlobals(previous);
     window.close();
   }

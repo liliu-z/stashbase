@@ -17,19 +17,19 @@ user-managed results.
 
 ## Current Experience
 
-- Exact text search works without AI Index, including raw JSON and current
-  prepared text. Whole-token search applies its result cap after token
-  filtering, so substring-heavy files do not hide later eligible evidence.
+- Exact text search works without AI Index over the direct source or current
+  prepared representation declared by the
+  [Documents format matrix](documents.md#format-capability-matrix), including
+  raw JSON and current prepared text. Whole-token search applies its result cap
+  after token filtering, so substring-heavy files do not hide later eligible
+  evidence.
 - AI Index provides meaning-based retrieval when an embedding source is
   configured. Product copy says **AI Index**; engineering terms such as
   semantic indexing and embeddings appear only where technically necessary.
-- Setup offers a Supabase browser sign-in with Google and an included monthly
-  allowance as the primary path, with OpenAI/OpenRouter keys as the advanced
-  path. The active source is explicit, while inactive account and key
-  credentials remain available for later switching. After browser sign-in,
-  the initiating desktop window returns to the foreground and the centered
-  callback card attempts to close. If the OS or browser blocks the automatic
-  handoff, the card offers an explicit **Open StashBase** action.
+- AI Index setup offers hosted account access as the primary path and
+  OpenAI/OpenRouter keys as an advanced path. The active source remains
+  explicit, and browser sign-in returns to the initiating window or offers a
+  deliberate app-return action.
 - The search popup searches the whole library by default and can narrow to one
   member folder. It remembers query, mode, options, scope, and results across
   close, reopen, and folder switches, then refreshes against current content.
@@ -45,13 +45,11 @@ user-managed results.
 - Readiness distinguishes disabled, preparing, partial, paused, failed, and
   ready states. Exact search remains usable while AI Index is absent or
   deferred.
-- AI Index setup is strongly recommended but not a gate for local browsing,
-  editing, preview, or exact search. A fresh blank window offers setup before a
-  folder is selected. Activation persists; “Skip for now” is retained only in
-  the current window. A blank-window skip carries into the first folder opened
-  so one launch makes one offer. Returning to a skipped folder stays quiet;
-  another folder or a fresh window re-offers setup. The choice remains
-  reversible from Files or Settings.
+- AI Index setup is strongly recommended but never gates local browsing,
+  editing, preview, or exact search. Activation persists, while a deliberate
+  skip is local to the current window context and remains reversible. The
+  observable setup sequence lives in
+  [J01](../user-journeys.md#j01-complete-onboarding-and-reach-first-value).
 - Hosted indexing and meaning-based queries draw from one token allowance.
   The account menu shows identity, remaining percentage, and reset date. When
   the allowance is exhausted, hosted semantic work stops while Exact search
@@ -69,16 +67,16 @@ user-managed results.
   is presented. Current indexed files may still provide partial results.
 - Result scope never widens silently, and a derived path never crosses the
   product boundary.
+- Previewability alone never claims retrievable text. Each result comes from a
+  direct-text or current prepared-text capability and resolves to the visible
+  source.
 - BYOK credentials are managed through Settings. Account login starts only
   from an explicit Sign in action in setup, Settings, or the account menu.
   Browsing local files and serving an existing local index never depends on
   online authentication.
-- Account sessions remain Node-owned. Renderer responses contain only account
-  display/quota state, and the Python daemon receives only an ephemeral
-  loopback credential rather than Supabase access or refresh tokens.
-- A credential save fails with an actionable error when the app-owned settings
-  path is not writable. StashBase does not change filesystem ownership, flags,
-  or access-control entries to make the save succeed.
+- Account and credential ownership remains outside renderer and indexing
+  presentation. Persistence and process-boundary invariants live in
+  [Settings and Config](../../code-review/settings-config.md).
 - MCP is context infrastructure over authorized folders, not a general host
   filesystem interface.
 
@@ -111,8 +109,14 @@ user-managed results.
 
 ## Related Journeys and Contracts
 
-Journeys: [J05](../user-journeys.md#j05-search-and-open-source-evidence) and
-[J08](../user-journeys.md#j08-connect-an-external-agent-through-mcp).
+Journeys: [J01](../user-journeys.md#j01-complete-onboarding-and-reach-first-value),
+[J05](../user-journeys.md#j05-search-and-open-source-evidence), and
+[J08](../user-journeys.md#j08-connect-an-external-agent-through-mcp). The
+end-to-end route is the
+[J10](../user-journeys.md#j10-turn-a-local-project-into-durable-agent-assisted-work)
+core loop.
 
-Contracts: [Data Lifecycle](../../code-review/data-lifecycle.md) and
+Contracts: [Data Lifecycle](../../code-review/data-lifecycle.md),
+[Renderer Workspace](../../code-review/renderer-workspace.md),
+[Settings and Config](../../code-review/settings-config.md), and
 [MCP Access](../../code-review/mcp-access.md).

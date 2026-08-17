@@ -35,7 +35,11 @@ export function AgentRuntimePanel() {
   const [busy, setBusy] = useState<string | null>(null);
   const [status, setStatus] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
   const activeInstall = useMemo(
-    () => agents.some((agent) => agent.bootstrap?.phase === 'installing' || agent.bootstrap?.phase === 'configuring'),
+    () => agents.some((agent) => (
+      agent.bootstrap?.phase === 'installing'
+      || agent.bootstrap?.phase === 'authenticating'
+      || agent.bootstrap?.phase === 'configuring'
+    )),
     [agents],
   );
 
@@ -64,7 +68,20 @@ export function AgentRuntimePanel() {
     setBusy(`install:${agent}`);
     setStatus(null);
     try {
-      applyResponse(await api.bootstrapAgent(agent));
+      applyResponse(await api.prepareAgent(agent, 'bootstrap'));
+    } catch (error) {
+      setStatus({ tone: 'error', text: error instanceof Error ? error.message : String(error) });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function login(agent: AgentKind) {
+    if (agent !== 'codex') return;
+    setBusy(`login:${agent}`);
+    setStatus(null);
+    try {
+      applyResponse(await api.prepareAgent(agent, 'login'));
     } catch (error) {
       setStatus({ tone: 'error', text: error instanceof Error ? error.message : String(error) });
     } finally {
@@ -133,7 +150,7 @@ export function AgentRuntimePanel() {
         {AGENTS.map((definition) => {
           const runtime = agents.find((candidate) => candidate.id === definition.id);
           const phase = runtime?.bootstrap?.phase;
-          const working = phase === 'installing' || phase === 'configuring';
+          const working = phase === 'installing' || phase === 'authenticating' || phase === 'configuring';
           const description = runtimeDescription(runtime);
           const action = runtimeAction(runtime, working);
           const Icon = definition.Icon;
@@ -149,9 +166,9 @@ export function AgentRuntimePanel() {
                   variant="outline"
                   size="sm"
                   disabled={busy != null || working}
-                  onClick={() => void install(definition.id)}
+                  onClick={() => void (action.kind === 'login' ? login(definition.id) : install(definition.id))}
                 >
-                  {action}
+                  {action.label}
                 </Button>
               )}
               {/* Uninstall applies only to the StashBase-managed install —
@@ -259,13 +276,14 @@ function AgentDebugSelect(props: ComponentProps<typeof Select>) {
  * attach), so the healthy states carry no button at all. An affordance
  * appears only when the user must act: nothing is installed or a bootstrap
  * explicitly failed. */
-function runtimeAction(runtime: Agent | undefined, working: boolean): string | null {
-  if (working) return 'Preparing…';
+function runtimeAction(runtime: Agent | undefined, working: boolean): { label: string; kind: 'prepare' | 'login' } | null {
+  if (working) return { label: 'Preparing…', kind: 'prepare' };
   if (!runtime) return null;
   if (runtime.bootstrap?.phase === 'failed') {
-    return runtime.bootstrap.failure?.stage === 'mcp' ? 'Retry connection' : 'Retry';
+    if (runtime.bootstrap.failure?.stage === 'authentication') return { label: 'Sign in', kind: 'login' };
+    return { label: runtime.bootstrap.failure?.stage === 'mcp' ? 'Retry connection' : 'Retry', kind: 'prepare' };
   }
-  if (!runtime.installed) return 'Install';
+  if (!runtime.installed) return { label: 'Install', kind: 'prepare' };
   return null;
 }
 
@@ -273,7 +291,7 @@ function runtimeDescription(runtime: Agent | undefined): string {
   if (!runtime) return 'Checking…';
   const bootstrap = runtime.bootstrap;
   if (bootstrap?.phase === 'failed') return bootstrap.failure?.message ?? 'Setup failed';
-  if (bootstrap?.phase === 'installing' || bootstrap?.phase === 'configuring') return bootstrap.message ?? 'Preparing…';
+  if (bootstrap?.phase === 'installing' || bootstrap?.phase === 'authenticating' || bootstrap?.phase === 'configuring') return bootstrap.message ?? 'Preparing…';
   if (!runtime.installed) return 'Not installed';
   const source = runtime.source === 'managed' ? 'StashBase-managed runtime' : 'System runtime';
   return bootstrap?.phase === 'ready' ? `Ready for Chat · ${source}` : source;

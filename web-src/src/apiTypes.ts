@@ -34,6 +34,14 @@ export interface AppearancePreferences {
   readingTextSize: AppearanceScale;
 }
 
+export interface CapturePreferences {
+  clipboardImageImport: boolean;
+}
+
+export interface UpdatePreferences {
+  autoCheck: boolean;
+}
+
 /** Viewer format the renderer uses for tab routing. `md` / `html` / `json` are
  *  text formats loaded from `/api/files/*`; `pdf`, `image`, and `docx` load
  *  their source bytes from `/asset/*`. DOCX visible preview conversion happens
@@ -384,9 +392,14 @@ export interface Agent {
   };
 }
 
-export type AgentBootstrapPhase = 'idle' | 'installing' | 'configuring' | 'ready' | 'failed';
-export type AgentBootstrapFailureStage = 'discovery' | 'installation' | 'mcp';
-export type AgentBootstrapFailureCode = 'simulated' | 'operation-failed' | 'runtime-unavailable';
+export type AgentBootstrapPhase = 'idle' | 'installing' | 'authenticating' | 'configuring' | 'ready' | 'failed';
+export type AgentBootstrapFailureStage = 'discovery' | 'installation' | 'authentication' | 'mcp';
+export type AgentBootstrapFailureCode =
+  | 'simulated'
+  | 'operation-failed'
+  | 'runtime-unavailable'
+  | 'authentication-required'
+  | 'authentication-check-failed';
 export type AgentBootstrapManualRecovery = 'install-command' | 'mcp-settings';
 
 export interface AgentBootstrapFailure {

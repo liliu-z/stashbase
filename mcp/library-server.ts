@@ -247,8 +247,10 @@ const BUILTIN_TOOLS = [
         'default new-folder location and `folders` lists "Your ' +
         'Folders", each with an ABSOLUTE `path` (the identity the file tools and ' +
         'search_library use), a display `name`, and the embedder provider. Folders can ' +
-        'live anywhere on disk. Use StashBase file tools for these paths; sandboxed ' +
-        'shells may not be able to see those host files.',
+        'live anywhere on disk. Folder purpose and durable working instructions belong ' +
+        'in the visible `AGENTS.md`, which you can read with the file tools when needed. ' +
+        'Use StashBase file tools for these paths; sandboxed shells may not be able to ' +
+        'see those host files.',
       inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     },
     {

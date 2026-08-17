@@ -111,6 +111,65 @@ function claudeSuccessResult(): SDKMessage {
   } as unknown as SDKMessage;
 }
 
+function streamingClaudeQuery(prompt: AsyncIterable<unknown>, sessionId = 'test-session'): Query {
+  async function* stream() {
+    yield {
+      type: 'system', subtype: 'init', session_id: sessionId, model: 'native-model',
+    } as unknown as SDKMessage;
+    for await (const _message of prompt) {
+      yield { ...claudeSuccessResult(), session_id: sessionId } as unknown as SDKMessage;
+    }
+  }
+  return Object.assign(stream(), {
+    supportedModels: async () => [],
+    supportedCommands: async () => [],
+    setModel: async () => {},
+    setPermissionMode: async () => {},
+    interrupt: async () => {},
+  }) as unknown as Query;
+}
+
+test('Claude project rebind resumes the same native session from the project cwd', async (t) => {
+  const project = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-claude-rebound-'));
+  t.after(() => fs.rmSync(project, { recursive: true, force: true }));
+  const starts: Array<{ cwd?: string; resume?: string }> = [];
+  const ws = new FakeAgentWebSocket();
+  const session = new AgentSession(
+    ws as unknown as WebSocket,
+    'claude-rebound-window',
+    undefined,
+    undefined,
+    'default',
+    undefined,
+    undefined,
+    ((request: { prompt: AsyncIterable<unknown>; options: { cwd?: string; resume?: string } }) => {
+      starts.push({ cwd: request.options.cwd, resume: request.options.resume });
+      return streamingClaudeQuery(request.prompt, 'native-rebound');
+    }) as never,
+    () => '/fake/claude',
+    undefined,
+    undefined,
+    'library',
+  );
+  t.after(() => session.dispose());
+
+  session.begin();
+  await settle();
+  ws.emit('message', JSON.stringify({ t: 'prompt', text: 'create the project' }));
+  await settle();
+  assert.equal(session.nativeSessionId(), 'native-rebound');
+
+  assert.equal(session.rebindToFolder(project), true);
+  ws.emit('message', JSON.stringify({ t: 'prompt', text: 'continue in the project' }));
+  await settle();
+  await settle();
+
+  assert.equal(starts.length, 2);
+  assert.equal(starts[1]?.cwd, project);
+  assert.equal(starts[1]?.resume, 'native-rebound');
+  assert.equal(session.nativeSessionId(), 'native-rebound');
+});
+
 function claudeRetryMessage(): SDKMessage {
   return {
     type: 'system',

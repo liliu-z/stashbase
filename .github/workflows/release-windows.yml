@@ -1,8 +1,12 @@
 name: Release Windows
 
 on:
-  release:
-    types: [published]
+  workflow_call:
+    inputs:
+      tag:
+        description: Release tag to attach the Windows assets to, for example v0.9.0
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       tag:
@@ -20,13 +24,13 @@ jobs:
       contents: read
     uses: ./.github/workflows/release-ci-gate.yml
     with:
-      tag: ${{ github.event_name == 'workflow_dispatch' && (startsWith(inputs.tag, 'v') && inputs.tag || format('v{0}', inputs.tag)) || github.event.release.tag_name }}
+      tag: ${{ startsWith(inputs.tag, 'v') && inputs.tag || format('v{0}', inputs.tag) }}
 
   windows-installer:
     needs: release-ci-gate
     runs-on: windows-latest
     env:
-      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && (startsWith(inputs.tag, 'v') && inputs.tag || format('v{0}', inputs.tag)) || github.event.release.tag_name }}
+      RELEASE_TAG: ${{ startsWith(inputs.tag, 'v') && inputs.tag || format('v{0}', inputs.tag) }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -84,10 +88,50 @@ jobs:
 
       - name: Build Windows installer
         env:
+          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
           STASHBASE_REQUIRE_EXTRACT: '1'
           STASHBASE_SKIP_SIDECAR_BUILD: '1'
           STASHBASE_SKIP_TRANSCRIPTION_BUILD: '1'
         run: pnpm dist:win
+
+      - name: Verify optional Windows signature
+        env:
+          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+        shell: pwsh
+        run: |
+          $hasCertificate = -not [string]::IsNullOrWhiteSpace($env:CSC_LINK)
+          $hasPassword = -not [string]::IsNullOrWhiteSpace($env:CSC_KEY_PASSWORD)
+          if (-not $hasCertificate -and -not $hasPassword) {
+            Write-Host "No Windows signing certificate configured; publishing unsigned NSIS artifacts."
+            exit 0
+          }
+          if (-not $hasCertificate -or -not $hasPassword) {
+            Write-Error "Windows signing requires both WIN_CSC_LINK and WIN_CSC_KEY_PASSWORD"
+            exit 1
+          }
+          $installers = @(Get-ChildItem -Path release.nosync -File -Filter '*.exe')
+          if ($installers.Count -eq 0) {
+            Write-Error "Missing signed NSIS installer"
+            exit 1
+          }
+          foreach ($installer in $installers) {
+            $signature = Get-AuthenticodeSignature $installer.FullName
+            if ($signature.Status -ne 'Valid') {
+              Write-Error "Invalid Authenticode signature for $($installer.Name): $($signature.Status)"
+              exit 1
+            }
+          }
+          $appUpdate = Get-ChildItem -Path release.nosync -Recurse -File -Filter 'app-update.yml' | Select-Object -First 1
+          if (-not $appUpdate) {
+            Write-Error "Packaged updater config is missing"
+            exit 1
+          }
+          if (-not (Select-String -Path $appUpdate.FullName -Pattern '^publisherName:' -Quiet)) {
+            Write-Error "Packaged updater config is missing publisherName signature verification"
+            exit 1
+          }
 
       - name: Smoke packaged Windows server
         env:
@@ -100,12 +144,29 @@ jobs:
         shell: pwsh
         run: |
           $artifacts = Get-ChildItem -Path release.nosync -File |
-            Where-Object { $_.Name -match '\.(exe|zip)$' -and $_.Length -gt 0 }
+            Where-Object { $_.Name -match '(\.(exe|zip|blockmap)$|^latest.*\.ya?ml$)' -and $_.Length -gt 0 }
 
-          if (-not $artifacts) {
-            Write-Error "No Windows release artifacts found in release.nosync"
+          if (-not ($artifacts | Where-Object { $_.Name -eq 'latest.yml' })) {
+            Write-Error "Missing latest.yml Windows update metadata"
+            exit 1
+          }
+          if (-not ($artifacts | Where-Object { $_.Extension -eq '.exe' })) {
+            Write-Error "Missing NSIS installer"
+            exit 1
+          }
+          if (-not ($artifacts | Where-Object { $_.Extension -eq '.zip' })) {
+            Write-Error "Missing Windows zip archive"
+            exit 1
+          }
+          if (-not ($artifacts | Where-Object { $_.Extension -eq '.blockmap' })) {
+            Write-Error "Missing Windows blockmap"
             exit 1
           }
 
           $artifactPaths = @($artifacts | ForEach-Object { $_.FullName })
-          gh release upload $env:RELEASE_TAG @artifactPaths --repo $env:GITHUB_REPOSITORY --clobber
+          $release = gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --json isDraft | ConvertFrom-Json
+          if (-not $release.isDraft) {
+            Write-Error "Release $env:RELEASE_TAG must exist and remain a draft while assets are uploaded"
+            exit 1
+          }
+          gh release upload $env:RELEASE_TAG @artifactPaths --repo $env:GITHUB_REPOSITORY

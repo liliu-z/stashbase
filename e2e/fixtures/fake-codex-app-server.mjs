@@ -1,11 +1,19 @@
 #!/usr/bin/env node
 
 import fs from 'node:fs';
+import path from 'node:path';
 import readline from 'node:readline';
+import { fileURLToPath } from 'node:url';
 import { fakeAgentNetworkPolicy } from './deny-network.mjs';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const PROJECT_ROOT = path.resolve(HERE, '..', '..');
+const MCP_SERVER = path.join(PROJECT_ROOT, 'mcp', 'server.ts');
 const logFile = process.env.STASHBASE_FAKE_CODEX_LOG;
 let turnSequence = 0;
+let toolSequence = 0;
 let nextServerRequestId = 10_000;
 let historyCwd = process.cwd();
 const pendingApprovals = new Map();
@@ -24,6 +32,15 @@ record({
   networkDenied: fakeAgentNetworkPolicy.denied,
 });
 
+if (process.argv[2] === 'login' && process.argv[3] === 'status') {
+  process.stdout.write('Logged in using deterministic fixture\n');
+  process.exit(0);
+}
+if (process.argv[2] === 'login') {
+  process.stdout.write('Deterministic browser login completed\n');
+  process.exit(0);
+}
+
 const input = readline.createInterface({ input: process.stdin });
 input.on('line', (line) => {
   let message;
@@ -38,7 +55,7 @@ input.on('line', (line) => {
     return;
   }
   if ('id' in message && ('result' in message || 'error' in message)) {
-    handleResponse(message);
+    void handleResponse(message);
   }
 });
 
@@ -164,6 +181,65 @@ function startTurn(requestId, params) {
     });
     return;
   }
+  if (/journey:j07 converge canvas/i.test(prompt)) {
+    requestMcpApproval({
+      turnId,
+      threadId: String(params.threadId || 'fake-thread-1'),
+      tool: 'write_file',
+      title: 'Allow Codex to write Canvas.md?',
+      args: {
+        path: path.join(String(params.cwd || process.cwd()), 'Canvas.md'),
+        content: [
+          '---',
+          'generated_by: stashbase-agent',
+          '---',
+          '# Canvas',
+          '',
+          'Accepted conclusion from the scoped conversation.',
+          '',
+          '## Open questions',
+          '',
+          '- Confirm the next implementation step.',
+          '',
+        ].join('\n'),
+      },
+      successMessage: 'Canvas.md now contains the accepted conclusions.',
+    });
+    return;
+  }
+  if (/journey:j11 create project/i.test(prompt)) {
+    requestMcpApproval({
+      turnId,
+      threadId: String(params.threadId || 'fake-thread-1'),
+      tool: 'create_project',
+      title: 'Allow Codex to create conversation-project?',
+      args: { name: 'conversation-project' },
+      successMessage: 'conversation-project is ready and this conversation moved into it.',
+    });
+    return;
+  }
+  if (/journey:j11 continue in project/i.test(prompt)) {
+    requestMcpApproval({
+      turnId,
+      threadId: String(params.threadId || 'fake-thread-1'),
+      tool: 'write_file',
+      title: 'Allow Codex to write Project Plan.md?',
+      args: {
+        path: path.join(String(params.cwd || process.cwd()), 'Project Plan.md'),
+        content: '# Project Plan\n\nAccepted goal from the continued project conversation.\n',
+      },
+      successMessage: 'Project Plan.md was written inside conversation-project.',
+    });
+    return;
+  }
+  if (/journey:j10 synthesize retrieved evidence/i.test(prompt)) {
+    void startJ10Turn({
+      turnId,
+      threadId: String(params.threadId || 'fake-thread-1'),
+      cwd: String(params.cwd || process.cwd()),
+    });
+    return;
+  }
 
   const itemId = `fake-command-${turnSequence}`;
   notify('item/started', {
@@ -179,7 +255,7 @@ function startTurn(requestId, params) {
     },
   });
   const approvalId = nextServerRequestId++;
-  pendingApprovals.set(approvalId, { turnId, itemId, threadId: String(params.threadId || 'fake-thread-1') });
+  pendingApprovals.set(approvalId, { kind: 'command', turnId, itemId, threadId: String(params.threadId || 'fake-thread-1') });
   send({
     id: approvalId,
     method: 'item/commandExecution/requestApproval',
@@ -194,10 +270,177 @@ function startTurn(requestId, params) {
   });
 }
 
-function handleResponse(response) {
+function requestMcpApproval({ turnId, threadId, tool, title, args, successMessage }) {
+  const itemId = `fake-mcp-${++toolSequence}`;
+  notify('item/started', {
+    threadId,
+    turnId,
+    item: {
+      type: 'mcpToolCall',
+      id: itemId,
+      server: 'stashbase',
+      tool,
+      arguments: args,
+      status: 'inProgress',
+    },
+  });
+  const approvalId = nextServerRequestId++;
+  pendingApprovals.set(approvalId, {
+    kind: 'mcp',
+    turnId,
+    threadId,
+    itemId,
+    tool,
+    args,
+    successMessage,
+  });
+  send({
+    id: approvalId,
+    method: 'mcpServer/elicitation/request',
+    params: {
+      message: title,
+      _meta: {
+        codex_approval_kind: 'mcp_tool_call',
+        connector_name: 'stashbase',
+        tool_name: tool,
+        tool_title: tool,
+        codex_mcp_tool_call_id: itemId,
+        tool_params: args,
+      },
+    },
+  });
+}
+
+async function startJ10Turn({ turnId, threadId, cwd }) {
+  const evidence = 'J10 prepared screenshot evidence.';
+  const source = 'Prepared Evidence.png';
+  const searchArgs = {
+    query: evidence,
+    mode: 'keyword',
+    folder: cwd,
+    top_k: 4,
+  };
+  const itemId = `fake-mcp-${++toolSequence}`;
+  notify('item/started', {
+    threadId,
+    turnId,
+    item: {
+      type: 'mcpToolCall',
+      id: itemId,
+      server: 'stashbase',
+      tool: 'search_library',
+      arguments: searchArgs,
+      status: 'inProgress',
+    },
+  });
+  let result;
+  try {
+    result = await callStashbaseTool('search_library', searchArgs);
+  } catch (error) {
+    failMcpItemAndTurn({
+      turnId,
+      threadId,
+      itemId,
+      tool: 'search_library',
+      args: searchArgs,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return;
+  }
+  const resultText = mcpResultText(result);
+  if (result?.isError === true || !resultText.includes(evidence) || !resultText.includes(source)) {
+    failMcpItemAndTurn({
+      turnId,
+      threadId,
+      itemId,
+      tool: 'search_library',
+      args: searchArgs,
+      error: resultText || 'Expected project evidence was not retrieved.',
+    });
+    return;
+  }
+  notify('item/completed', {
+    threadId,
+    turnId,
+    item: {
+      type: 'mcpToolCall',
+      id: itemId,
+      server: 'stashbase',
+      tool: 'search_library',
+      arguments: searchArgs,
+      status: 'completed',
+      result,
+    },
+  });
+  requestMcpApproval({
+    turnId,
+    threadId,
+    tool: 'write_file',
+    title: 'Allow Codex to write Core Loop.md?',
+    args: {
+      path: path.join(cwd, 'Core Loop.md'),
+      content: [
+        '---',
+        'generated_by: stashbase-agent',
+        '---',
+        '# Core Loop',
+        '',
+        '## Retrieved evidence',
+        '',
+        `- Source: ${source}`,
+        `- Evidence: ${evidence}`,
+        '',
+        '## Accepted result',
+        '',
+        'Use the retrieved project evidence as the durable starting point.',
+        '',
+      ].join('\n'),
+    },
+    successMessage: 'Core Loop.md contains the retrieved project evidence.',
+  });
+}
+
+function failMcpItemAndTurn({ turnId, threadId, itemId, tool, args, error }) {
+  notify('item/completed', {
+    threadId,
+    turnId,
+    item: {
+      type: 'mcpToolCall',
+      id: itemId,
+      server: 'stashbase',
+      tool,
+      arguments: args,
+      status: 'failed',
+      error,
+    },
+  });
+  notify('turn/completed', {
+    threadId,
+    turn: { id: turnId, items: [], status: 'failed', error: { message: error } },
+  });
+}
+
+function completeAssistantTurn({ turnId, threadId, text }) {
+  notify('item/agentMessage/delta', {
+    threadId,
+    turnId,
+    itemId: `fake-message-${turnSequence}`,
+    delta: text,
+  });
+  notify('turn/completed', {
+    threadId,
+    turn: { id: turnId, items: [], status: 'completed' },
+  });
+}
+
+async function handleResponse(response) {
   const pending = pendingApprovals.get(response.id);
   if (!pending) return;
   pendingApprovals.delete(response.id);
+  if (pending.kind === 'mcp') {
+    await handleMcpApproval(response, pending);
+    return;
+  }
   const decision = response.result?.decision ?? 'error';
   record({ event: 'approval-response', decision, response });
   const accepted = decision === 'accept' || decision === 'acceptForSession';
@@ -232,6 +475,99 @@ function handleResponse(response) {
       ...(accepted ? {} : { error: { message: 'Permission was declined.' } }),
     },
   });
+}
+
+async function handleMcpApproval(response, pending) {
+  const decision = response.result?.action ?? 'error';
+  record({ event: 'mcp-approval-response', decision, tool: pending.tool, response });
+  if (decision !== 'accept') {
+    completeMcpTurn(pending, {
+      accepted: false,
+      error: 'permission declined',
+    });
+    return;
+  }
+  try {
+    const result = await callStashbaseTool(pending.tool, pending.args);
+    const failed = result?.isError === true;
+    completeMcpTurn(pending, {
+      accepted: true,
+      result,
+      error: failed ? mcpResultText(result) || 'MCP tool failed.' : '',
+    });
+  } catch (error) {
+    completeMcpTurn(pending, {
+      accepted: true,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+async function callStashbaseTool(tool, args) {
+  const port = Number(process.env.STASHBASE_FAKE_MCP_PORT);
+  if (!Number.isInteger(port) || port <= 0) {
+    throw new Error('STASHBASE_FAKE_MCP_PORT is required for Journey MCP calls.');
+  }
+  const client = new Client({ name: 'stashbase-e2e-fake-agent', version: '1.0.0' });
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: ['--import', 'tsx', MCP_SERVER, `--port=${port}`],
+    cwd: PROJECT_ROOT,
+    env: {
+      ...(process.env.STASHBASE_WINDOW_ID ? { STASHBASE_WINDOW_ID: process.env.STASHBASE_WINDOW_ID } : {}),
+      ...(process.env.STASHBASE_AGENT_SESSION_ID ? { STASHBASE_AGENT_SESSION_ID: process.env.STASHBASE_AGENT_SESSION_ID } : {}),
+    },
+    stderr: 'pipe',
+  });
+  transport.stderr?.on('data', (chunk) => record({ event: 'mcp-stderr', text: String(chunk) }));
+  try {
+    await client.connect(transport);
+    const result = await client.callTool({ name: tool, arguments: args });
+    record({ event: 'mcp-result', tool, args, result });
+    return result;
+  } finally {
+    await client.close();
+  }
+}
+
+function completeMcpTurn(pending, { accepted, result, error }) {
+  const success = accepted && !error;
+  notify('item/completed', {
+    threadId: pending.threadId,
+    turnId: pending.turnId,
+    item: {
+      type: 'mcpToolCall',
+      id: pending.itemId,
+      server: 'stashbase',
+      tool: pending.tool,
+      arguments: pending.args,
+      status: success ? 'completed' : 'failed',
+      ...(success ? { result } : { error: error || 'MCP tool failed.' }),
+    },
+  });
+  if (success && pending.successMessage) {
+    notify('item/agentMessage/delta', {
+      threadId: pending.threadId,
+      turnId: pending.turnId,
+      itemId: `fake-message-${turnSequence}`,
+      delta: pending.successMessage,
+    });
+  }
+  notify('turn/completed', {
+    threadId: pending.threadId,
+    turn: {
+      id: pending.turnId,
+      items: [],
+      status: success ? 'completed' : 'failed',
+      ...(success ? {} : { error: { message: error || 'MCP tool failed.' } }),
+    },
+  });
+}
+
+function mcpResultText(result) {
+  return Array.isArray(result?.content)
+    ? result.content.filter((item) => item?.type === 'text').map((item) => item.text).join('\n')
+    : '';
 }
 
 function objectValue(value) {

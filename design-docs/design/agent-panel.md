@@ -18,54 +18,36 @@ a transcript-centered file manager.
 
 ## Current Experience
 
-- Chat is expanded from the first window frame. With no document it fills the
-  workspace beside Files; opening a source docks the same mounted session as a
-  side panel. Closing the last document expands an open Chat again.
-- The sidebar New Chat split button is the only creation entry. Its main action
-  uses the remembered Agent; its chevron changes the default without starting
-  a chat. A completely blank chat is reused instead of stacked.
-- Opening the app or a folder creates presentation state only. New Chat opens
-  the selected Agent's readiness gate. A supported system or managed runtime
-  continues normally; a missing runtime waits for the explicit **Install and
-  continue** action before StashBase downloads the official managed runtime in
-  AppData and connects StashBase MCP.
-- Preparation failures identify the stage that needs recovery. Installation
-  failure offers retry and, when useful, the provider's install command; MCP
-  failure offers connection retry and the manual MCP access guide. A failed
-  MCP write never presents an installation command.
-- Every chat is pinned to either Library or one member folder. A blank chat can
-  follow the window default; content, a draft, attachments, or resumed history
-  freezes the scope. Folder switches preserve started chats and running work.
-- History anchors on the sidebar: the active folder's header lists that
-  folder's sessions, and the New Chat row lists ALL sessions across the
-  library — each row labeled with its home folder and resumed in its own
-  scope. Both menus merge supported Agent sessions; a listing failure for
-  one Agent does not hide the other.
-- The empty chat centers the composer and a quiet, scope-appropriate suggestion
-  that only prefills text. With content, the composer returns to the bottom of
-  the transcript.
-- Model, permission mode, and reasoning effort reflect the active runtime's
-  capabilities. Defaults do not rewrite global CLI settings; a populated or
-  resumed conversation cannot silently change model or scope.
-- Streaming responses, stop, retry, queued follow-ups, tool activity,
-  permission requests, attachments, skills, and file artifacts remain
-  inspectable. Completed working traces fold so final answers are easy to scan;
-  actionable permissions and recovery never hide inside the fold.
-- Editing and resending while a response is active stops that response, then
-  starts the edited text as the next turn. It does not leave the new message
-  waiting beneath activity that belongs to the old turn.
-- The current document is never implicit context. Users attach or mention files
-  explicitly. Agent-created files refresh Files but open only when selected.
-- A library-scoped Agent may create a project. Only the attributed calling
-  library chat migrates to that project; folder chats and external callers do
-  not silently rebind.
-
-- Agent response Markdown supports GFM plus locally bundled KaTeX for inline
-  and display math. Formula rendering is presentation-only: Copy Reply and
-  restored history retain the original Markdown/LaTeX source. Raw HTML and
-  remote images remain inert; only workspace-relative links and HTTP(S) links
-  are active. Incomplete or invalid formulas stay visible rather than breaking
-  a streaming response, and wide display math scrolls inside the reply.
+- Chat begins expanded. With no document it is the primary work surface;
+  opening a source docks the same mounted session beside it, and closing the
+  last source expands an open Chat again.
+- New Chat is the deliberate creation entry and reuses a completely blank tab.
+  Opening the app, a folder, a tab, or history never grants runtime-installation
+  consent; a missing runtime waits for **Install and continue**.
+- An installed but signed-out Codex runtime stops at a dedicated sign-in gate.
+  **Sign in with ChatGPT** runs that same discovered executable's official
+  browser flow; completion resumes preparation without another installation.
+- Every conversation is scoped to Library or one member folder. Drafts,
+  attachments, content, and resumed history freeze that scope, while folder
+  switching preserves started work. History remains attributable to its Agent
+  and home scope.
+- Runtime capabilities determine model, permission, and effort controls without
+  rewriting global CLI defaults. Suggestions prefill rather than send.
+- Streaming, tool activity, permissions, attachments, skills, recovery, and
+  file artifacts remain inspectable. Editing and resending an earlier prompt
+  stops conflicting active work before beginning the new turn.
+- Attachment labels preserve user-visible Unicode filenames from selection or
+  drop through the sent transcript and restored history.
+- Source and attachment access follows the
+  [Documents format matrix](documents.md#format-capability-matrix). Built-in
+  image attachment behavior does not imply that every external MCP client can
+  read image bytes, and previewability does not imply content-write access.
+- Document context is explicit. Agent-created files refresh the workspace but
+  open only when selected; project creation rebinds only an attributed eligible
+  library chat.
+- Responses support GFM and local math rendering while preserving original
+  Markdown for history and copy. Raw HTML, remote images, unsafe links, and
+  invalid formulas remain inert or visibly recoverable.
 
 ## Experience Contract
 
@@ -78,16 +60,28 @@ a transcript-centered file manager.
   Each missing runtime waits for its own explicit setup action.
 - A runtime, transport, or turn failure leaves one persistent explanation and
   a truthful, stage-specific recovery path. Retrying preparation resumes from
-  the first incomplete stage. Late output from an abandoned generation cannot
-  enter a newer turn.
+  the first incomplete stage. After an installation failure, **Check again**
+  remains available so an external repair can be discovered without
+  authorizing another download. Authentication is distinct from installation:
+  in-app sign-in uses the selected Codex runtime and never handles its token,
+  while **Check again** discovers a login completed elsewhere. Late output
+  from an abandoned generation cannot enter a newer turn.
 - Permission, deletion, command, network, and broader filesystem decisions
   remain explicit. Tool payloads render in a human-readable form.
+- Agent copy and tool affordances describe the actual source or prepared
+  representation and never advertise a broader format capability than the
+  selected surface provides.
 - Streaming does not steal the reading position of someone inspecting earlier
   content.
 - Agent response Markdown treats raw HTML and remote images as inert; only
   validated workspace links and HTTP(S) links are active.
 - Discovering and invoking a runtime skill never installs, edits, or exposes
   the skill implementation through the composer.
+- Turning a Library conversation into a project follows an explicit user
+  decision. The same Chat may rebind to the newly registered ordinary folder;
+  later tool and file work uses that project as its working folder while native
+  session identity and transcript remain continuous. The transcript is never
+  copied into source files without a separate explicit write.
 
 ## Cross-area Seams
 
@@ -120,10 +114,17 @@ a transcript-centered file manager.
 
 ## Related Journeys and Contracts
 
-Journeys: [J06](../user-journeys.md#j06-start-and-continue-an-agent-chat) and
-[J07](../user-journeys.md#j07-converge-chat-into-a-document).
+Journeys: [J01](../user-journeys.md#j01-complete-onboarding-and-reach-first-value),
+[J06](../user-journeys.md#j06-start-and-continue-an-agent-chat), and
+[J07](../user-journeys.md#j07-converge-chat-into-a-document). The complete
+source-to-Agent-to-source route is the
+[J10](../user-journeys.md#j10-turn-a-local-project-into-durable-agent-assisted-work)
+core loop. A Library Chat becomes a new durable project through
+[J11](../user-journeys.md#j11-turn-a-conversation-into-a-project).
 
 Contracts: [Agent Panel](../../code-review/agent-panel.md),
 [Agent Runtime](../../code-review/agent-runtime.md),
 [Settings and Config](../../code-review/settings-config.md), and
-[MCP Access](../../code-review/mcp-access.md).
+[MCP Access](../../code-review/mcp-access.md). Agent writes additionally cross
+[File Transactions](../../code-review/file-transactions.md); use the canonical
+route for [J07](../../code-review/journey-coverage.md#traceability-map).

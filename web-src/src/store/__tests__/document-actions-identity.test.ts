@@ -12,6 +12,7 @@ const loadFiles = async (): Promise<State['files']> => [];
 const refreshIndexState = async () => undefined;
 const toast = () => 'toast';
 const primeFind = () => undefined;
+const askConfirm = async () => true;
 const dispatch = (_action: Action) => undefined;
 
 function DocumentActionsHarness({
@@ -27,7 +28,7 @@ function DocumentActionsHarness({
   const saveInFlight = useRef<Promise<boolean> | null>(null);
   const actions = useDocumentActions(
     { state, editor, saveTimer, saveInFlight },
-    { loadFiles, refreshIndexState, toast, primeFind },
+    { loadFiles, refreshIndexState, toast, primeFind, askConfirm },
     dispatch,
   );
   onRender(actions);

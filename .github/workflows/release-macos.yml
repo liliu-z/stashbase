@@ -1,8 +1,12 @@
 name: Release macOS
 
 on:
-  release:
-    types: [published]
+  workflow_call:
+    inputs:
+      tag:
+        description: Release tag to attach the macOS assets to, for example v0.9.0
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       tag:
@@ -20,15 +24,14 @@ jobs:
       contents: read
     uses: ./.github/workflows/release-ci-gate.yml
     with:
-      tag: ${{ github.event_name == 'workflow_dispatch' && (startsWith(inputs.tag, 'v') && inputs.tag || format('v{0}', inputs.tag)) || github.event.release.tag_name }}
+      tag: ${{ startsWith(inputs.tag, 'v') && inputs.tag || format('v{0}', inputs.tag) }}
 
   macos-dmg:
     needs: release-ci-gate
     runs-on: macos-latest
     env:
-      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && (startsWith(inputs.tag, 'v') && inputs.tag || format('v{0}', inputs.tag)) || github.event.release.tag_name }}
+      RELEASE_TAG: ${{ startsWith(inputs.tag, 'v') && inputs.tag || format('v{0}', inputs.tag) }}
       GITHUB_TOKEN: ${{ github.token }}
-      HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -51,21 +54,34 @@ jobs:
             exit 1
           fi
 
-      - name: Configure Git author
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-      - name: Configure Homebrew tap auth
-        run: |
-          if [ -z "$HOMEBREW_TAP_TOKEN" ]; then
-            echo "::error::HOMEBREW_TAP_TOKEN secret is required to update liliu-z/homebrew-stashbase"
-            exit 1
-          fi
-          echo "HOMEBREW_TAP_GIT_URL=https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/liliu-z/homebrew-stashbase.git" >> "$GITHUB_ENV"
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build, upload, and publish Homebrew cask
-        run: pnpm dist:brew
+      - name: Prepare Apple signing credentials
+        env:
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+        run: |
+          if [ -z "$APPLE_API_KEY_P8" ] || [ -z "$APPLE_API_KEY_ID" ] || [ -z "$APPLE_API_ISSUER" ]; then
+            echo "::error::APPLE_API_KEY_P8, APPLE_API_KEY_ID, and APPLE_API_ISSUER are required"
+            exit 1
+          fi
+          if [ -z "$CSC_LINK" ] || [ -z "$CSC_KEY_PASSWORD" ]; then
+            echo "::error::MAC_CSC_LINK and MAC_CSC_KEY_PASSWORD are required"
+            exit 1
+          fi
+          key_path="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
+          printf '%s' "$APPLE_API_KEY_P8" | /usr/bin/base64 -D > "$key_path"
+          chmod 600 "$key_path"
+          echo "APPLE_API_KEY=$key_path" >> "$GITHUB_ENV"
+
+      - name: Build and upload macOS assets to draft release
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+        run: node scripts/publish-github-release.mjs --require-draft

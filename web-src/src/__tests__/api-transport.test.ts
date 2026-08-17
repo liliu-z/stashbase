@@ -59,9 +59,14 @@ test('2xx payloads that model failure as data resolve instead of throwing', asyn
   assert.equal(payload.error, 'transcription failed');
 });
 
-test('JSON transport errors preserve server message, status, and code', async () => {
+test('JSON transport errors expose only server message, status, and code', async () => {
   const response = new Response(
-    JSON.stringify({ error: 'The file changed on disk.', code: 'STALE_VERSION' }),
+    JSON.stringify({
+      error: 'The file changed on disk.',
+      code: 'STALE_VERSION',
+      currentVersion: 'sha256:newer',
+      unrelated: 'must not become an error property',
+    }),
     { status: 409, headers: { 'content-type': 'application/json' } },
   );
 
@@ -72,6 +77,8 @@ test('JSON transport errors preserve server message, status, and code', async ()
       assert.equal(error.message, 'The file changed on disk.');
       assert.equal(error.status, 409);
       assert.equal(error.code, 'STALE_VERSION');
+      assert.equal('currentVersion' in error, false);
+      assert.equal('unrelated' in error, false);
       return true;
     },
   );

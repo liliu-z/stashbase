@@ -46,7 +46,7 @@ Apple Silicon Macs running macOS 12 or later can install with Homebrew:
 brew install --cask liliu-z/stashbase/stashbase
 ```
 
-Or download the `StashBase-*-mac-arm64.dmg` from [Releases](https://github.com/liliu-z/stashbase/releases), drag the app to **Applications**, and open it there. If macOS says the app is damaged or asks to move it to Trash, use the `Fix.sh` included in that DMG to repair the copy in Applications.
+Or download the `StashBase-*-mac-arm64.dmg` from [Releases](https://github.com/liliu-z/stashbase/releases), drag the app to **Applications**, and open it there. Published macOS artifacts are signed with Apple Developer ID and notarized by Apple.
 
 ### Windows
 
@@ -112,9 +112,9 @@ them. Neither is required to begin browsing local files.
 - Try running the installer as Administrator (right-click → Run as administrator)
 - If antivirus software blocks it, temporarily disable it and try again (it's safe to do so from official releases)
 
-**"App is damaged" error on macOS**
-- This can happen with unsigned builds. The `Fix.sh` script in the DMG resolves this
-- Drag StashBase to Applications, then run the `Fix.sh` from the DMG
+**macOS blocks or rejects the downloaded app**
+- Delete that copy and download the current DMG again from the official Releases page
+- Do not bypass Gatekeeper for an artifact that still reports a signing or malware-verification problem; report the StashBase version and macOS version in the Discord community
 
 **App won't launch after installation**
 - Try restarting your computer
@@ -168,6 +168,11 @@ Some formats need preparation before their contents can be searched. StashBase k
 
 For PDF, DOCX, audio, and video, Agents read the derived text while the original remains the visible source file. Audio and video play directly when supported; otherwise, StashBase creates a compatible local audio preview. Large files dragged into the app stream to disk instead of being held entirely in memory. See [Architecture](design-docs/architecture.md) and [Preparation](design-docs/design/preparation.md) for the product and system contracts.
 
+Preview, Workbench editing, retrieval text, Agent reads, and file writes are
+separate capabilities. See the canonical
+[Format Capability Matrix](design-docs/design/documents.md#format-capability-matrix)
+for the current per-format boundary.
+
 Audio and video transcription is optional. Download a local speech model from
 **Settings → Transcription** when you need it. Small (465 MiB) is the default;
 Tiny (74 MiB) and Base (141 MiB) are lighter choices. Transcription runs on
@@ -206,7 +211,7 @@ While the StashBase app is running, a local MCP server makes the same library av
 
 Common tools:
 
-- `library_info` - return the default folder home, opened folders, optional folder descriptions, and embedder status.
+- `library_info` - return the default folder home, opened folder paths and names, and embedder status. Folder purpose, organization rules, and durable Agent instructions belong in the visible, user-owned `AGENTS.md` instead of separate library metadata.
 - `search_library` - search the library in semantic (default) or keyword mode, optionally filtered by source type. Semantic mode may search the whole library; exact keyword mode works before AI Index is set up and requires a folder or path-prefix scope.
 - `reindex` - reconcile disk changes and make updated files searchable.
 - `create_project` - create and register a new project folder beneath an authorized location.
@@ -277,12 +282,35 @@ Removing a folder from the library clears StashBase's app-owned state for that f
 
 ---
 
-## Design Docs
+## Design and Maintenance
 
-The design docs explain the product intent, system contracts, and contribution
-areas without duplicating the source tree:
+StashBase is also an experiment in human-directed, AI-first software
+development. Humans retain control of product direction, engineering Seams,
+trust decisions, and releases. AI helps explore designs, implement changes,
+maintain documentation, produce evidence, and review diffs.
 
-- [Design docs guide](design-docs/README.md) - contribution map and maintenance rules
+The goal is not autonomous code generation. It is a closed engineering loop in
+which intent, contracts, implementation, and evidence remain traceable:
+
+```text
+intent → design → engineering contract → implementation → evidence
+   ↑                                                     │
+   └──────────────── diff-first review ──────────────────┘
+```
+
+Product acceptance runs forward from a
+[Journey](design-docs/user-journeys.md) through
+[Journey Coverage](code-review/journey-coverage.md) to exact evidence. Diff
+review runs backward through
+[Reverse Traceability Review](code-review/README.md#reverse-traceability-review)
+to an owning engineering contract and either an affected Journey or an
+explicit cross-cutting rationale.
+
+Start with the [Project Maintenance Model](MAINTENANCE.md) for the working
+method, then descend into the product design and engineering contracts:
+
+- [Project maintenance model](MAINTENANCE.md) - human and AI responsibilities and the maintenance loop
+- [Design docs guide](design-docs/README.md) - product design and extension model
 - [Overview](design-docs/overview.md) - product thesis
 - [Principles](design-docs/principles.md) - durable decision rules
 - [Architecture](design-docs/architecture.md) - system boundaries and invariants
@@ -370,6 +398,9 @@ Reasonably stable:
 ## Contributing
 
 Small focused PRs are preferred. Open an issue before larger changes so scope and direction can be discussed first.
+
+For substantial design, implementation, or review work, follow the
+[Project Maintenance Model](MAINTENANCE.md).
 
 Not sure where to start? Pick something from [Where We Need Help](#where-we-need-help), or open [`design-docs/`](design-docs/) in StashBase and ask the Agent — or just ask us.
 

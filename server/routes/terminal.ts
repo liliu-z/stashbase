@@ -12,7 +12,12 @@ import {
   setAgentRuntimeDebugState,
   type ManagedAgentId,
 } from '../agent-runtime-paths.ts';
-import { beginAgentBootstrap, resetAgentBootstrap } from '../agent-runtime-installer.ts';
+import {
+  beginAgentBootstrap,
+  loginAgentBootstrap,
+  recheckAgentBootstrap,
+  resetAgentBootstrap,
+} from '../agent-runtime-installer.ts';
 
 function agentId(value: unknown): ManagedAgentId | null {
   return value === 'claude' || value === 'codex' ? value : null;
@@ -39,6 +44,43 @@ export function mount(app: express.Express): void {
     }
     try {
       beginAgentBootstrap(id);
+      res.status(202).json(agentCatalogResponse());
+    } catch (error) {
+      sendError(res, error);
+    }
+  });
+
+  /** Explicit recheck after the user installs or repairs a CLI outside the
+   * app. This may perform idempotent MCP preparation for a discovered runtime
+   * but never starts a managed download when the CLI is still missing. */
+  app.post('/api/terminal/clis/:id/check', (req, res) => {
+    const id = agentId(req.params.id);
+    if (!id) {
+      res.status(404).json({ error: 'Unsupported Agent runtime.' });
+      return;
+    }
+    try {
+      recheckAgentBootstrap(id);
+      res.json(agentCatalogResponse());
+    } catch (error) {
+      sendError(res, error);
+    }
+  });
+
+  /** Launch the selected Codex executable's provider-owned browser login.
+   * This never installs another CLI or handles provider credentials itself. */
+  app.post('/api/terminal/clis/:id/login', (req, res) => {
+    const id = agentId(req.params.id);
+    if (!id) {
+      res.status(404).json({ error: 'Unsupported Agent runtime.' });
+      return;
+    }
+    if (id !== 'codex') {
+      res.status(400).json({ error: 'In-app login is available only for Codex.' });
+      return;
+    }
+    try {
+      loginAgentBootstrap(id);
       res.status(202).json(agentCatalogResponse());
     } catch (error) {
       sendError(res, error);

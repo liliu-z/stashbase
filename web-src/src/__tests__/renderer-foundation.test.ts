@@ -105,6 +105,7 @@ test('chrome type scale and radius scale are the only visual values', () => {
       const source = read(path.join(dir, file));
       assert.doesNotMatch(source, /text-\[calc\(/, `${dir}/${file} uses an arbitrary scaled font size — use the text-* ramp`);
       assert.doesNotMatch(source, /bg-\[var\(--hover\)\]/, `${dir}/${file} uses bg-[var(--hover)] — use bg-muted`);
+      assert.doesNotMatch(source, /rounded-\[\d+(?:\.\d+)?px\]/, `${dir}/${file} uses a literal radius — use the rounded-* role scale`);
       // Placeholders are one role, not a per-field opacity guess. Four
       // fields had drifted to three different values before this landed.
       assert.doesNotMatch(source, /placeholder:text-(?!placeholder\b)/, `${dir}/${file} styles a placeholder off-role — use placeholder:text-placeholder`);
@@ -146,6 +147,9 @@ test('new foundation paths use Base UI and reduced-motion-aware Motion', () => {
   assert.match(read('web-src/src/components/ui/dialog.tsx'), /@base-ui\/react\/dialog/);
   assert.match(read('web-src/src/components/ui/dialog.tsx'), /bg-veil.*data-open:animate-in/);
   assert.match(read('web-src/src/components/ui/dialog.tsx'), /data-open:zoom-in-95/);
+  const checkbox = read('web-src/src/components/ui/checkbox.tsx');
+  assert.match(checkbox, /@base-ui\/react\/checkbox/);
+  assert.doesNotMatch(checkbox, /\bmt-/);
   assert.match(read('web-src/src/components/ManagedModalShell.tsx'), /\.\/ui\/dialog/);
   assert.match(read('web-src/src/components/ManagedModalShell.tsx'), /<DialogTitle/);
   assert.match(read('web-src/src/components/ManagedModalShell.tsx'), /w-\[min\(420px,90vw\)\]/);

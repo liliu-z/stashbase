@@ -165,6 +165,46 @@ test('Codex publishes its native model catalog before ready and forwards a selec
   session.dispose();
 });
 
+test('Codex project rebind changes the next native turn cwd without replacing the thread', async (t) => {
+  const project = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-codex-rebound-'));
+  t.after(() => fs.rmSync(project, { recursive: true, force: true }));
+  const ws = new FakeWebSocket();
+  const native = catalogProcess(undefined, { turnIds: ['turn-1', 'turn-2'] });
+  const session = new CodexSession(
+    ws as unknown as WebSocket,
+    'rebound-window',
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    'library',
+    undefined,
+    () => native.proc as unknown as ChildProcessWithoutNullStreams,
+  );
+  session.begin();
+  await settle();
+
+  ws.emit('message', JSON.stringify({ t: 'prompt', text: 'create the project' }));
+  await settle();
+  emitCodexTurnCompleted(native.proc, 'turn-1', 'completed');
+  await settle();
+
+  assert.equal(session.rebindToFolder(project), true);
+  ws.emit('message', JSON.stringify({ t: 'prompt', text: 'continue in the project' }));
+  await settle();
+
+  const threads = native.requests.filter((request) => request.method === 'thread/start');
+  const turns = native.requests.filter((request) => request.method === 'turn/start');
+  assert.equal(threads.length, 1);
+  assert.equal(turns.length, 2);
+  assert.equal(turns[0]?.params.threadId, 'thread-1');
+  assert.notEqual(turns[0]?.params.cwd, project);
+  assert.equal(turns[1]?.params.threadId, 'thread-1');
+  assert.equal(turns[1]?.params.cwd, project);
+  session.dispose();
+});
+
 test('Codex recovers unavailable selections to Default and never forwards an override while resuming', async (t) => {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-codex-model-'));
   runWithWindowId('stale-window', () => setCurrentFolder(folder));

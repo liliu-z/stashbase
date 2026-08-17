@@ -6,6 +6,7 @@ import { AgentView } from '../components/AgentView';
 import { MessageList } from '../components/agent/AgentMessages';
 import { AgentComposer } from '../components/agent/AgentComposer';
 import { AGENT_META } from '../agentCatalog';
+import { api } from '../api';
 import { AppContext, type AppActions } from '../store/AppContext';
 import { initialState, type State } from '../store/state';
 
@@ -70,7 +71,7 @@ function buttonNamed(root: ReactTestInstance, label: string): ReactTestInstance 
   return button;
 }
 
-async function mountAgentView(t: TestContext) {
+async function mountAgentView(t: TestContext, state = rendererState()) {
   const previousWebSocket = globalThis.WebSocket;
   const previousWindow = globalThis.window;
   const previousLocation = globalThis.location;
@@ -129,7 +130,7 @@ async function mountAgentView(t: TestContext) {
   await act(async () => {
     renderer = create(React.createElement(
       AppContext.Provider,
-      { value: { state: rendererState(), dispatch: () => {}, actions: actionsStub() } },
+      { value: { state, dispatch: () => {}, actions: actionsStub() } },
       React.createElement(AgentView, { active: true, id: 'tab-1', title: 'Untitled', agent: 'codex' }),
     ));
   });
@@ -151,6 +152,84 @@ async function mountAgentView(t: TestContext) {
 
   return { renderer, first: LifecycleWebSocket.instances[0]! };
 }
+
+test('failed runtime setup keeps Check again available after external recovery', async (t) => {
+  const state = rendererState();
+  state.agents = [{
+    ...state.agents[0]!,
+    installed: false,
+    source: null,
+    state: 'unavailable',
+    bootstrap: {
+      phase: 'failed',
+      failure: {
+        stage: 'installation',
+        code: 'operation-failed',
+        message: 'Download failed.',
+        retryable: true,
+        manualRecovery: 'install-command',
+      },
+    },
+  }];
+
+  let checks = 0;
+  t.mock.method(api, 'prepareAgent', async () => {
+    checks += 1;
+    return { clis: state.agents };
+  });
+  const { renderer } = await mountAgentView(t, state);
+
+  buttonNamed(renderer.root, 'Check again');
+  buttonNamed(renderer.root, 'Retry');
+  const checkAgain = renderer.root.findAll((node) => (
+    node.props.children === 'Check again' && typeof node.props.onPress === 'function'
+  ))[0];
+  assert.ok(checkAgain);
+  await act(async () => { checkAgain.props.onPress(); });
+  assert.equal(checks, 1);
+});
+
+test('Codex authentication recovery starts login with the installed runtime', async (t) => {
+  const state = rendererState();
+  state.agents = [{
+    ...state.agents[0]!,
+    installed: true,
+    source: 'managed',
+    state: 'available',
+    bootstrap: {
+      phase: 'failed',
+      failure: {
+        stage: 'authentication',
+        code: 'authentication-required',
+        message: 'Codex is installed, but it is not signed in.',
+        retryable: true,
+      },
+    },
+  }];
+
+  let logins = 0;
+  t.mock.method(api, 'prepareAgent', async (
+    _agent: 'claude' | 'codex',
+    action: 'check' | 'bootstrap' | 'login',
+  ) => {
+    if (action === 'login') logins += 1;
+    return {
+      clis: [{
+        ...state.agents[0]!,
+        bootstrap: { phase: 'authenticating', message: 'Finish signing in to Codex in your browser…' },
+      }],
+    };
+  });
+  const { renderer } = await mountAgentView(t, state);
+
+  buttonNamed(renderer.root, 'Sign in with ChatGPT');
+  const signIn = renderer.root.findAll((node) => (
+    node.props.children === 'Sign in with ChatGPT' && typeof node.props.onPress === 'function'
+  ))[0];
+  assert.ok(signIn);
+  await act(async () => { signIn.props.onPress(); });
+  assert.equal(logins, 1);
+});
 
 test('mounted AgentView ready → raw close renders recovery and reconnects with transcript + resume', async (t) => {
   const { renderer, first } = await mountAgentView(t);

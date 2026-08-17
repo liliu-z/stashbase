@@ -1,6 +1,6 @@
 {
   "name": "stashbase",
-  "version": "1.3.2",
+  "version": "2.0.0",
   "packageManager": "pnpm@11.5.1",
   "description": "Local-first knowledge base desktop app.",
   "author": {
@@ -50,7 +50,7 @@
     "test:python": "node scripts/test-python.mjs",
     "test:config": "node --import tsx --test server/app-config.test.ts server/embedding-availability.test.ts server/hosted-account.test.ts server/account-route.test.ts",
     "test:renderer": "node --import tsx --test web-src/src/__tests__/*.test.ts web-src/src/milkdown/__tests__/*.test.ts web-src/src/store/__tests__/*.test.ts",
-    "test:electron": "node --test --test-reporter=spec electron/multi-window.test.cjs electron/bug-report-service.test.cjs electron/bug-report-redaction.test.cjs electron/bug-report-collection.test.cjs electron/bug-report-handoff.test.cjs electron/bug-report-review.test.cjs",
+    "test:electron": "node --test --test-reporter=spec electron/multi-window.test.cjs electron/clipboard-watch-policy.test.cjs electron/bug-report-service.test.cjs electron/bug-report-redaction.test.cjs electron/bug-report-collection.test.cjs electron/bug-report-handoff.test.cjs electron/bug-report-review.test.cjs",
     "test:electron:smoke": "node electron/multi-window-smoke-runner.cjs",
     "test:e2e:harness": "node --import tsx --test e2e/support/fixtures.test.ts && node --test e2e/support/ci-summary-reporter.test.cjs && playwright test e2e/harness --project=electron-smoke",
     "test:e2e:check-focus": "node --test scripts/check-e2e-focus.test.mjs && node scripts/check-e2e-focus.mjs e2e",
@@ -63,23 +63,26 @@
     "typecheck:e2e": "tsc --noEmit -p e2e/tsconfig.json",
     "test:renderer-chunks": "node scripts/check-renderer-chunks.mjs",
     "test:docs": "node scripts/check-docs.mjs",
-    "test:conversion-scheduler": "node --import tsx --test server/filesystem-path.test.ts server/folder-relative-path.test.ts server/folder-window.test.ts server/window-context-route.test.ts server/internal-shutdown-route.test.ts server/files.test.ts server/file-formats.test.ts server/file-hash.test.ts server/http.test.ts server/markdown-source-format.test.ts server/keyword-search.test.ts server/index-status.test.ts server/indexer-mfs-path.test.ts server/semantic-workload.test.ts server/session-path.test.ts server/conversion-scheduler.test.ts server/conversion-auxiliary.test.ts server/conversion-status.test.ts server/conversion.test.ts server/extractor-process.test.ts server/audio-transcription.test.ts server/transcription-models.test.ts server/transcription-provider.test.ts server/transcription-runtime.test.ts server/transcription-tools.test.ts server/upload.test.ts",
-    "test:library-files": "node --import tsx --test server/library-file-mutations.test.ts server/library-operations/index.test.ts server/routes/library-files.test.ts server/routes/internal-grants.test.ts",
+    "test:inventory": "node scripts/check-test-inventory.mjs",
+    "test:conversion-scheduler": "node --import tsx --test server/filesystem-path.test.ts server/folder-relative-path.test.ts server/folder-window.test.ts server/window-context-route.test.ts server/internal-shutdown-route.test.ts server/files.test.ts server/file-formats.test.ts server/file-hash.test.ts server/http.test.ts server/markdown-source-format.test.ts server/keyword-search.test.ts server/index-status.test.ts server/indexer-mfs-path.test.ts server/semantic-workload.test.ts server/session-path.test.ts server/conversion-scheduler.test.ts server/conversion-auxiliary.test.ts server/conversion-status.test.ts server/conversion.test.ts server/extractor-process.test.ts server/audio-transcription.test.ts server/transcription-models.test.ts server/transcription-provider.test.ts server/transcription-runtime.test.ts server/transcription-tools.test.ts server/upload.test.ts server/client-error.test.ts server/semantic-indexing-state.test.ts",
+    "test:library-files": "node --import tsx --test server/library-file-mutations.test.ts server/library-operations/index.test.ts server/routes/library-files.test.ts server/routes/attach.test.ts server/routes/internal-grants.test.ts server/__tests__/file-listing.test.ts",
     "test:retrieval": "node --import tsx --test server/retrieval/index.test.ts",
-    "test:agent": "node --import tsx --test server/__tests__/agent.test.ts server/__tests__/agent-contract.test.ts server/__tests__/agent-history-routes.test.ts server/__tests__/agent-projects.test.ts server/__tests__/agent-runtime-installer.test.ts server/__tests__/codex-agent.test.ts",
+    "test:agent": "node --import tsx --test server/__tests__/agent.test.ts server/__tests__/agent-contract.test.ts server/__tests__/agent-history-routes.test.ts server/__tests__/agent-projects.test.ts server/__tests__/agent-runtime-installer.test.ts server/__tests__/codex-agent.test.ts server/__tests__/agent-cli.test.ts server/codex-history.test.ts",
     "test:agent:native": "node --import tsx --test server/__tests__/agent-native-smoke.test.ts",
     "test:mcp": "node --import tsx --test server/__tests__/mcp-http-settings.test.ts server/__tests__/mcp-http-service.test.ts server/__tests__/mcp-http-transport.test.ts server/__tests__/shutdown-cleanup.test.ts",
     "test:release-gate": "node --test scripts/require-green-ci.test.mjs",
     "test:package-inputs": "node --test scripts/package-inputs.test.mjs",
-    "test:macos-recovery-installer": "node --test scripts/macos-recovery-installer.test.mjs",
+    "test:macos-signing": "node --test scripts/macos-release-contract.test.mjs",
+    "test:windows-signing": "node --test scripts/windows-release-contract.test.mjs",
+    "test:updates": "node --test electron/update-manager.test.cjs electron/update-install-strategy.test.cjs electron/update-window-barrier.test.cjs scripts/github-release-api.test.mjs scripts/update-release-contract.test.mjs",
     "typecheck": "tsc --noEmit && tsc --noEmit -p web-src/tsconfig.json && pnpm typecheck:e2e",
-    "check": "pnpm test:docs && pnpm test:python && pnpm test:release-gate && pnpm test:package-inputs && pnpm test:macos-recovery-installer && pnpm test:config && pnpm test:renderer && npm run test:electron && pnpm test:conversion-scheduler && pnpm test:library-files && pnpm test:retrieval && pnpm test:agent && pnpm test:mcp && pnpm typecheck && pnpm build && pnpm test:electron:smoke",
+    "check": "pnpm test:docs && pnpm test:inventory && pnpm test:python && pnpm test:release-gate && pnpm test:package-inputs && pnpm test:macos-signing && pnpm test:windows-signing && pnpm test:updates && pnpm test:config && pnpm test:renderer && npm run test:electron && pnpm test:conversion-scheduler && pnpm test:library-files && pnpm test:retrieval && pnpm test:agent && pnpm test:mcp && pnpm typecheck && pnpm build && pnpm test:electron:smoke",
     "prestart": "pnpm build:web",
     "electron": "electron .",
-    "package:mac": "node scripts/package-unsigned.mjs",
-    "package:mac:dir": "node scripts/package-unsigned.mjs --dir",
-    "package:win": "node scripts/package-unsigned.mjs --win",
-    "package:linux": "node scripts/package-unsigned.mjs --linux",
+    "package:mac": "node scripts/package-desktop.mjs",
+    "package:mac:dir": "node scripts/package-desktop.mjs --dir",
+    "package:win": "node scripts/package-desktop.mjs --win",
+    "package:linux": "node scripts/package-desktop.mjs --linux",
     "dist": "pnpm package:mac",
     "dist:all": "pnpm package:mac && pnpm package:win && pnpm package:linux",
     "dist:brew": "node scripts/publish.mjs",
@@ -103,11 +106,17 @@
     ],
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "icon": "build/icon",
-    "electronDist": "node_modules/electron/dist",
-    "afterPack": "scripts/after-pack-unsigned.cjs",
+    "afterPack": "scripts/after-pack-macos.cjs",
     "directories": {
       "output": "release.nosync"
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "liliu-z",
+        "repo": "stashbase"
+      }
+    ],
     "files": [
       "package.json",
       "electron/**/*",
@@ -154,9 +163,11 @@
     ],
     "mac": {
       "category": "public.app-category.productivity",
-      "identity": null,
-      "hardenedRuntime": false,
+      "hardenedRuntime": true,
       "gatekeeperAssess": false,
+      "notarize": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.inherit.plist",
       "target": [
         "dmg"
       ]
@@ -175,27 +186,6 @@
           "y": 220,
           "type": "link",
           "path": "/Applications"
-        },
-        {
-          "x": 120,
-          "y": 80,
-          "type": "file",
-          "path": "build/dmg-scripts/Fix.sh",
-          "name": "Fix.sh"
-        },
-        {
-          "x": 420,
-          "y": 80,
-          "type": "file",
-          "path": "build/dmg-scripts/Read Me.txt",
-          "name": "Read Me.txt"
-        },
-        {
-          "x": 40,
-          "y": 40,
-          "type": "file",
-          "path": "scripts/sign-macos-app.sh",
-          "name": ".sign-macos-app.sh"
         }
       ]
     },
@@ -250,12 +240,13 @@
     "better-sqlite3": "^12.10.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "electron-updater": "^6.8.9",
     "express": "^4.21.2",
     "jsonc-parser": "^3.3.1",
     "katex": "^0.16.47",
     "mammoth": "^1.12.0",
     "motion": "^12.43.0",
-    "multer": "^1.4.5-lts.1",
+    "multer": "^2.2.0",
     "pdfjs-dist": "^5.7.284",
     "react": "^19.2.6",
     "react-aria-components": "^1.19.0",
@@ -275,7 +266,7 @@
     "@tailwindcss/vite": "^4.3.3",
     "@types/better-sqlite3": "^7.6.13",
     "@types/express": "^4.17.21",
-    "@types/multer": "^1.4.13",
+    "@types/multer": "^2.2.0",
     "@types/node": "^22.10.5",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

@@ -15,7 +15,6 @@ import {
 import {
   api,
   ApiError,
-  versionedAssetUrl,
 } from '../api';
 import {
   getActiveTab,
@@ -167,6 +166,13 @@ export interface AppActions {
 
   scheduleSave: () => void;
   flushSave: () => Promise<boolean>;
+
+  /** Resolve a save-conflict by overwriting the disk file with the editor's current content. */
+  resolveConflictOverwrite: (tabId: string) => Promise<void>;
+  /** Resolve a save-conflict by reloading the disk version, discarding unsaved edits. */
+  resolveConflictReload: (tabId: string) => Promise<void>;
+  /** Resolve a save-conflict by inserting inline conflict markers and returning to the editor. */
+  resolveConflictMerge: (tabId: string) => Promise<void>;
 
   registerEditor: (h: EditorHandle | null) => void;
 
@@ -334,58 +340,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       !!file && file.name === name && file.folder === libraryFolder;
     try {
       if (tab.file.isExternal) {
-        const grantId = tab.file.grantId!;
-        try {
-          if (
-            tab.file.format === 'pdf'
-            || tab.file.format === 'image'
-            || tab.file.format === 'docx'
-            || tab.file.format === 'audio'
-          ) {
-            const url = versionedAssetUrl(tab.file.name, tab.file.version ?? '', undefined, grantId);
-            const response = await fetch(url, { method: 'HEAD' });
-            if (!response.ok) throw new Error('Unavailable');
-            return;
-          }
-          const body = await api.getExternalFileText(grantId);
-          if (stateRef.current.folderPath !== folderPathAtStart) return;
-          const latestActive = getActiveTab(stateRef.current);
-          if (!latestActive?.file?.isExternal || latestActive.file.grantId !== grantId) return;
-
-          if (opts.force) {
-            dispatch({
-              type: 'FILE_OPEN',
-              body: {
-                name: latestActive.file.name,
-                format: latestActive.file.format,
-                content: body.content,
-                version: 'transient',
-                isExternal: true,
-                isReadOnly: true,
-                grantId,
-                absolutePath: latestActive.file.absolutePath,
-              },
-            });
-            dispatch({ type: 'SAVE_STATUS', status: { text: 'Reloaded from disk', cls: 'saved' } });
-            return;
-          }
-          if (body.content === latestActive.file.content) return;
-          dispatch({
-            type: 'FILE_PATCH',
-            patch: { content: body.content },
-          });
-        } catch {
-          if (stateRef.current.folderPath !== folderPathAtStart) return;
-          const latestActive = getActiveTab(stateRef.current);
-          if (latestActive?.file?.isExternal && latestActive.file.grantId === tab.file.grantId) {
-            if (latestActive.file.format === 'md' || latestActive.file.format === 'html' || latestActive.file.format === 'json') {
-              dispatch({
-                type: 'FILE_PATCH',
-                patch: { content: '⚠️ This external file is no longer available.' }
-              });
-            }
-          }
-        }
+        const { refreshExternalFile } = await import('./externalFileRefresh');
+        await refreshExternalFile({
+          file: tab.file,
+          folderPathAtStart,
+          force: opts.force === true,
+          getFolderPath: () => stateRef.current.folderPath,
+          getActiveFile: () => getActiveTab(stateRef.current)?.file ?? null,
+          dispatch,
+        });
         return;
       }
       if (
@@ -489,6 +452,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     newNote: workspace.newNote, newFolder: workspace.newFolder, deleteFile: workspace.deleteFile, deleteFolder: workspace.deleteFolder,
     renameFile: workspace.renameFile, renameFolder: workspace.renameFolder, moveFile: workspace.moveFile, upload: workspace.upload,
     scheduleSave: workspace.scheduleSave, flushSave: workspace.flushSave,
+    resolveConflictOverwrite: workspace.resolveConflictOverwrite,
+    resolveConflictReload: workspace.resolveConflictReload,
+    resolveConflictMerge: workspace.resolveConflictMerge,
     registerEditor: workspace.registerEditor,
     registerFindController, openFind, closeFind, setFindQuery,
     toggleFindCaseSensitive, toggleFindWholeWord, findNext, findPrev,

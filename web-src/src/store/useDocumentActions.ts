@@ -5,12 +5,13 @@ import { electronBridge } from '../electronBridge';
 import { folderRefsEqual } from '../folderPath';
 import { basename } from '../lib/paths';
 import type { EditorHandle } from './actionTypes';
+import { buildConflictMarkerDraft } from './conflictDiff';
 import {
   isFolderFileTab,
   keywordFindCaseSensitive,
   waitForNextFrame,
 } from './appContextHelpers';
-import { getActiveTab, type Action, type PendingHighlight, type State } from './state';
+import { getActiveTab, type Action, type PendingHighlight, type State, type TabConflict, type ModalRequest } from './state';
 import type { ToastOptions } from './useFeedbackActions';
 
 const AUTOSAVE_DEBOUNCE_MS = 1200;
@@ -32,9 +33,21 @@ interface DocumentActionDependencies {
   loadFiles: (expectedFolderPath?: string) => Promise<State['files']>;
   refreshIndexState: (folderPath?: string) => Promise<void>;
   toast: Toast;
+  askConfirm: (message: string, opts?: Pick<ModalRequest, 'title' | 'confirmLabel' | 'destructive'>) => Promise<boolean>;
   primeFind: (query: string, opts: { wholeWord: boolean; caseSensitive: boolean }) => void;
   scheduleAfter?: (callback: () => void, delayMs: number) => ReturnType<typeof setTimeout>;
   cancelScheduled?: (timer: ReturnType<typeof setTimeout>) => void;
+}
+
+interface ConflictSettlement {
+  tabId: string;
+  fileName: string;
+  durableContent: string;
+  durableVersion: string;
+  supersededVersions: Array<string | undefined>;
+  nextContent: string;
+  dirty: boolean;
+  status: State['tabs'][number]['saveStatus'];
 }
 
 function isDocxName(name: string): boolean {
@@ -56,16 +69,23 @@ export function useDocumentActions(
   dispatch: Dispatch,
 ) {
   const { editor, saveInFlight, saveTimer, state } = refs;
-  /** The last save the server accepted. `state` is a render-time mirror, so
-   *  a flush that starts between a previous run's dispatches and the React
-   *  commit still reads the pre-save file; this ref carries the accepted
-   *  baseline across that gap (see flushSave). `superseded` holds every
-   *  baseVersion this uncommitted save chain has replaced, so a reader
-   *  lagging more than one save still recognizes its version as stale. */
-  const lastAcceptedSave = useRef<{
+  /** The latest durable disk baseline. `state` is a render-time mirror, so a
+   *  flush can start before the reducer commits a save acknowledgement or a
+   *  conflict-resolution snapshot. This ref carries that baseline across the
+   *  render gap. `superseded` holds every older baseVersion in the chain. */
+  const latestDurableBaseline = useRef<{
     name: string; content: string; version?: string; superseded: Set<string | undefined>;
   } | null>(null);
-  const { loadFiles, refreshIndexState, toast, primeFind } = dependencies;
+  // The state flag disables the UI after React commits; this ref closes the
+  // earlier same-tick window so two resolution callbacks cannot both mutate
+  // one conflict.
+  const conflictResolutionsInFlight = useRef(new Set<string>());
+  // A renderer dirty dispatch may commit one render after the editor change.
+  // Track edit intent synchronously per tab so the live buffer can remain save
+  // authority without treating an editor's mount-time normalization as a user
+  // edit.
+  const pendingEditorChangeTabs = useRef(new Set<string>());
+  const { loadFiles, refreshIndexState, toast, primeFind, askConfirm } = dependencies;
   const scheduleAfter = dependencies.scheduleAfter ?? scheduleWithTimeout;
   const cancelScheduled = dependencies.cancelScheduled ?? cancelTimeout;
 
@@ -83,31 +103,41 @@ export function useDocumentActions(
 
     const run = (async () => {
       const tabAtStart = getActiveTab(state.current);
-      const currentFile = tabAtStart?.file ?? null;
-      const tabId = tabAtStart?.id ?? null;
+      if (!tabAtStart?.file) return true;
+      const currentFile = tabAtStart.file;
+      const tabId = tabAtStart.id;
       const folderPathAtSave = state.current.folderPath;
-      const handle = editor.current;
-      if (!currentFile || !handle) return true;
-      // Out-of-folder or external tabs are read-only; a PUT would write a same-named
+      // Out-of-folder tabs are read-only; a PUT would write a same-named
       // file into the ACTIVE folder.
       if (currentFile.folder || currentFile.isExternal || currentFile.isReadOnly) return true;
-      if (!tabAtStart?.dirty) return true;
+      // The conflict surface intentionally replaces the editor. Treat that as
+      // an unresolved save barrier, not as evidence that there is nothing to
+      // save; native close/reload and renderer navigation must remain blocked.
+      if (tabAtStart.conflict) return false;
+      const handle = editor.current;
+      if (!handle) return tabAtStart.dirty !== true;
+      if (!pendingEditorChangeTabs.current.has(tabId) && tabAtStart.dirty !== true) {
+        return true;
+      }
+      // The editor callback can update its live value one render before the
+      // reducer's dirty flag reaches state.current. Context release may land
+      // in that gap, so the UI flag is presentation, not save authority.
       const content = handle.getValue();
-      // If the state mirror still shows the version the last accepted save
-      // replaced, its FILE_PATCH has not committed yet: compare and base the
-      // PUT on the accepted save instead, or this run would re-send with a
-      // stale baseVersion and trip the 409 force-overwrite path.
-      const accepted = lastAcceptedSave.current;
-      const staleAfterAccepted = accepted != null
-        && accepted.name === currentFile.name
-        && accepted.superseded.has(currentFile.version);
-      const baselineContent = staleAfterAccepted ? accepted.content : currentFile.content;
+      // If the state mirror still shows a version the durable baseline
+      // replaced, its reducer patch has not committed yet: compare and base
+      // the PUT on the ref instead, or this run would use a stale version.
+      const durable = latestDurableBaseline.current;
+      const stateLagsDurable = durable != null
+        && durable.name === currentFile.name
+        && durable.superseded.has(currentFile.version);
+      const baselineContent = stateLagsDurable ? durable.content : currentFile.content;
       if (content === baselineContent) {
+        pendingEditorChangeTabs.current.delete(tabId);
         dispatch({ type: 'DOCUMENT_DIRTY', dirty: false });
         dispatch({ type: 'SAVE_STATUS', status: { text: 'Saved', cls: 'saved' } });
         return true;
       }
-      const baseVersion = staleAfterAccepted ? accepted.version : currentFile.version;
+      const baseVersion = stateLagsDurable ? durable.version : currentFile.version;
       dispatch({ type: 'SAVE_STATUS', status: { text: 'Saving…', cls: '' } });
       const saveContent = async (base?: string) => {
         const result = await api.putFile(currentFile.name, content, base);
@@ -120,16 +150,39 @@ export function useDocumentActions(
           savedResult = await saveContent(baseVersion);
         } catch (err: unknown) {
           if (!(err instanceof ApiError && err.status === 409)) throw err;
+          let diskContent: string;
+          let diskVersion: string;
+          try {
+            const body = await api.getFile(currentFile.name);
+            if (!body.version) throw new Error('conflicted file read did not include a version');
+            diskContent = body.content;
+            diskVersion = body.version;
+          } catch (fetchErr: unknown) {
+            console.error('Failed to fetch conflicted file content from disk:', fetchErr);
+            throw err;
+          }
           const latestTab = getActiveTab(state.current);
           const sameTab = latestTab?.id === tabId && latestTab.file?.name === currentFile.name;
-          const liveValue = editor.current?.getValue();
-          if (!sameTab || liveValue !== content) return false;
-          savedResult = await saveContent(undefined);
-          toast('Saved over a newer disk copy from sync.', { level: 'info' });
+          if (!sameTab) return false;
+          // The request may have been in flight while the user kept typing.
+          // Capture the live buffer immediately before the conflict surface
+          // replaces and unmounts the editor.
+          const latestEditorContent = editor.current?.getValue() ?? content;
+          dispatch({
+            type: 'SET_CONFLICT',
+            id: tabId,
+            conflict: {
+              diskContent,
+              diskVersion,
+              editorContent: latestEditorContent,
+            },
+          });
+          dispatch({ type: 'SAVE_STATUS', status: { text: 'Conflict detected', cls: 'error' } });
+          return false;
         }
-        const superseded = staleAfterAccepted && accepted ? accepted.superseded : new Set<string | undefined>();
+        const superseded = stateLagsDurable && durable ? durable.superseded : new Set<string | undefined>();
         superseded.add(baseVersion);
-        lastAcceptedSave.current = {
+        latestDurableBaseline.current = {
           name: currentFile.name,
           content,
           version: savedResult.version,
@@ -146,9 +199,11 @@ export function useDocumentActions(
         // acknowledgement this value already equals the live editor.
         dispatch({ type: 'FILE_PATCH', patch: { content, version: savedResult.version } });
         if (liveValue === content) {
+          pendingEditorChangeTabs.current.delete(tabId);
           dispatch({ type: 'DOCUMENT_DIRTY', dirty: false });
           dispatch({ type: 'SAVE_STATUS', status: { text: 'Saved', cls: 'saved' } });
         } else {
+          pendingEditorChangeTabs.current.add(tabId);
           dispatch({ type: 'SAVE_STATUS', status: { text: 'Unsaved', cls: '' } });
           if (!saveTimer.current) {
             saveTimer.current = scheduleAfter(() => { void flushSave(); }, AUTOSAVE_DEBOUNCE_MS);
@@ -177,11 +232,36 @@ export function useDocumentActions(
   }, [cancelScheduled, dispatch, editor, loadFiles, saveInFlight, saveTimer, scheduleAfter, state, toast]);
 
   const scheduleSave = useCallback(() => {
+    const tabId = state.current.activeTabId;
+    if (tabId) pendingEditorChangeTabs.current.add(tabId);
     dispatch({ type: 'DOCUMENT_DIRTY', dirty: true });
     dispatch({ type: 'SAVE_STATUS', status: { text: 'Unsaved', cls: '' } });
     if (saveTimer.current) cancelScheduled(saveTimer.current);
     saveTimer.current = scheduleAfter(() => { void flushSave(); }, AUTOSAVE_DEBOUNCE_MS);
-  }, [cancelScheduled, dispatch, flushSave, saveTimer, scheduleAfter]);
+  }, [cancelScheduled, dispatch, flushSave, saveTimer, scheduleAfter, state]);
+
+  const claimConflictResolution = useCallback((tabId: string) => {
+    const tab = state.current.tabs.find((candidate) => candidate.id === tabId);
+    if (
+      !tab?.conflict
+      || !tab.file
+      || tab.conflict.resolving
+      || conflictResolutionsInFlight.current.has(tabId)
+    ) {
+      return null;
+    }
+    conflictResolutionsInFlight.current.add(tabId);
+    dispatch({ type: 'SET_CONFLICT_RESOLVING', id: tabId, resolving: true });
+    return tab;
+  }, [dispatch, state]);
+
+  const releaseConflictResolution = useCallback((tabId: string) => {
+    conflictResolutionsInFlight.current.delete(tabId);
+    // Successful settlement clears the conflict first, making this a no-op.
+    // Failure or a cancelled close keeps the comparison visible and
+    // re-enables every choice.
+    dispatch({ type: 'SET_CONFLICT_RESOLVING', id: tabId, resolving: false });
+  }, [dispatch]);
 
   const loadFile = useCallback(async (
     name: string,
@@ -196,7 +276,7 @@ export function useDocumentActions(
   ) => {
     if (opts.expectedFolder && state.current.folderPath !== opts.expectedFolder) return;
     const currentFile = getActiveTab(state.current)?.file ?? null;
-    if (editor.current && currentFile && currentFile.name !== name && !opts.newTab) {
+    if (currentFile && currentFile.name !== name && !opts.newTab) {
       if (!(await flushSave())) return;
     }
     if (opts.expectedFolder && state.current.folderPath !== opts.expectedFolder) return;
@@ -288,7 +368,7 @@ export function useDocumentActions(
   // one click, one lasting tab.
   const selectFile = useCallback(async (name: string) => {
     const expectedFolder = state.current.folderPath;
-    if (editor.current && !(await flushSave())) return;
+    if (!(await flushSave())) return;
     if (state.current.folderPath !== expectedFolder) return;
     const currentState = state.current;
     const existing = currentState.tabs.find((tab) => isFolderFileTab(tab, name));
@@ -335,7 +415,7 @@ export function useDocumentActions(
   const openInNewTab = useCallback(async (name: string, expectedFolder?: string) => {
     const targetFolder = expectedFolder ?? state.current.folderPath;
     if (targetFolder && state.current.folderPath !== targetFolder) return;
-    if (editor.current && !(await flushSave())) return;
+    if (!(await flushSave())) return;
     if (targetFolder && state.current.folderPath !== targetFolder) return;
     const currentState = state.current;
     const existing = currentState.tabs.find((tab) => isFolderFileTab(tab, name));
@@ -347,20 +427,41 @@ export function useDocumentActions(
   }, [dispatch, editor, flushSave, loadFile, state]);
 
   const newTab = useCallback(async () => {
-    if (editor.current && !(await flushSave())) return;
+    if (!(await flushSave())) return;
     dispatch({ type: 'NEW_TAB' });
   }, [dispatch, editor, flushSave]);
 
   const closeTab = useCallback(async (id: string) => {
     const currentState = state.current;
     const tab = currentState.tabs.find((t) => t.id === id);
-    if (currentState.activeTabId === id && editor.current && !(await flushSave())) return;
+    if (tab?.conflict) {
+      const ownedTab = claimConflictResolution(id);
+      if (!ownedTab) return;
+      try {
+        const confirmed = await askConfirm(
+          `"${ownedTab.file?.name}" has unresolved conflicts. Closing this tab will discard your changes.`,
+          {
+            title: 'Discard Conflicted Changes?',
+            confirmLabel: 'Close and Discard',
+            destructive: true,
+          }
+        );
+        if (!confirmed) return;
+        pendingEditorChangeTabs.current.delete(id);
+        dispatch({ type: 'RESOLVE_CONFLICT_DISCARD', id });
+        dispatch({ type: 'CLOSE_TAB', id });
+      } finally {
+        releaseConflictResolution(id);
+      }
+      return;
+    }
+    if (currentState.activeTabId === id && !(await flushSave())) return;
     dispatch({ type: 'CLOSE_TAB', id });
     if (tab?.file?.isExternal && tab.file.grantId) {
       const bridge = electronBridge();
       void bridge?.revokePreviewGrant?.(tab.file.grantId);
     }
-  }, [dispatch, editor, flushSave, state]);
+  }, [askConfirm, claimConflictResolution, dispatch, flushSave, releaseConflictResolution, state]);
 
   const closeActiveTab = useCallback(async () => {
     const id = state.current.activeTabId;
@@ -370,7 +471,7 @@ export function useDocumentActions(
   const activateTab = useCallback(async (id: string) => {
     const currentState = state.current;
     if (currentState.activeTabId === id) return;
-    if (editor.current && !(await flushSave())) return;
+    if (!(await flushSave())) return;
     dispatch({ type: 'ACTIVATE_TAB', id });
   }, [dispatch, editor, flushSave, state]);
 
@@ -381,7 +482,7 @@ export function useDocumentActions(
       if (anchor) dispatch({ type: 'PENDING_SCROLL', anchor });
       return;
     }
-    if (editor.current && !(await flushSave())) return;
+    if (!(await flushSave())) return;
     if (state.current.folderPath !== expectedFolder) return;
     const existing = state.current.tabs.find((tab) => isFolderFileTab(tab, name));
     if (existing) {
@@ -407,7 +508,7 @@ export function useDocumentActions(
       else await selectFile(name);
       return;
     }
-    if (editor.current && !(await flushSave())) return;
+    if (!(await flushSave())) return;
     const isTarget = () => {
       const file = getActiveTab(state.current)?.file;
       return file?.name === name && file.folder != null && folderRefsEqual(file.folder, folder);
@@ -465,88 +566,20 @@ export function useDocumentActions(
   }, [editor]);
 
   const openExternalFilePath = useCallback(async (filePath: string, opts?: { suppressToast?: boolean }) => {
-    let grantIdToRevokeOnFailure: string | null = null;
-    try {
-      const bridge = electronBridge();
-      if (!bridge?.registerPreviewGrant) throw new Error('Electron bridge not available');
-      
-      const result = await bridge.registerPreviewGrant(filePath);
-      if (result.isInternal) {
-        await selectFile(result.relPath);
-        return { ok: true as const };
-      } else {
-        grantIdToRevokeOnFailure = result.grantId;
-        const existing = state.current.tabs.find(
-          (t) => t.file?.isExternal && t.file.absolutePath === result.absolutePath
-        );
-        if (existing) {
-          if (state.current.activeTabId !== existing.id) {
-            dispatch({ type: 'ACTIVATE_TAB', id: existing.id });
-          }
-          void bridge.revokePreviewGrant?.(result.grantId);
-          return { ok: true as const };
-        }
-
-        const body = {
-          name: result.name,
-          format: result.format,
-          content: '',
-          version: 'transient',
-          isExternal: true,
-          isReadOnly: true,
-          grantId: result.grantId,
-          absolutePath: result.absolutePath,
-        };
-
-        if (result.format === 'md' || result.format === 'html' || result.format === 'json') {
-          const contentResult = await api.getExternalFileText(result.grantId);
-          body.content = contentResult.content;
-        }
-
-        dispatch({
-          type: 'FILE_OPEN',
-          body,
-          newTab: true,
-        });
-        return { ok: true as const };
-      }
-    } catch (err: unknown) {
-      if (grantIdToRevokeOnFailure) {
-        const bridge = electronBridge();
-        void bridge?.revokePreviewGrant?.(grantIdToRevokeOnFailure);
-      }
-      const msg = err instanceof Error ? err.message : String(err);
-      if (!opts?.suppressToast) {
-        toast(`Could not open external file: ${msg}`, { level: 'error' });
-      }
-      return { ok: false as const, error: msg };
-    }
+    const { openExternalFilePath: openPath } = await import('./externalFileOpen');
+    return openPath({
+      filePath,
+      suppressToast: opts?.suppressToast === true,
+      selectFile,
+      getState: () => state.current,
+      dispatch,
+      toast,
+    });
   }, [dispatch, selectFile, state, toast]);
 
   const openExternalFiles = useCallback(async (files: File[]) => {
-    const bridge = electronBridge();
-    let failedCount = 0;
-    let lastError = '';
-
-    for (const file of files) {
-      const filePath = bridge?.getPathForFile?.(file);
-      if (!filePath) {
-        failedCount++;
-        lastError = 'Could not determine file path';
-        continue;
-      }
-      const res = await openExternalFilePath(filePath, { suppressToast: true });
-      if (!res.ok) {
-        failedCount++;
-        lastError = res.error;
-      }
-    }
-
-    if (failedCount === 1) {
-      toast(`Could not open external file: ${lastError}`, { level: 'error' });
-    } else if (failedCount > 1) {
-      toast(`${failedCount} unsupported files could not be opened`, { level: 'error' });
-    }
+    const { openExternalFiles: openFiles } = await import('./externalFileOpen');
+    await openFiles({ files, openPath: openExternalFilePath, toast });
   }, [openExternalFilePath, toast]);
 
   const updateTabPdfPage = useCallback((tabId: string, page: number) => {
@@ -556,6 +589,116 @@ export function useDocumentActions(
   const setUnsupportedModalOpen = useCallback((open: boolean) => {
     dispatch({ type: 'UNSUPPORTED_MODAL', open });
   }, [dispatch]);
+
+  const settleConflict = useCallback((settlement: ConflictSettlement) => {
+    const activeTab = getActiveTab(state.current);
+    if (
+      activeTab?.id !== settlement.tabId
+      || activeTab.file?.name !== settlement.fileName
+      || !activeTab.conflict
+    ) {
+      return false;
+    }
+    latestDurableBaseline.current = {
+      name: settlement.fileName,
+      content: settlement.durableContent,
+      version: settlement.durableVersion,
+      superseded: new Set(settlement.supersededVersions),
+    };
+    if (settlement.dirty) pendingEditorChangeTabs.current.add(settlement.tabId);
+    else pendingEditorChangeTabs.current.delete(settlement.tabId);
+    dispatch({
+      type: 'FILE_PATCH',
+      patch: { content: settlement.nextContent, version: settlement.durableVersion },
+    });
+    dispatch({ type: 'SET_CONFLICT', id: settlement.tabId, conflict: null });
+    dispatch({ type: 'DOCUMENT_DIRTY', dirty: settlement.dirty });
+    dispatch({ type: 'SAVE_STATUS', status: settlement.status });
+    return true;
+  }, [dispatch, state]);
+
+  const resolveConflictOverwrite = useCallback(async (tabId: string) => {
+    const tab = claimConflictResolution(tabId);
+    if (!tab?.conflict || !tab.file) return;
+    const folderPathAtStart = state.current.folderPath;
+    const { editorContent } = tab.conflict;
+    const fileName = tab.file.name;
+    dispatch({ type: 'SAVE_STATUS', status: { text: 'Saving…', cls: '' } });
+    try {
+      const savedResult = await api.putFile(fileName, editorContent, undefined);
+      if (savedResult.indexWarning) toast(savedResult.indexWarning, { level: 'warning' });
+
+      if (!savedResult.version) throw new Error('save response did not include a version');
+      if (!settleConflict({
+        tabId,
+        fileName,
+        durableContent: editorContent,
+        durableVersion: savedResult.version,
+        supersededVersions: [tab.file.version],
+        nextContent: editorContent,
+        dirty: false,
+        status: { text: 'Saved', cls: 'saved' },
+      })) return;
+      void loadFiles(folderPathAtStart);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      const activeTab = getActiveTab(state.current);
+      if (activeTab?.id === tabId && activeTab.file?.name === fileName && activeTab.conflict) {
+        dispatch({ type: 'SAVE_STATUS', status: { text: 'Save failed: ' + message, cls: 'error' } });
+      }
+      toast('Failed to overwrite: ' + message, { level: 'error' });
+    } finally {
+      releaseConflictResolution(tabId);
+    }
+  }, [claimConflictResolution, dispatch, loadFiles, releaseConflictResolution, settleConflict, state, toast]);
+
+  const resolveConflictReload = useCallback(async (tabId: string) => {
+    const tab = claimConflictResolution(tabId);
+    if (!tab?.conflict || !tab.file) return;
+    const folderPathAtStart = state.current.folderPath;
+    const { diskContent, diskVersion } = tab.conflict;
+    try {
+      if (!settleConflict({
+        tabId,
+        fileName: tab.file.name,
+        durableContent: diskContent,
+        durableVersion: diskVersion,
+        supersededVersions: [tab.file.version],
+        nextContent: diskContent,
+        dirty: false,
+        status: { text: '', cls: '' },
+      })) return;
+      void loadFiles(folderPathAtStart);
+    } finally {
+      releaseConflictResolution(tabId);
+    }
+  }, [claimConflictResolution, loadFiles, releaseConflictResolution, settleConflict, state]);
+
+  const resolveConflictMerge = useCallback(async (tabId: string) => {
+    const tab = claimConflictResolution(tabId);
+    if (!tab?.conflict || !tab.file) return;
+    const { diskContent, editorContent, diskVersion } = tab.conflict;
+
+    const mergedContent = buildConflictMarkerDraft(editorContent, diskContent);
+
+    // The merge is an editor draft based on the disk snapshot, not a durable
+    // save. Preserve the disk content/version as the comparison baseline so
+    // the remounted editor must PUT the merged draft before any transition.
+    try {
+      settleConflict({
+        tabId,
+        fileName: tab.file.name,
+        durableContent: diskContent,
+        durableVersion: diskVersion,
+        supersededVersions: [tab.file.version, diskVersion],
+        nextContent: mergedContent,
+        dirty: true,
+        status: { text: 'Merged', cls: '' },
+      });
+    } finally {
+      releaseConflictResolution(tabId);
+    }
+  }, [claimConflictResolution, releaseConflictResolution, settleConflict]);
 
   // One stable actions object: the workspace memo depends on this object,
   // not on individually listed members, so a new action added here is
@@ -580,6 +723,9 @@ export function useDocumentActions(
     setUnsupportedModalOpen,
     toggleEditMode,
     updateTabPdfPage,
+    resolveConflictOverwrite,
+    resolveConflictReload,
+    resolveConflictMerge,
   }), [
     activateTab,
     closeActiveTab,
@@ -598,5 +744,8 @@ export function useDocumentActions(
     setUnsupportedModalOpen,
     toggleEditMode,
     updateTabPdfPage,
+    resolveConflictOverwrite,
+    resolveConflictReload,
+    resolveConflictMerge,
   ]);
 }

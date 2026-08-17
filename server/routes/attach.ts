@@ -19,6 +19,10 @@ const log = logger('routes/attach');
 
 const upload = multer({
   storage: multer.memoryStorage(),
+  // Browsers encode multipart filename parameters as UTF-8. Multer otherwise
+  // inherits Busboy's legacy Latin-1 default for parameters without an
+  // explicit charset, which corrupts CJK and other non-ASCII basenames.
+  defParamCharset: 'utf8',
   limits: { fileSize: 64 * 1024 * 1024, files: 50 },
 });
 

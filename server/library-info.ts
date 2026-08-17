@@ -7,7 +7,8 @@
  * source spelling (the path exposed through MCP) plus a short label. Everything else
  * (reading/writing notes, listing files) the agent does with the StashBase
  * file tools against those absolute paths; semantic facts come from
- * `search_library`.
+ * `search_library`. Durable folder purpose and working instructions belong in
+ * the visible, user-owned `AGENTS.md`, not separate library metadata.
  */
 import path from 'node:path';
 import { getFolderHome, getRecentFolders } from './folder.ts';
@@ -26,9 +27,6 @@ export interface LibraryInfo {
     path: string;
     name: string;
     provider: EmbedderProvider;
-    description?: string;
-    descriptionSource?: 'user' | 'ai';
-    descriptionUpdatedAt?: string;
   }>;
 }
 
@@ -43,9 +41,6 @@ export function getLibraryInfo(): LibraryInfo {
       path: filesystemPath.absolute(folder.path),
       name: path.basename(folder.path),
       provider,
-      ...(folder.description ? { description: folder.description } : {}),
-      ...(folder.descriptionSource ? { descriptionSource: folder.descriptionSource } : {}),
-      ...(folder.descriptionUpdatedAt ? { descriptionUpdatedAt: folder.descriptionUpdatedAt } : {}),
     })),
   };
 }

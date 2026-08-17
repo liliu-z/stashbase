@@ -5,8 +5,47 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import {
+  createCapturePreferencesStore,
+  createUpdatePreferencesStore,
+  normalizeCapturePreferences,
+  normalizeUpdatePreferences,
+  type AppConfigFile,
+} from './app-config.ts';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+test('clipboard image capture is default-off and persists only an explicit opt-in', () => {
+  let config: AppConfigFile = { appearance: { theme: 'dark' } };
+  const store = createCapturePreferencesStore({
+    read: () => structuredClone(config),
+    write: (next) => { config = structuredClone(next); },
+  });
+
+  assert.deepEqual(store.get(), { clipboardImageImport: false });
+  assert.deepEqual(store.set({ clipboardImageImport: true }), { clipboardImageImport: true });
+  assert.equal(config.appearance?.theme, 'dark');
+  assert.deepEqual(store.get(), { clipboardImageImport: true });
+  assert.deepEqual(normalizeCapturePreferences({ clipboardImageImport: 'yes' }), {
+    clipboardImageImport: false,
+  });
+});
+
+test('desktop update checks are default-on and preserve unrelated config', () => {
+  let config: AppConfigFile = { appearance: { theme: 'dark' } };
+  const store = createUpdatePreferencesStore({
+    read: () => structuredClone(config),
+    write: (next) => { config = structuredClone(next); },
+  });
+
+  assert.deepEqual(store.get(), { autoCheck: true });
+  assert.deepEqual(store.set({ autoCheck: false }), { autoCheck: false });
+  assert.equal(config.appearance?.theme, 'dark');
+  assert.deepEqual(store.get(), { autoCheck: false });
+  assert.deepEqual(normalizeUpdatePreferences({ autoCheck: 'yes' }), {
+    autoCheck: true,
+  });
+});
 
 function runConfigWrite(home: string) {
   return spawnSync(
@@ -65,6 +104,48 @@ function runConfigMutation(home: string, statement: string) {
     },
   );
 }
+
+test('retired folder metadata does not escape library APIs or survive a membership write', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-folder-metadata-test-'));
+  const configDir = path.join(home, '.stashbase');
+  const configPath = path.join(configDir, 'config.json');
+  const member = path.join(home, 'member');
+  const openedAt = '2026-08-17T00:00:00.000Z';
+  fs.mkdirSync(configDir);
+  fs.mkdirSync(member);
+  fs.writeFileSync(configPath, JSON.stringify({
+    recentFolders: [{
+      path: member,
+      openedAt,
+      favorite: false,
+      description: 'retired summary',
+      descriptionSource: 'ai',
+      descriptionUpdatedAt: openedAt,
+    }],
+  }));
+  try {
+    const result = runConfigMutation(home, `
+      const assert = (await import('node:assert/strict')).default;
+      const fs = (await import('node:fs')).default;
+      const folder = await import('./server/folder.ts');
+      const library = await import('./server/library-info.ts');
+      assert.deepEqual(folder.getRecentFolders(), [{
+        path: ${JSON.stringify(member)},
+        openedAt: ${JSON.stringify(openedAt)},
+      }]);
+      assert.deepEqual(Object.keys(library.getLibraryInfo().folders[0]).sort(), ['name', 'path', 'provider']);
+      assert.equal(folder.setRecentFavorite(${JSON.stringify(member)}, true), true);
+      assert.deepEqual(JSON.parse(fs.readFileSync(${JSON.stringify(configPath)}, 'utf8')).recentFolders, [{
+        path: ${JSON.stringify(member)},
+        openedAt: ${JSON.stringify(openedAt)},
+        favorite: true,
+      }]);
+    `);
+    assert.equal(result.status, 0, result.stderr);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
 
 test('credential and source mutations never overwrite malformed config through a fallback read', () => {
   const statements = [

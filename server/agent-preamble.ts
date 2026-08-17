@@ -12,9 +12,9 @@
  * `library_info`. This puts orientation into the system prompt deterministically
  * instead.
  *
- * Built per session: cwd is fixed for a session's lifetime (switching
- * folders tears the session down), so the live context here — current folder,
- * sibling folders — is always current.
+ * Built per native mount. Ordinary window switching never changes a started
+ * session's cwd; an attributed Library-to-project transition remounts Claude
+ * with the same native session id and a project preamble.
  */
 import path from 'node:path';
 

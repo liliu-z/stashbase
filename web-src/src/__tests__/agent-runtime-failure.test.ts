@@ -38,6 +38,39 @@ test('MCP failures never expose an install command', () => {
   assert.equal(result.manualLabel, 'View manual setup');
 });
 
+test('Codex authentication failures start in-app browser login', () => {
+  const result = runtimeFailurePresentation({
+    phase: 'failed',
+    failure: {
+      stage: 'authentication',
+      code: 'authentication-required',
+      message: 'Codex is installed, but it is not signed in.',
+      retryable: true,
+    },
+  }, 'Codex');
+
+  assert.equal(result.title, 'Sign in to Codex');
+  assert.equal(result.retryLabel, 'Sign in with ChatGPT');
+  assert.equal(result.primaryAction, 'start-codex-login');
+  assert.equal(result.manualAction, undefined);
+});
+
+test('Codex authentication status failures retry preparation without opening login', () => {
+  const result = runtimeFailurePresentation({
+    phase: 'failed',
+    failure: {
+      stage: 'authentication',
+      code: 'authentication-check-failed',
+      message: 'Could not check Codex sign-in.',
+      retryable: true,
+    },
+  }, 'Codex');
+
+  assert.equal(result.title, 'Couldn’t check Codex sign-in');
+  assert.equal(result.retryLabel, 'Retry');
+  assert.equal(result.primaryAction, 'retry-bootstrap');
+});
+
 test('one-shot simulated failures keep recovery focused on retry', () => {
   const result = runtimeFailurePresentation({
     phase: 'failed',

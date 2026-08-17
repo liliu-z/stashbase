@@ -7,6 +7,8 @@ import type {
   AgentContextFile,
   AgentsResponse,
   AppearancePreferences,
+  CapturePreferences,
+  UpdatePreferences,
   ApiKeySaveResult,
   EmbedderState,
   EmbedderProvider,
@@ -267,6 +269,12 @@ export const api = {
   appearance: () => getJson<AppearancePreferences>('/api/appearance'),
   setAppearance: (preferences: Partial<AppearancePreferences>) =>
     send<AppearancePreferences>('PUT', '/api/appearance', preferences),
+  capturePreferences: () => getJson<CapturePreferences>('/api/capture'),
+  setCapturePreferences: (preferences: Partial<CapturePreferences>) =>
+    send<CapturePreferences>('PUT', '/api/capture', preferences),
+  updatePreferences: () => getJson<UpdatePreferences>('/api/updates/preferences'),
+  setUpdatePreferences: (preferences: Partial<UpdatePreferences>) =>
+    send<UpdatePreferences>('PUT', '/api/updates/preferences', preferences),
   setTranscriptionPreferences: (preferences: { providerId?: string; modelId?: string; language?: string }) =>
     send<{ providerId: string; modelId: string; language: string }>('PUT', '/api/transcription/preferences', preferences),
   downloadTranscriptionModel: (id: TranscriptionModelId) =>
@@ -293,8 +301,8 @@ export const api = {
   // the renderer just calls them "agents". `listAgents` populates the
   // launcher registry / installed-state.
   listAgents: () => getJson<AgentsResponse>('/api/terminal/clis'),
-  bootstrapAgent: (agent: 'claude' | 'codex') =>
-    send<AgentsResponse>('POST', `/api/terminal/clis/${encodeURIComponent(agent)}/bootstrap`),
+  prepareAgent: (agent: 'claude' | 'codex', action: 'check' | 'bootstrap' | 'login') =>
+    send<AgentsResponse>('POST', `/api/terminal/clis/${encodeURIComponent(agent)}/${action}`),
   setAgentRuntimeDebug: (patch: Partial<{
     discoveryPolicy: 'auto' | 'managed-only' | 'system-only';
     nextFailure: 'none' | 'installation' | 'mcp';

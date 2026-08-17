@@ -3,7 +3,7 @@ import { lazyWithRetry } from './ErrorBoundary';
 import { useOverlayLayer } from './OverlayStack';
 import { ModalLoadingStatus } from './ui/status';
 
-export type SettingsSection = 'appearance' | 'agents' | 'embedding' | 'transcription' | 'mcp';
+export type SettingsSection = 'general' | 'appearance' | 'agents' | 'embedding' | 'transcription' | 'mcp';
 
 export interface SettingsModalProps {
   initialSection: SettingsSection;

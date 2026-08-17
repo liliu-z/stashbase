@@ -191,6 +191,7 @@ test('Agent chooser reuses only blank chats, drafts freeze scope, and history re
     const copyReply = app.page.getByRole('menuitem', { name: 'Copy Reply' });
     await expect(copyReply).toBeVisible();
     await copyReply.click();
+    await expect(app.page.getByText('Copied.', { exact: true })).toBeVisible();
     const copied = await app.electron.evaluate(({ clipboard }) => clipboard.readText());
     expect(copied).toBe(HISTORY_MATH_REPLY);
 

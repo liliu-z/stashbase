@@ -13,7 +13,9 @@
   Opaque draft and artifact references identify resources but never authorize
   access.
 - The dedicated review window, its narrow preload, and its IPC handlers are
-  Adapters. The workspace sidebar and native Help menu are entry Adapters.
+  Adapters. The workspace sidebar and native Help menu are entry Adapters. The
+  sidebar entry is a secondary utility and may be replaced by an available
+  update action; native **Help → Report a Bug…** remains the durable entry.
 - The handoff Module accepts only a claimed approved snapshot. It does not
   accept renderer-provided paths, artifact lists, or report objects.
 

@@ -17,9 +17,10 @@ workspace files. They never join the library, search, preparation, or AI Index.
 
 ## Current Experience
 
-- Reporting starts from the sidebar **Report Bug** action or native
-  **Help → Report a Bug…**. The native entry remains available when the main
-  workspace renderer is unhealthy.
+- Reporting normally starts from the sidebar **Report Bug** action or native
+  **Help → Report a Bug…**. When an available update temporarily replaces the
+  sidebar's secondary utilities, the native entry remains available; it also
+  remains usable when the main workspace renderer is unhealthy.
 - StashBase opens a dedicated local review window. It collects the selected
   StashBase window, a fixed environment summary, and a bounded sanitized log
   tail on a best-effort basis; one unavailable artifact does not discard the

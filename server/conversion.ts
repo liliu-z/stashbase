@@ -211,17 +211,6 @@ export async function cancelAllConversions(timeoutMs = 2500): Promise<string[]> 
   return sourcePaths;
 }
 
-export async function cancelConversionsUnder(sourcePathPrefix: string, timeoutMs = 2500): Promise<string[]> {
-  const cancelled = scheduler.cancelUnder(filesystemPath.absolute(sourcePathPrefix), 'folder-removed');
-  const sourcePaths = cancelled.map((item) => item.key);
-  if (cancelled.length === 0) return [];
-  await Promise.race([
-    Promise.allSettled(cancelled.map((item) => item.completion)),
-    new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)),
-  ]);
-  return sourcePaths;
-}
-
 /** Destructive folder operations require a real cancellation barrier rather
  * than the bounded shutdown/removal wait above. Returning means no child task
  * still owns a file handle or scheduler lane under the prefix. */
@@ -240,14 +229,6 @@ export function isConversionPending(sourcePath: string): boolean {
 export function isConversionTextUnavailable(sourcePath: string): boolean {
   const key = filesystemPath.absolute(sourcePath);
   return scheduler.has(key) || isPendingOrFailed(key);
-}
-
-export function hasConversionsUnder(sourcePathPrefix: string): boolean {
-  return scheduler.hasUnder(filesystemPath.absolute(sourcePathPrefix));
-}
-
-export function hasRunningConversionsUnder(sourcePathPrefix: string): boolean {
-  return scheduler.hasRunningUnder(filesystemPath.absolute(sourcePathPrefix));
 }
 
 export function getConversionSchedulerSnapshot(): ConversionSchedulerSnapshot {

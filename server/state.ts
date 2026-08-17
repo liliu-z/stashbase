@@ -55,12 +55,6 @@ function recordIndexWarning(folder: string, message: string): void {
 
 const folderSyncGeneration = new Map<string, number>();
 
-export function invalidateFolderSync(folderRoot: string): void {
-  const root = filesystemPath.identity(folderRoot);
-  if (!root) return;
-  folderSyncGeneration.set(root, (folderSyncGeneration.get(root) ?? 0) + 1);
-}
-
 function currentFolderSyncGeneration(folderRoot: string): number {
   return folderSyncGeneration.get(filesystemPath.identity(folderRoot)) ?? 0;
 }

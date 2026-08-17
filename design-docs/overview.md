@@ -7,14 +7,16 @@ media, and the work produced by earlier agents. These files are difficult for
 an agent to reuse reliably: some are not readable as text, and finding the
 right material depends too much on filenames, paths, and human memory.
 
-StashBase keeps those files local, prepares the formats that need help, indexes
-them, and exposes the resulting context through MCP. The same library can then
-serve the app's search, the built-in Agent Panel, and external Agent clients.
+StashBase keeps source ownership in local files, prepares the formats that need
+help, indexes them, and exposes authorized context through MCP. Local browsing,
+editing, preview, and exact retrieval do not require a cloud account. When a
+user explicitly selects hosted AI Index, extracted text may be sent to that
+provider for indexing or retrieval; the source files remain locally owned.
 
 ## Product Promise
 
 StashBase makes local knowledge usable by agents without asking people to move
-that knowledge into a closed cloud workspace or adopt a new file model.
+their source of truth into a closed cloud workspace or adopt a new file model.
 
 The core loop is simple:
 

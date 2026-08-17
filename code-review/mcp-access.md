@@ -28,18 +28,37 @@ clients and are not a general host-filesystem API.
   `path_prefix`, and `types` accepts the shared source categories.
 - Results retain absolute visible-source identity for Agent tools. Converted
   evidence never exposes an AppData path.
+- `library_info` returns folder identity and provider state, not a second
+  folder-description store. Durable folder purpose and working instructions
+  remain visible, user-owned source in `AGENTS.md`.
 - File mutations use the shared transaction/version boundary and schedule or
   reconcile index maintenance after success.
 - `list_directory` enumerates only the requested directory surface and does
   not read file bodies. `read_file` has an `8 MiB` response ceiling for source
   and current derived text; oversized content fails explicitly rather than
   consuming unbounded server memory.
+- Format capability follows the
+  [Documents matrix](../design-docs/design/documents.md#format-capability-matrix):
+  `read_file` returns direct Markdown, HTML, or JSON source text and current
+  prepared PDF, DOCX, or media text; it does not return image bytes.
+  `write_file` and `edit_file` accept Markdown, HTML, and JSON source text only.
+  Previewability or built-in image attachment support must not be generalized
+  into external MCP text-read capability.
 - `create_project` creates only beneath the default folder home or an already
   authorized location. Both the selected location and creatable target must
   remain inside that owned root after symlinks are resolved. The operation
   seeds missing Agent instructions create-only and registers the folder.
   Session rebind requires trusted live-session attribution; ambiguous or
   external callers only create and register.
+
+## Known Gap — JSON Tool Description
+
+Shipping `write_file` and `edit_file` operations accept JSON through the same
+versioned text transaction used by Markdown and HTML, and focused mutation
+tests exercise that behavior. Their current MCP tool descriptions name only
+Markdown/HTML, so clients may underuse a real capability. Until the tool
+metadata is corrected and locked by focused evidence, treat the operation and
+the product matrix as implementation truth rather than the narrower copy.
 
 ## Transports and Credentials
 
@@ -79,6 +98,13 @@ approval path. Ordinary `write_file` and `edit_file` may be accepted only by
 the built-in panel's explicit Edit policy. Move, delete, commands, network,
 sandbox changes, and broader access remain explicit approval decisions.
 
+`create_project` creates a new source folder and changes Library membership.
+A built-in Agent call must follow an explicit user request or a visible
+approval that names the action and target; exploratory conversation alone is
+not consent. The operation returns the resolved project path. Only an
+attributable live Library Chat may rebind to it; folder-bound, stale,
+unattributed, and external callers never redirect a built-in session.
+
 ## Implementation Map
 
 | Role | Stable entry points |
@@ -107,5 +133,15 @@ Add `pnpm test:config` for persistence changes. Cover token rotation, malformed
 config, Docker bind failure/rollback, concurrent listener transitions, invalid
 scope, and built-in/external result parity.
 
-Related journeys: [J05](../design-docs/user-journeys.md#j05-search-and-open-source-evidence)
-and [J08](../design-docs/user-journeys.md#j08-connect-an-external-agent-through-mcp).
+Related journeys: [J05](../design-docs/user-journeys.md#j05-search-and-open-source-evidence),
+[J06](../design-docs/user-journeys.md#j06-start-and-continue-an-agent-chat),
+[J07](../design-docs/user-journeys.md#j07-converge-chat-into-a-document), and
+[J08](../design-docs/user-journeys.md#j08-connect-an-external-agent-through-mcp),
+plus the [J10](../design-docs/user-journeys.md#j10-turn-a-local-project-into-durable-agent-assisted-work)
+core loop and
+[J11](../design-docs/user-journeys.md#j11-turn-a-conversation-into-a-project)
+conversation-to-project transition.
+
+Related contracts: [File Transactions](file-transactions.md),
+[Data Lifecycle](data-lifecycle.md), [Settings and Config](settings-config.md),
+and [Agent Runtime](agent-runtime.md).

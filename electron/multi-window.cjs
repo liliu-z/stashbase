@@ -31,6 +31,7 @@ function createApplicationMenuTemplate({
   onCloseWindow,
   onOpenExternal,
   onReportBug = () => { },
+  includeDeveloperTools = false,
 }) {
   const isMac = platform === 'darwin';
   // Do not use Electron's `role: 'close'`: its Cmd/Ctrl+W binding conflicts
@@ -59,7 +60,19 @@ function createApplicationMenuTemplate({
       ],
     },
     { role: 'editMenu' },
-    { role: 'viewMenu' },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+        ...(includeDeveloperTools
+          ? [{ type: 'separator' }, { role: 'toggleDevTools' }]
+          : []),
+        { type: 'separator' },
+        { role: 'togglefullscreen' },
+      ],
+    },
     { role: 'windowMenu' },
     // Help is where both platforms train people to look when they are
     // stuck, and it is the only route out of the app that survives a
@@ -99,7 +112,6 @@ function windowLifecycleShortcutAction(input, platform = process.platform) {
   if (
     !input
     || input.type !== 'keyDown'
-    || input.isAutoRepeat === true
     || typeof input.key !== 'string'
   ) {
     return null;
@@ -111,6 +123,15 @@ function windowLifecycleShortcutAction(input, platform = process.platform) {
     : input.control === true && input.meta !== true;
   const shiftedPrimary = primary && input.shift === true && input.alt !== true;
 
+  // Electron's stock View menu and Chromium both expose reload chords. A
+  // reload tears down the renderer, so it may only happen through the awaited
+  // main-process save barrier used by the recovery UI.
+  const windowsReloadKey = platform !== 'darwin'
+    && key === 'f5'
+    && input.alt !== true
+    && input.meta !== true;
+  if ((primary && input.alt !== true && key === 'r') || windowsReloadKey) return 'block-reload';
+  if (input.isAutoRepeat === true) return null;
   if (shiftedPrimary && key === 'n') return 'new-window';
   if (shiftedPrimary && key === 'w') return 'close-window';
   if (
@@ -338,6 +359,69 @@ function createRendererFlushCoordinator({
   };
 }
 
+/** Coordinates the only product-owned renderer reload path. Normal reloads
+ * must first pass the renderer save barrier. If the renderer has already lost
+ * that barrier (for example, a root error unmounted it), main may proceed only
+ * after an explicit risk confirmation. */
+function createSafeReloadCoordinator({
+  requestFlush,
+  confirmWithoutSaveBarrier = async () => false,
+  reloadWindow = (win) => win.webContents.reload(),
+}) {
+  if (typeof requestFlush !== 'function') {
+    throw new TypeError('requestFlush must be a function');
+  }
+  const pendingByWebContents = new Map();
+
+  return {
+    request(win, { saveBarrierReady = false } = {}) {
+      if (!win || win.isDestroyed?.() || win.webContents?.isDestroyed?.()) {
+        return Promise.resolve({ reloaded: false, reason: 'window-unavailable' });
+      }
+      const webContentsId = win.webContents.id;
+      const existing = pendingByWebContents.get(webContentsId);
+      if (existing) return existing;
+
+      const pending = (async () => {
+        if (saveBarrierReady) {
+          let saved = false;
+          try {
+            saved = await requestFlush(win, 'window-reload');
+          } catch {
+            saved = false;
+          }
+          if (!saved) return { reloaded: false, reason: 'save-failed' };
+        } else {
+          let confirmed = false;
+          try {
+            confirmed = await confirmWithoutSaveBarrier(win);
+          } catch {
+            confirmed = false;
+          }
+          if (!confirmed) return { reloaded: false, reason: 'unconfirmed' };
+        }
+
+        if (win.isDestroyed?.() || win.webContents?.isDestroyed?.()) {
+          return { reloaded: false, reason: 'window-unavailable' };
+        }
+        try {
+          reloadWindow(win);
+          return { reloaded: true, reason: null };
+        } catch {
+          return { reloaded: false, reason: 'reload-failed' };
+        }
+      })();
+      pendingByWebContents.set(webContentsId, pending);
+      void pending.finally(() => {
+        if (pendingByWebContents.get(webContentsId) === pending) {
+          pendingByWebContents.delete(webContentsId);
+        }
+      });
+      return pending;
+    },
+  };
+}
+
 /** Tracks whether a renderer can answer the awaited save barrier. Kept as a
  * separate seam because BrowserWindow `did-finish-load` precedes React effect
  * registration, and closing inside that gap must not manufacture a save
@@ -422,6 +506,7 @@ module.exports = {
   createNativeOpenQueueCoordinator,
   createRendererFlushCoordinator,
   createRendererFlushReadiness,
+  createSafeReloadCoordinator,
   createSingleFlight,
   createWindowRegistry,
   focusWindow,

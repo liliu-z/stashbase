@@ -1,25 +1,8 @@
 /**
- * Shared helpers for the same-origin (`sandbox=allow-same-origin`)
- * preview iframes used by legacy-compatible document previews and `Split`'s live-preview
- * pane. Both inject a `<base>` so relative asset URLs resolve under
- * `/asset/`, and both intercept in-iframe `<img>` / `<a>` clicks to
- * forward them to the host (image lightbox / in-app nav / external open)
- * via `postMessage`. Previously each component carried its own copy.
+ * Click forwarding for the same-origin (`sandbox=allow-same-origin`)
+ * preview iframes: in-iframe `<img>` / `<a>` clicks are forwarded to the
+ * host (image lightbox / in-app nav / external open) via `postMessage`.
  */
-
-/** Inject a `<base href>` so relative asset refs resolve under `/asset/`.
- *  Handles docs with or without a `<head>` and a leading `<!doctype>`. */
-export function injectAssetBase(html: string, baseHref: string): string {
-  if (/<base\b/i.test(html)) return html;
-  const tag = `<base href="${escapeAttr(baseHref)}">`;
-  if (/<head\b[^>]*>/i.test(html)) {
-    return html.replace(/<head\b[^>]*>/i, (m) => m + tag);
-  }
-  if (/^\s*<!doctype\b[^>]*>/i.test(html)) {
-    return html.replace(/^(\s*<!doctype\b[^>]*>)/i, `$1<head>${tag}</head>`);
-  }
-  return `<head>${tag}</head>` + html;
-}
 
 /** Click handler for a preview iframe's document: a clicked image opens
  *  the shared lightbox; a clicked link forwards to in-app nav (relative
@@ -109,12 +92,4 @@ function decodeAssetPathname(pathname: string): { path: string; folder?: string 
     }
   }
   return { path: encoded.split('/').map(decodeURIComponent).join('/'), folder };
-}
-
-function escapeAttr(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
 }

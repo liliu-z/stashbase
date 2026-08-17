@@ -5,6 +5,11 @@
 
 ## Viewer Contract
 
+- The [Documents format capability matrix](../design-docs/design/documents.md#format-capability-matrix)
+  owns the user-visible distinction among preview, Workbench authoring,
+  retrieval text, and Agent/MCP access. Viewer dispatch and affordances must
+  match it; previewability never implies content editing or text-readable MCP
+  access.
 - A viewer is selected from the visible source format and retains that source
   as tab identity. Prepared text is evidence and fallback, never a replacement
   tab.
@@ -25,8 +30,9 @@
 
 ## Trust Boundary
 
-Markdown, Agent Markdown, and DOCX-derived HTML are sanitized by their owning
-renderers. Viewer messages validate the expected frame Window before applying
+Markdown and Agent Markdown render structured node trees and never inject a
+raw HTML string; DOCX-derived HTML is sanitized by its owning renderer through
+`shared/html-sanitization.ts`. Viewer messages validate the expected frame Window before applying
 navigation, Find, or highlight events. HTTP(S) navigation goes through the
 system browser; relative source links stay within authorized library paths.
 
@@ -72,6 +78,7 @@ forwarding, and script confinement.
 
 | Role | Stable entry points |
 |---|---|
+| Shared format vocabulary | `shared/file-formats.ts` and dispatch policy in `server/format.ts` |
 | Viewer dispatch | `web-src/src/components/MainPane.tsx` |
 | Primary viewers | `PdfPreview.tsx`, `DocxPreview.tsx`, `HtmlPreview.tsx`, `ImagePreview.tsx`, `ImageLightbox.tsx`, `AudioPreview.tsx`, `JsonDocument.tsx`, and the lazy `json/JsonTreeView.tsx` controller |
 | Preview-control Modules | `web-src/src/components/audio/`, `web-src/src/components/findIframe.ts`, `previewChunkHighlight.ts`, `pdfText.ts`, `pdfFindController.ts`, `web-src/src/lib/previewIframe.ts`, and `previewMessages.ts` |
@@ -93,6 +100,12 @@ pnpm build:web
 Run `pnpm test:e2e:functional` for viewer selection, valid fixtures, failure
 identity, navigation, or Find changes. Packaged complex PDF/DOCX/media and
 native codec behavior remain release checks.
+
+Review at least one representative fixture for each behavior class rather than
+inferring every capability from one extension: editable prose, editable
+structured text, direct preview-only text, binary preview with prepared text,
+OCR image, and transcript media. Extension aliases remain lower-level format
+detection evidence.
 
 Related journeys: [J03](../design-docs/user-journeys.md#j03-read-and-edit-source-documents)
 and [J04](../design-docs/user-journeys.md#j04-prepare-a-hard-to-read-file).

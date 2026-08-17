@@ -1,13 +1,12 @@
 /**
- * Agent CLI registry + binary probe. The supported CLIs (Claude Code,
- * Codex) are enumerated here with their install hints and a cheap
- * on-PATH check; the chat panel surfaces them via `/api/terminal/clis`.
+ * Agent CLI registry. The supported CLIs (Claude Code, Codex) are
+ * enumerated here with their install hints; the chat panel surfaces
+ * them via `/api/terminal/clis`.
  *
  * The CLIs themselves run through structured agent bridges (Claude Agent
  * SDK in server/agent.ts, Codex app-server in server/codex-agent.ts),
  * not a PTY — this module no longer bridges a shell.
  */
-import { resolveAgentCli } from './agent-cli.ts';
 
 function codexInstallHint(): string {
   if (process.platform === 'win32') return 'irm https://chatgpt.com/codex/install.ps1 | iex';
@@ -68,15 +67,4 @@ export const CLIS: Record<string, CliDef> = {
  *  Surfaced via `/api/terminal/clis` for completeness. */
 export function launchCommandFor(cli: CliDef): string {
   return [cli.bin, ...cli.launchArgs].join(' ');
-}
-
-/** The shared resolver covers explicit overrides, GUI-process PATH, common
- * install locations, a cached POSIX login-shell probe, and managed runtimes. */
-export function checkCliInstalled(id: string): boolean {
-  const cli = CLIS[id];
-  if (!cli) return false;
-  const envNames = id === 'claude'
-    ? ['STASHBASE_CLAUDE_BIN', 'CLAUDE_CODE_BIN']
-    : ['STASHBASE_CODEX_BIN', 'CODEX_CLI_BIN', 'CODEX_CLI_PATH'];
-  return Boolean(resolveAgentCli({ name: cli.bin, envNames, logLabel: cli.label }));
 }

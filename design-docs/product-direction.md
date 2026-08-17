@@ -5,6 +5,22 @@ StashBase is evolving toward three connected capabilities:
 > A VS Code-like Document Workbench, a Codex-like Agent Panel, and a local
 > RAG layer for document retrieval.
 
+## AI-native Product Scope
+
+StashBase is not constrained to one isolated AI feature. Its value comes from
+continuous assistance across an existing local-file workflow: more formats
+become understandable, evidence becomes easier to retrieve, Agents receive
+stable context, and accepted results return to ordinary files. Adding breadth
+is consistent with the product when the new capability deepens this same
+environment and reuses its source identity, library scope, permission, and
+recovery model.
+
+The limiting resource is product coherence, not generated code. A new format,
+provider, or Agent may extend an existing capability without adding a new user
+concept. A second knowledge store, document model, authorization world, or
+unrelated work surface changes the product model and requires explicit
+direction before implementation.
+
 ## Document Workbench
 
 StashBase should provide a workbench for browsing, reading, editing, navigating,
@@ -22,6 +38,11 @@ document appears, the same Chat adapts into a side panel alongside the source.
 It is a convenient client of StashBase context, not a separate AI workspace
 and not a replacement for external Agent clients.
 
+Work may begin before a project exists. When an exploratory Library Chat
+becomes worth continuing, the user can explicitly turn it into an ordinary
+local project. The same conversation follows the new scope; project files
+receive only content deliberately written from the conversation.
+
 ## Local RAG Layer
 
 Opened folders become retrievable context. The local RAG layer prepares
@@ -37,39 +58,21 @@ evidence may span long-form files, OCR, or transcripts. StashBase therefore
 treats preparation, a persistent meaning-based index, and source-grounded
 retrieval as one first-class RAG layer instead of relying on exact terms alone.
 
-### AI Index source and activation
+### AI Index activation
 
-AI Index needs a source of embedding capacity, and StashBase strongly steers
-every user to set one up at first run — an unindexed library has a degraded
-Agent — while stopping short of forcing it. Two sources are available: a hosted
-StashBase account with free monthly usage as the low-friction default for most
-people, and a bring-your-own OpenAI/OpenRouter key for advanced users.
+StashBase should strongly recommend meaning-based indexing because document
+libraries often need it, while keeping no-index mode a supported local state.
+Hosted service and bring-your-own-key sources are choices, not gates to local
+files. Browsing, editing, preview, exact retrieval, and an existing local index
+must remain usable through authentication, provider, network, or quota failure.
 
-Recommend, don't lock. Signing in should unlock StashBase's hosted service, not
-unlock computation the user's own machine can already do — so browsing, editing,
-preview, and keyword search must never be gated behind a remote login. The setup
-dialog leads hard toward enabling indexing and has no casual dismiss, but it
-offers a deliberate, low-emphasis exit ("Skip AI Index for now") to a
-"basic mode". No-index mode is a real, supported state, not a peer presented
-with equal weight — so the exit is a plain, low-key link, a window-local "for
-now" rather than a permanent opt-out. A fresh blank window makes the offer
-before a folder is selected. Skipping there covers the first folder opened so
-the same launch does not immediately ask twice; after that, the choice is
-remembered per folder in that window. Returning to a skipped folder stays
-quiet, while another folder or a fresh window re-offers indexing. The surviving
-local abilities are not advertised as a competing feature; the default guides
-everyone to enable.
-
-Activation must not turn local files into something that needs the cloud to
-open. The governing rule: first use should choose an indexing source, but daily
-use must never depend on online auth to reach local files. Activation persists
-locally, while a skip follows the window-local context rule above; the app
-opens and serves its existing index offline; a network or service error never
-forces re-authentication; and when hosted free usage is exhausted, new AI Index
-updates pause while the existing index and Agent retrieval keep working. In
-basic mode the Agent still connects but flags, on first use or a failed
-retrieval, that indexing is off. Signing out or removing the key returns the
-library to the unactivated state.
+This document owns that durable choice. Shipping setup timing and recovery live
+in [Search and Retrieval](design/search.md),
+[J01](user-journeys.md#j01-complete-onboarding-and-reach-first-value), and
+[J05](user-journeys.md#j05-search-and-open-source-evidence). Credential and
+runtime invariants live in
+[Settings and Config](../code-review/settings-config.md) and
+[Data Lifecycle](../code-review/data-lifecycle.md).
 
 ## Current Investment Themes
 

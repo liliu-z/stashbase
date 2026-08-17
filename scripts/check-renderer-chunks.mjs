@@ -9,11 +9,12 @@ const manifestPath = path.join(outputRoot, '.vite', 'manifest.json');
  * not a freeze on shell features. Raised 400 → 416 KiB when the activity
  * rail became the titlebar controls + a sidebar Settings row; 416 → 418
  * when the active-folder header gained the folder-switcher trigger and
- * its menu-item builder (the menu body itself stays in the lazy
- * ManagedMenu chunk). Both are eager chrome by definition. Raise it only
- * for shell UI that must load with the window — anything a user can open
- * on demand belongs in a dynamic entry above. */
-const initialJsBudgetBytes = 418 * 1024;
+ * its menu-item builder (the menu body itself stays in the lazy ManagedMenu
+ * chunk); 418 → 423 when native-open delivery and the sidebar/main drop-zone
+ * router became shell-owned behavior. External grant opening and refresh stay
+ * in dynamic entries. Raise this only for shell UI that must load with the
+ * window — anything a user can open on demand belongs in a dynamic entry. */
+const initialJsBudgetBytes = 423 * 1024;
 const expectedEntries = [
   'src/components/ChatPane.tsx',
   'src/components/agent/AgentMathMarkdown.tsx',

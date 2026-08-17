@@ -11,6 +11,7 @@
  */
 
 const { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, shell } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const { spawn } = require('node:child_process');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
@@ -29,6 +30,10 @@ const { captureWindowScreenshot } = require('./bug-report-screenshot.cjs');
 const { createBugReportHandoff } = require('./bug-report-handoff.cjs');
 const { registerBugReportReviewIpc } = require('./bug-report-review-ipc.cjs');
 const { createBugReportReviewWindow } = require('./bug-report-review-window.cjs');
+const { shouldOfferClipboardImage } = require('./clipboard-watch-policy.cjs');
+const { createUpdateInstaller } = require('./update-install-strategy.cjs');
+const { createUpdateManager } = require('./update-manager.cjs');
+const { createUpdateWindowBarrier } = require('./update-window-barrier.cjs');
 const {
   WINDOW_ID_ARG_PREFIX,
   classifyProtocolLaunch,
@@ -36,6 +41,7 @@ const {
   createNativeOpenQueueCoordinator,
   createRendererFlushCoordinator,
   createRendererFlushReadiness,
+  createSafeReloadCoordinator,
   createSingleFlight,
   createWindowRegistry,
   focusWindow,
@@ -140,9 +146,83 @@ const bugReportReviewDraftBySender = new Map();
 const windowRegistry = createWindowRegistry({ platform: process.platform });
 const rendererFlush = createRendererFlushCoordinator();
 const rendererFlushReadinessByWebContents = new Map();
+const safeReload = createSafeReloadCoordinator({
+  requestFlush: (win, reason) => rendererFlush.request(win, reason),
+  confirmWithoutSaveBarrier: async (win) => {
+    const result = await dialog.showMessageBox(win, {
+      type: 'warning',
+      title: 'Reload without save confirmation?',
+      message: 'StashBase cannot confirm that the current edit is saved.',
+      detail: 'Reloading may discard unsaved changes. Continue only if the window cannot recover.',
+      buttons: ['Cancel', 'Reload Anyway'],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+    });
+    return result.response === 1;
+  },
+  reloadWindow: (win) => win.webContents.reload(),
+});
 const approvedWindowCloses = new WeakSet();
 const pendingWindowCloses = new WeakSet();
 let lastMainWindow = null;
+
+function broadcastUpdateState(state) {
+  for (const win of mainWindows) {
+    if (isLiveMainWindow(win)) win.webContents.send('updates:state', state);
+  }
+}
+
+async function readAutoUpdatePreference() {
+  const response = await fetch(`${SERVER_URL}/api/updates/preferences`);
+  if (!response.ok) throw new Error(`Update preferences returned HTTP ${response.status}`);
+  const preferences = await response.json();
+  return preferences?.autoCheck === true;
+}
+
+const updateWindowBarrier = createUpdateWindowBarrier({
+  getWindows: () => mainWindows,
+  isLiveWindow: (win) => isLiveMainWindow(win),
+  shouldRequestFlush: (win) => {
+    const readiness = rendererFlushReadinessByWebContents.get(win.webContents.id);
+    return readiness?.shouldRequest() === true;
+  },
+  requestFlush: (win) => rendererFlush.request(win, 'update-install'),
+  approveClose: (win) => approvedWindowCloses.add(win),
+  revokeCloseApproval: (win) => approvedWindowCloses.delete(win),
+  onBlocked: async () => {
+    const parent = isLiveMainWindow(lastMainWindow) ? lastMainWindow : undefined;
+    const options = {
+      type: 'error',
+      title: 'Could not install update',
+      message: 'StashBase could not confirm that every open edit was saved.',
+      detail: 'Resolve the save error and try the update again.',
+    };
+    if (parent) await dialog.showMessageBox(parent, options);
+    else await dialog.showMessageBox(options);
+  },
+});
+
+const installDesktopUpdate = createUpdateInstaller({
+  updater: autoUpdater,
+  app,
+  platform: process.platform,
+  appImagePath: process.env.APPIMAGE || null,
+  fileExists: fs.existsSync,
+});
+
+const desktopUpdates = createUpdateManager({
+  updater: autoUpdater,
+  currentVersion: app.getVersion(),
+  platform: process.platform,
+  isPackaged: app.isPackaged,
+  readAutoCheck: readAutoUpdatePreference,
+  beforeInstall: updateWindowBarrier.prepare,
+  installUpdate: installDesktopUpdate,
+  afterInstallFailure: updateWindowBarrier.revoke,
+  openReleasePage: (url) => openHttpExternal(url, 'update release URL'),
+  onStateChange: broadcastUpdateState,
+});
 const bugReports = createBugReportService({
   captureScreenshot: async ({ webContentsId }) => {
     const sourceWindow = [...mainWindows].find((win) => (
@@ -797,8 +877,9 @@ async function openBugReportReview(win) {
 // back), we ping the renderer to ask "add this to the library?". Reading
 // the clipboard is cheap; we hash the PNG bytes so the same image is only
 // offered once — dismiss is final until the clipboard content changes.
-// Default-on; toggleable from the renderer via `clipboard:setWatch`.
-let clipboardWatchEnabled = true;
+// Fail closed. The renderer enables this only after reading the durable,
+// explicit Settings opt-in from the server.
+let clipboardWatchEnabled = false;
 let lastClipboardOfferHash = null;
 const agentComposerFocusedContents = new Set();
 
@@ -826,12 +907,15 @@ function markCurrentClipboardImageHandled() {
   return true;
 }
 
-function offerClipboardImage(win) {
-  if (!clipboardWatchEnabled) return;
+function offerClipboardImage(win, focused = win?.isFocused?.() === true) {
   if (!win || win.isDestroyed()) return;
   // A focused Agent composer claims clipboard images as transient chat
   // context, so do not race the explicit paste with a library-import offer.
-  if (agentComposerFocusedContents.has(win.webContents.id)) return;
+  if (!shouldOfferClipboardImage({
+    enabled: clipboardWatchEnabled,
+    focused,
+    composerFocused: agentComposerFocusedContents.has(win.webContents.id),
+  })) return;
   let img;
   try {
     img = clipboard.readImage();
@@ -877,7 +961,7 @@ function startClipboardPolling() {
   if (clipboardPollTimer || !clipboardWatchEnabled) return;
   clipboardPollTimer = setInterval(() => {
     const win = BrowserWindow.getFocusedWindow();
-    if (win && mainWindows.has(win) && !win.isDestroyed()) offerClipboardImage(win);
+    if (win && mainWindows.has(win) && !win.isDestroyed()) offerClipboardImage(win, true);
     else stopClipboardPolling();
   }, CLIPBOARD_POLL_MS);
 }
@@ -930,7 +1014,7 @@ async function createWindow(initialFolder) {
   lastMainWindow = win;
   win.on('focus', () => {
     lastMainWindow = win;
-    offerClipboardImage(win);
+    offerClipboardImage(win, true);
     startClipboardPolling();
   });
   win.on('blur', () => {
@@ -1012,15 +1096,12 @@ async function createWindow(initialFolder) {
     nativeOpenQueue.resetReadiness(webContentsId);
     rendererFlushReadiness.markDocumentLoaded();
     pushFullscreen();
+    win.webContents.send('updates:state', desktopUpdates.getState());
   });
 
-  // Swallow ⌘R / Ctrl+R from the keyboard. Electron's default View
-  // menu binds it to "Reload", which does a full renderer re-mount —
-  // dropping all tab / nav / search state on the floor. Folder switching
-  // happens through the sidebar's library list, which swaps the window's
-  // folder cleanly without re-mounting.
-  // The View → Reload menu item is left in place as an escape hatch
-  // (mouse click); only the keyboard chord is gone.
+  // Reload is a destructive renderer-context transition. Native reload and
+  // force-reload chords stay blocked; the recovery UI invokes main's awaited
+  // save barrier and receives an explicit failure instead.
   win.webContents.on('before-input-event', (event, input) => {
     // Own window-level input before it reaches the renderer. The native menu
     // still advertises the platform accelerator, while this boundary prevents
@@ -1036,10 +1117,7 @@ async function createWindow(initialFolder) {
       win.close();
       return;
     }
-    if (input.type !== 'keyDown') return;
-    if (!(input.meta || input.control)) return;
-    if (input.shift) return; // ⌘⇧R (Force Reload) stays — dev escape hatch.
-    if (input.key.toLowerCase() === 'r') event.preventDefault();
+    if (windowAction === 'block-reload') event.preventDefault();
   });
 
   const url = initialFolder
@@ -1088,6 +1166,7 @@ function installApplicationMenu() {
       const target = BrowserWindow.getFocusedWindow();
       void openBugReportReview(isLiveMainWindow(target) ? target : lastMainWindow);
     },
+    includeDeveloperTools: process.env.STASHBASE_DEV_VITE === '1',
   });
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
@@ -1156,6 +1235,31 @@ ipcMain.handle('window:openFolder', async (event, name) => {
   return result.ok;
 });
 
+ipcMain.handle('window:safeReload', async (event) => {
+  const senderWindow = BrowserWindow.fromWebContents(event.sender);
+  if (!isLiveMainWindow(senderWindow)) return false;
+  const saveBarrierReady = rendererFlushReadinessByWebContents
+    .get(event.sender.id)
+    ?.shouldRequest() === true;
+  const result = await safeReload.request(senderWindow, { saveBarrierReady });
+  if (!result.reloaded && result.reason === 'save-failed' && isLiveMainWindow(senderWindow)) {
+    await dialog.showMessageBox(senderWindow, {
+      type: 'error',
+      title: 'Could not reload window',
+      message: 'StashBase could not confirm that the current edit was saved.',
+      detail: 'Resolve the save error and try again.',
+    });
+  }
+  if (!result.reloaded && result.reason === 'reload-failed' && isLiveMainWindow(senderWindow)) {
+    await dialog.showMessageBox(senderWindow, {
+      type: 'error',
+      title: 'Could not reload window',
+      message: 'StashBase could not reload this window.',
+    });
+  }
+  return result.reloaded;
+});
+
 ipcMain.on('window:context-release-ready', (event, payload) => {
   rendererFlush.handleResponse(event.sender.id, payload);
 });
@@ -1205,19 +1309,65 @@ ipcMain.handle('window:notifyLibraryFolderAdded', (event, folder) => {
   return true;
 });
 
-// Renderer toggles clipboard-image watching (privacy switch). When
-// turning it back on we clear the last-offered hash so the current
-// clipboard image becomes eligible again.
-ipcMain.handle('clipboard:setWatch', (_event, enabled) => {
-  clipboardWatchEnabled = enabled !== false;
+// Renderer asks main to refresh clipboard-image watching after startup or a
+// Settings write. Main re-reads server-owned durable truth so a slow renderer
+// cannot overwrite a newer choice made in another window.
+ipcMain.handle('clipboard:refreshWatch', async (event) => {
+  const wasEnabled = clipboardWatchEnabled;
+  let enabled = false;
+  try {
+    const response = await fetch(`${SERVER_URL}/api/capture`);
+    if (response.ok) {
+      const preferences = await response.json();
+      enabled = preferences?.clipboardImageImport === true;
+    }
+  } catch {
+    // Ambient capture fails closed when config cannot be read.
+  }
+  clipboardWatchEnabled = enabled;
   if (clipboardWatchEnabled) {
-    lastClipboardOfferHash = null;
-    const win = BrowserWindow.getFocusedWindow();
-    if (win && mainWindows.has(win)) { offerClipboardImage(win); startClipboardPolling(); }
+    if (!wasEnabled) lastClipboardOfferHash = null;
+    // The Settings click can momentarily race Electron's global focus sample.
+    // The invoking renderer is stable authority for where to surface the first
+    // offer; later focus events continue to move polling between windows.
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (isLiveMainWindow(win) && win.isFocused()) {
+      offerClipboardImage(win, true);
+      startClipboardPolling();
+    }
   } else {
     stopClipboardPolling();
   }
   return clipboardWatchEnabled;
+});
+
+ipcMain.handle('updates:getState', (event) => {
+  const senderWindow = BrowserWindow.fromWebContents(event.sender);
+  return isLiveMainWindow(senderWindow) ? desktopUpdates.getState() : null;
+});
+
+ipcMain.handle('updates:check', async (event) => {
+  const senderWindow = BrowserWindow.fromWebContents(event.sender);
+  if (!isLiveMainWindow(senderWindow)) return null;
+  return desktopUpdates.check({ manual: true });
+});
+
+ipcMain.handle('updates:primaryAction', async (event) => {
+  const senderWindow = BrowserWindow.fromWebContents(event.sender);
+  if (!isLiveMainWindow(senderWindow)) return null;
+  return desktopUpdates.primaryAction();
+});
+
+ipcMain.handle('updates:openDownloadPage', async (event) => {
+  const senderWindow = BrowserWindow.fromWebContents(event.sender);
+  if (!isLiveMainWindow(senderWindow)) return false;
+  return desktopUpdates.openDownloadPage();
+});
+
+ipcMain.handle('updates:refreshPreference', async (event) => {
+  const senderWindow = BrowserWindow.fromWebContents(event.sender);
+  if (!isLiveMainWindow(senderWindow)) return null;
+  return desktopUpdates.refreshPreference();
 });
 
 // Renderer confirms it imported (or chose to keep ignoring) a clipboard
@@ -1447,6 +1597,7 @@ if (!hasSingleInstanceLock) {
     const startupFiles = getFilePathsFromArgs(process.argv);
     nativeOpenQueue.handleStartupFiles(startupFiles);
     await initialWindowFlight.run();
+    await desktopUpdates.start();
     if (initialProtocolLaunch === 'oauth-return') focusOAuthReturn();
   });
 
@@ -1494,4 +1645,8 @@ app.on('will-quit', (event) => {
     clearTimeout(fallback);
     app.exit(process.exitCode || 0);
   });
+});
+
+app.on('quit', () => {
+  desktopUpdates.dispose();
 });

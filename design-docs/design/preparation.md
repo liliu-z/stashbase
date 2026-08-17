@@ -9,8 +9,13 @@ original file remains visible, openable, and authoritative.
 
 Preparation covers PDF extraction, image OCR, durable DOCX text derivation,
 audio/video transcription, compatible audio preview generation, progress, and
-recovery. Together with Search and Retrieval, it forms the local RAG layer. It
-does not own the visible source preview or semantic ranking.
+recovery. An opt-in clipboard screenshot becomes an ordinary image source only
+after explicit acceptance, then follows the same OCR path. Together with Search
+and Retrieval, preparation forms the local RAG layer. It does not own the
+visible source preview, content-editing capability, or semantic ranking. The
+[Documents format matrix](documents.md#format-capability-matrix) is the
+canonical product-facing boundary between direct-text, prepared-text, and
+preview-only behavior.
 
 Users do not manage generated text, checkpoints, model internals, or index
 artifacts.
@@ -22,6 +27,10 @@ artifacts.
 - PDF, image, DOCX, audio, and supported video sources may gain AppData-derived
   text. PDF and media derived text also serves Agent reading; source identity
   remains unchanged.
+- Clipboard-image offers are disabled by default. When enabled in Settings,
+  StashBase notices copied images only while focused and asks before importing;
+  dismissal writes nothing. Accepted screenshots remain visible image sources
+  while OCR stays derived.
 - Preparation runs in the background with interactive and open-folder work
   preferred over library background work.
 - Direct DOCX preview and ordinary media playback do not wait for durable
@@ -37,6 +46,9 @@ artifacts.
 
 - Preparation can improve a source but never replace it or make basic browsing
   depend on it.
+- A direct-text readable format never becomes dependent on durable Preparation.
+  A prepared-text readable format never exposes its derived representation as
+  an editable source.
 - A derived result is current only when its format-specific completion and
   source-freshness contract succeeds. File existence or an in-memory status is
   not completion truth.
@@ -45,6 +57,8 @@ artifacts.
   interruption is rediscoverable.
 - Optional native tools and state stores degrade to actionable status rather
   than blocking folder entry.
+- Ambient capture remains opt-in and reversible. Failure to read the setting or
+  clipboard fails closed rather than enabling monitoring or creating a source.
 
 ## Cross-area Seams
 
@@ -76,7 +90,10 @@ artifacts.
 
 ## Related Journeys and Contracts
 
-Journey: [J04](../user-journeys.md#j04-prepare-a-hard-to-read-file).
+Journeys: [J04](../user-journeys.md#j04-prepare-a-hard-to-read-file) and the
+[J10](../user-journeys.md#j10-turn-a-local-project-into-durable-agent-assisted-work)
+core loop.
 
-Contracts: [Data Lifecycle](../../code-review/data-lifecycle.md) and
-[Document Viewers](../../code-review/document-viewers.md).
+Contracts: [Data Lifecycle](../../code-review/data-lifecycle.md),
+[Document Viewers](../../code-review/document-viewers.md), and
+[Settings and Config](../../code-review/settings-config.md).

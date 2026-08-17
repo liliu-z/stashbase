@@ -5,6 +5,7 @@ import {
   type ErrorInfo,
   type ReactNode,
 } from 'react';
+import { electronBridge, type ElectronBridge } from '../electronBridge';
 import { StatusMessage } from './ui/status';
 
 /** One button recipe for both error surfaces. Hand-rolled on purpose:
@@ -64,6 +65,21 @@ export function lazyWithRetry<T extends ComponentType<any>>(
   return lazy(() => loadWithRetry(loader));
 }
 
+export async function reloadForRecovery(
+  bridge: Pick<ElectronBridge, 'reloadWindow'> | undefined = electronBridge(),
+  browserReload: () => void = () => window.location.reload(),
+): Promise<boolean> {
+  if (!bridge?.reloadWindow) {
+    browserReload();
+    return true;
+  }
+  try {
+    return await bridge.reloadWindow();
+  } catch {
+    return false;
+  }
+}
+
 export class LazyLoadBoundary extends Component<LazyLoadBoundaryProps, LazyLoadBoundaryState> {
   constructor(props: LazyLoadBoundaryProps) {
     super(props);
@@ -97,7 +113,7 @@ export class LazyLoadBoundary extends Component<LazyLoadBoundaryProps, LazyLoadB
         <button
           type="button"
           className={ERROR_BUTTON_OUTLINE_CLASS}
-          onClick={() => window.location.reload()}
+          onClick={() => void reloadForRecovery()}
         >
           Reload
         </button>
@@ -114,12 +130,10 @@ export class LazyLoadBoundary extends Component<LazyLoadBoundaryProps, LazyLoadB
  * stack trace), and POST the stack to the server log so the failure
  * shows up alongside other server-side issues for debugging.
  *
- * Reload uses `window.location.reload()` because the renderer state
- * may be in an inconsistent shape — a softer "reset state and try
- * again" risks re-triggering the same crash on the next render. The
- * SAVE_STATUS / activeTab buffer is already persisted (autosave runs
- * on every edit + a `beforeunload` `sendBeacon`), so a hard reload
- * loses at most the cursor position in the current tab.
+ * Recovery still uses a hard renderer reload because a softer state reset can
+ * immediately re-trigger the same render failure. In Electron, however, the
+ * button delegates to main so a live edit must pass the awaited save barrier;
+ * a renderer that has lost that barrier requires an explicit risk warning.
  */
 export class ErrorBoundary extends Component<ErrorBoundaryProps, State> {
   state: State = { error: null, componentStack: null };
@@ -133,7 +147,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, State> {
     reportClientError(error, info);
   }
 
-  reset = () => window.location.reload();
+  reset = () => { void reloadForRecovery(); };
 
   copyDetails = async () => {
     if (!this.state.error) return;

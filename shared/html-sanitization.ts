@@ -1,17 +1,5 @@
 import sanitizeHtml from 'sanitize-html';
 
-/** Applies the document-preview trust policy to parsed Markdown HTML. */
-export function sanitizeMarkdownHtml(html: string): string {
-  return addAlertLandmarks(sanitizeHtml(html, MARKDOWN_SANITIZE_OPTIONS));
-}
-
-function addAlertLandmarks(html: string): string {
-  return html.replace(
-    /<div class="markdown-alert markdown-alert-(note|tip|important|warning|caution)">/g,
-    (_match, variant: string) => `<div class="markdown-alert markdown-alert-${variant}" role="note" aria-label="${variant[0].toUpperCase()}${variant.slice(1)}">`,
-  );
-}
-
 /** DOCX uses the same preview trust policy as Markdown, except Mammoth emits
  *  embedded document images as data URLs. Scripts, event handlers, style,
  *  navigation-breaking tags, and unsafe link schemes remain disallowed. */

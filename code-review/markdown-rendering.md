@@ -123,32 +123,26 @@ CodeMirror Markdown editor, HTML preview, or iframe document surface.
 |---|---|
 | Document Interface | `web-src/src/components/CrepeDocument.tsx` and its registered editor handle |
 | Markdown Modules | `web-src/src/milkdown/frontmatter.ts`, `headings.ts`, `outlineNavigation.ts`, `navigation.ts`, `paths.ts`, and `imageUrls.ts` |
-| Trust Interface | `sanitizeMarkdownHtml` in `shared/html-sanitization.ts` |
+| Trust Interface | Milkdown schema rendering in `CrepeDocument.tsx` — document Markdown never renders through a raw HTML string; sanitized-HTML trust is a [Document Viewers](document-viewers.md) concern |
 | Workspace Adapter | `useDocumentActions.ts`, document tabs, Find, outline, lightbox, and upload actions |
 | Asset/navigation Adapter | `/asset` route plus `web-src/src/api.ts` and Milkdown navigation helpers |
 | Focused evidence | `web-src/src/milkdown/__tests__/`, navigation/image/Find renderer tests, and `e2e/journeys/markdown-*.spec.ts` |
 
 ## Validation
 
-Run `pnpm typecheck`, `pnpm test:renderer`, and `pnpm build:web`. Add focused tests for local
-link validation, serialization/refresh behavior, document-scoped Find, and
-local image path derivation whenever those seams change. Run
-`pnpm test:e2e:functional` for the automated Markdown journey: frontmatter
-preservation, edit/save, Writer/Reading transitions, safe local and remote
-images, external links, local-note routing, tabs, and persisted content. On
-Linux, run `pnpm test:e2e:visual` when Markdown reading/writing composition
-changes.
+Run `pnpm typecheck`, `pnpm test:renderer`, and `pnpm build:web`. Add focused
+tests at the changed parsing, serialization, trust, navigation, or document
+lifecycle Seam. Run `pnpm test:e2e:functional` for user-visible Markdown
+journey changes, `pnpm test:electron:smoke` for retained-tab/native lifecycle,
+and `pnpm test:e2e:visual` on Linux for composition changes.
 
-For retained-tab lifecycle changes, run the bounded real-Electron smoke and
-verify repeated switches preserve ready DOM identity without a naked active
-shell, activation observes clean external edits, the MRU bound holds, and tab
-close destroys only the closed builder. The smoke must close live windows
-before quitting so macOS cannot stall in application shutdown.
+When no deterministic automated interaction exists, verify the affected
+behavior manually and add the lowest practical regression. Harness and
+baseline rules live in [UI Regression Testing](ui-regression-testing.md).
+Executable source HTML remains a separate
+[Document Viewers](document-viewers.md) concern.
 
-The current Electron journey does not cover every Crepe interaction. When
-changing slash commands, tables, code blocks, math, selection popovers, or
-lightbox behavior, verify the affected interaction manually and add the
-lowest-level focused regression practical. See
-[UI Regression Testing](ui-regression-testing.md) for fixture, selector, and
-baseline rules. Executable source HTML is a separate viewer and its current
-trust exception lives in [Document Viewers](document-viewers.md).
+Related journeys: [J03](../design-docs/user-journeys.md#j03-read-and-edit-source-documents)
+and [J07](../design-docs/user-journeys.md#j07-converge-chat-into-a-document), plus
+the [J10](../design-docs/user-journeys.md#j10-turn-a-local-project-into-durable-agent-assisted-work)
+core loop.

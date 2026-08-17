@@ -111,6 +111,14 @@ export interface CtxMenu {
   kind: 'file' | 'folder';
 }
 
+export interface TabConflict {
+  diskContent: string;
+  diskVersion: string;
+  editorContent: string;
+  /** One explicit resolution owns the conflict until it settles. */
+  resolving?: boolean;
+}
+
 /** One open tab. Everything that varies per-document lives here so
  *  switching tabs is just a pointer swap. `file === null` is a blank
  *  tab created by the `+` button — empty pane until the user clicks
@@ -137,6 +145,7 @@ export interface Tab {
   /** Last page viewed in this PDF tab for the renderer session. A different
    *  file or source version clears it before the viewer reloads. */
   pdfPage?: number;
+  conflict?: TabConflict | null;
 }
 
 /** Search-hit-derived highlight signal: which lines (for HTML / MD /
@@ -495,4 +504,7 @@ export type Action =
   | { type: 'FIND_OPEN' }
   | { type: 'FIND_CLOSE' }
   | { type: 'FIND_SET'; patch: Partial<State['find']> }
-  | { type: 'UNSUPPORTED_MODAL'; open: boolean };
+  | { type: 'UNSUPPORTED_MODAL'; open: boolean }
+  | { type: 'SET_CONFLICT'; id: string; conflict: TabConflict | null }
+  | { type: 'SET_CONFLICT_RESOLVING'; id: string; resolving: boolean }
+  | { type: 'RESOLVE_CONFLICT_DISCARD'; id: string };

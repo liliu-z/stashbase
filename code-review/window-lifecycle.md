@@ -14,8 +14,9 @@
 ## State Transitions
 
 ```text
-created → renderer loaded → save handler ready → close requested
-        → save acknowledged → identity retired → native window closed
+created → renderer loaded → save handler ready → context release requested
+        → save acknowledged → close: identity retired → native window closed
+                            → reload: identity retained → renderer replaced
 ```
 
 `did-finish-load` is not save readiness. Navigation invalidates the previous
@@ -29,13 +30,17 @@ after readiness, a save failure or timeout keeps the window open.
 - Native close awaits the current renderer save barrier before retiring the
   identity. Retirement installs a bounded tombstone so an in-flight open
   request cannot recreate a ghost binding.
+- Product-owned reload is error recovery, not ordinary navigation. Native
+  Reload and Force Reload menu and keyboard bypasses are absent. Recovery crosses
+  main's awaited save barrier; if the failed renderer can no longer answer,
+  reload requires a second explicit risk confirmation.
 - Closing one window releases only that window's folder and Agent state,
   revokes all active preview grants registered for it, and cleans up its
   pending native-open queue. Shared server, daemon, settings, MCP, and other
   windows remain live.
-- Native file open requests (OS open-file events, CLI arguments, second-instance launches)
-  are queued per target window identity (`webContents.id`) rather than drained globally,
-  ensuring cold startup and focused windows receive only their targeted files.
+- Native file-open requests from OS events, CLI arguments, and second-instance
+  launches are queued for one target window identity rather than drained
+  globally, so cold startup and focused windows receive only their own files.
 - Removing a library folder flushes every window showing it, commits membership
   removal, and broadcasts the transition. Recovery may rebind only if durable
   membership still contains the folder.
@@ -64,6 +69,19 @@ after readiness, a save failure or timeout keeps the window open.
 - macOS may remain alive without a window and recreate one on activation.
   Windows and Linux quit after the final window closes. Platform window
   accelerators never masquerade as document-tab commands.
+- Native Help remains main-process-owned and usable when the renderer cannot
+  paint. Website, Community Discord, and Report an Issue open fixed shared URLs
+  in the system browser; Report a Bug enters the J09 review flow. These are
+  cross-cutting support routes, not separate product journeys.
+- Electron main owns release checks and installation. The renderer receives a
+  bounded state snapshot and may request Check or one Update operation; it
+  cannot select a feed or installer path. Update downloads, crosses every ready
+  renderer save barrier, invokes the platform installer, and relaunches. A save
+  failure leaves the downloaded update ready for retry. Windows uses silent
+  NSIS after the explicit click; Authenticode publisher verification applies
+  when the installed build was signed. Linux deb may request elevation. The
+  AppImage Adapter applies without force-running a competing instance and asks
+  Electron to relaunch the final filename after the old process exits.
 - Frameless chrome remains draggable on every desktop platform; macOS
   traffic-light layout is selected only by the exact Darwin platform marker.
 
@@ -90,6 +108,8 @@ creation, presentation, survival, and retirement.
 ## Failure and Recovery
 
 - Save error or timeout: leave the native window open and surface the failure.
+- Reload save error or timeout: keep the current renderer and buffer; never
+  turn the error-recovery button into a force reload.
 - Late request after retirement: reject it; never recreate window state.
 - Initial quit cancelled by an asynchronous window guard: resume quit through
   the platform-specific final-window path.
@@ -107,7 +127,8 @@ creation, presentation, survival, and retirement.
 | HTTP Adapters | `server/routes/window-context.ts`, `server/routes/internal-shutdown.ts` |
 | Cleanup Interface | `server/shutdown-cleanup.ts` |
 | Bug-report window Adapter | `electron/bug-report-review-window.cjs`; draft authority lives in [Bug Reporting](bug-reporting.md) |
-| Focused evidence | `electron/multi-window.test.cjs`, `electron/multi-window-smoke.cjs`, `server/folder-window.test.ts`, `server/window-context-route.test.ts`, `server/internal-shutdown-route.test.ts`, `server/__tests__/shutdown-cleanup.test.ts` |
+| Desktop update Module | `electron/update-manager.cjs`; platform install strategy in `electron/update-install-strategy.cjs`; all-window save barrier in `electron/update-window-barrier.cjs`; IPC and native Adapters in `electron/main.cjs` and `electron/preload.cjs` |
+| Focused evidence | `electron/multi-window.test.cjs`, `electron/update-manager.test.cjs`, `electron/update-install-strategy.test.cjs`, `electron/update-window-barrier.test.cjs`, `electron/multi-window-smoke.cjs`, `server/folder-window.test.ts`, `server/window-context-route.test.ts`, `server/internal-shutdown-route.test.ts`, `server/__tests__/shutdown-cleanup.test.ts` |
 
 ## Validation
 
@@ -126,6 +147,8 @@ shutdown, and cleanup tests. Cover save readiness, failed save, two independent
 windows, folder removal, last-window platform behavior, clean port release,
 and a second launch against the same state.
 
-Related journeys: [J01](../design-docs/user-journeys.md#j01-launch-into-a-usable-workspace),
+Related journeys: [J01](../design-docs/user-journeys.md#j01-complete-onboarding-and-reach-first-value),
 [J02](../design-docs/user-journeys.md#j02-add-and-open-a-folder), and
-[J03](../design-docs/user-journeys.md#j03-read-and-edit-source-documents).
+[J03](../design-docs/user-journeys.md#j03-read-and-edit-source-documents), plus
+[J09](../design-docs/user-journeys.md#j09-prepare-and-hand-off-a-bug-report) for
+the dedicated review window.

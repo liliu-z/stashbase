@@ -118,9 +118,13 @@ export class CodexSession implements AttributedAgentSession {
   private libraryScoped = false;
 
   /** Member folder this LIBRARY session was migrated to by `create_project`.
-   * The native thread keeps its cwd (the folder home); the binding,
-   * teardown scope, and history override follow this. */
+   * The native thread identity stays intact while future turns, workspace
+   * approvals, skills, teardown scope, and history follow this folder. */
   private rebound: string | null = null;
+
+  private activeCwd(): string | null {
+    return this.rebound ?? this.cwd;
+  }
 
   /** The member folder this session is (or will be) bound to. `cwd` is the
    * authoritative binding once the session started; before that, the explicit
@@ -145,11 +149,9 @@ export class CodexSession implements AttributedAgentSession {
     return this.threadId;
   }
 
-  /** Migrate this LIBRARY-scoped session's binding to a member folder
-   * (create_project). The native thread keeps running with its original
-   * cwd; only the StashBase-side binding moves, and the renderer is told so
-   * the pill and the owning window's sidebar can follow. A folder-bound
-   * chat is never rebound. */
+  /** Migrate this LIBRARY-scoped session to a member folder (create_project).
+   * The native thread identity stays intact, but subsequent turns use the
+   * project cwd. A folder-bound chat is never rebound. */
   rebindToFolder(folderAbs: string): boolean {
     if (this.closed || !this.isLibraryScoped()) return false;
     this.rebound = folderAbs;
@@ -190,7 +192,8 @@ export class CodexSession implements AttributedAgentSession {
     if (this.closed) return;
     // An explicit folder pins the session; an explicit library scope (or
     // no folder anywhere) binds the folder home as the reserved library
-    // cwd — either way the binding never changes later.
+    // cwd. Ordinary window navigation never changes it; an attributed
+    // create_project transition is the one deliberate exception.
     const binding = resolveSessionBinding({
       scope: this.scope,
       folder: this.folder,
@@ -379,7 +382,7 @@ export class CodexSession implements AttributedAgentSession {
       this.throwIfInterruptedBeforeTurn();
       const startTurn = (override: string | undefined) => this.request('turn/start', {
         threadId,
-        cwd: this.cwd,
+        cwd: this.activeCwd(),
         ...codexEffortOption(this.effort),
         ...(override ? { model: override } : {}),
         input: [{ type: 'text', text: skill ? `$${skill.name}${prompt ? ` ${prompt}` : ''}` : prompt, text_elements: [] }, ...(skill ? [{ type: 'skill', name: skill.name, path: skill.path }] : [])],
@@ -508,11 +511,12 @@ export class CodexSession implements AttributedAgentSession {
   }
 
   private async publishSkills(forceReload = false): Promise<void> {
-    if (!this.cwd) return;
+    const cwd = this.activeCwd();
+    if (!cwd) return;
     try {
-      const result = await this.request('skills/list', { cwds: [this.cwd], ...(forceReload ? { forceReload: true } : {}) }) as JsonObject;
+      const result = await this.request('skills/list', { cwds: [cwd], ...(forceReload ? { forceReload: true } : {}) }) as JsonObject;
       const entries = Array.isArray(result.data) ? result.data : [];
-      const entry = entries.find((item) => stringValue((item as JsonObject).cwd) === this.cwd) as JsonObject | undefined;
+      const entry = entries.find((item) => stringValue((item as JsonObject).cwd) === cwd) as JsonObject | undefined;
       const raw = Array.isArray(entry?.skills) ? entry.skills : [];
       this.skills.clear();
       const skills: AgentSkill[] = [];
@@ -531,16 +535,17 @@ export class CodexSession implements AttributedAgentSession {
 
   private async ensureThread(titleHint = ''): Promise<string> {
     if (this.threadId) return this.threadId;
-    if (!this.cwd) throw new Error('No folder open.');
+    const cwd = this.activeCwd();
+    if (!cwd) throw new Error('No folder open.');
     await this.ensureAppServer();
     const isNewThread = !this.resumeThreadId;
     const access = codexAccessOptions(this.accessMode);
     const common = {
-      cwd: this.cwd,
+      cwd,
       approvalPolicy: access.approvalPolicy,
       approvalsReviewer: access.approvalsReviewer,
       sandbox: access.sandbox,
-      developerInstructions: buildStashbasePreamble(this.cwd, this.libraryScoped ? 'library' : 'folder'),
+      developerInstructions: buildStashbasePreamble(cwd, this.rebound || !this.libraryScoped ? 'folder' : 'library'),
     };
     const result = await this.request(
       this.resumeThreadId ? 'thread/resume' : 'thread/start',
@@ -646,7 +651,7 @@ export class CodexSession implements AttributedAgentSession {
         // must stay on the shared approval-card path. Keeping the app-server
         // policy at on-request also leaves command, network, and sandbox
         // escalation approvals visible instead of making Edit a bypass.
-        if (this.accessMode === 'acceptEdits' && isWorkspaceFileChange(params, this.cwd)) {
+        if (this.accessMode === 'acceptEdits' && isWorkspaceFileChange(params, this.activeCwd())) {
           this.respond(id, { decision: 'accept' });
           break;
         }
@@ -684,7 +689,7 @@ export class CodexSession implements AttributedAgentSession {
       case 'mcpServer/elicitation/request': {
         const approval = mcpToolApprovalFromElicitation(params);
         if (approval) {
-          if (this.accessMode === 'acceptEdits' && isStashbaseWorkspaceEdit(approval, this.cwd)) {
+          if (this.accessMode === 'acceptEdits' && isStashbaseWorkspaceEdit(approval, this.activeCwd())) {
             this.respond(id, { action: 'accept', content: {}, _meta: null });
             break;
           }

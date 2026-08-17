@@ -1,10 +1,15 @@
 # Agent maintenance contract for this repo
 
+The human/AI operating model is [`MAINTENANCE.md`](MAINTENANCE.md). Follow it
+for design, implementation, review, and evidence ownership.
+
 Before writing code, consult the affected product area in `design-docs/` and
-the owning engineering contract in `code-review/`. Product docs define intent
-and observable behavior; review contracts define risky Interfaces, invariants,
-implementation entry points, and validation. Code remains the source of truth
-for the current implementation.
+the owning engineering contract in `code-review/`. For code review, pin the
+diff and follow the diff-first route in `code-review/README.md`, then use
+`code-review/journey-coverage.md` to recover product intent and evidence.
+Product docs define intent and observable behavior; review contracts define
+risky Interfaces, invariants, implementation entry points, and validation.
+Code remains the source of truth for the current implementation.
 
 Keep the affected docs current in the same change as code. This is not a later
 documentation pass. All committed docs are English-only.
@@ -54,8 +59,9 @@ Start with [`design-docs/README.md`](design-docs/README.md).
 - `user-journeys.md` — observable Shipping flows with stable `Jxx` IDs.
 - `glossary.md` — shared product language.
 - `architecture.md` — product-level ownership, flows, and trust boundaries.
-- `design/*.md` — Workspace, Documents, Preparation, Search and Retrieval, and
-  Agent Panel outcomes, current experience, contracts, and contribution areas.
+- `design/*.md` — Workspace, Documents, Preparation, Search and Retrieval,
+  Agent Panel, and Bug Reporting outcomes, current experience, contracts, and
+  contribution areas.
 
 Start engineering review with
 [`code-review/README.md`](code-review/README.md). It routes a change to:
@@ -85,7 +91,9 @@ topic across these layers.
 - **Truth:** code > docs. Tests prove only what they exercise.
 - **Status:** Current means observed Shipping behavior; Required contracts may
   be stricter. If they differ, record a Known Gap instead of rewriting intent
-  as implementation truth. Direction stays under Next/Coordinate First.
+  as implementation truth. Durable capability direction lives in
+  `product-direction.md`; area-specific direction stays under Next/Coordinate
+  First.
 - **Concision:** every paragraph should pay rent. Cross-reference the one
   owning document.
 - **Boundary:** product docs contain no source-tree inventories. Review

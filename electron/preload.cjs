@@ -11,6 +11,7 @@ const windowId = windowIdFromArgv(process.argv);
 const contextReleaseHandlers = new Set();
 const folderRemovedHandlers = new Set();
 const libraryFolderAddedHandlers = new Set();
+const updateStateHandlers = new Set();
 
 ipcRenderer.on('window:prepare-context-release', async (_event, payload) => {
   if (!payload || typeof payload.requestId !== 'string') return;
@@ -36,6 +37,11 @@ ipcRenderer.on('window:folder-removed', (_event, folder) => {
 ipcRenderer.on('window:library-folder-added', (_event, folder) => {
   if (typeof folder !== 'string') return;
   for (const handler of libraryFolderAddedHandlers) handler(folder);
+});
+
+ipcRenderer.on('updates:state', (_event, state) => {
+  if (!state || typeof state !== 'object') return;
+  for (const handler of updateStateHandlers) handler(state);
 });
 
 // Mark the document as running under Electron so CSS can reserve room
@@ -72,6 +78,8 @@ contextBridge.exposeInMainWorld('electron', {
    *  be reliable, and the system browser already has user cookies. */
   openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
   reportBug: () => ipcRenderer.invoke('bug-report:open'),
+  /** Reload only through main's awaited renderer-save barrier. */
+  reloadWindow: () => ipcRenderer.invoke('window:safeReload'),
   openFolderWindow: (name) => ipcRenderer.invoke('window:openFolder', name),
   /** Keep the main-process folder → BrowserWindow registry current so
    *  "Open in New Window" can focus an existing matching context. */
@@ -118,8 +126,18 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.on('clipboard:image-available', wrapped);
     return () => ipcRenderer.removeListener('clipboard:image-available', wrapped);
   },
-  /** Enable / disable clipboard-image watching (privacy toggle). */
-  setClipboardWatch: (enabled) => ipcRenderer.invoke('clipboard:setWatch', enabled),
+  /** Refresh clipboard-image watching from the durable server setting. */
+  refreshClipboardWatch: () => ipcRenderer.invoke('clipboard:refreshWatch'),
+  /** Main owns release discovery, verified downloads, and installation. */
+  getUpdateState: () => ipcRenderer.invoke('updates:getState'),
+  checkForUpdates: () => ipcRenderer.invoke('updates:check'),
+  runUpdateAction: () => ipcRenderer.invoke('updates:primaryAction'),
+  openUpdateDownloadPage: () => ipcRenderer.invoke('updates:openDownloadPage'),
+  refreshUpdatePreference: () => ipcRenderer.invoke('updates:refreshPreference'),
+  onUpdateState: (handler) => {
+    updateStateHandlers.add(handler);
+    return () => updateStateHandlers.delete(handler);
+  },
   /** Tell main an offered clipboard image was handled so it isn't
    *  re-offered on the next focus. */
   markClipboardHandled: (hash) => ipcRenderer.send('clipboard:markHandled', hash),

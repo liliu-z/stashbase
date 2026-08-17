@@ -5,9 +5,9 @@ import { activateChatTabForAgent } from '../components/agent/chatActivation';
 import type { Action } from '../store/state';
 
 test('switching a blank Codex tab to Claude does not install Claude before confirmation', async () => {
-  const originalBootstrap = api.bootstrapAgent;
+  const originalBootstrap = api.prepareAgent;
   const requested: string[] = [];
-  api.bootstrapAgent = async (agent): Promise<AgentsResponse> => {
+  api.prepareAgent = async (agent): Promise<AgentsResponse> => {
     requested.push(agent);
     return { clis: [] };
   };
@@ -29,6 +29,6 @@ test('switching a blank Codex tab to Claude does not install Claude before confi
     ]);
     assert.deepEqual(requested, []);
   } finally {
-    api.bootstrapAgent = originalBootstrap;
+    api.prepareAgent = originalBootstrap;
   }
 });

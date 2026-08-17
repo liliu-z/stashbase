@@ -4,6 +4,8 @@ import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { assertMacosReleaseCredentials } from './macos-release-contract.mjs';
+import { resolveWindowsSigningConfiguration } from './windows-release-contract.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
@@ -127,11 +129,16 @@ function runElectronBuilder() {
   }
   assertPnpmCollectorInput();
   const fallback = preparePnpmCollectorFallback();
+  const requireMacosSigning = platform === 'mac' && process.env.STASHBASE_RELEASE_BUILD === '1';
+  const windowsSigningConfigured = platform === 'win'
+    ? resolveWindowsSigningConfiguration(process.env)
+    : false;
+  if (requireMacosSigning) assertMacosReleaseCredentials(process.env);
+  const builderArgs = [electronBuilderCli, `--${platform}`, ...target, '--publish', 'never'];
+  if (requireMacosSigning) builderArgs.push('--config.forceCodeSigning=true');
+  if (windowsSigningConfigured) builderArgs.push('--config.forceCodeSigning=true');
   try {
-    run(process.execPath, [electronBuilderCli, `--${platform}`, ...target, '--publish', 'never'], {
-      ...fallback.env,
-      CSC_IDENTITY_AUTO_DISCOVERY: 'false',
-    });
+    run(process.execPath, builderArgs, fallback.env);
   } finally {
     fallback.cleanup();
   }
@@ -481,4 +488,3 @@ if (!hostMatchesTarget()) {
 }
 clearQuarantine();
 runElectronBuilder();
-clearQuarantine(['release.nosync']);

@@ -63,7 +63,7 @@ data.
 Related journeys: [J03](user-journeys.md#j03-read-and-edit-source-documents)
 and [J05](user-journeys.md#j05-search-and-open-source-evidence).
 
-## Common Scenario Shape
+## Core Product Scenario
 
 Across these scenarios, work can begin with a question or task for an Agent
 against an explicit scope. The user may open a source document at any point to
@@ -71,3 +71,10 @@ inspect evidence or continue the same work beside it, or may complete the task
 entirely in Chat. Documents are optional working surfaces rather than required
 entry points. When an outcome needs to persist beyond the conversation, it is
 explicitly written into an ordinary source file.
+
+The canonical end-to-end product behavior is
+[J10: Turn a local project into durable Agent-assisted work](user-journeys.md#j10-turn-a-local-project-into-durable-agent-assisted-work).
+For Chat-first work, [J11: Turn a conversation into a project](user-journeys.md#j11-turn-a-conversation-into-a-project)
+creates the durable scope before entering that loop.
+The scenarios above vary the source material and desired result; they do not
+create separate storage, scope, permission, or Agent models.
