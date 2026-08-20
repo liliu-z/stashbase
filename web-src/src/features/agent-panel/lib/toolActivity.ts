@@ -97,9 +97,9 @@ export function toolRowParts(name: string, input: Record<string, unknown>): { ve
 }
 
 /** A quiet, count-free description of a group's work (Codex register:
- * "Read files, ran commands"). It lists the categories present with stable
- * plural labels because the summary intentionally omits exact counts. Live
- * and done states keep the same wording; an active group appends "…". */
+ * "Read files, ran commands"). It omits exact counts but uses each category's
+ * count to keep singular and plural labels grammatical. Live and done states
+ * keep the same wording; an active group appends "…". */
 export function activitySummary(tools: ToolBlock[], active?: boolean): string {
   let reads = 0;
   let lists = 0;
@@ -129,12 +129,12 @@ export function activitySummary(tools: ToolBlock[], active?: boolean): string {
     }
   }
   const labels = [
-    reads && 'read files',
-    lists && 'listed folders',
+    reads && `read ${reads === 1 ? 'file' : 'files'}`,
+    lists && `listed ${lists === 1 ? 'folder' : 'folders'}`,
     searches && 'searched',
-    commands && 'ran commands',
-    changes && 'edited files',
-    toolsUsed && 'used tools',
+    commands && `ran ${commands === 1 ? 'command' : 'commands'}`,
+    changes && `edited ${changes === 1 ? 'file' : 'files'}`,
+    toolsUsed && `used ${toolsUsed === 1 ? 'tool' : 'tools'}`,
   ].filter(Boolean);
   const summary = labels.length ? labels.join(', ') : 'worked';
   const capped = summary.charAt(0).toUpperCase() + summary.slice(1);

@@ -90,8 +90,10 @@
 - Completed thinking, interim narration, and tool activity fold under one
   working-trace header while the final answer remains visible. Interrupted work
   stays expanded. Resumed history has no invented duration.
-- Tool activity is compact and inspectable. Intermediate failure may tint its
-  row but does not turn the whole summary into a terminal error.
+- Tool activity is compact and inspectable. Its collapsed category summary
+  omits exact counts but preserves singular/plural grammar from the underlying
+  actions. Intermediate failure may tint its row but does not turn the whole
+  summary into a terminal error.
 - Permission requests and recovery actions never enter collapsed activity.
 - User messages expose copy and edit-and-resend. Resend is a new prompt, never
   transcript rewind or fork. When another turn is active, enqueue the edited

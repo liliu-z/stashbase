@@ -36,8 +36,10 @@ a transcript-centered file manager.
   decides when an action needs approval; Ask is an explicit per-session pick.
   Suggestions prefill rather than send.
 - Streaming, tool activity, permissions, attachments, skills, recovery, and
-  file artifacts remain inspectable. Editing and resending an earlier prompt
-  stops conflicting active work before beginning the new turn.
+  file artifacts remain inspectable. Collapsed tool summaries omit exact
+  counts while using grammatical singular or plural category labels. Editing
+  and resending an earlier prompt stops conflicting active work before
+  beginning the new turn.
 - Native runtime advisories — including automatic-review, skill-context, and
   configuration warnings — remain inspectable as non-fatal notices. They do
   not close Chat, fail a turn, or masquerade as recovery-requiring errors.

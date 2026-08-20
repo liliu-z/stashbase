@@ -6,7 +6,7 @@ import { activitySummary } from '@/features/agent-panel/lib/toolActivity';
 import { payloadPreview } from '@/features/agent-panel/lib/toolPayload';
 import type { ToolBlock } from '@/features/agent-panel/lib/types';
 
-test('count-free activity summaries use stable plural category labels', () => {
+test('activity summaries pluralize each countable category', () => {
   const tools: ToolBlock[] = [
     {
       kind: 'tool',
@@ -28,6 +28,11 @@ test('count-free activity summaries use stable plural category labels', () => {
 
   assert.equal(
     activitySummary(tools),
+    'Read file, listed folder, searched, ran command, edited file, used tool',
+  );
+
+  assert.equal(
+    activitySummary([...tools, ...tools.map((tool) => ({ ...tool, id: `${tool.id}-2` }))]),
     'Read files, listed folders, searched, ran commands, edited files, used tools',
   );
 });
