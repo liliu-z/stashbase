@@ -39,8 +39,10 @@ editor, a media editor, or a proprietary document format.
 - HTML is viewed as source content; the current compatibility preview executes
   local document scripts in a same-origin iframe. PDF uses its source document
   in the preview surface. DOCX uses a sanitized source-based preview with a
-  prepared fallback. Image and media viewers keep source identity while adding
-  format-appropriate navigation, playback, or transcript evidence.
+  prepared fallback; direct-preview failure remains explicit while that
+  independently prepared fallback is pending or available. Image and media
+  viewers keep source identity while adding format-appropriate navigation,
+  playback, or transcript evidence.
 - Safe workspace-relative links stay in StashBase. HTTP(S) links use the
   system browser. Markdown, DOCX, and Agent-rendered executable content stays
   inert.

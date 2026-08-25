@@ -56,7 +56,10 @@ forwarding, and script confinement.
   and holds one scroll owner and no preparation state.
 - DOCX fetches source bytes, parses in a renderer Worker, sanitizes output, and
   falls back to durable prepared HTML after a `20 s` direct-preview deadline.
-  Server preparation has its own `60 s` worker deadline.
+  A parse, fetch, or timeout failure keeps an explicit direct-preview warning
+  above the fallback; it does not depend on or fabricate a preparation failure.
+  Reprocess remains available only for a real preparation failure. Server
+  preparation has its own `60 s` worker deadline.
 - Local HTML is served with the viewer bootstrap the frame needs — heading
   ids, anchor scroll, the in-frame Find half, external-link forwarding, and a
   neutral scrollbar rule. Injected chrome is a default, not an override: it

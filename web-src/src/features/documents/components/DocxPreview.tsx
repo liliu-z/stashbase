@@ -184,22 +184,28 @@ export function DocxPreview({ name }: { name: string }) {
      * preparation continues independently and occupies only the slim
      * status row, never the document viewport. */
     <div className="relative box-border flex h-full w-full flex-col overflow-hidden bg-background">
-      {failure ? (
+      {directFailed || failure ? (
         <StatusMessage tone="warning" className="flex min-h-7 shrink-0 items-center gap-1.5 rounded-none border-x-0 border-t-0 px-3.5 py-1.5">
           <span className="min-w-0 flex-1">
-            {retryError
-              ? 'The document is visible, but search preparation could not restart.'
-              : 'The document is visible, but its searchable text is unavailable.'}
+            {directFailed
+              ? failure
+                ? 'Direct DOCX preview failed, and its searchable fallback is unavailable.'
+                : 'Direct DOCX preview failed. StashBase will show the prepared fallback when it is available.'
+              : retryError
+                ? 'The document is visible, but search preparation could not restart.'
+                : 'The document is visible, but its searchable text is unavailable.'}
           </span>
-          <Button
-            variant="outline"
-            size="xs"
-            className="shrink-0"
-            disabled={retryBusy}
-            onClick={() => { void retry(); }}
-          >
-            {retryBusy ? 'Reprocessing…' : 'Reprocess'}
-          </Button>
+          {failure ? (
+            <Button
+              variant="outline"
+              size="xs"
+              className="shrink-0"
+              disabled={retryBusy}
+              onClick={() => { void retry(); }}
+            >
+              {retryBusy ? 'Reprocessing…' : 'Reprocess'}
+            </Button>
+          ) : null}
         </StatusMessage>
       ) : preparationStatus ? (
         <div className="box-border flex min-h-7 shrink-0 items-center gap-1.5 border-b border-border bg-background px-3.5 py-1.5 text-sm text-muted-foreground" role="status">

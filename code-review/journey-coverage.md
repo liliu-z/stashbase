@@ -133,8 +133,8 @@ aliases, and Journey E2E owns representative composition.
   [library mutations](../e2e/journeys/library-mutations.spec.ts), and
   [format and media](../e2e/journeys/formats-media.spec.ts) cover representative
   format classes and document work, including preview-only affordances,
-  external-write conflict recovery, and a live edit flushed through recovery
-  reload.
+  explicit PDF/DOCX preview-failure identity, external-write conflict recovery,
+  and a live edit flushed through recovery reload.
 - **AI Eval:** not required.
 - **Release Check:** complex packaged PDF, DOCX, and media behavior remains
   release evidence.
