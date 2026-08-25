@@ -151,6 +151,8 @@ MCP write inside the new project.
 ## Validation Commands
 
 ```bash
+pnpm test:renderer-quality-gates
+pnpm audit:renderer
 pnpm test:e2e:check-focus
 pnpm test:e2e:harness
 pnpm test:e2e:smoke
@@ -160,6 +162,14 @@ pnpm test:e2e:visual
 pnpm typecheck
 pnpm build:web
 ```
+
+The pinned ShadScan source audit complements, but does not replace, rendered
+evidence. Its reviewed floor protects the current static baseline and its JSON
+report remains a CI artifact. Playwright owns the claims that static analysis
+cannot decide: one keyboard-only Quick Open path with focus return, reduced
+motion on a real overlay, compact-layout continuity, both application themes,
+and Linux screenshots spanning application chrome, workspace navigation,
+command surfaces, and a document state.
 
 Use `pnpm test:e2e:debug` for an interactive local smoke run. On headless Linux,
 prefix Playwright with `xvfb-run -a`. `pnpm test:e2e:visual:update` is
@@ -179,6 +189,7 @@ do not copy a test count or per-test catalog into this contract.
 | Deterministic fixtures | `e2e/fixtures/journey-workspaces.ts`, `fake-extractor.mjs`, and the fake Codex app-server |
 | Required suites | `e2e/smoke/`, `e2e/journeys/`, and `e2e/visual/` |
 | Harness evidence | `e2e/harness/`, `e2e/support/fixtures.test.ts`, and CI summary reporter tests |
+| Static renderer audit | `pnpm audit:renderer` and `scripts/renderer-quality-gates.test.mjs` |
 | CI Adapter | `.github/workflows/ci.yml` and `.github/workflows/visual-baselines.yml` |
 
 ## Visual Baseline Workflow

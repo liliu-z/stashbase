@@ -78,3 +78,37 @@ test('splitters expose keyboard-updated ARIA values and compact resize preserves
     await fixture.cleanup();
   }
 });
+
+test('J01 reduced motion keeps overlay feedback while removing transform movement', async ({}, testInfo) => {
+  const fixture = await createAppFixture({ membership: 'one-folder' });
+  let app: LaunchedApp | undefined;
+  try {
+    app = await launchApp(fixture, testInfo);
+    await app.page.emulateMedia({ reducedMotion: 'reduce' });
+    await expect.poll(
+      () => app?.page.evaluate(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches),
+    ).toBe(true);
+
+    await app.page.getByRole('button', { name: 'Settings', exact: true }).click();
+    const settings = app.page.getByRole('dialog', { name: 'Settings' });
+    await expect(settings).toBeVisible();
+
+    const motion = await settings.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        animationDurationMs: Math.max(...style.animationDuration.split(',').map((duration) => {
+          const value = Number.parseFloat(duration);
+          return duration.trim().endsWith('ms') ? value : value * 1000;
+        })),
+        transitionProperty: style.transitionProperty,
+      };
+    });
+    expect(motion.animationDurationMs).toBeLessThanOrEqual(0.01);
+    expect(motion.transitionProperty).not.toMatch(/transform|translate|scale|rotate/);
+    expect(motion.transitionProperty).toContain('opacity');
+    app.errors.assertNone();
+  } finally {
+    await app?.close();
+    await fixture.cleanup();
+  }
+});

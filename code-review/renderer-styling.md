@@ -1097,6 +1097,17 @@ the tag.
 
 Extend them when the contract grows; never weaken one to land a change.
 
+The external ShadScan audit is a complementary regression signal for the
+shadcn/Base UI layer, not a substitute for these repository-owned invariants or
+browser evidence. CI pins the Action revision and CLI `0.17.0`, uploads the
+machine-readable report, and enforces the reviewed `45` floor. The baseline is
+intentionally not treated as a product-quality percentage: Electron/Vite
+implementations such as theme management, the Error Boundary, Toasts, and the
+command surface are observable in renderer and Playwright evidence even when
+that static ruleset does not recognize their custom wiring. Raise the floor
+only after reviewing a complete report; never add product behavior solely to
+silence an inapplicable rule.
+
 ## CSS exemptions — rules Tailwind utilities can't own
 
 These categories are still exempt from the utility-only rule; what changed
@@ -1178,7 +1189,7 @@ deletes its CSS import in the same change.
 | Overlay + measure geometry | `--overlay-w-*` / `--overlay-h-*` / `--measure-*` in `globals.css`; `--container-overlay-*` / `--container-measure-*` and `@utility max-h-overlay-*` / `max-w-overlay-fit` in `styles.css` |
 | Pane chrome offsets | `--chrome-top` / `--chrome-banner-h` / `--chrome-top-banner` in `globals.css`; `@utility top-chrome` / `top-chrome-banner` in `styles.css` |
 | Generated icon Adapter | source map in `scripts/gen-icons.mjs` → `web-src/src/common/components/icons.tsx` |
-| Focused evidence | `web-src/src/common/__tests__/renderer-foundation.test.ts`, `electron/tab-strip-layout-smoke.cjs`, and `e2e/visual/` |
+| Focused evidence | `web-src/src/common/__tests__/renderer-foundation.test.ts`, `scripts/renderer-quality-gates.test.mjs`, `electron/tab-strip-layout-smoke.cjs`, and `e2e/visual/` |
 
 ## Review checklist for styling changes
 

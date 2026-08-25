@@ -51,6 +51,8 @@
     "test:config": "node --import tsx --test server/app-config.test.ts server/embedding-availability.test.ts server/hosted-account.test.ts server/account-route.test.ts",
     "lint:web": "oxlint --config .oxlintrc.json web-src/src && node --test scripts/check-renderer-api-access.test.mjs && node scripts/check-renderer-api-access.mjs",
     "test:renderer": "node scripts/run-renderer-tests.mjs \"web-src/src/**/*.test.ts\"",
+    "audit:renderer": "npx --yes @shadscan/cli@0.17.0 . --json --no-interactive --fail-under 45",
+    "test:renderer-quality-gates": "node --test scripts/renderer-quality-gates.test.mjs",
     "test:electron": "node --test --test-reporter=spec electron/multi-window.test.cjs electron/clipboard-watch-policy.test.cjs electron/bug-report-service.test.cjs electron/bug-report-redaction.test.cjs electron/bug-report-collection.test.cjs electron/bug-report-handoff.test.cjs electron/bug-report-review.test.cjs",
     "test:electron:smoke": "node electron/multi-window-smoke-runner.cjs",
     "test:e2e:harness": "node --import tsx --test e2e/support/fixtures.test.ts && node --test e2e/support/ci-summary-reporter.test.cjs && playwright test e2e/harness --project=electron-smoke",

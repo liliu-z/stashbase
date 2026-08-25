@@ -82,8 +82,11 @@ aliases, and Journey E2E owns representative composition.
 - **Journey E2E:** [launch smoke](../e2e/smoke/launch.spec.ts) and
   [library navigation](../e2e/journeys/library-navigation.spec.ts) exercise
   blank-workspace entry, AI Index skip behavior, folder selection, and local
-  availability. They do not yet prove the full orientation, first-value, and
-  return sequence as one onboarding outcome.
+  availability. [Navigation layout](../e2e/journeys/navigation-layout.spec.ts)
+  verifies that Appearance Settings remains usable with the operating system's
+  reduced-motion preference while transform movement is removed and quiet
+  state feedback remains. These checks do not yet prove the full orientation,
+  first-value, and return sequence as one onboarding outcome.
 - **AI Eval:** onboarding mechanics are deterministic. If first value uses
   semantic retrieval or a real Agent, its quality evidence comes from J05 or
   J10 rather than being duplicated here.

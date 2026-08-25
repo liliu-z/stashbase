@@ -31,6 +31,10 @@ before its metadata and payloads coexist.
   release/update/signing contracts, config/account, scheduler, cancellation,
   retrieval, renderer, server, MCP, Python, and real Electron lifecycle
   behavior.
+- A read-only Ubuntu renderer-quality job pins both the ShadScan Action
+  revision and CLI version, publishes the complete JSON report, and fails an
+  unassessed audit or a score below the reviewed baseline. It never launches an
+  Agent, creates an issue, or mutates repository state.
 - Ubuntu Playwright adds smoke, deterministic functional journeys, and reviewed
   visual baselines without replacing the three-platform source matrix.
 - Linux source Electron may use `--no-sandbox` under hosted Xvfb. Packaged apps
@@ -129,7 +133,7 @@ journeys.
 | Platform Adapters | `.github/workflows/release-macos.yml`, `release-linux.yml`, `release-windows.yml` |
 | Packaging Module | `scripts/package-desktop.mjs`, signing contracts, `scripts/update-artifact-contract.mjs`, `scripts/build-python-sidecar.mjs`, `scripts/build-transcription-sidecar.sh`, `scripts/after-pack-macos.cjs` |
 | Packaged verification | `scripts/smoke-packaged-server.mjs` and platform release verifiers |
-| Focused evidence | `scripts/package-inputs.test.mjs`, `scripts/require-green-ci.test.mjs`, signing contract tests, `scripts/update-release-contract.test.mjs`, `electron/update-install-strategy.test.cjs`, the platform workflows, and the N→N+1 release check |
+| Focused evidence | `scripts/renderer-quality-gates.test.mjs`, `scripts/package-inputs.test.mjs`, `scripts/require-green-ci.test.mjs`, signing contract tests, `scripts/update-release-contract.test.mjs`, `electron/update-install-strategy.test.cjs`, the platform workflows, and the N→N+1 release check |
 
 ## Release Runbook
 

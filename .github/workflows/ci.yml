@@ -5,7 +5,47 @@ on:
     branches: [main, 'release/**']
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
+  renderer-quality:
+    name: Renderer quality gates (Ubuntu)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.5.1
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Test renderer quality gate contract
+        run: pnpm test:renderer-quality-gates
+
+      - name: Audit renderer fundamentals
+        id: shadscan
+        uses: TheOrcDev/shadscan@1d4415ac799f453fe5ef192cf7f165433aa4e82b # v0.17.0
+        with:
+          path: .
+          version: '0.17.0'
+          fail-under: '45'
+          create-issue: 'false'
+
+      - name: Upload ShadScan report
+        if: ${{ always() && steps.shadscan.outputs.report-path != '' }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: shadscan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ steps.shadscan.outputs.report-path }}
+          if-no-files-found: error
+          retention-days: 14
+
   source-build:
     name: Source build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
