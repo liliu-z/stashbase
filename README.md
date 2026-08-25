@@ -28,9 +28,9 @@ Local files -> prepared evidence -> retrieval -> Agents
 
 ## 🚀 Demo
 
-Open this repo in StashBase and ask the built-in Agent: **How is this project designed?**
+Open a local folder in StashBase and ask the built-in Agent: **How do I use StashBase?**
 
-![StashBase demo: opening local design docs and asking the Agent about architecture and product direction](assets/readme/demo.gif)
+![StashBase demo: browsing local guides and asking the built-in Agent how to use StashBase](assets/readme/demo.gif)
 
 ---
 
