@@ -239,15 +239,7 @@ function findSidecarExecutable(root, name) {
 }
 
 function findPackagedOpenCode(resourcesPath) {
-  const unpackedModules = path.join(resourcesPath, 'app.asar.unpacked', 'node_modules');
-  const direct = path.join(unpackedModules, 'opencode-ai', 'bin', 'opencode.exe');
-  if (fs.existsSync(direct)) return direct;
-  const pnpmRoot = path.join(unpackedModules, '.pnpm');
-  let packages = [];
-  try { packages = fs.readdirSync(pnpmRoot).filter((name) => name.startsWith('opencode-ai@')); } catch { /* reported below */ }
-  return packages
-    .map((name) => path.join(pnpmRoot, name, 'node_modules', 'opencode-ai', 'bin', 'opencode.exe'))
-    .find((candidate) => fs.existsSync(candidate)) ?? direct;
+  return path.join(resourcesPath, 'opencode', 'opencode.exe');
 }
 
 async function waitForServer(port, child, output) {

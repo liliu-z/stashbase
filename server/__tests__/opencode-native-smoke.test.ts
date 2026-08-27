@@ -30,6 +30,23 @@ async function unusedPort(): Promise<number> {
   return port;
 }
 
+test('packaged OpenCode resolves from the explicit resources path before dependency fallbacks', () => {
+  const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-opencode-resource-'));
+  const executable = path.join(temporaryRoot, 'opencode', 'opencode.exe');
+  const previousResourcesRoot = process.env.STASHBASE_RESOURCES_PATH;
+  fs.mkdirSync(path.dirname(executable), { recursive: true });
+  fs.writeFileSync(executable, 'packaged runtime');
+  process.env.STASHBASE_RESOURCES_PATH = temporaryRoot;
+
+  try {
+    assert.equal(bundledOpenCodeExecutable(), executable);
+  } finally {
+    if (previousResourcesRoot === undefined) delete process.env.STASHBASE_RESOURCES_PATH;
+    else process.env.STASHBASE_RESOURCES_PATH = previousResourcesRoot;
+    fs.rmSync(temporaryRoot, { recursive: true, force: true });
+  }
+});
+
 test('pinned bundled OpenCode completes one SDK session against a fake compatible model gateway', {
   timeout: 30_000,
 }, async (t) => {

@@ -90,16 +90,24 @@ test('packaged AI Index daemon includes the local ONNX embedding runtime', () =>
   assert.match(build, /'--hidden-import',\s*'mfs\.embedder\.onnx'/);
 });
 
-test('bundled OpenCode runtime and SDK are pinned and executable outside asar', () => {
+test('bundled OpenCode runtime and SDK are pinned with an explicit packaged executable', () => {
   assert.equal(pkg.dependencies?.['@opencode-ai/sdk'], '1.18.19');
   assert.equal(pkg.dependencies?.['opencode-ai'], '1.18.19');
+  assert.deepEqual(
+    pkg.build?.extraResources?.find((entry) => entry?.to === 'opencode/opencode.exe'),
+    {
+      from: 'node_modules/opencode-ai/bin/opencode.exe',
+      to: 'opencode/opencode.exe',
+    },
+    'OpenCode postinstall target must be copied to a stable resource path',
+  );
   assert.ok(
     pkg.build?.asarUnpack?.includes('node_modules/opencode-ai/bin/**/*'),
-    'OpenCode binary must be unpacked from app.asar',
+    'direct OpenCode dependency fallback must remain executable outside app.asar',
   );
   assert.ok(
     pkg.build?.asarUnpack?.includes('node_modules/.pnpm/opencode-ai*/node_modules/opencode-ai/bin/**/*'),
-    'pnpm OpenCode binary target must be unpacked from app.asar',
+    'pnpm OpenCode dependency fallback must remain executable outside app.asar',
   );
   const workspace = fs.readFileSync(path.join(root, 'pnpm-workspace.yaml'), 'utf8');
   assert.match(workspace, /^\s*opencode-ai:\s+true\s*$/m);

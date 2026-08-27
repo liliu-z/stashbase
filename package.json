@@ -155,6 +155,10 @@
       {
         "from": "assets/builtin-library",
         "to": "assets/builtin-library"
+      },
+      {
+        "from": "node_modules/opencode-ai/bin/opencode.exe",
+        "to": "opencode/opencode.exe"
       }
     ],
     "asar": true,

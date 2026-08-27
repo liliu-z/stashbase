@@ -59,10 +59,16 @@ function unpackedPath(file: string): string {
 /** Resolve only the package-owned postinstall target. We never fall back to
  * PATH: a user's unrelated OpenCode version must not change this adapter. */
 export function bundledOpenCodeExecutable(): string | null {
+  const resourcesRoot = process.env.STASHBASE_RESOURCES_PATH?.trim();
   const root = process.env.STASHBASE_APP_ROOT?.trim()
     ? path.resolve(process.env.STASHBASE_APP_ROOT)
     : path.resolve(process.cwd());
-  const candidates = [unpackedPath(path.join(root, 'node_modules', 'opencode-ai', 'bin', 'opencode.exe'))];
+  const candidates = [
+    ...(resourcesRoot
+      ? [path.join(path.resolve(resourcesRoot), 'opencode', 'opencode.exe')]
+      : []),
+    unpackedPath(path.join(root, 'node_modules', 'opencode-ai', 'bin', 'opencode.exe')),
+  ];
   try {
     const packageJson = createRequire(import.meta.url).resolve('opencode-ai/package.json');
     candidates.push(unpackedPath(path.join(path.dirname(packageJson), 'bin', 'opencode.exe')));

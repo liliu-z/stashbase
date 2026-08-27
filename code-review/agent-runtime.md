@@ -7,9 +7,12 @@
 
 - StashBase Agent is the default adapter. It uses exact-version
   `opencode-ai@1.18.19` and `@opencode-ai/sdk@1.18.19` dependencies; packaging
-  unpacks the native OpenCode target from asar. Resolution accepts only that
-  package-owned binary and never falls back to PATH. OpenCode auto-update and
-  sharing are disabled, provider configuration is process-injected, and its
+  copies the dependency's platform-specific postinstall target to a stable
+  resource outside asar rather than relying on dependency collection to retain
+  a generated file. Resolution prefers that explicit package-owned binary,
+  retains package-owned development fallbacks, and never falls back to PATH.
+  OpenCode auto-update and sharing are disabled, provider configuration is
+  process-injected, and its
   XDG state plus child HOME stay under AppData so user-global OpenCode/Claude
   config and skills cannot enter the bundled runtime implicitly. Its child
   environment is an allowlist of launch, locale, temporary-directory, and TLS
