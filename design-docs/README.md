@@ -97,12 +97,12 @@ product vocabulary; the test suite owns exact setup and assertions.
 
 ## Capabilities and Product Areas
 
-StashBase builds one **AI Wiki** over local files through three product
+StashBase is a **Wiki** for local files, delivered through three product
 capabilities. The **Document Workbench** spans the Workspace and Documents
-areas; the AI Wiki's invisible **local RAG layer** spans Preparation and Search
-and Retrieval; its visible structured Markdown is created through the **Agent
-Panel**, which is also a product area. Product capabilities describe what
-StashBase is. Product areas divide design and contribution ownership.
+areas; the Wiki's **local RAG layer** spans Preparation and Search and
+Retrieval; visible **Wiki Pages** are built through the **Agent Panel**, which
+is also a product area. Product capabilities describe what StashBase is.
+Product areas divide design and contribution ownership.
 
 ## Product Areas
 

@@ -38,6 +38,11 @@ access surface external clients copy from.
   write persisted. Folder membership, recents, favorites, and seed-state
   mutations use the strict path so unreadable configuration is never replaced
   with fallback defaults.
+- Agent Instructions use one bounded packaged default. Exact-member-folder
+  customizations live in the same config; Library-wide Chats and absent or
+  blank folder entries resolve to the default. Reads fail soft during Agent
+  startup, saves use the strict path, and removing membership clears only that
+  folder's entry.
 - The app never changes user-managed filesystem ownership, flags, or ACLs to
   repair an unwritable config directory. Errors name the user-actionable config
   location without leaking atomic temporary paths.
@@ -47,21 +52,21 @@ access surface external clients copy from.
   variables may isolate automated tests or select runtime plumbing, but are
   never the product credential source of truth.
 - Launch into a bare Library only resolves authorization state. The first
-  active folder opens the one-time AI setup invitation when authorization is
-  absent. Completing it or choosing **Not now** records a durable renderer
-  preference across folders and relaunches; Similar Search, the persistent
-  Files-panel Enable action, and Settings remain explicit reopen routes.
-  Create Wiki has no setup request or correlated result and remains independent
-  from embedding authorization.
+  active folder opens the one-time Similarity Search setup invitation when
+  authorization is absent. Completing it or choosing **Not now** records a durable renderer
+  preference across folders and relaunches; Similarity Search, the persistent
+  Files-panel **Set up** action, and Settings remain explicit reopen routes.
+  Build Wiki has no setup request or correlated result and remains
+  independent from embedding authorization.
 - Every OAuth flow records its initiating purpose. Account-menu and Agent
-  sign-in establish identity only; only the explicit hosted AI Index choice
-  may activate `stashbase-account`, reset the indexer, or begin backfill.
+  sign-in establish identity only; only the explicit hosted Similarity Search
+  choice may activate `stashbase-account`, reset the indexer, or begin backfill.
 - BYOK credentials, the refreshable Supabase account session, and the active
   embedding source persist independently. Switching between account and BYOK
   retains the inactive credential and never silently falls back after a
   provider failure. The retired local source is a one-way, pre-daemon startup
   migration: select a valid account session first, otherwise a stored BYOK
-  credential, otherwise clear the explicit source so AI Index is not set up.
+  credential, otherwise clear the explicit source so Similarity Search is not set up.
   New local selections are rejected.
 - Account access and refresh tokens are Node-only configuration. They never
   cross renderer HTTP responses or the Node/Python boundary; Python receives a
@@ -126,22 +131,23 @@ access surface external clients copy from.
   appearance updates the renderer, capture updates the Electron clipboard
   monitor, update checks refresh the Electron update scheduler, embedding affects semantic readiness, transcription affects
   preparation, and MCP HTTP settings affect the listener. Ordinary browsing
-  and exact search remain available on failure.
+  and Exact Search remain available on failure.
 
 ## Implementation Map
 
 | Role | Stable entry points |
 |---|---|
 | Persistent Interface | strict/fallback read and write plus domain getters/setters in `server/app-config.ts` |
-| Domain owners | `server/mcp-http-settings.ts`, `server/hosted-account.ts`, `server/hosted-embedding-broker.ts`, `server/hosted-agent-broker.ts`, embedding and transcription configuration Modules |
-| HTTP Adapters | `server/routes/appearance.ts`, `capture.ts`, `updates.ts`, `workspace-preferences.ts`, `onboarding.ts`, `account.ts`, `embedder.ts`, `transcription.ts`, `mcp.ts` |
+| Domain owners | `server/agent-instructions.ts`, `server/mcp-http-settings.ts`, `server/hosted-account.ts`, `server/hosted-embedding-broker.ts`, `server/hosted-agent-broker.ts`, embedding and transcription configuration Modules |
+| HTTP Adapters | `server/routes/agent-instructions.ts`, `appearance.ts`, `capture.ts`, `updates.ts`, `workspace-preferences.ts`, `onboarding.ts`, `account.ts`, `embedder.ts`, `transcription.ts`, `mcp.ts` |
 | Renderer Adapters | `web-src/src/features/account/components/SidebarAccountRow.tsx`, `web-src/src/common/components/AccountIdentity.tsx`, and `web-src/src/features/settings/hooks/` — one controller per panel (`useGeneralSettings.ts`, `useEmbedderSettings.ts`, `useTranscriptionSettings.ts`, `useMcpAccess.ts`, `useAgentRuntimes.ts`, `useAppearanceSettings.ts`, `useApiKeyEntry.ts`), each owning its reads, its optimistic writes, and their ordering guards. The panels under `components/` render what a controller returns and hold only which dialog is open |
+| Agent Instructions renderer Adapter | `web-src/src/features/agent-panel/hooks/useAgentInstructionsEditor.ts` owns toolbar presence reads plus scoped editor reads/writes and stale-load fencing; the button and modal are presentation only |
 | Authorization read | `web-src/src/common/hooks/useEmbedderState.ts` — shared with the Files-panel callout, which may not import this feature |
 | Appearance Adapter | `web-src/src/features/settings/lib/appearance.ts`, applied to a window by `hooks/useAppliedAppearance.ts` |
 | Capture runtime Adapter | `web-src/src/app/hooks/useClipboardImageOffer.ts`, `electron/preload.cjs`, and the clipboard boundary in `electron/main.cjs` |
 | Update runtime Adapter | `electron/update-manager.cjs`, `electron/main.cjs`, `electron/preload.cjs`, `web-src/src/common/hooks/useDesktopUpdate.ts`, and `web-src/src/common/components/DesktopUpdateBanner.tsx` — the hook and banner sit in `common/` because Settings and the sidebar account row both render update state, and a feature may not import a sibling |
-| Open-request Interfaces | `web-src/src/common/lib/settingsTrigger.ts` (Settings), `web-src/src/common/lib/embeddingSetupTrigger.ts` (manual AI setup), `web-src/src/common/lib/embeddingAuth.ts` (authorization and durable one-time-onboarding preference) — shared so no surface reaches into the Settings feature to ask it to open |
-| Focused evidence | `server/app-config.test.ts`, `server/hosted-account.test.ts`, `server/__tests__/hosted-agent-broker.test.ts`, `server/__tests__/mcp-http-settings.test.ts`, `electron/clipboard-watch-policy.test.cjs`, `electron/update-manager.test.cjs`, renderer account/appearance/embedding tests, `web-src/src/common/__tests__/desktop-update-hook.test.ts`, `web-src/src/features/settings/__tests__/appearance.test.ts`, `web-src/src/common/__tests__/embedding-auth.test.ts`, `e2e/smoke/settings.spec.ts`, and J04 in `e2e/journeys/preparation-capture.spec.ts` |
+| Open-request Interfaces | `web-src/src/common/lib/settingsTrigger.ts` (Settings), `web-src/src/common/lib/embeddingSetupTrigger.ts` (manual Similarity Search setup), `web-src/src/common/lib/embeddingAuth.ts` (authorization and durable one-time-onboarding preference) — shared so no surface reaches into the Settings feature to ask it to open |
+| Focused evidence | `server/app-config.test.ts`, `server/agent-instructions.test.ts`, `server/hosted-account.test.ts`, `server/__tests__/hosted-agent-broker.test.ts`, `server/__tests__/mcp-http-settings.test.ts`, `electron/clipboard-watch-policy.test.cjs`, `electron/update-manager.test.cjs`, renderer account/appearance/embedding tests, `web-src/src/common/__tests__/desktop-update-hook.test.ts`, `web-src/src/features/settings/__tests__/appearance.test.ts`, `web-src/src/common/__tests__/embedding-auth.test.ts`, `e2e/smoke/settings.spec.ts`, J04 in `e2e/journeys/preparation-capture.spec.ts`, and J06 in `e2e/journeys/agent-panel.spec.ts` |
 
 ## Validation
 
@@ -167,7 +173,7 @@ Related journeys: [J01](../design-docs/user-journeys.md#j01-complete-onboarding-
 [J08](../design-docs/user-journeys.md#j08-connect-an-external-agent-through-mcp),
 plus [J11](../design-docs/user-journeys.md#j11-turn-a-conversation-into-a-project)
 for the owned default project location and
-[J12](../design-docs/user-journeys.md#j12-build-an-ai-wiki-over-a-local-folder)
-for first-folder AI activation and independent Wiki creation.
+[J12](../design-docs/user-journeys.md#j12-build-wiki-pages-from-a-local-folder)
+for first-folder Similarity Search activation and independent Wiki Page builds.
 Related contracts: [MCP Access](mcp-access.md), [Agent Runtime](agent-runtime.md),
 and [Data Lifecycle](data-lifecycle.md).

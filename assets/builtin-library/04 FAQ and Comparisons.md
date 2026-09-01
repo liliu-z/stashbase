@@ -15,9 +15,9 @@ Current online FAQ: <https://stashbase.ai/docs/faq/>
 | NotebookLM | A bounded notebook, grounded answers, and Audio Overviews | Sources are added to a Google notebook | StashBase keeps existing folders as the Library, supports ordinary-file writeback, and is Agent-agnostic |
 | Obsidian | Human-authored Markdown, links, and vault navigation | A local Markdown-first vault | StashBase can use the same vault while adding built-in retrieval, MCP, bounded Agent operations, and prepared non-Markdown evidence |
 | AI project uploads | A small, disposable context set | Copies are added to one AI conversation or project | StashBase is for a long-lived local Library whose current source files serve several Agents |
-| Spotlight, Everything, or text search | A known filename or wording | Local metadata or lexical lookup | StashBase adds format Preparation, Similar Search, visible evidence, and Agent access |
+| Spotlight, Everything, or text search | A known filename or wording | Local metadata or lexical lookup | StashBase adds format Preparation, Similarity Search, visible evidence, and Agent access |
 | Vector database or RAG framework | Building a custom application | Developer-owned ingestion and retrieval infrastructure | StashBase supplies the end-user workbench, lifecycle, permissions, recovery, and MCP boundary |
-| LLM wiki or knowledge graph | A chosen way to organize knowledge | A structured representation created in files or another system | StashBase builds a source-linked Markdown Wiki plus AI Index over the existing local files, without requiring a graph or proprietary store |
+| LLM wiki or knowledge graph | A chosen way to organize knowledge | A structured representation created in files or another system | StashBase brings Sources, source-linked Wiki Pages, and Similarity Search together without requiring a graph or proprietary store |
 
 ## Claude Code and Codex Already Read Files. Why Would I Need StashBase?
 
@@ -33,26 +33,27 @@ contents. `AGENTS.md` can identify known important files; it does not discover
 which unfamiliar source is relevant to today's question.
 
 StashBase adds that document workbench and retrieval layer. It prepares
-heterogeneous formats, offers Exact and Similar Search, preserves visible
+heterogeneous formats, offers Exact Search and Similarity Search, preserves visible
 source identity, and gives multiple Agents one authorized Library. Use direct
 Agent filesystem access when paths are known and the collection is simple; use
 StashBase when discovery, prepared evidence, or reuse across Agents matters.
 
-## Does AI Index Add Latency or Block My Work?
+## Does Similarity Search Add Latency or Block My Work?
 
-AI Index takes time to build for new or changed material, but it does not sit in
-front of ordinary file work. Indexing runs incrementally in the background.
+New or changed material takes time to prepare for Similarity Search, but that
+work does not sit in front of ordinary file work. Similarity Search preparation
+runs incrementally in the background.
 Browsing, preview, editing, Preparation, direct Agent file reads where
-available, and Exact Search continue without waiting for Similar Search.
+available, and Exact Search continue without waiting for Similarity Search.
 
-Similar Search becomes useful as current content enters AI Index. Until then,
-use Exact Search or read known files directly. A paused or failed semantic
-workload must not turn the local workspace into a blocked state.
+Similarity Search becomes useful as current content is prepared. Until then,
+use Exact Search or read known files directly. Paused or failed Similarity
+Search preparation must not turn the local workspace into a blocked state.
 
-## What Does AI Index Cost?
+## What Does Similarity Search Cost?
 
 Current StashBase builds offer a hosted monthly allowance after sign-in.
-Hosted indexing and Similar queries share it, and the account menu shows the
+Hosted indexing and Similarity Search queries share it, and the account menu shows the
 remaining percentage and reset date. When it runs out, Exact Search and every
 ordinary local workflow keep working.
 
@@ -69,24 +70,24 @@ rebuildable from them.
 
 Optional online choices still matter:
 
-- hosted or bring-your-own AI Index may send extracted text to the selected
-  indexing provider;
+- hosted or bring-your-own Similarity Search may send extracted text to the
+  selected provider;
 - Claude Code, Codex, or another Agent may send context it reads to its own
   provider according to that provider's terms;
 - local browsing, preview, editing, Preparation, transcription, and Exact
   Search do not require those hosted paths.
 
 "Local-first" therefore describes source ownership and the always-available
-local workflow; it does not mean that every optional Agent or AI Index request
+local workflow; it does not mean that every optional Agent or Similarity Search request
 is offline.
 
 ## Is StashBase an LLM Wiki or Knowledge Graph?
 
-StashBase is an AI Wiki over local files. Its structured part is ordinary,
-source-linked `wiki/index.md` plus optional pages beside it; its unstructured
-part is the invisible AI Index used for meaning-based retrieval. Create Wiki asks an
-Agent to create the structured part without replacing the folder as source of
-truth.
+StashBase is a Wiki for local files. It brings together Sources, visible
+source-linked Wiki Pages, Search, and Agent work. Build Wiki asks an
+Agent to organize Sources into `wiki/index.md` and optional focused pages
+without replacing or reorganizing the original files. Similarity Search may
+independently make the same Sources and Wiki Pages retrievable by meaning.
 
 It does not require a generated knowledge graph, a proprietary Wiki format, or
 a new storage foundation. Existing Markdown vaults, code-and-doc projects, and
@@ -170,7 +171,7 @@ builder.
 
 StashBase is the end-user document workbench and lifecycle around that
 infrastructure. It owns the ordinary-folder Library, Preparation, Exact and
-Similar Search, visible-source mapping, bounded MCP access, and built-in Chat.
+Similarity Search, visible-source mapping, bounded MCP access, and built-in Chat.
 Use a framework when building a custom application; use StashBase when the
 desired application is an Agent-ready local document Library.
 
@@ -182,9 +183,10 @@ and usable by Agents without imposing another required organization model.
 
 An Agent may organize or write files only as part of work the user directs and
 approves. StashBase does not autonomously restructure the Library in the
-background. Current Shipping folder entry has one visible create-only
-exception: StashBase seeds a missing `AGENTS.md` instruction file and never
-overwrites an existing one.
+background. Adding or opening a folder does not create instruction files. Use
+**Agent Instructions** in the Chat tab toolbar for guidance that StashBase
+stores outside the folder; existing `AGENTS.md` and `CLAUDE.md` files remain
+ordinary user-owned files.
 
 ## When Do I Probably Not Need StashBase?
 

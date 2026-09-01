@@ -1,5 +1,5 @@
 /**
- * The first-folder AI setup dialog (see `EmbedderRequireKeyGate`).
+ * The first-folder Similarity Search setup dialog (see `EmbedderRequireKeyGate`).
  *
  * Setting up an indexing source is strongly recommended, not forced: an
  * unindexed library still browses, edits, previews, and keyword-searches —
@@ -56,7 +56,7 @@ const PROVIDER_ORDER: EmbedderProvider[] = ['openai', 'openrouter'];
 type View = 'choice' | 'signin' | 'key';
 
 const TITLES: Record<View, string> = {
-  choice: 'Enable AI for your files',
+  choice: 'Set up Similarity Search',
   signin: 'Sign in to StashBase',
   key: 'Add your API key',
 };
@@ -66,7 +66,7 @@ const TITLES: Record<View, string> = {
  * dialog whose job is a choice, and the sentence that started every layer
  * of this screen running two lines deep. */
 const DESCRIPTIONS: Record<View, ReactNode> = {
-  choice: 'StashBase automatically prepares folders you add for Chat and Similar Search.',
+  choice: 'Find related Sources and Wiki Pages even when the wording differs.',
   /* The free allowance is the one thing this view has to say, so it takes
    * the view's single accent moment: the same `accent/8` wash the tinted
    * card that led here wears at rest, laid over the operative phrase.
@@ -83,11 +83,11 @@ const DESCRIPTIONS: Record<View, ReactNode> = {
     <>
       Use your{' '}
       <mark className="rounded-xs bg-accent/8 box-decoration-clone px-px text-inherit">
-        included monthly AI usage
+        included monthly Similarity Search allowance
       </mark>.
     </>
   ),
-  key: 'Paste an OpenAI or OpenRouter key.',
+  key: 'Paste an OpenAI or OpenRouter API key for Similarity Search.',
 };
 
 export function RequireApiKeyModal({
@@ -172,7 +172,7 @@ export function RequireApiKeyModal({
         * reads as "these two words are different sizes", and it stretched
         * to the dialog width so the two providers got unequal shares. */}
       <FieldSet className="mb-2 w-fit">
-      <FieldLegend className="sr-only">Embedding provider</FieldLegend>
+      <FieldLegend className="sr-only">Similarity Search provider</FieldLegend>
       <SegmentedControl
         disabled={busy}
         value={[provider]}

@@ -108,6 +108,12 @@ export function useAgentPromptQueue({
     mutateQueue((queue) => queue.map((p) => (p.id === promptId ? { ...p, status } : p)));
   }
 
+  /** Remove one prompt only while it is still local and unsent. A stale
+   * click must not discard a steer that already moved in flight. */
+  function deleteQueuedPrompt(promptId: string) {
+    mutateQueue((queue) => queue.filter((prompt) => prompt.id !== promptId || prompt.status !== 'waiting'));
+  }
+
   function send(text: string, skill?: string) {
     const atts = attachmentsRef.current;
     const titleHint = capabilitiesRef.current?.titleHint && isDefaultChatTitle(titleRef.current) ? text : undefined;
@@ -119,13 +125,12 @@ export function useAgentPromptQueue({
     void sendPromptNow({ text, attachments: atts, titleHint, skill, appendBlock: true, clearAttachments: true });
   }
 
-  /** Send a product-owned preset whose wire instructions are intentionally
-   * fuller than the action the user sees in the transcript. Presets are only
-   * fired while idle, so they never join the user-authored follow-up queue. */
-  function sendPreset(text: string, displayText: string) {
+  /** Send a product action while idle without borrowing composer attachments.
+   * Its visible transcript text and wire text are deliberately identical. */
+  function sendPreset(text: string) {
     if (turnActiveRef.current) return false;
-    const titleHint = capabilitiesRef.current?.titleHint && isDefaultChatTitle(titleRef.current) ? displayText : undefined;
-    void sendPromptNow({ text, displayText, attachments: [], titleHint, appendBlock: true });
+    const titleHint = capabilitiesRef.current?.titleHint && isDefaultChatTitle(titleRef.current) ? text : undefined;
+    void sendPromptNow({ text, attachments: [], titleHint, appendBlock: true });
     return true;
   }
 
@@ -279,6 +284,7 @@ export function useAgentPromptQueue({
     clearQueue,
     retireQueue,
     setQueuedPromptStatus,
+    deleteQueuedPrompt,
     runNextQueuedPrompt,
     steerQueuedPrompt,
     send,

@@ -13,7 +13,7 @@ handoff destinations. It does not own general diagnostics, telemetry, crash
 reporting, GitHub authentication, or automatic issue submission.
 
 Bug-report drafts and prepared temporary artifacts are application state, not
-workspace files. They never join the library, search, preparation, or AI Index.
+workspace files. They never join the library, search, preparation, or Similarity Search.
 
 ## Current Experience
 

@@ -12,8 +12,6 @@ export type MentionQuery = { kind: 'mention' | 'skill'; q: string; from: number 
 
 export type MentionComposerHandle = {
   focus: () => void;
-  /** Replace the draft with a starter template. Prefill only — never sends. */
-  setText: (text: string) => void;
   insertMention: (path: string, query: Exclude<MentionQuery, null>) => void;
   insertSkill: (label: string, query: Exclude<MentionQuery, null>) => void;
   clearQuery: (query: Exclude<MentionQuery, null>) => void;
@@ -228,17 +226,6 @@ export function MentionComposer({
 
   useImperativeHandle(ref, () => ({
     focus: () => viewRef.current?.focus(),
-    setText: (text) => {
-      const view = viewRef.current;
-      if (!view) return;
-      // Replacing the whole document drops any mention markers with it; the
-      // update listener then re-syncs the serialized draft and skill state.
-      view.dispatch({
-        changes: { from: 0, to: view.state.doc.length, insert: text },
-        selection: { anchor: text.length },
-      });
-      view.focus();
-    },
     insertMention: (path, query) => {
       const view = viewRef.current;
       if (!view) return;

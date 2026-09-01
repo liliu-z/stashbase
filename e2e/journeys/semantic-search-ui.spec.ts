@@ -82,10 +82,10 @@ test('semantic search UI renders deterministic loading, grouped, empty, and erro
   }
 });
 
-// Intent: removing the API key updates the persistent AI Index state right
+// Intent: removing the API key updates the persistent Similarity Search state right
 // away without interrupting the user. Setup opens only after an explicit
-// Enable action. Fully route-stubbed: no real key or provider.
-test('removing the API key exposes the quiet AI Index action without auto-opening setup', async ({}, testInfo) => {
+// Set up action. Fully route-stubbed: no real key or provider.
+test('removing the API key exposes the quiet Similarity Search action without auto-opening setup', async ({}, testInfo) => {
   const fixture = await createAppFixture({ membership: 'two-folders' });
   let app: LaunchedApp | undefined;
   try {
@@ -126,14 +126,14 @@ test('removing the API key exposes the quiet AI Index action without auto-openin
 
     // Remove the key through Settings.
     await app.page.getByRole('button', { name: 'Settings', exact: true }).click();
-    await app.page.getByRole('tab', { name: 'AI Index' }).click();
+    await app.page.getByRole('tab', { name: 'Similarity Search' }).click();
     await app.page.getByRole('button', { name: 'Remove key…' }).click();
     await app.page.getByRole('button', { name: 'Remove key', exact: true }).click();
 
     await app.page.getByRole('button', { name: 'Close settings' }).click();
     await expect(skip).toBeHidden();
-    await expect(app.page.getByText('AI is off', { exact: true })).toBeVisible();
-    await app.page.getByRole('button', { name: 'Enable', exact: true }).click();
+    await expect(app.page.getByText("Similarity Search isn't set up", { exact: true })).toBeVisible();
+    await app.page.getByRole('button', { name: 'Set up', exact: true }).click();
     await expect(skip).toBeVisible();
     app.errors.assertNone();
   } finally {

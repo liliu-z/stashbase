@@ -56,10 +56,9 @@ import {
 } from '@anthropic-ai/claude-agent-sdk';
 import { logger, errorMessage } from './log.ts';
 import { getCurrentFolder, getFolderHome, memberRootForAbs, runWithWindowId } from './folder.ts';
-import { buildStashbasePreamble } from './agent-preamble.ts';
+import { resolveAgentInstructions } from './agent-instructions.ts';
 import { agentCliEnv, agentCliNeedsShell, commandDir, resolveAgentCli } from './agent-cli.ts';
-import { ensureClaudeBridgeFile, ensureClaudeFolderTrust } from './agent-rules.ts';
-import { noteTreeChanged } from './watcher.ts';
+import { ensureClaudeFolderTrust } from './agent-rules.ts';
 import { disposeSessionsBoundToFolder, isAgentAccessMode, reportAgentRuntimeFailure, resolveSessionBinding, type AgentAccessMode, type AgentSessionTermination } from './agent-contract.ts';
 import type { AgentClientEvent, AgentModel, AgentServerEvent, AgentSkill } from './agent-contract.ts';
 import {
@@ -420,9 +419,6 @@ export class AgentSession implements AttributedAgentSession {
       this.finish(missingClaudeMessage());
       return;
     }
-    // Instruction bridge files belong to member folders; a library-wide
-    // session must not write them into the folder home container.
-    if (!this.libraryScoped && ensureClaudeBridgeFile(cwd)) noteTreeChanged();
     // Pre-accept Claude's folder-trust gate for the session cwd (library
     // sessions run in the folder home — same gate). Without this a NEW
     // folder's headless session hangs at "working" with no visible prompt.
@@ -458,14 +454,15 @@ export class AgentSession implements AttributedAgentSession {
           // Apply the shared Access choice when the native session starts.
           // Later changes still use the SDK's live setPermissionMode API.
           permissionMode: this.access,
-          // Orient the panel inside StashBase. settingSources below loads
-          // CLAUDE.md / skills / MCP, but nothing tells the model it's in a
-          // StashBase folder, what search_library/reindex are for, or the house
-          // rules (those reach the model only via the advisory MCP
-          // `instructions` field + an optional library_info call). Inject that
-          // deterministically as a system-prompt append. See
-          // agent-preamble.ts and architecture.md §8.4.
-          systemPrompt: { type: 'preset', preset: 'claude_code', append: buildStashbasePreamble(cwd, scope) },
+          // Agent Instructions are the only StashBase-owned prompt. Preserve
+          // Claude Code's native preset and append the resolved working-folder
+          // text (or the packaged default for a Library Chat) without an
+          // Adapter-specific preamble or wrapper.
+          systemPrompt: {
+            type: 'preset',
+            preset: 'claude_code',
+            append: resolveAgentInstructions(scope === 'library' ? null : cwd),
+          },
           // Resuming a past session loads its conversation history so the
           // user can continue it. The transcript itself is rendered from
           // getSessionMessages on the client; `resume` only primes the SDK
@@ -756,7 +753,6 @@ export class AgentSession implements AttributedAgentSession {
 
       const claudeCodeExecutable = this.resolveBinary();
       if (!claudeCodeExecutable) throw new Error(missingClaudeMessage());
-      if (ensureClaudeBridgeFile(target)) noteTreeChanged();
       ensureClaudeFolderTrust(target);
 
       this.input = new Pushable<SDKUserMessage>();

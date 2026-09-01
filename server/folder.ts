@@ -23,6 +23,7 @@ import {
   readAppConfigAsync as readConfigAsync,
   readAppConfigStrict as readConfigStrict,
   writeAppConfigStrict as writeConfigStrict,
+  type AppConfigFile,
   type RecentFolder,
 } from './app-config.ts';
 
@@ -738,13 +739,15 @@ export async function assertLibraryFolderAvailableAsync(absPath: string): Promis
 
 /** Remove a folder from the membership list ("Your Folders"). Does NOT
  *  touch the folder on disk — removal only forgets it from the knowledge
- *  base; the caller clears its index rows separately. No-op if absent. */
+ *  base; the caller clears its index rows separately. StashBase-owned Agent
+ *  Instructions for that membership leave with it; user files do not. */
 export function removeRecent(absPath: string): void {
   const target = filesystemPath.absolute(absPath);
   const cfg = readConfigStrict();
   const list = (cfg.recentFolders ?? []).map(currentRecentFolder);
   const filtered = list.filter((v) => !storedFolderPathEquals(v.path, target));
-  if (filtered.length === list.length) return;
+  const instructionsChanged = removeFolderInstructions(cfg, target);
+  if (filtered.length === list.length && !instructionsChanged) return;
   cfg.recentFolders = filtered;
   writeConfigStrict(cfg);
 }
@@ -757,11 +760,24 @@ export async function removeRecentAsync(absPath: string): Promise<void> {
     const revision = JSON.stringify(snapshot);
     const list = (snapshot.recentFolders ?? []).map(currentRecentFolder);
     const matches = await Promise.all(list.map((value) => storedFolderPathEqualsAsync(value.path, target)));
+    const instructionFolders = Array.isArray(snapshot.agentInstructions?.folders)
+      ? snapshot.agentInstructions.folders
+      : [];
+    const instructionMatches = await Promise.all(
+      instructionFolders.map((value) => storedFolderPathEqualsAsync(value?.path, target)),
+    );
     const current = readConfigStrict();
     if (JSON.stringify(current) !== revision) continue;
     const filtered = list.filter((_, index) => !matches[index]);
-    if (filtered.length === list.length) return;
+    const retainedInstructions = instructionFolders.filter((_, index) => !instructionMatches[index]);
+    const instructionsChanged = retainedInstructions.length !== instructionFolders.length;
+    if (filtered.length === list.length && !instructionsChanged) return;
     current.recentFolders = filtered;
+    if (instructionsChanged) {
+      if (retainedInstructions.length) current.agentInstructions!.folders = retainedInstructions;
+      else delete current.agentInstructions!.folders;
+      compactAgentInstructions(current);
+    }
     writeConfigStrict(current);
     return;
   }
@@ -769,6 +785,24 @@ export async function removeRecentAsync(absPath: string): Promise<void> {
   (err as any).code = 'CONFIG_BUSY';
   (err as any).status = 409;
   throw err;
+}
+
+function removeFolderInstructions(config: AppConfigFile, target: string): boolean {
+  const folders = Array.isArray(config.agentInstructions?.folders)
+    ? config.agentInstructions.folders
+    : [];
+  const retained = folders.filter((entry) => !storedFolderPathEquals(entry?.path, target));
+  if (retained.length === folders.length) return false;
+  if (retained.length) config.agentInstructions!.folders = retained;
+  else delete config.agentInstructions!.folders;
+  compactAgentInstructions(config);
+  return true;
+}
+
+function compactAgentInstructions(config: AppConfigFile): void {
+  if (!config.agentInstructions?.folders?.length) {
+    delete config.agentInstructions;
+  }
 }
 
 /** Star / unstar a member folder in the library list. Returns false when

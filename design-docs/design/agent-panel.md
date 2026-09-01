@@ -23,20 +23,38 @@ and uses a hosted service only as its metered model provider.
 - Chat begins expanded. With no document it is the primary work surface;
   opening a source docks the same mounted session beside it, and closing the
   last source expands an open Chat again.
-- A blank Chat keeps the durable greeting **Your knowledge is here**. In folder
-  scope, one fixed **Create Wiki** capsule sits directly below the composer and
-  sends a complete product-owned preset immediately. The greeting, composer,
-  and capsule remain one vertically centered action group rather than
-  inheriting the Library suggestion layout. Library-scoped Chat retains
-  rotating prompt templates, which prefill rather than send.
+- A blank Chat keeps the durable greeting **Your Wiki is here**. In folder
+  scope, one fixed **Build Wiki** capsule sits directly below the composer
+  and sends a complete product-owned preset immediately. The greeting,
+  composer, and capsule remain one vertically centered action group. A
+  Library-scoped blank Chat stays focused on the greeting and composer without
+  a bottom suggestion carousel.
 - **Similarity Search** is a single switch inside the Chat's session scope
   picker, below the folder list and outside the Agent's Mode and model
   settings. It sits with scope because scope decides what a lookup may reach
   and this decides how it matches. On adds meaning-based retrieval on top of
-  text matching; turning it Off never stops search. It is On when AI Index
-  is available and can be turned Off per Chat to keep `search_library`
+  text matching; turning it Off never stops search. It is On when Similarity
+  Search is available and can be turned Off per Chat to keep `search_library`
   text-only. Both states retain direct and prepared document retrieval; asking
-  to turn it On before AI setup opens the explicit setup path.
+  to turn it On before Similarity Search setup opens the explicit setup path.
+- For a Chat with a concrete working folder, **Agent Instructions** is a glyph
+  action at the right of the Chat tab strip, separate from conversation controls
+  and sharing a centre line with the chat-panel toggle beside it. It edits that
+  concrete working folder — named in its tooltip — and a quiet dot shows when that folder
+  customizes the default. Library-wide Chats use the packaged default and do
+  not show a misleading Library-wide editor.
+  The editor saves in StashBase rather than the source tree, and saving takes
+  effect from the next message in every open Chat already using that folder,
+  not only in Chats started afterwards — the editor opens from the tab strip,
+  so there is always an open Chat that a new-Chats-only rule would exclude. A
+  Chat mid-turn applies it once that turn settles. The plain-language packaged
+  default contains every StashBase-owned behavior: search the Wiki when an
+  answer may depend on the user's work, answer briefly and name source files,
+  offer to make specific changes surfaced in discussion, keep Wiki Pages under
+  `wiki/`, and maintain an existing Wiki's conventions and affected links.
+  Clearing and saving restores that default. Existing `AGENTS.md` and
+  `CLAUDE.md` files remain separate user-owned runtime inputs and are never
+  changed.
 - New users start with **Built-in** selected. The New Chat picker lists Codex,
   Claude Code, then Built-in. Its second line says **Sign in for free credits**
   while signed out and **Free credits included** after sign-in, keeping the
@@ -70,13 +88,17 @@ and uses a hosted service only as its metered model provider.
   An idle Codex conversation can change the model used by its next turn without
   replacing its native thread; the picker pauses while a turn is active. Claude
   keeps its selected model fixed after the conversation has content.
-  Suggestions prefill rather than send; Create Wiki is the deliberate exception
-  because it is a complete capability action rather than an editable template.
+  Build Wiki sends immediately because it is a complete capability action
+  rather than an editable template.
 - Streaming, tool activity, permissions, runtime-supported attachments, skills, recovery, and
   file artifacts remain inspectable. Collapsed tool summaries omit exact
   counts while using grammatical singular or plural category labels. Editing
   and resending an earlier prompt stops conflicting active work before
   beginning the new turn.
+- A follow-up submitted during an active turn waits visibly. The user may
+  delete one waiting follow-up before it is sent without interrupting the
+  active turn or removing its queued siblings; runtimes that support steering
+  also offer **Steer** for that waiting item.
 - Built-in normalizes OpenCode streaming, tools, permission requests,
   native session history, and file Diffs into the same panel contract. Each
   live panel session has an independently attributed local runtime and MCP
@@ -118,20 +140,26 @@ and uses a hosted service only as its metered model provider.
 - Opening, switching, or resuming an Agent tab is not installation consent.
   The included runtime needs no install action; each missing bring-your-own
   runtime waits for its own explicit setup action.
-- Create Wiki pins its blank tab to the shown folder and retains one
+- Build Wiki pins its blank tab to the shown folder and retains one
   cancellable, renderer-local pending intent across selected-Agent setup or
   reconnect. Once the runtime is ready, the preset sends exactly once in that
-  tab. AI setup is independent and never blocks this intent. Folder removal
-  cancels it; app restart never restores it.
+  tab. Similarity Search setup is independent and never blocks this intent.
+  Folder removal cancels it; app restart never restores it.
 - Similarity Search is live session policy, not Agent permission mode. The
   renderer sends the effective value before any ready-transition prompt and
-  reapplies it when AI Index availability changes. Turning it Off leaves
+  reapplies it when Similarity Search availability changes. Turning it Off leaves
   prepared PDF and document text searchable and does not alter background
   indexing.
-- The Create Wiki preset may create or improve `wiki/index.md` and focused
-  pages under `wiki/`. It may not modify anything outside `wiki/`; moves,
-  renames, deletions, or broad source rewrites are separate proposals requiring
-  explicit approval.
+- Agent Instructions are durable working-folder metadata, not a live turn
+  control or a security boundary. Save failures remain visible, the folder
+  requires live library membership, and changes reach matching open folder
+  Chats from their next message. Library-wide Chats resolve the packaged
+  default. The resolved text is the only StashBase-owned Agent prompt; Runtime
+  Adapters inject it verbatim without another product preamble or hidden MCP
+  instruction.
+- The Build Wiki preset sends only its visible concise request. Wiki Page
+  placement and maintenance behavior live in Agent Instructions rather than a
+  second hidden wire prompt.
 - A runtime, transport, or turn failure leaves one persistent explanation and
   a truthful, stage-specific recovery path. Retrying preparation resumes from
   the first incomplete stage. After an installation failure, **Check again**
@@ -229,7 +257,7 @@ Codex and Claude Code retain the full native cwd and history migration contract.
 Journeys: [J01](../user-journeys.md#j01-complete-onboarding-and-reach-first-value),
 [J06](../user-journeys.md#j06-start-and-continue-an-agent-chat), and
 [J07](../user-journeys.md#j07-converge-chat-into-a-document), plus
-[J12](../user-journeys.md#j12-build-an-ai-wiki-over-a-local-folder). The complete
+[J12](../user-journeys.md#j12-build-wiki-pages-from-a-local-folder). The complete
 source-to-Agent-to-source route is the
 [J10](../user-journeys.md#j10-turn-a-local-project-into-durable-agent-assisted-work)
 core loop. A Library Chat becomes a new durable project through

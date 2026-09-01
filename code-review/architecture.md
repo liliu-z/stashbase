@@ -30,9 +30,11 @@ presentation, and Agent tabs.
 
 ## Ownership Boundaries
 
-- The user owns source files and visible `AGENTS.md` / `CLAUDE.md` files.
+- The user owns source files and visible `AGENTS.md` / `CLAUDE.md` files;
+  StashBase never creates or rewrites those runtime-native inputs.
 - The Node server owns authorized filesystem operations, format preparation,
-  reconcile orchestration, Settings writes, MCP, and Agent adapters.
+  reconcile orchestration, Settings writes including scoped Agent Instructions,
+  MCP, and Agent adapters.
 - The Python daemon owns chunking, embeddings, vector storage, and semantic
   retrieval. It receives text and source identity; it never decides how a
   source format is converted. For hosted embeddings it calls a Node-owned

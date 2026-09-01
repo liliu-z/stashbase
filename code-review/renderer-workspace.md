@@ -114,7 +114,7 @@ semantic readiness.
   state.
 - The blank-chat lifecycle follows [Agent Panel](agent-panel.md); the workspace
   may reveal or dock it but does not redefine Agent session scope. A pending
-  Create Wiki intent is started and pinned by the Agent Panel; window-folder
+  Build Wiki intent is started and pinned by the Agent Panel; window-folder
   transitions must neither redirect it nor count that tab as reusable blank
   state.
 
@@ -192,7 +192,7 @@ search presentation and result navigation, and
 for the complete cross-surface loop, and
 [J11](../design-docs/user-journeys.md#j11-turn-a-conversation-into-a-project)
 for project registration and originating-window entry, and
-[J12](../design-docs/user-journeys.md#j12-build-an-ai-wiki-over-a-local-folder)
+[J12](../design-docs/user-journeys.md#j12-build-wiki-pages-from-a-local-folder)
 for pending folder-pinned activation.
 Related contracts: [Window Lifecycle](window-lifecycle.md),
 [File Transactions](file-transactions.md), [Agent Panel](agent-panel.md), and

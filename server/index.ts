@@ -77,6 +77,7 @@ import { blake3File } from './file-hash.ts';
 import { mount as mountSessionsRoutes } from './routes/sessions.ts';
 import { mount as mountCodexSessionsRoutes } from './routes/codex-sessions.ts';
 import { mount as mountAgentSessionsRoutes } from './routes/agent-sessions.ts';
+import { mount as mountAgentInstructionsRoutes } from './routes/agent-instructions.ts';
 import { mount as mountOnboardingRoutes } from './routes/onboarding.ts';
 import { mount as mountAccountRoutes } from './routes/account.ts';
 import { BUILT_IN_AGENT_ADAPTERS } from './agent-adapters.ts';
@@ -359,6 +360,7 @@ mcpHttpService.mountLoopback(app); // local POST /mcp; Docker listener is opt-in
 mountSessionsRoutes(app); // global (no requireFolder) — lists all local sessions
 mountCodexSessionsRoutes(app); // global (no requireFolder) — filters to current folder when open
 mountAgentSessionsRoutes(app); // shared contract history surface for the built-in panel
+mountAgentInstructionsRoutes(app); // global + explicit member-folder Chat guidance
 
 // Renderer error sink. The root `ErrorBoundary` POSTs render-time
 // exceptions here so they appear in the same server log developers

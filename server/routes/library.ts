@@ -37,7 +37,6 @@ import { cancelConversionsUnderAndWait } from '../conversion.ts';
 import { noteTreeChanged } from '../watcher.ts';
 import { deleteDerivedForSource, deleteDerivedUnderFolder, type DerivedCleanupStats } from '../derived-store.ts';
 import { deleteFileOrderForRoot } from '../file-order.ts';
-import { ensureAgentsFile } from '../agent-rules.ts';
 import { stopAgentRuntimeForFolder } from '../agent-contract.ts';
 
 const log = logger('routes/folder');
@@ -121,7 +120,6 @@ export function mount(app: express.Express): void {
     try {
       const changed = setCurrentFolder(target, { create, exclusiveCreate });
       const folderRoot = getCurrentFolder()!;
-      if (ensureAgentsFile(folderRoot)) noteTreeChanged();
       const windowId = currentWindowId();
       if (changed) {
         res.once('finish', () => notifyFolderSwitch(folderRoot, windowId));

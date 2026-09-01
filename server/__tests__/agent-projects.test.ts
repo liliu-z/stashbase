@@ -46,7 +46,6 @@ const projectPath = (name: string, parent = HOME) => filesystemPath.join(parent,
 
 interface DepsLog {
   registered: string[];
-  agentsFiles: string[];
   treeChanges: number;
   synced: string[];
   events: string[];
@@ -87,12 +86,11 @@ function fakeDeps(
   windowSession: AttributedAgentSession | null = null,
   globalSession: AttributedAgentSession | null = null,
 ): { deps: CreateProjectDeps; log: DepsLog } {
-  const log: DepsLog = { registered: [], agentsFiles: [], treeChanges: 0, synced: [], events: [], overrides: [], cleared: [] };
+  const log: DepsLog = { registered: [], treeChanges: 0, synced: [], events: [], overrides: [], cleared: [] };
   const deps: CreateProjectDeps = {
     folderHome: () => HOME,
     memberRoots: () => [MEMBER],
     register: (abs) => { log.registered.push(abs); },
-    ensureAgentsFile: (abs) => { log.agentsFiles.push(abs); return true; },
     noteTreeChanged: () => { log.treeChanges += 1; },
     syncFolder: async (abs) => { log.synced.push(abs); },
     session: (attributionId) => (attributionId ? session : null),
@@ -133,7 +131,7 @@ test('create_project defaults to the folder home and accepts only owned location
   }
 });
 
-test('create_project creates, seeds AGENTS.md, registers, and reports no rebind without attribution', async () => {
+test('create_project creates and registers an empty folder without writing Agent files', async () => {
   const { deps, log } = fakeDeps(null);
   const result = await createProjectFolder({ name: 'Unattributed' }, deps);
   const target = projectPath('Unattributed');
@@ -142,7 +140,7 @@ test('create_project creates, seeds AGENTS.md, registers, and reports no rebind 
   assert.equal(result.rebound, false);
   assert.equal(fs.statSync(target).isDirectory(), true);
   assert.deepEqual(log.registered, [target]);
-  assert.deepEqual(log.agentsFiles, [target]);
+  assert.deepEqual(fs.readdirSync(target), []);
   assert.equal(log.treeChanges, 1);
   assert.deepEqual(log.overrides, []);
   // Background bind/sync is queued for the new member.

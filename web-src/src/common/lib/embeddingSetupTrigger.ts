@@ -1,5 +1,5 @@
-/** How any surface asks the AI setup dialog to open manually — the Files-panel
- * Enable entry, Similar Search, or Settings. Mirrors `settingsTrigger`; the gate
+/** How any surface asks the Similarity Search setup dialog to open manually — the Files-panel
+ * Set up entry, Similarity Search mode, or Settings. Mirrors `settingsTrigger`; the gate
  * that listens stays in the Settings feature, and the alternative is
  * threading a callback from the app root down to a lazily-loaded card. */
 

@@ -202,7 +202,7 @@ function FilesPanel() {
         </section>
         )}
       </ActiveFolderSection>
-      {/* AI Index authorization is APP-WIDE, not a property of the
+      {/* Similarity Search authorization is APP-WIDE, not a property of the
         * open folder, so it sits in the bottom chrome above the account
         * row rather than inside the file tree. Wedged between a folder header
         * and its own files it read as a fact about those files, and it

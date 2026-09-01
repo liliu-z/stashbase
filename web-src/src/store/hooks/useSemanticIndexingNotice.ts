@@ -12,7 +12,7 @@ interface SemanticIndexingNoticeModel {
 
 const NOTICE_STATES = ['awaiting-decision', 'paused', 'partial-paused'];
 
-/** The AI Index workload the Files panel and the search popup both announce,
+/** The Similarity Search workload the Files panel and the search popup both announce,
  *  or `null` when there is nothing to say. One rule, so the two surfaces
  *  cannot disagree about when the notice is due. */
 export function useSemanticIndexingNotice(): SemanticIndexingNoticeModel | null {

@@ -83,7 +83,7 @@ test('a data-free native return focuses the window attached to the browser retur
   assert.equal(output.second.appReturned, undefined);
 });
 
-test('OAuth flows retain whether sign-in may activate hosted AI Index', () => {
+test('OAuth flows retain whether sign-in may activate hosted Similarity Search', () => {
   const result = runIsolated(`
     const account = await import('./server/hosted-account.ts');
     const identity = account.beginHostedOAuth('google', 'http://127.0.0.1:8090');

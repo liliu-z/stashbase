@@ -2,7 +2,7 @@
   "name": "stashbase",
   "version": "2.0.0",
   "packageManager": "pnpm@11.5.1",
-  "description": "StashBase builds an AI wiki over your local files.",
+  "description": "StashBase is a Wiki for your local files.",
   "author": {
     "name": "liliu-z",
     "email": "bingwuthu@gmail.com"
@@ -24,7 +24,7 @@
     "milvus",
     "embeddings",
     "rag",
-    "ai-index"
+    "similarity-search"
   ],
   "type": "module",
   "main": "electron/main.cjs",
@@ -48,7 +48,7 @@
     "build:desktop": "pnpm build && pnpm build:python-sidecar && pnpm build:transcription-sidecar",
     "setup:python": "node scripts/setup-python.mjs",
     "test:python": "node scripts/test-python.mjs",
-    "test:config": "node --import tsx --test server/app-config.test.ts server/embedding-availability.test.ts server/hosted-account.test.ts server/account-route.test.ts",
+    "test:config": "node --import tsx --test server/app-config.test.ts server/agent-instructions.test.ts server/embedding-availability.test.ts server/hosted-account.test.ts server/account-route.test.ts",
     "lint:web": "oxlint --config .oxlintrc.json web-src/src && node --test scripts/check-renderer-api-access.test.mjs && node scripts/check-renderer-api-access.mjs",
     "test:renderer": "node scripts/run-renderer-tests.mjs \"web-src/src/**/*.test.ts\"",
     "audit:renderer": "npx --yes @shadscan/cli@0.17.0 . --json --no-interactive --fail-under 45",
@@ -155,6 +155,10 @@
       {
         "from": "assets/builtin-library",
         "to": "assets/builtin-library"
+      },
+      {
+        "from": "assets/agent-instructions",
+        "to": "assets/agent-instructions"
       },
       {
         "from": "node_modules/opencode-ai/bin/opencode.exe",

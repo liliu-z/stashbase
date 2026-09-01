@@ -5,6 +5,8 @@
  */
 import type {
   AgentContextFile,
+  AgentInstructionsScope,
+  AgentInstructionsState,
   AgentDiscoveryPolicy,
   AgentSetupFailureSimulation,
   AgentTurnFailureSimulation,
@@ -326,6 +328,13 @@ export const api = {
   }>) => send<AgentsResponse>('PUT', '/api/terminal/debug', patch),
   resetManagedAgent: (agent: Exclude<import('@shared/agent-protocol').AgentId, 'stashbase'>) =>
     send<AgentsResponse>('DELETE', `/api/terminal/clis/${encodeURIComponent(agent)}/managed`),
+  getAgentInstructions: (scope: AgentInstructionsScope) =>
+    getJson<AgentInstructionsState>(`/api/agent-instructions?scope=${encodeURIComponent(agentInstructionsScopeValue(scope))}`),
+  setAgentInstructions: (scope: AgentInstructionsScope, text: string) =>
+    send<AgentInstructionsState>('PUT', '/api/agent-instructions', {
+      scope: agentInstructionsScopeValue(scope),
+      text,
+    }),
   mcpStatus: () =>
     getJson<{
       command: string;
@@ -374,6 +383,10 @@ export const api = {
   deleteSession: (id: string, agent: import('@shared/agent-protocol').AgentId = 'stashbase', scope?: SessionScopeParams) =>
     send<Record<string, never>>('DELETE', agentSessionBase(agent) + '/' + encodeURIComponent(id) + sessionScopeQuery(scope)),
 };
+
+function agentInstructionsScopeValue(scope: AgentInstructionsScope): string {
+  return scope.path;
+}
 
 function agentSessionBase(agent: import('@shared/agent-protocol').AgentId): string {
   return `/api/agents/${encodeURIComponent(agent)}/sessions`;

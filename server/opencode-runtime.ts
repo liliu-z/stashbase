@@ -20,7 +20,7 @@ import {
 } from '@opencode-ai/sdk';
 import { getHostedAccountSession } from './app-config.ts';
 import { ensureMcpLauncher } from './agent-mcp.ts';
-import { buildStashbasePreamble } from './agent-preamble.ts';
+import { resolveAgentInstructions } from './agent-instructions.ts';
 import { appDataRoot } from './local-data.ts';
 import { logger } from './log.ts';
 import {
@@ -129,7 +129,7 @@ export function buildOpenCodeConfig(
   model: { apiKey: string; baseUrl: string; model: string },
   mcp: string,
   mcpEnvironment: Record<string, string> = {},
-  preamble?: string,
+  agentInstructions?: string,
 ): Config {
   const permission = {
     edit: 'ask',
@@ -180,12 +180,12 @@ export function buildOpenCodeConfig(
       'stashbase-folder': {
         description: 'StashBase built-in Agent for one authorized library folder.',
         mode: 'primary',
-        ...(preamble ? { prompt: preamble } : {}),
+        ...(agentInstructions ? { prompt: agentInstructions } : {}),
       },
       'stashbase-library': {
         description: 'StashBase built-in Agent for the authorized library.',
         mode: 'primary',
-        ...(preamble ? { prompt: preamble } : {}),
+        ...(agentInstructions ? { prompt: agentInstructions } : {}),
         // A Library chat spans a non-contiguous set of registered folders.
         // Native cwd tools cannot express that membership boundary, so this
         // mode reaches files only through the scoped StashBase MCP server.
@@ -216,9 +216,9 @@ export function buildOpenCodeConfig(
 function openCodeConfig(
   model: { apiKey: string; baseUrl: string; model: string },
   mcpEnvironment: Record<string, string>,
-  preamble?: string,
+  agentInstructions?: string,
 ): Config {
-  return buildOpenCodeConfig(model, ensureMcpLauncher(), mcpEnvironment, preamble);
+  return buildOpenCodeConfig(model, ensureMcpLauncher(), mcpEnvironment, agentInstructions);
 }
 
 class OpenCodeRuntime {
@@ -230,7 +230,7 @@ class OpenCodeRuntime {
 
   constructor(
     private readonly mcpEnvironment: Record<string, string> = {},
-    private readonly preamble?: string,
+    private readonly agentInstructions?: string,
     private readonly requireAccount = true,
     private readonly agentSessionId = 'history',
   ) {
@@ -355,7 +355,7 @@ class OpenCodeRuntime {
       '--pure',
       '--log-level=WARN',
     ], {
-      env: privateRuntimeEnvironment(openCodeConfig(model, this.mcpEnvironment, this.preamble), username, password),
+      env: privateRuntimeEnvironment(openCodeConfig(model, this.mcpEnvironment, this.agentInstructions), username, password),
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
     });
@@ -448,7 +448,9 @@ export function createOpenCodeSessionRuntime(
   const sessionRuntime = new OpenCodeRuntime({
     STASHBASE_WINDOW_ID: context.windowId,
     STASHBASE_AGENT_SESSION_ID: context.agentSessionId,
-  }, buildStashbasePreamble(context.cwd, context.scope), true, context.agentSessionId);
+  }, resolveAgentInstructions(
+    context.scope === 'library' ? null : context.cwd,
+  ), true, context.agentSessionId);
   return {
     client: (directory) => sessionRuntime.client(directory),
     beginTurn: (turnId, profile) => beginHostedAgentTurn(context.agentSessionId, turnId, profile),

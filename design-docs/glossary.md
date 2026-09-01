@@ -20,6 +20,20 @@ leads before a document is opened and docks beside the Document Workbench when
 a source is active. The Agent Panel may run Built-in, Claude Code, or
 Codex; it is not itself synonymous with any runtime.
 
+## Agent Instructions
+
+The one StashBase-owned Agent prompt. A plain-language packaged default applies
+to every Chat. A concrete working folder may customize it in application
+metadata; Library-wide Chats use the packaged default and have no Library-wide
+customization. Runtime Adapters inject the resolved text verbatim and do not
+prepend or append another StashBase prompt. Saving remounts matching folder
+Chats so it applies from their next message. It is guidance, not a security
+boundary.
+
+`AGENTS.md`, `CLAUDE.md`, and other runtime-native instruction files remain
+ordinary user-owned runtime inputs. StashBase neither creates nor rewrites
+them, and does not call those files Agent Instructions in product UI.
+
 ## Built-in
 
 The included zero-install Agent shown as **Built-in** in Agent pickers and Chat
@@ -28,30 +42,38 @@ out and **Free credits included** after sign-in. It uses
 StashBase's pinned local OpenCode runtime and the signed-in account allowance.
 `stashbase` remains its implementation identifier.
 
-## AI Index
+## Similarity Search
 
-The user-facing name for the optional meaning-based index within the local RAG
-layer. It enables semantic retrieval when an embedding source is configured,
-but it is not the whole RAG layer: preparation and exact retrieval remain
-useful without it. Use `semantic indexing`, `semantic retrieval`, and
-`embedding` only in engineering contracts or a disclosure that needs the
-technical mechanism.
+The user-facing name for optional meaning-based retrieval across the Wiki.
+When an embedding source is configured, it combines vector similarity with
+text matching and always returns evidence through a visible Source. Exact
+Search remains available without it.
 
-**Similarity Search** is the per-Chat use control for this capability, not a
-second name for the index. On lets Agent retrieval combine AI Index similarity
-with text matches. Off keeps Agent retrieval on direct and prepared text only;
-it does not delete, pause, or expose the AI Index.
+A Chat's **Similarity Search** control decides whether that Chat uses the
+capability. Turning it off keeps retrieval text-only; it does not pause or
+delete background search data. Describe background work as preparing or
+updating files for Similarity Search. Use `semantic indexing`, `semantic
+retrieval`, `vector`, and `embedding` only in engineering contracts or a
+disclosure that needs the technical mechanism.
 
-## AI Wiki
+## Wiki
 
-The product-level layer StashBase builds over local files. It combines a
-**structured Wiki**—visible, source-linked `wiki/index.md` and optional pages
-beside it—with the invisible **AI Index**. Both help Agents use the same local
-sources; neither replaces the folder as source of truth.
+The product-level knowledge space StashBase presents over the Library. A Wiki
+brings together user-owned **Sources**, visible source-linked **Wiki Pages**,
+Exact Search, Similarity Search, and Agent work without replacing the folders
+as source of truth. It is not a separate hosted knowledge store.
 
-Use **Create Wiki** for the explicit first action that asks an Agent to create
-or improve the structured part. Do not use AI Wiki as a synonym for only the
-vector index, only generated Markdown, or a separate hosted knowledge store.
+## Wiki Pages
+
+Visible Markdown under a folder's `wiki/` directory, with `wiki/index.md` as
+the entry page and optional focused pages beside it. Wiki Pages organize and
+explain Sources through relative links. They are ordinary user-owned files,
+not hidden StashBase derived data, and they re-enter browsing, search, and
+future Agent work.
+
+Use **Build Wiki** for the explicit folder-scoped action that asks an
+Agent to create or improve these pages from Sources. The action never grants
+permission to move, rename, delete, or broadly rewrite Sources.
 
 ## Canvas
 
@@ -110,7 +132,8 @@ communicates this capability boundary; it does not mean the file is missing.
 
 Rebuildable text, assets, indexes, checkpoints, and status records that
 StashBase creates from source files. Derived data stays outside the visible
-workspace and never replaces source-file identity.
+workspace and never replaces source-file identity. Do not use this term for
+visible, user-owned Wiki Pages.
 
 ## Library
 
@@ -125,24 +148,26 @@ source-grounded Agent context. It combines Preparation with exact and
 meaning-based retrieval. **Local** describes ownership of sources, derived
 state, and index lifecycle; configured embedding capacity may be hosted.
 
-AI Index is the optional meaning-based index inside this layer, not a synonym
-for the whole layer.
+Similarity Search is the optional meaning-based retrieval capability inside
+this layer, not a synonym for the whole layer.
 
 ## Preparation
 
 Format-specific work that makes a source usable for search or Agent reading,
 such as PDF extraction, image OCR, DOCX text derivation, or media
-transcription. Preparation and AI Index readiness are separate states.
+transcription. Preparation and Similarity Search readiness are separate states.
 
 ## Product scenario
 
 A durable, high-level reason someone uses StashBase. A scenario explains
 motivation and desired outcome; it does not prescribe screens or test steps.
 
-## Source file
+## Source
 
-The user-owned file that remains visible, openable, and authoritative. Search
-evidence and Agent-readable derived text always resolve back to this identity.
+An original user-owned file that remains visible, openable, and authoritative.
+Product headings and controls may use **Source** or **Sources**; explanatory
+prose may say source file. Search evidence, prepared text, and Wiki Pages
+always resolve or link back to this identity.
 
 ## User journey
 

@@ -121,8 +121,8 @@ export function SearchStatusBanner({ semanticMode, onNavigateAway }: {
     return (
       <SearchBanner
         tone="info"
-        title="AI setup required"
-        detail="Set up AI to search by meaning. Exact Search stays available without it."
+        title="Similarity Search setup required"
+        detail="Set up Similarity Search to match by meaning. Exact Search stays available without it."
         actions={
           <Button
             variant="outline"
@@ -132,7 +132,7 @@ export function SearchStatusBanner({ semanticMode, onNavigateAway }: {
               openEmbeddingSetup();
             }}
           >
-            Enable
+            Set up
           </Button>
         }
       />
@@ -147,7 +147,7 @@ export function SearchStatusBanner({ semanticMode, onNavigateAway }: {
     return (
       <SearchBanner
         tone="info"
-        title={semanticMode ? 'Making files searchable' : 'Preparing text for exact search'}
+        title={semanticMode ? 'Preparing files for Similarity Search' : 'Preparing text for Exact Search'}
         detail={<>{readyLabel} {pendingLabel}</>}
       />
     );

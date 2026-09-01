@@ -576,6 +576,40 @@ test('mounted AgentView ready → raw close renders recovery and reconnects with
   assert.match(output, /Reconnect/);
 });
 
+test('deleting one waiting follow-up preserves the active turn and its queued sibling', async (t) => {
+  const { renderer, first } = await mountAgentView(t);
+  await act(async () => {
+    first.event({ t: 'ready' });
+    renderer.root.findByType(AgentComposer).props.onSend('Original prompt');
+    first.event({ t: 'turn-start' });
+    renderer.root.findByType(AgentComposer).props.onSend('Delete this follow-up');
+    renderer.root.findByType(AgentComposer).props.onSend('Keep this follow-up');
+  });
+
+  const beforeDelete = renderer.root.findByType(MessageList).props.queuedTurns;
+  assert.deepEqual(beforeDelete.map((turn: { text: string }) => turn.text), [
+    'Delete this follow-up',
+    'Keep this follow-up',
+  ]);
+  const sentBeforeDelete = first.sent.length;
+
+  await act(async () => {
+    renderer.root.findByType(MessageList).props.onDeleteQueued(beforeDelete[0].id);
+  });
+
+  assert.equal(first.sent.length, sentBeforeDelete, 'deleting a queued prompt does not interrupt or send');
+  assert.deepEqual(renderer.root.findByType(MessageList).props.queuedTurns.map((turn: { text: string }) => turn.text), [
+    'Keep this follow-up',
+  ]);
+
+  await act(async () => {
+    first.event({ t: 'turn-end', isError: false });
+  });
+
+  const promptWires = first.sent.map((entry) => JSON.parse(entry)).filter((entry) => entry.t === 'prompt');
+  assert.deepEqual(promptWires.map((entry) => entry.text), ['Original prompt', 'Keep this follow-up']);
+});
+
 test('edit-and-resend interrupts an active turn before starting the edited prompt', async (t) => {
   const { renderer, first } = await mountAgentView(t);
   await act(async () => {

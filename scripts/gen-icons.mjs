@@ -11,7 +11,6 @@ const MAP = [
   ['ChevronDownIcon', 'caret-down', 'regular', 'Disclosure caret: menus, pills, section headers.'],
   ['HistoryIcon', 'clock-counter-clockwise', 'regular', 'Past sessions — the chat panel’s History dropdown.'],
   ['ArrowUpIcon', 'arrow-up', 'regular', 'Composer send.'],
-  ['ArrowInsertIcon', 'arrow-up-left', 'regular', 'Fill the composer above with a suggestion (the search-suggestion idiom). Deliberately distinct from ArrowUpIcon, which means send.'],
   ['StopIcon', 'stop', 'fill', 'Stop a streaming Agent turn. Fill weight: a solid block reads as a hard stop where an outline reads as a frame.'],
   ['PlusIcon', 'plus', 'regular', 'New chat / add.'],
   ['CodeIcon', 'code', 'regular', 'Edit permission mode.'],

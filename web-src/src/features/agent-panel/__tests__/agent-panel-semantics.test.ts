@@ -11,7 +11,16 @@ import { createElement as h } from 'react';
 import { appState, mountApp, withDom } from '@/common/__tests__/renderHarness';
 import { MessageList } from '@/features/agent-panel/components/AgentMessages';
 import ChatPane from '@/features/agent-panel/components/ChatPane';
+import { api } from '@/common/api/api';
 import { makeChatTab, type Action } from '@/store/state/state';
+
+const originalGetAgentInstructions = api.getAgentInstructions;
+test.before(() => {
+  api.getAgentInstructions = async (scope) => ({ scope, text: 'Customized guidance', customized: true });
+});
+test.after(() => {
+  api.getAgentInstructions = originalGetAgentInstructions;
+});
 
 const emptyList = {
   blocks: [],
@@ -26,6 +35,7 @@ const emptyList = {
   agentShortName: 'Codex',
   onPermission: () => {},
   onSteerQueued: () => {},
+  onDeleteQueued: () => {},
   onCopyUserMessage: () => {},
   onResendUserMessage: () => {},
   onRetry: () => {},
@@ -34,6 +44,22 @@ const emptyList = {
   onTurnFailureAction: () => {},
 };
 
+test('a waiting queued turn can be deleted before it is sent', async () => {
+  await withDom(async (dom) => {
+    const deleted: string[] = [];
+    await dom.render(h(MessageList, {
+      ...emptyList,
+      queuedTurns: [{ id: 'queued-1', text: 'Build a structured Wiki', status: 'waiting' }],
+      onDeleteQueued: (id: string) => deleted.push(id),
+    }));
+
+    const remove = dom.query('button[aria-label="Delete queued message"]');
+    assert.ok(remove, 'a waiting queued turn exposes a delete action');
+    await dom.fire(remove, new MouseEvent('click', { bubbles: true }));
+    assert.deepEqual(deleted, ['queued-1']);
+  });
+});
+
 test('chat sessions are a named tab list whose tabs and panels reference each other', async () => {
   const first = { ...makeChatTab('codex', []), title: 'Chat 1' };
   const second = { ...makeChatTab('codex', [first]), title: 'Chat 2' };
@@ -41,7 +67,10 @@ test('chat sessions are a named tab list whose tabs and panels reference each ot
   await withDom(async (dom) => {
     const dispatched: Action[] = [];
     await mountApp(dom, h(ChatPane), {
-      state: appState({ chat: { chatOpen: true, chatTabs: [first, second], activeChatTabId: first.id } }),
+      state: appState({
+        workspace: { folderPath: '/Users/me/Projects/Research' },
+        chat: { chatOpen: true, chatTabs: [first, second], activeChatTabId: first.id },
+      }),
       dispatch: (action) => dispatched.push(action),
     });
 
@@ -67,8 +96,37 @@ test('chat sessions are a named tab list whose tabs and panels reference each ot
     }
     assert.notEqual(panels[0].id, panels[1].id, 'chat panels are per session');
 
+    const instructions = dom.query('button[title^="Agent Instructions for "]');
+    assert.ok(instructions, 'the active Agent panel exposes persistent Instructions');
+    assert.equal(instructions.closest('[role="tablist"]'), null, 'the panel action is not a tab');
+    await dom.flush();
+    assert.equal(instructions.dataset.customized, 'true');
+
     await dom.fire(tabs[1], new MouseEvent('click', { bubbles: true }));
     assert.deepEqual(dispatched.at(-1), { type: 'CHAT_TAB_ACTIVATE', id: second.id });
+  });
+});
+
+test('Library-wide chats do not expose a working-directory Instructions editor', async () => {
+  const libraryTab = {
+    ...makeChatTab('codex', []),
+    title: 'Library Chat',
+    boundFolder: null,
+  };
+
+  await withDom(async (dom) => {
+    await mountApp(dom, h(ChatPane), {
+      state: appState({
+        workspace: { folderPath: '/Users/me/Projects/Research' },
+        chat: { chatOpen: true, chatTabs: [libraryTab], activeChatTabId: libraryTab.id },
+      }),
+    });
+
+    assert.equal(
+      dom.query('button[title^="Agent Instructions for "]'),
+      null,
+      'Library retrieval scope must not masquerade as a working directory',
+    );
   });
 });
 

@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import type { LaunchedApp } from '../support/app.ts';
 import { launchApp } from '../support/app.ts';
@@ -29,12 +31,16 @@ test('folder switching resets the workspace while library membership remains ava
   try {
     app = await launchApp(fixture, testInfo);
     await openLibraryFolder(app.page, 'project-alpha');
+    expect(fs.existsSync(path.join(fixture.workspaces.projectA, 'AGENTS.md'))).toBe(false);
+    expect(fs.existsSync(path.join(fixture.workspaces.projectA, 'CLAUDE.md'))).toBe(false);
     await dismissEmbeddingKeyPrompt(app.page);
     await fileTreeRow(app.page, 'Welcome.md').click();
     await expect(activeDocument(app.page)).toContainText('Project Alpha');
     await expect(app.page.getByRole('tab', { name: 'Welcome.md' })).toHaveAttribute('aria-selected', 'true');
 
     await openLibraryFolder(app.page, 'project-beta');
+    expect(fs.existsSync(path.join(fixture.workspaces.projectB, 'AGENTS.md'))).toBe(false);
+    expect(fs.existsSync(path.join(fixture.workspaces.projectB, 'CLAUDE.md'))).toBe(false);
     await expect(app.page).toHaveTitle('project-beta — StashBase');
     await dismissEmbeddingKeyPrompt(app.page);
     await expect(fileTreeRow(app.page, 'Notes.md')).toBeVisible();
@@ -104,9 +110,9 @@ test('persistent document tabs and Quick Open remain keyboard-operable and resto
 });
 
 // Intent: J01/J12 — a bare Library stays interruption-free, while the first
-// active folder offers the one app-wide AI setup choice. Not now is durable;
+// active folder offers the one app-wide Similarity Search setup choice. Not now is durable;
 // the Files-panel action keeps setup manually reachable.
-test('AI setup is offered on the first active folder and Not now suppresses later automatic prompts', async ({}, testInfo) => {
+test('Similarity Search setup is offered on the first active folder and Not now suppresses later automatic prompts', async ({}, testInfo) => {
   const fixture = await createAppFixture({ membership: 'two-folders' });
   let app: LaunchedApp | undefined;
   try {
@@ -114,7 +120,7 @@ test('AI setup is offered on the first active folder and Not now suppresses late
     const skip = app.page.getByRole('button', { name: 'Not now', exact: true });
 
     await expect(skip).toBeHidden();
-    await expect(app.page.getByText('AI is off', { exact: true })).toBeVisible();
+    await expect(app.page.getByText("Similarity Search isn't set up", { exact: true })).toBeVisible();
 
     await openLibraryFolder(app.page, 'project-alpha');
     await expect(app.page).toHaveTitle('project-alpha — StashBase');
@@ -125,9 +131,9 @@ test('AI setup is offered on the first active folder and Not now suppresses late
     // A folder switch remains quiet after that explicit local-only choice.
     await openLibraryFolder(app.page, 'project-beta');
     await expect(skip).toBeHidden();
-    await expect(app.page.getByText('AI is off', { exact: true })).toBeVisible();
+    await expect(app.page.getByText("Similarity Search isn't set up", { exact: true })).toBeVisible();
 
-    await app.page.getByRole('button', { name: 'Enable', exact: true }).click();
+    await app.page.getByRole('button', { name: 'Set up', exact: true }).click();
     await expect(skip).toBeVisible();
     app.errors.assertNone();
   } finally {

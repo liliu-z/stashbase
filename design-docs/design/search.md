@@ -17,7 +17,7 @@ user-managed results.
 
 ## Current Experience
 
-- Exact text search works without AI Index over the direct source or current
+- Exact Search works without Similarity Search over the direct Source or current
   prepared representation declared by the
   [Documents format matrix](documents.md#format-capability-matrix), including
   raw JSON, valid UTF-8 plain text, and current prepared text. Plain-text files
@@ -25,20 +25,21 @@ user-managed results.
   rather than decoded lossily. Whole-token search applies its result cap
   after token filtering, so substring-heavy files do not hide later eligible
   evidence.
-- AI Index provides meaning-based retrieval when an embedding source is
-  configured. Product copy says **AI Index**; engineering terms such as
-  semantic indexing and embeddings appear only where technically necessary.
+- Similarity Search provides meaning-based retrieval when an embedding source
+  is configured. Product copy says **Similarity Search**; engineering terms
+  such as semantic indexing and embeddings appear only where technically
+  necessary.
 - Chat exposes one product-owned **Similarity Search** control. On lets Agent
-  retrieval combine AI Index similarity with text matching. Off uses text
+  retrieval combine vector similarity with text matching. Off uses text
   matching only, including current prepared PDF, DOCX, image, and media text.
   It changes retrieval for that Chat; it never pauses background Preparation
-  or AI Index maintenance.
-- AI Index setup offers hosted account access as the primary path and
+  or semantic indexing.
+- Similarity Search setup offers hosted account access as the primary path and
   OpenAI/OpenRouter keys as an advanced path. The active source remains
   explicit, and browser sign-in returns to the initiating window or offers a
   deliberate app-return action. Upgrades retire a previously selected local
   source before indexing starts: a signed-in account takes priority, then a
-  stored BYOK credential, otherwise AI Index returns to not set up.
+  stored BYOK credential, otherwise Similarity Search returns to not set up.
 - The search popup searches the whole library by default and can narrow to one
   member folder. It remembers query, mode, options, scope, and results across
   close, reopen, and folder switches, then refreshes against current content.
@@ -48,32 +49,33 @@ user-managed results.
   file-type categories. An attributed panel Chat's Similarity Search choice
   resolves the operation's strategy without asking the Agent to select a
   different tool.
-- Exact and Similar modes share one query surface. Results preserve rank while
-  grouping evidence by folder when needed.
+- Exact and Similarity modes share one query surface. Results preserve rank
+  while grouping evidence by folder when needed.
 - A result always identifies a source file. Evidence may come from PDF, DOCX,
   OCR, or transcript text, but opening it never exposes AppData. Cross-folder
   results open read-only without unexpectedly switching an active folder.
 - Readiness distinguishes disabled, preparing, partial, paused, failed, and
-  ready states. Exact search remains usable while AI Index is absent or
-  deferred.
-- AI setup is strongly recommended but never gates local browsing, editing,
-  preview, exact search, or structured Wiki creation. An empty Library stays
+  ready states. Exact Search remains usable while Similarity Search is absent
+  or deferred.
+- Similarity Search setup is strongly recommended but never gates local browsing, editing,
+  preview, Exact Search, or building Wiki Pages. An empty Library stays
   quiet; the first activated folder offers setup once. Completing it or
   choosing **Not now** is remembered across folders and relaunches, while
-  Similar Search, the persistent Files-panel **Enable** action, and Settings
-  remain explicit routes back. Create Wiki never opens or waits for setup. The
+  Similarity Search, the persistent Files-panel **Set up** action, and Settings
+  remain explicit routes back. Build Wiki never opens or waits for
+  Similarity Search setup. The
   observable activation paths live
   in [J01](../user-journeys.md#j01-complete-onboarding-and-reach-first-value)
-  and [J12](../user-journeys.md#j12-build-an-ai-wiki-over-a-local-folder).
-- AI Index runtime refreshes after account, quota, or key changes remain
+  and [J12](../user-journeys.md#j12-build-wiki-pages-from-a-local-folder).
+- Semantic runtime refreshes after account, quota, or key changes remain
   background work. Overlapping refresh and folder-removal activity does not
   interrupt local browsing or surface native process errors as user actions.
 - Hosted indexing and meaning-based queries draw from one token allowance.
-  The account menu and AI Index Settings show the provider display name and
-  avatar when available, retain the full email for account identification, and
+  The account menu and Similarity Search Settings show the provider display
+  name and avatar when available, retain the full email for account identification, and
   share deterministic fallbacks. They also show remaining percentage and reset
   date. When the allowance is exhausted, hosted semantic work stops while
-  Exact search and every local-file workflow remain available. Pending
+  Exact Search and every local-file workflow remain available. Pending
   semantic work resumes after the allowance refreshes or an available BYOK
   source is selected.
 - In-app and MCP retrieval share source identity and access rules. MCP also
@@ -95,10 +97,10 @@ user-managed results.
   source.
 - Similarity Search is a use-time retrieval choice. Turning it off must neither
   make prepared documents unreadable nor stop, remove, or foreground the
-  background AI Index lifecycle.
+  background semantic-index lifecycle.
 - BYOK credentials and account source selection are managed through Settings.
   Account login starts only from an explicit Sign in action in first-folder or
-  Similar Search setup, Settings, or the account menu.
+  Similarity Search setup, Settings, or the account menu.
   Browsing local files and serving an existing local index never depends on
   online authentication.
 - Account and credential ownership remains outside renderer and indexing
@@ -130,7 +132,7 @@ user-managed results.
 
 ### Not Planned
 
-- Requiring AI Index for the basic local workflow.
+- Requiring Similarity Search for the basic local workflow.
 - A chunk or vector administration surface for ordinary users.
 - Generated artifacts as normal files or result identities.
 

@@ -38,7 +38,7 @@ test('empty library keeps the redesigned zero-state composition', async ({}, tes
     await setVisualViewport(page, 1280, 820);
 
     await expect(page.getByRole('complementary', { name: 'Agent chat' }).getByRole('tab', { selected: true })).toBeInViewport();
-    await expect(page.getByText('Add a folder to build an AI wiki over your files.')).toBeVisible();
+    await expect(page.getByText('Add a folder to your Wiki.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Add Folder…' })).toBeVisible();
     // With no folder open the switcher trigger reads "Library".
     await expect(folderSwitcherTrigger(page)).toContainText('Library');

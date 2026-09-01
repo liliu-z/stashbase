@@ -8,9 +8,9 @@ AppData note. The image itself stays on disk as the user-facing file;
 the derived note is indexed under the image source path so a
 screenshot's text becomes searchable.
 
-Unlike `pdf_extract.py` there is no image bundle. Empty OCR is a
-conversion failure: the image still opens normally, but StashBase should
-not claim it is searchable when no text was extracted.
+Unlike `pdf_extract.py` there is no image bundle. Empty OCR is a normal,
+completed result: some images simply contain no readable text. The completion
+marker prevents futile retries without claiming that searchable text exists.
 
 Args: ``<image> <out_note>``.
 
@@ -85,10 +85,8 @@ def main() -> int:
         print(f"[ocr_extract] OCR failed: {err}", file=sys.stderr)
         return 1
 
-    if not text:
-        print(f"[ocr_extract] no text found in image: {image_path}", file=sys.stderr)
-        return 3
-    out_path.write_text(f"{text}\n\n{OCR_COMPLETE_MARKER}\n", encoding="utf-8")
+    content = f"{text}\n\n" if text else ""
+    out_path.write_text(f"{content}{OCR_COMPLETE_MARKER}\n", encoding="utf-8")
     return 0
 
 

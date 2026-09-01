@@ -11,7 +11,7 @@ export interface EmbedderStateRead {
 }
 
 /**
- * Whether an AI Index source is authorized, read from the server.
+ * Whether a Similarity Search provider is authorized, read from the server.
  *
  * This is in `common/` because two features ask the same question from
  * opposite sides: Settings gates the setup dialog on it, and the Files

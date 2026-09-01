@@ -5,8 +5,8 @@ import { SectionHeading } from '@/common/components/ui/section';
 import { statusVariants } from '@/common/components/ui/status';
 import { cn } from '@/common/lib/utils';
 
-/** The AI Index workload notice. Presentational: the surfaces that show it
- *  (the Files panel and the search popup) read the workload through
+/** The Similarity Search preparation notice. Presentational: the surfaces that
+ *  show it (the Files panel and the search popup) read the workload through
  *  `useSemanticIndexingNotice` and pass it in. */
 export function SemanticIndexingNoticeView({
   awaiting,
@@ -40,9 +40,9 @@ export function SemanticIndexingNoticeView({
         {/* The line that NAMES this card, so a real heading rather than a
           * bold div. The type is pinned back to the card's own step: the
           * level is what changed, not the look. */}
-        <SectionHeading id={headingId} level={2} className="text-sm">{awaiting ? 'Large AI Index workload' : 'AI Index paused'}</SectionHeading>
+        <SectionHeading id={headingId} level={2} className="text-sm">{awaiting ? 'Many files need Similarity Search preparation' : 'Similarity Search preparation paused'}</SectionHeading>
         <div className="leading-snug opacity-90">
-          About {count.toLocaleString()} file{count === 1 ? '' : 's'} waiting{size}. Building AI Index may take a while and use provider quota. Exact text search remains available.
+          About {count.toLocaleString()} file{count === 1 ? '' : 's'} waiting{size}. Preparing them may take a while and use provider quota. Exact Search remains available.
         </div>
         {failureMessage && (
           <div className="leading-snug opacity-90" role="status" aria-live="polite">
@@ -52,7 +52,7 @@ export function SemanticIndexingNoticeView({
       </div>
       <div className="flex shrink-0 items-center gap-1">
         <Button variant="outline" size="xs" onClick={onStart}>
-          {awaiting ? 'Build AI Index' : 'Resume AI Index'}
+          {awaiting ? 'Prepare files' : 'Resume preparation'}
         </Button>
         {awaiting && <Button variant="outline" size="xs" onClick={onDefer}>Not now</Button>}
       </div>

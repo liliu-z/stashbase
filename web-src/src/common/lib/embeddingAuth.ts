@@ -1,5 +1,5 @@
 /**
- * Whether AI Index is authorized, whether the one-time setup invitation has
+ * Whether Similarity Search is authorized, whether the one-time setup invitation has
  * already been handled, and the one place that decides both.
  *
  * A signed-in account allowance and a provider API key are equal activation
@@ -16,16 +16,18 @@ export function isEmbeddingAuthorized(state: EmbedderState | null | undefined): 
 
 /** The first-folder setup is a one-time invitation, not a per-folder nag.
  * Completing or declining it records a durable renderer preference; the
- * standing Files-panel action and Settings remain available if AI is off. */
-const AI_SETUP_SEEN_KEY = 'stashbase.ai-setup-seen';
+ * standing Files-panel action and Settings remain available if Similarity Search isn't set up. */
+// Keep the legacy storage key so existing dismissals survive the terminology
+// migration; the identifier names the current product concept.
+const SIMILARITY_SEARCH_SETUP_SEEN_KEY = 'stashbase.ai-setup-seen';
 
-export interface AiSetupPreferenceStorage {
+export interface SimilaritySearchSetupPreferenceStorage {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
   removeItem(key: string): void;
 }
 
-function browserStorage(): AiSetupPreferenceStorage | undefined {
+function browserStorage(): SimilaritySearchSetupPreferenceStorage | undefined {
   if (typeof window === 'undefined') return undefined;
   try {
     return window.localStorage;
@@ -34,25 +36,25 @@ function browserStorage(): AiSetupPreferenceStorage | undefined {
   }
 }
 
-export function hasSeenAiSetup(
-  storage: AiSetupPreferenceStorage | undefined = browserStorage(),
+export function hasSeenSimilaritySearchSetup(
+  storage: SimilaritySearchSetupPreferenceStorage | undefined = browserStorage(),
 ): boolean {
   try {
-    return storage?.getItem(AI_SETUP_SEEN_KEY) === '1';
+    return storage?.getItem(SIMILARITY_SEARCH_SETUP_SEEN_KEY) === '1';
   } catch {
     return false;
   }
 }
 
-export function setAiSetupSeen(
+export function setSimilaritySearchSetupSeen(
   seen: boolean,
-  storage: AiSetupPreferenceStorage | undefined = browserStorage(),
+  storage: SimilaritySearchSetupPreferenceStorage | undefined = browserStorage(),
 ): void {
   try {
-    if (seen) storage?.setItem(AI_SETUP_SEEN_KEY, '1');
-    else storage?.removeItem(AI_SETUP_SEEN_KEY);
+    if (seen) storage?.setItem(SIMILARITY_SEARCH_SETUP_SEEN_KEY, '1');
+    else storage?.removeItem(SIMILARITY_SEARCH_SETUP_SEEN_KEY);
   } catch {
     // Hardened WebViews may reject localStorage. The setup can reappear on a
-    // later launch, but browsing and exact search still remain available.
+    // later launch, but browsing and Exact Search still remain available.
   }
 }

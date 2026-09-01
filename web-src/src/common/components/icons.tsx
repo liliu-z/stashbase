@@ -72,15 +72,6 @@ export function ArrowUpIcon({ className }: IconProps) {
   );
 }
 
-/** Fill the composer above with a suggestion (the search-suggestion idiom). Deliberately distinct from ArrowUpIcon, which means send. (phosphor `arrow-up-left`, regular) */
-export function ArrowInsertIcon({ className }: IconProps) {
-  return (
-    <Icon className={className}>
-      <path d="M197.66,197.66a8,8,0,0,1-11.32,0L72,83.31V168a8,8,0,0,1-16,0V64a8,8,0,0,1,8-8H168a8,8,0,0,1,0,16H83.31L197.66,186.34A8,8,0,0,1,197.66,197.66Z"/>
-    </Icon>
-  );
-}
-
 /** Stop a streaming Agent turn. Fill weight: a solid block reads as a hard stop where an outline reads as a frame. (phosphor `stop`, fill) */
 export function StopIcon({ className }: IconProps) {
   return (

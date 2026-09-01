@@ -123,7 +123,7 @@ export function SidebarAccountRow() {
                   <div role="presentation" className="p-1">
                     <MenuItem
                       className="items-start py-2"
-                      label="Sign in to StashBase — Built-in Agent and AI features"
+                      label="Sign in to StashBase — Built-in Agent and optional hosted Similarity Search"
                       disabled={signingIn}
                       onClick={signIn}
                     >
@@ -131,7 +131,7 @@ export function SidebarAccountRow() {
                         <ExternalLinkIcon className="mt-0.5 size-4 flex-none" />
                         <span className="grid min-w-0 gap-0.5">
                           <span>{signingIn ? 'Waiting for browser…' : 'Sign in to StashBase'}</span>
-                          <span className="text-xs leading-snug text-muted-foreground">Built-in Agent and AI features</span>
+                          <span className="text-xs leading-snug text-muted-foreground">Built-in Agent and optional hosted Similarity Search</span>
                         </span>
                       </span>
                     </MenuItem>

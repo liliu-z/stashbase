@@ -36,8 +36,10 @@ clients and are not a general host-filesystem API.
 - Results retain absolute visible-source identity for Agent tools. Converted
   evidence never exposes an AppData path.
 - `library_info` returns folder identity and provider state, not a second
-  folder-description store. Durable folder purpose and working instructions
-  remain visible, user-owned source in `AGENTS.md`.
+  folder-description or Agent Instructions store. StashBase Chat instructions
+  are injected verbatim by the panel Runtime Adapter. The MCP server publishes
+  capability and tool descriptions but no second top-level instruction prompt;
+  user-owned portable rules may remain visible source in `AGENTS.md`.
 - File mutations use the shared transaction/version boundary and schedule or
   reconcile index maintenance after success.
 - `list_directory` enumerates only the requested directory surface and does
@@ -60,7 +62,7 @@ clients and are not a general host-filesystem API.
 - `create_project` creates only beneath the default folder home or an already
   authorized location. Both the selected location and creatable target must
   remain inside that owned root after symlinks are resolved. The operation
-  seeds missing Agent instructions create-only and registers the folder.
+  registers an empty folder and never seeds Agent instruction files.
   Session rebind requires trusted live-session attribution; ambiguous or
   external callers only create and register.
 

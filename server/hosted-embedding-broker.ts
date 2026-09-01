@@ -123,7 +123,7 @@ class HostedEmbeddingBroker {
     if (isHostedQuotaExhausted()) {
       writeJson(response, 402, {
         error: {
-          message: 'Hosted AI Index allowance is exhausted. Exact search remains available.',
+          message: 'Hosted Similarity Search allowance is exhausted. Exact Search remains available.',
           type: 'stashbase_hosted_error',
           code: 'quota_exhausted',
         },

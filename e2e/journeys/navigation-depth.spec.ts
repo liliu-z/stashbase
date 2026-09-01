@@ -54,9 +54,11 @@ test('persistent tabs prevent duplicates, reuse a blank tab, and expose MRU Edit
 
     await app.page.keyboard.press(`${primaryKey}+T`);
     await expect(activeDocumentTab(app.page)).toHaveAttribute('title', 'Empty tab');
-    await fileTreeRow(app.page, 'AGENTS.md').click();
+    // Use an ordinary fixture source for the third editor. Folder entry no
+    // longer manufactures AGENTS.md as hidden setup for unrelated tab tests.
+    await fileTreeRow(app.page, 'data.json').click();
     await expect(app.page.locator('.tab-strip-inner > [role="tab"]')).toHaveCount(3);
-    await expect(documentTab(app.page, 'AGENTS.md')).toHaveCount(1);
+    await expect(documentTab(app.page, 'data.json')).toHaveCount(1);
 
     // The chord cancels on window blur BY DESIGN (alt-tab register), so
     // make sure this window owns OS focus before pressing it — a stray
@@ -69,7 +71,7 @@ test('persistent tabs prevent duplicates, reuse a blank tab, and expose MRU Edit
     await app.page.keyboard.press('Tab');
     const history = app.page.getByRole('dialog', { name: 'Editor History' });
     await expect(history).toBeVisible();
-    await expect(history.getByRole('option').first()).toContainText('AGENTS.md');
+    await expect(history.getByRole('option').first()).toContainText('data.json');
     await expect(history.getByRole('option', { name: 'Second Note.md' })).toHaveAttribute('aria-selected', 'true');
     await app.page.keyboard.up('Control');
     await expect(activeDocumentTab(app.page)).toHaveAttribute('title', 'Second Note.md');
@@ -159,7 +161,7 @@ test('Favorites pin above recents and removing the active folder returns to Home
     // Selecting a member in the open menu switches this window in place.
     await switcherFolderItem(app.page, 'project-alpha').click();
     await expect(app.page).toHaveTitle('project-alpha — StashBase');
-    // Folder switching remains uninterrupted when AI Index is off.
+    // Folder switching remains uninterrupted when Similarity Search is off.
     await dismissEmbeddingKeyPrompt(app.page);
 
     await openFolderMenu(app, 'project-alpha');

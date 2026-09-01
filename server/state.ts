@@ -268,7 +268,7 @@ export async function bindIndexerForFolder(folderAbs: string): Promise<void> {
         : getEmbedderConfig().provider,
   };
   if (!cfg) {
-    log.warn(`embedder: no embedding source active — ${folderAbs} bound but AI Index is disabled until an account or key is selected`);
+    log.warn(`embedder: no embedding source active — ${folderAbs} bound but semantic retrieval is unavailable until an account or key is selected`);
   }
   await indexer.bindFolder(filesystemPath.absolute(folderAbs), runtime);
 }

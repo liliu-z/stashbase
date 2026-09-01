@@ -119,7 +119,7 @@ export function useLibrarySearchController({ prefill, onClose }: {
           return;
         }
         if (embedder.source === 'stashbase-account' && embedder.account.quota?.remainingTokens === 0) {
-          setError('Your hosted AI Index allowance is exhausted. Exact search is still available.');
+          setError('Your hosted Similarity Search allowance is exhausted. Exact Search is still available.');
           setSemanticHits(null);
           setSearching(false);
           return;

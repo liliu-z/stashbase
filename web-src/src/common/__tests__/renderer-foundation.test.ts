@@ -780,7 +780,7 @@ const RAW_CONTROL_EXEMPTIONS: Record<string, { count: number; why: string }> = {
   },
   'features/settings/components/embedder/EmbeddingAuthChoice.tsx': {
     count: 2,
-    why: 'AI Index setup cards. Not a radio group (each fires on click, nothing reads as pre-selected) and not `Button`s (that primitive is a centred single-line -ui-cornered ITEM; these are two-line, left-aligned, -container-cornered BOXES that keep full opacity when disabled).',
+    why: 'Similarity Search setup cards. Not a radio group (each fires on click, nothing reads as pre-selected) and not `Button`s (that primitive is a centred single-line -ui-cornered ITEM; these are two-line, left-aligned, -container-cornered BOXES that keep full opacity when disabled).',
   },
   'features/settings/components/TranscriptionPanel.tsx': {
     count: 1,

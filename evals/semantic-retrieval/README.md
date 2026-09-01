@@ -9,7 +9,7 @@ pnpm eval:semantic-retrieval --out release.nosync/j05-openai-1.txt
 ```
 
 The command uses the OpenAI or OpenRouter key already saved in **StashBase
-Settings > AI Index**. It does not read credentials from environment variables,
+Settings > Similarity Search**. It does not read credentials from environment variables,
 launch Electron, touch the user's library, or reuse the product vector store.
 It creates an isolated temporary library and store, indexes the versioned
 fixtures through `MfsIndexer`, and searches through the production Retrieval
@@ -23,7 +23,7 @@ credential.
 queries, relevance judgments, `K`, thresholds, and baseline records. Its 22
 synthetic documents contain no user data. Twenty-two paraphrased judgments
 cover multiple intents for direct Markdown, HTML, JSON, and PDF source identity
-backed by prepared Markdown evidence. Similar Search is evaluated at K=3 so
+backed by prepared Markdown evidence. Similarity Search is evaluated at K=3 so
 plausible distractors materially affect both retrieval and rank.
 
 Retrieval ranks **chunks**, not documents. The runner therefore asks the index
@@ -42,7 +42,7 @@ documented triggers.
 
 The report names the dataset schema/version, commit, provider, model, Recall@K,
 and mean reciprocal rank (MRR). Each query prints its acceptable source set,
-ordered Similar Search results, and—where a deliberately paraphrased query
+ordered Similarity Search results, and—where a deliberately paraphrased query
 makes the contrast useful—Exact Search results. Misses therefore show both the
 expected evidence and unexpected top results. A report produced from a dirty
 working tree says so, because the commit it names is then not what ran.

@@ -37,16 +37,16 @@ const LIBRARY_VALUE = '__library__';
  * once a conversation has content — a chat never rebinds), and an optional
  * `footer` section pinned below the list.
  *
- * `footer` exists because scope answers "what can this find" and the chat's
- * retrieval mode answers "how does it match" — one question in two halves,
- * and the composer bar is the wrong place to spell the second one out. It
- * is a slot rather than a built-in section so this stays the scope picker:
- * the caller owns what goes in it, and the search popup passes nothing.
+ * `footer` exists for Chat controls whose meaning is inseparable from the
+ * selected scope: retrieval answers how matching works, while Agent
+ * Instructions edit durable guidance for that exact scope. It is a slot
+ * rather than a built-in section so this stays the scope picker: the caller
+ * owns what goes in it, and the search popup passes nothing.
  *
  * A locked scope no longer kills the trigger when a footer is present.
  * The lock is a rule about the scope VALUE, not about reading the binding,
- * and a menu holding a live setting has to stay openable for the life of
- * the conversation. Locked rows go inert in place and say why.
+ * and a menu holding independent scope controls has to stay openable for the
+ * life of the conversation. Locked rows go inert in place and say why.
  */
 export function ScopeMenu({
   scope,

@@ -324,12 +324,3 @@
   overflow-y: auto;
   scroll-padding-block: 4px;
 }
-
-/* Empty-chat rotating hint: the incoming line rises from below while the
- * outgoing one drifts upward as it fades (AgentEmptyState remounts the
- * span per hint and sets durations inline from HINT_FADE_MS). The global
- * reduced-motion rule zeroes this keyframe and excludes `translate` from
- * transition-property, so the swap degrades to a plain crossfade. */
-@keyframes chat-hint-rise {
-  from { opacity: 0; translate: 0 8px; }
-}

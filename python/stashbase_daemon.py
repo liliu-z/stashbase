@@ -1545,7 +1545,7 @@ def op_search(svc: StashbaseStore, args: dict) -> dict:
     except Exception as exc:
         sys.stderr.write(f"[stashbase] search store failed: {exc}\n")
         # Hosted quota exhaustion is a product state, not an empty result.
-        # Let Node surface it so the renderer can keep Exact search available
+        # Let Node surface it so the renderer can keep Exact Search available
         # while explaining why meaning-based search stopped.
         if "quota_exhausted" in str(exc):
             raise

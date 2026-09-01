@@ -188,7 +188,7 @@ function startTurn(requestId, params) {
     });
     return;
   }
-  if (/Create or improve the visible Wiki/i.test(prompt)) {
+  if (/Build or update Wiki Pages from these Sources\./i.test(prompt)) {
     requestMcpApproval({
       turnId,
       threadId: String(params.threadId || 'fake-thread-1'),

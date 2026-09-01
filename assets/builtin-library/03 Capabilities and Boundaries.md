@@ -75,29 +75,29 @@ downloads a speech model under **Settings → Transcription**.
 ### Exact Search
 
 Exact Search is the UI name for word-based or keyword retrieval. It requires no
-AI Index account or key. It searches direct source text and any current
+Similarity Search setup. It searches direct Source text and any current
 prepared text that is ready.
 
-### Similar Search
+### Similarity Search
 
-Similar Search is the UI name for meaning-based or semantic retrieval. It uses
-AI Index and can find related material even when the query and source use
-different wording.
+Similarity Search is meaning-based retrieval. It
+can find related material even when the query and Source use different wording.
 
-AI Index can use:
+Similarity Search can use:
 
 - hosted capacity after explicit StashBase sign-in; or
 - a user-provided OpenAI or OpenRouter key configured in Settings.
 
-Hosted indexing and Similar queries share the allowance displayed in the
-account menu. If it is exhausted or unavailable, hosted semantic work stops;
+Hosted indexing and Similarity Search queries share the allowance displayed in the
+account menu. If it is exhausted or unavailable, hosted Similarity Search pauses;
 Exact Search and all local-file workflows continue.
 
 The search popup uses Library scope by default and can narrow to one folder.
 Results always identify visible source files, even when their evidence came
 from PDF extraction, DOCX conversion, OCR, or a transcript. A missing result
-may mean wrong scope, wrong mode, incomplete Preparation, incomplete AI Index,
-provider failure, or quota state; those are not equivalent conditions.
+may mean wrong scope, wrong mode, incomplete Preparation, files still being
+prepared for Similarity Search, provider failure, or quota state; those are not
+equivalent conditions.
 
 ## Built-In Agent Chat
 
@@ -105,7 +105,7 @@ provider failure, or quota state; those are not equivalent conditions.
 - A new app window starts with one reusable blank Chat.
 - A missing runtime waits for explicit **Install and continue**.
 - Agent authentication belongs to the selected runtime and provider. It is
-  separate from StashBase account sign-in and AI Index credentials.
+  separate from StashBase account sign-in and Similarity Search credentials.
 - Every conversation has visible Library or folder scope. A started draft,
   turn, attachment set, or restored conversation keeps that scope when the
   window switches folders.
@@ -128,8 +128,8 @@ Library through MCP.
 
 Common operations include:
 
-- `library_info` for Library folders and AI Index status;
-- `search_library` for Exact or Similar retrieval with explicit narrowing;
+- `library_info` for Library folders and Similarity Search status;
+- `search_library` for Exact Search or Similarity Search with explicit narrowing;
 - `reindex` for external disk changes;
 - `create_project` for a new ordinary folder under an authorized location;
 - bounded `list_directory`, `read_file`, `write_file`, `edit_file`,
@@ -149,9 +149,9 @@ Keep these separate when explaining setup or recovery:
 
 | Capability | Credential owner |
 |---|---|
-| Hosted AI Index | StashBase account session |
-| Bring-your-own AI Index | OpenAI or OpenRouter key stored through StashBase Settings |
-| Structured Wiki creation | The selected Built-in, Claude Code, or Codex Agent; no separate credential |
+| Hosted Similarity Search | StashBase account session |
+| Bring-your-own Similarity Search provider | OpenAI or OpenRouter key stored through StashBase Settings |
+| Build Wiki | The selected Built-in, Claude Code, or Codex Agent; no separate credential |
 | Built-in Claude Code | Claude runtime/provider authentication |
 | Built-in Codex | Codex runtime/provider authentication, including the runtime's ChatGPT sign-in flow |
 | External MCP client | That client's account plus the StashBase MCP connection configuration |
@@ -163,14 +163,15 @@ normal StashBase setup path.
 
 - Adding or opening a folder authorizes that ordinary directory as one Library
   member; it does not migrate its files.
-- Current Shipping folder entry has one create-only source-mutation exception:
-  if `AGENTS.md` is missing, StashBase seeds a visible user-owned instruction
-  file. It never overwrites an existing `AGENTS.md`.
+- Adding or opening a folder never creates or edits `AGENTS.md`, `CLAUDE.md`, or
+  another instruction file. Use **Agent Instructions** in the Chat tab toolbar
+  for working-folder guidance stored by StashBase. Library-wide Chats use the
+  packaged default rather than a separate Library-wide setting.
 - Folder entry prioritizes navigation while Preparation and indexing continue
   in the background.
 - Removing a folder from the Library saves active edits, clears StashBase-owned
-  derived/index/runtime state for that member, and leaves the source folder and
-  its files on disk.
+  derived/index/runtime state and folder-scoped Agent Instructions for that
+  member, and leaves the source folder and its files on disk.
 - Deleting a source is a separate explicit destructive operation.
 - Generated representations never appear in the file tree or search results as
   independent sources.

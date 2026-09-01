@@ -29,13 +29,13 @@ test('awaiting notice renders live guidance and dispatches both decisions withou
   assert.equal(section.props['aria-live'], undefined);
   const heading = renderer!.root.findByType('h2');
   assert.equal(section.props['aria-labelledby'], heading.props.id);
-  assert.equal(heading.children.join(''), 'Large AI Index workload');
+  assert.equal(heading.children.join(''), 'Many files need Similarity Search preparation');
   const status = renderer!.root.findByProps({ role: 'status' });
   assert.equal(status.props['aria-live'], 'polite');
   assert.match(status.children.join(''), /stale row/);
   assert.equal(renderer!.root.findAllByProps({ role: 'alert' }).length, 0);
   const buttons = renderer!.root.findAllByType('button');
-  assert.deepEqual(buttons.map((button) => button.children.join('')), ['Build AI Index', 'Not now']);
+  assert.deepEqual(buttons.map((button) => button.children.join('')), ['Prepare files', 'Not now']);
   assert.ok(buttons.every((button) => button.props.autoFocus == null));
   await act(async () => { buttons[0].props.onClick(); buttons[1].props.onClick(); });
   assert.deepEqual(decisions, ['start', 'defer']);
@@ -55,7 +55,7 @@ test('durably paused notice keeps the recoverable start action only', async () =
   });
   const buttons = renderer!.root.findAllByType('button');
   assert.equal(buttons.length, 1);
-  assert.equal(buttons[0].children.join(''), 'Resume AI Index');
+  assert.equal(buttons[0].children.join(''), 'Resume preparation');
   await act(async () => { buttons[0].props.onClick(); });
   assert.equal(starts, 1);
   await act(async () => { renderer!.unmount(); });

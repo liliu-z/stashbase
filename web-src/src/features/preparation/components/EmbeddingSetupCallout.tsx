@@ -2,8 +2,8 @@
  * The standing embedding-authorization affordance, in the Files panel.
  *
  * This quiet line is the persistent explicit route after a local-only user
- * chooses Not now during first-folder AI setup. It keeps setup reachable
- * without making the technical index name part of the everyday workspace.
+ * chooses Not now during first-folder Similarity Search setup. It keeps setup reachable
+ * without exposing technical index terminology in the everyday workspace.
  *
  * It lives in the sidebar's bottom chrome, above the account row, because
  * authorization is app-wide. Inside the file tree it sat between a folder
@@ -40,7 +40,7 @@ export default function EmbeddingSetupCallout() {
     // `flex-none` because the sidebar is a flex column: without it a tall
     // tree squeezes this to nothing.
     <div className="mx-1.5 mb-1 flex flex-none items-center gap-2 px-2 py-1 text-xs leading-snug text-muted-foreground">
-      <span className="min-w-0 flex-1 truncate">AI is off</span>
+      <span className="min-w-0 flex-1 truncate">Similarity Search isn't set up</span>
       {/* `size="xs"` for the type step only — the band's own padding places
         * the control, so height and padding come back off. Accent rather
         * than the link variant's primary: this is the one accent in the
@@ -50,7 +50,7 @@ export default function EmbeddingSetupCallout() {
         size="xs"
         className="h-auto flex-none cursor-pointer border-0 p-0 font-semibold text-accent underline underline-offset-2"
         onClick={() => openEmbeddingSetup()}
-      >Enable</Button>
+      >Set up</Button>
     </div>
   );
 }

@@ -195,7 +195,7 @@ export async function moveLibraryFile(
         indexWarning = 'Searchable text is being regenerated in the background.';
       } else if (!isEmbeddingAvailable()) {
         await indexer.deleteFile(oldTarget.abs);
-        indexWarning = 'AI Index was not updated because it is not set up.';
+        indexWarning = "The file wasn't updated for Similarity Search because it isn't set up.";
       } else {
         const movedContent = (await readTextAsync(newTarget.folderRel)) ?? '';
         const tooLarge = contentSizeError(movedContent);
@@ -203,7 +203,7 @@ export async function moveLibraryFile(
           await indexer.deleteFile(oldTarget.abs).catch((err) => {
             log.warn(`library move: failed to remove old index row ${oldTarget.abs}: ${errorMessage(err)}`);
           });
-          indexWarning = `${tooLarge}. The file moved, but AI Index will skip it until you split or reduce it and run sync.`;
+          indexWarning = `${tooLarge}. The file moved, but it won't be available to Similarity Search until you split or reduce it and run sync.`;
         } else {
           await indexer.renameFile(oldTarget.abs, newTarget.abs, movedContent);
         }
@@ -220,7 +220,7 @@ export async function moveLibraryFile(
       await indexer.deleteFile(oldTarget.abs).catch((cleanupErr) => {
         log.warn(`library move: stale-source cleanup failed for ${oldTarget.abs}: ${errorMessage(cleanupErr)}`);
       });
-      indexWarning = `Moved, but AI Index update failed: ${errorMessage(err)}`;
+      indexWarning = `Moved, but the file couldn't be updated for Similarity Search: ${errorMessage(err)}`;
     }
     return {
       oldPath: oldTarget.abs,
@@ -269,7 +269,7 @@ export async function deleteLibraryFile(
     return {
       path: target.abs,
       alreadyGone: !removed,
-      ...(failures.length ? { indexWarning: `Deleted, but AI Index cleanup failed for ${failures.length} path(s). Run sync to reconcile.` } : {}),
+      ...(failures.length ? { indexWarning: `Deleted, but Similarity Search cleanup failed for ${failures.length} path(s). Run sync to reconcile.` } : {}),
     };
   });
 }

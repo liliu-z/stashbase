@@ -1,11 +1,11 @@
 /**
- * Owns the AI Index setup dialog. Mounted once at the app root, always —
+ * Owns the Similarity Search setup dialog. Mounted once at the app root, always —
  * not only when a folder is open — so it can resolve the app-wide
  * `embedderHasKey` fact even in a bare window, which is what lets the standing
  * Files-panel callout (and its "Set up" action) work before any folder opens.
  *
- * The dialog opens once when the first folder becomes active and no AI source
- * is authorized. A bare Library never prompts. Explicit capability actions
+ * The dialog opens once when the first folder becomes active and no embedding
+ * source is authorized. A bare Library never prompts. Explicit capability actions
  * and the standing Files-panel entry can reopen it later; a durable Not now
  * choice prevents automatic re-prompts without hiding those manual routes.
  *
@@ -22,12 +22,12 @@
  * Exits:
  *   • Select a source or save a key — activates; dialog closes.
  *   • Not now — records that onboarding was handled; dialog closes. The
- *     Files-panel Enable entry (and Settings) can reopen it later.
+ *     Files-panel Set up entry (and Settings) can reopen it later.
  */
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useAppActions, useWorkspace } from '@/store/contexts/AppContext';
 import { useEmbedderState } from '@/common/hooks/useEmbedderState';
-import { hasSeenAiSetup, isEmbeddingAuthorized, setAiSetupSeen } from '@/common/lib/embeddingAuth';
+import { hasSeenSimilaritySearchSetup, isEmbeddingAuthorized, setSimilaritySearchSetupSeen } from '@/common/lib/embeddingAuth';
 import { type EmbedderState } from '@/common/api/apiTypes';
 import { lazyWithRetry } from '@/common/components/ErrorBoundary';
 import { useOverlayLayer } from '@/common/components/OverlayStack';
@@ -53,8 +53,8 @@ export function EmbedderRequireKeyGate() {
     dispatch({ type: 'EMBEDDER_KEY_STATE', hasKey: embedder.authorized });
     // An already-authorized installation has necessarily handled setup,
     // including installations upgraded from before this preference existed.
-    if (isEmbeddingAuthorized(embedder)) setAiSetupSeen(true);
-    if (folder && !isEmbeddingAuthorized(embedder) && !hasSeenAiSetup()) {
+    if (isEmbeddingAuthorized(embedder)) setSimilaritySearchSetupSeen(true);
+    if (folder && !isEmbeddingAuthorized(embedder) && !hasSeenSimilaritySearchSetup()) {
       setOpen(true);
     }
   }, [dispatch, folder]);
@@ -65,7 +65,7 @@ export function EmbedderRequireKeyGate() {
 
   const finishSetup = useCallback((backfillStarted?: boolean) => {
     dispatch({ type: 'EMBEDDER_KEY_STATE', hasKey: true });
-    setAiSetupSeen(true);
+    setSimilaritySearchSetupSeen(true);
     setOpen(false);
     if (backfillStarted) void actions.markVisibleFilesPendingForSearch();
     void actions.refreshIndexState();
@@ -101,7 +101,7 @@ export function EmbedderRequireKeyGate() {
         onSkip={() => {
           // One deliberate dismissal quiets automatic onboarding across
           // folders and relaunches; manual setup routes remain available.
-          setAiSetupSeen(true);
+          setSimilaritySearchSetupSeen(true);
           setOpen(false);
         }}
       />

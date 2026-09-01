@@ -23,7 +23,7 @@ test('user can launch into the empty library workspace', async ({}, testInfo) =>
     await expect(appShell(app.page)).toBeVisible();
     await expect(app.page.getByRole('button', { name: 'New Chat', exact: true })).toBeVisible();
     await expect(settingsButton(app.page)).toBeVisible();
-    await expect(app.page.getByText('Add a folder to build an AI wiki over your files.')).toBeVisible();
+    await expect(app.page.getByText('Add a folder to your Wiki.')).toBeVisible();
     await expectChatExpanded(app.page);
     app.errors.assertNone();
   } finally {

@@ -122,7 +122,7 @@ export interface ComposerAttachments {
 }
 
 export function AgentComposer({
-  phase, disabled, turnActive, active, agentShortName, hero, prefill,
+  phase, disabled, turnActive, active, agentShortName, hero,
   mode, effort, model, scope, similaritySearch, mentions, skills, attachments,
   closedPlaceholder, onDraftChange, onFocusChange, onSend, onStop,
 }: {
@@ -135,8 +135,6 @@ export function AgentComposer({
    * sanctioned shadow. Width is deliberately NOT part of it: both layouts
    * mount the same instance at the same measure. */
   hero?: boolean;
-  /** Empty-state starter template. Prefills the draft only — never sends. */
-  prefill?: { text: string; nonce: number } | null;
   /** A terminal state can be expected and non-reconnectable (folder scope
    * retirement). Keep its composer draft visible, but do not tell the user
    * to reconnect to a scope that no longer exists. */
@@ -170,12 +168,6 @@ export function AgentComposer({
   });
 
   useEffect(() => { if (active) composerRef.current?.focus(); }, [active]);
-
-  // Starter-suggestion prefill: replace the draft and keep focus in the
-  // editor so typing continues naturally. Sending stays a user action.
-  useEffect(() => {
-    if (prefill) composerRef.current?.setText(prefill.text);
-  }, [prefill]);
 
   function cycleMode() {
     mode.onSet(nextPermMode(mode.value));
@@ -324,8 +316,9 @@ export function AgentComposer({
             * mode) group right next to send. Retrieval mode is library
             * context too, but it rides INSIDE the scope popup rather than
             * beside it: scope is what a lookup may reach and matching is
-            * how it compares, and only one of those two is worth the
-            * docked bar's width. */}
+            * how it compares. Durable Agent Instructions live in the panel
+            * toolbar rather than this conversation-control popup. Only the
+            * scope itself is worth the docked bar's width. */}
           <ScopeMenu
             scope={scope.current}
             entries={scope.entries}

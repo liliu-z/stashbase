@@ -16,7 +16,7 @@ const SECTIONS: { id: SettingsSection; label: string; render: () => ReactNode }[
   { id: 'general', label: 'General', render: () => <GeneralPanel /> },
   { id: 'appearance', label: 'Appearance', render: () => <AppearancePanel /> },
   { id: 'agents', label: 'Agents', render: () => <AgentRuntimePanel /> },
-  { id: 'embedding', label: 'AI Index', render: () => <EmbeddingPanel /> },
+  { id: 'embedding', label: 'Similarity Search', render: () => <EmbeddingPanel /> },
   { id: 'transcription', label: 'Transcription', render: () => <TranscriptionPanel /> },
   { id: 'mcp', label: 'MCP', render: () => <McpAccessPanel /> },
 ];

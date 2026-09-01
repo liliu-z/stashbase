@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { LibraryOperationError, createLibraryOperations } from './index.ts';
 
-test('Library Operations rejects AI Index retrieval without embedding configuration', async () => {
+test('Library Operations rejects Similarity Search retrieval without embedding configuration', async () => {
   const operations = createLibraryOperations({
     getLibraryInfo: () => ({ folder_home: '/library', folders: [] }),
     retrieval: { search: async () => ({

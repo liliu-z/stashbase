@@ -78,7 +78,7 @@ reason when a platform cannot exercise it.
   interaction when available, completion, and a clean close. Never use a real
   user workspace or capture credentials in evidence.
 - [ ] **J05 / J07 / J10** — In a disposable project with one non-sensitive source and
-  one Markdown Canvas, confirm Similar Search returns the source, ask the real
+  one Markdown Canvas, confirm Similarity Search returns the source, ask the real
   Agent to use that evidence and write an accepted result into the Canvas,
   approve the write, review and edit the file, then close and reopen it. Confirm
   Exact Search can find the new durable content. This is a packaged integration

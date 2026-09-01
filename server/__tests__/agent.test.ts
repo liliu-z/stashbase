@@ -17,21 +17,10 @@ import {
   claudeSkillPrompt,
   selectClaudeModel,
 } from '../agent.ts';
-import { buildStashbasePreamble } from '../agent-preamble.ts';
+import { setAgentInstructions } from '../agent-instructions.ts';
 import { clearAgentRuntimeFailure } from '../agent-contract.ts';
 import { clearCurrentFolder, runWithWindowId, setCurrentFolder } from '../folder.ts';
 import { claudeTranscriptEffort } from '../routes/sessions.ts';
-
-test('the preamble orients folder sessions to their folder and library sessions to the whole library', () => {
-  const folder = buildStashbasePreamble('/Users/me/Projects/Research');
-  assert.match(folder, /Current folder: \*\*Research\*\*/);
-
-  const library = buildStashbasePreamble('/Users/me/Documents/StashBase', 'library');
-  assert.match(library, /library-wide/);
-  assert.match(library, /whole library is in scope/);
-  assert.match(library, /search_library/);
-  assert.doesNotMatch(library, /Current folder:/);
-});
 
 class FakeAgentWebSocket extends EventEmitter {
   readyState = 1;
@@ -88,6 +77,40 @@ function fakeClaudeQuery(failureOrMessages?: Error | SDKMessage[], failure?: Err
     interrupt: async () => {},
   } as unknown as Query;
 }
+
+test('Claude appends only the exact scoped Agent Instructions', async (t) => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-claude-instructions-'));
+  const instructions = 'Prefer primary research notes.';
+  setAgentInstructions({ kind: 'folder', path: folder }, instructions);
+  t.after(() => {
+    setAgentInstructions({ kind: 'folder', path: folder }, '');
+    fs.rmSync(folder, { recursive: true, force: true });
+  });
+
+  let appended = '';
+  const ws = new FakeAgentWebSocket();
+  const session = new AgentSession(
+    ws as unknown as WebSocket,
+    'claude-instructions-window',
+    undefined,
+    undefined,
+    'default',
+    undefined,
+    undefined,
+    ((request: { options: { systemPrompt?: { append?: string } } }) => {
+      appended = request.options.systemPrompt?.append ?? '';
+      return fakeClaudeQuery();
+    }) as never,
+    () => '/fake/claude',
+    undefined,
+    folder,
+  );
+  t.after(() => session.dispose());
+
+  session.begin();
+  await settle();
+  assert.equal(appended, instructions);
+});
 
 interface TurnEvent {
   t: string;

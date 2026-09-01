@@ -24,7 +24,6 @@ import {
   registerLibraryFolderAsync,
   validateFolderName,
 } from './folder.ts';
-import { ensureAgentsFile } from './agent-rules.ts';
 import { filesystemPath } from './filesystem-path.ts';
 import { noteTreeChanged } from './watcher.ts';
 import { syncFolderNow } from './state.ts';
@@ -193,7 +192,6 @@ export interface CreateProjectDeps {
   memberRoots(): string[] | Promise<string[]>;
   /** Register into library membership (the sidebar list source). */
   register(abs: string): void | Promise<void>;
-  ensureAgentsFile(abs: string): boolean;
   noteTreeChanged(): void;
   /** Bind + reconcile the new folder in the background. */
   syncFolder(abs: string): Promise<unknown>;
@@ -218,7 +216,6 @@ const productionDeps: CreateProjectDeps = {
   },
   memberRoots: memberFolderRootsAsync,
   register: registerLibraryFolderAsync,
-  ensureAgentsFile,
   noteTreeChanged,
   syncFolder: (abs) => syncFolderNow(abs, { reason: 'create_project' }),
   session: (attributionId) => attributedAgentSession(attributionId),
@@ -268,19 +265,16 @@ export async function createProjectFolder(
     throw operationError(`could not create the project folder: ${errorMessage(err)}`, 500);
   }
 
-  // Membership is the commit record. Persist it before seeding any content so
-  // a config/removal failure can retire the still-empty directory we created.
+  // Membership is the commit record. Persist it before starting background
+  // work so a config/removal failure can retire the still-empty directory.
   try {
     await deps.register(target);
   } catch (err) {
     try { await fs.promises.rmdir(target); } catch { /* keep a raced/non-empty folder */ }
     throw err;
   }
-  // The project is a normal member folder from birth: AGENTS.md contract
-  // file (create-only), tree notification, and a background daemon bind +
-  // reconcile so search covers it.
-  try { deps.ensureAgentsFile(target); }
-  catch (err: unknown) { log.warn(`create_project: AGENTS.md seed failed for ${target}: ${errorMessage(err)}`); }
+  // Agent Instructions are app metadata edited from the Agent-panel toolbar, so
+  // project creation never writes an instruction file into the user's folder.
   deps.noteTreeChanged();
   void Promise.resolve()
     .then(() => deps.syncFolder(target))

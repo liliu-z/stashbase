@@ -196,11 +196,11 @@ export default function ManagedLibrarySearch({ prefill, onClose }: {
        * otherwise empty panel. */
       return null;
     }
-    if (error === EMBEDDER_KEY_ERROR || (error && error.startsWith('AI Index is disabled'))) {
+    if (error === EMBEDDER_KEY_ERROR || (error && error.startsWith("Similarity Search isn't set up"))) {
       return renderEmpty(
         <>
-          <div>Set up AI Index to search by meaning.</div>
-          <div>Exact text search works without AI Index.</div>
+          <div>Set up Similarity Search to search by meaning.</div>
+          <div>Exact Search works without Similarity Search.</div>
         </>,
       );
     }
@@ -310,10 +310,10 @@ export default function ManagedLibrarySearch({ prefill, onClose }: {
               value="semantic"
               className={SEARCH_MODE_SEGMENT_CLASS}
               title={state.embedderHasKey === false
-                ? 'Match by meaning — needs AI setup'
+                ? 'Match by meaning — needs Similarity Search setup'
                 : 'Match by meaning'}
             >
-              Similar
+              Similarity
             </SegmentedControlItem>
             <SegmentedControlItem value="keyword" className={SEARCH_MODE_SEGMENT_CLASS} title="Match exact text">
               Exact

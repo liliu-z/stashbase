@@ -2,7 +2,7 @@
  * App-level config persistence — the single `~/.stashbase/config.json`.
  * Writes enforce owner-only POSIX permissions; Windows relies on the user's
  * profile ACL. This module owns the file primitives and the user-preference
- * accessors (API keys, terminal CLI, embedder provider); `folder.ts`
+ * accessors (API keys, Agent Instructions, terminal CLI, embedder provider); `folder.ts`
  * reuses the same primitives for library membership. Extracted from folder.ts:
  * credentials and preferences have nothing to do with the folder registry, and
  * routes that only need a key shouldn't import the whole window-context machinery.
@@ -127,7 +127,7 @@ export interface AppConfigFile {
     model?: string;
     baseUrl?: string;
   };
-  /** Active AI Index funding source. BYOK credentials and the account
+  /** Active embedding funding source. BYOK credentials and the account
    * session are retained independently so switching never destroys the
    * other option or silently falls back after a hosted failure. */
   embeddingSource?: EmbeddingSource;
@@ -175,6 +175,11 @@ export interface AppConfigFile {
    * config writer. */
   updates?: Partial<UpdatePreferences>;
   onboarding?: OnboardingPreferences;
+  /** User-authored Chat guidance owned by StashBase. Folder entries use the
+   * exact spelling of library membership paths; no project file is created. */
+  agentInstructions?: {
+    folders?: Array<{ path: string; text: string }>;
+  };
 }
 
 export function readAppConfigStrict(): AppConfigFile {
@@ -354,7 +359,7 @@ export function setEmbeddingSource(source: EmbeddingSource): EmbeddingSource {
   if (source === 'stashbase-account') {
     if (!getHostedAccountSession()) throw new Error('Sign in before selecting the StashBase account allowance.');
   } else if (source === LOCAL_EMBEDDING_SOURCE) {
-    throw new Error('The local AI Index source is no longer available.');
+    throw new Error('The local embedding source is no longer available.');
   } else {
     const direct = getEmbedderConfig();
     if (!direct.apiKey || direct.provider !== source) throw new Error(`Add a ${source === 'openrouter' ? 'OpenRouter' : 'OpenAI'} key before selecting it.`);
@@ -696,7 +701,7 @@ export function migrateRetiredLocalEmbeddingSource(): void {
   if (next) cfg.embeddingSource = next;
   else delete cfg.embeddingSource;
   writeAppConfigStrict(cfg);
-  log.info(`retired local AI Index source${next ? `; selected ${next}` : '; AI Index is not configured'}`);
+  log.info(`retired local embedding source${next ? `; selected ${next}` : '; no embedding source configured'}`);
 }
 
 export function getOnboardingPreferences(): OnboardingPreferences {

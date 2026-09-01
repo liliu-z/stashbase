@@ -6,10 +6,10 @@ import { appState, mountApp, withDom } from '@/common/__tests__/renderHarness';
 import { EmbeddingAuthChoice } from '@/features/settings/components/embedder/EmbeddingAuthChoice';
 import { EmbedderRequireKeyGate } from '@/features/settings/components/EmbedderRequireKeyGate';
 import { OPEN_EMBEDDING_SETUP_EVENT } from '@/common/lib/embeddingSetupTrigger';
-import { setAiSetupSeen } from '@/common/lib/embeddingAuth';
+import { setSimilaritySearchSetupSeen } from '@/common/lib/embeddingAuth';
 import { OverlayStackProvider } from '@/common/components/OverlayStack';
 
-test('AI setup offers only hosted account and BYOK sources', async () => {
+test('Similarity Search setup offers only hosted account and BYOK sources', async () => {
   await withDom(async (dom) => {
     let signIns = 0;
     let keySelections = 0;
@@ -22,7 +22,7 @@ test('AI setup offers only hosted account and BYOK sources', async () => {
     assert.deepEqual(
       buttons.map((button) => button.textContent?.replace(/\s+/g, ' ').trim()),
       [
-        'Sign in to StashBaseIncluded monthly AI usage',
+        'Sign in to StashBaseIncluded monthly allowance',
         'Use your own API keyOpenAI or OpenRouter',
       ],
     );
@@ -34,7 +34,7 @@ test('AI setup offers only hosted account and BYOK sources', async () => {
   });
 });
 
-test('AI setup keeps the deliberate exit beside the two source choices', async () => {
+test('Similarity Search setup keeps the deliberate exit beside the two source choices', async () => {
   await withDom(async (dom) => {
     let skips = 0;
     await dom.render(h(EmbeddingAuthChoice, {
@@ -51,9 +51,9 @@ test('AI setup keeps the deliberate exit beside the two source choices', async (
   });
 });
 
-test('AI setup opens for the first active folder, remembers Not now, and remains manually reachable', async () => {
+test('Similarity Search setup opens for the first active folder, remembers Not now, and remains manually reachable', async () => {
   const realFetch = globalThis.fetch;
-  setAiSetupSeen(false);
+  setSimilaritySearchSetupSeen(false);
   globalThis.fetch = (async () => new Response(JSON.stringify({
     provider: 'openai',
     hasKey: false,
@@ -75,8 +75,8 @@ test('AI setup opens for the first active folder, remembers Not now, and remains
       });
       await dom.flush();
       await dom.flush();
-      assert.equal(dom.byRole('dialog').length, 1, 'the first active folder offers AI setup');
-      assert.match(document.body.textContent ?? '', /Enable AI for your files/);
+      assert.equal(dom.byRole('dialog').length, 1, 'the first active folder offers Similarity Search setup');
+      assert.match(document.body.textContent ?? '', /Set up Similarity Search/);
       const notNow = dom.queryAll('button').find((button) => button.textContent?.trim() === 'Not now');
       assert.ok(notNow);
       await dom.fire(notNow, new MouseEvent('click', { bubbles: true }));
@@ -96,7 +96,7 @@ test('AI setup opens for the first active folder, remembers Not now, and remains
       assert.equal(dom.byRole('dialog').length, 1);
     });
   } finally {
-    setAiSetupSeen(false);
+    setSimilaritySearchSetupSeen(false);
     globalThis.fetch = realFetch;
   }
 });

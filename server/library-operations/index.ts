@@ -169,13 +169,13 @@ export function createLibraryOperations(
       if (result.availability.state === 'unavailable') {
         if (result.availability.reason === 'hosted-quota-exhausted') {
           throw routeError(
-            'Your hosted AI Index allowance is exhausted. Exact search is still available.',
+            'Your hosted Similarity Search allowance is exhausted. Exact Search is still available.',
             402,
             'HOSTED_QUOTA_EXHAUSTED',
           );
         }
         throw routeError(
-          'AI Index is disabled until you set it up in StashBase Settings',
+          "Similarity Search isn't set up. Open StashBase Settings to set it up.",
           412,
           'EMBEDDER_KEY_REQUIRED',
         );

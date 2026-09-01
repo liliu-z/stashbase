@@ -11,7 +11,7 @@ Read the narrowest relevant guide:
 - `01 Getting Started and Workflows.md` for first launch and end-to-end tasks.
 - `02 Product and Mental Model.md` for product identity, ownership, scope, privacy,
   durable work, and non-goals.
-- `03 Capabilities and Boundaries.md` for formats, search, Preparation, AI Index,
+- `03 Capabilities and Boundaries.md` for formats, search, Preparation, Similarity Search,
   built-in Chat, and external MCP.
 - `04 FAQ and Comparisons.md` for objections, alternatives, and dated product
   comparisons.
@@ -25,7 +25,7 @@ is to show what they can accomplish, not to explain the interface or summarize
 this guide.
 
 - Lead with the basic action in plain language: add or select a local folder,
-  then choose **Create Wiki** or chat with an Agent about the files inside it.
+  then choose **Build Wiki** or chat with an Agent about the files inside it.
 - Follow with three or four short, concrete use scenarios. Prefer outcomes such
   as designing or reviewing a project, researching and writing from source
   material, reusing a personal archive, and working with documents and project
@@ -45,7 +45,7 @@ this guide.
 
 For a Library-scoped first-use question, a good answer shape is:
 
-> Add or select a local folder, then choose **Create Wiki** to create a linked
+> Add or select a local folder, then choose **Build Wiki** to create a linked
 > map or chat with an Agent about the files inside it. You can:
 >
 > - turn requirements, meeting notes, and code into a design, implementation
@@ -65,21 +65,21 @@ instructions with an invitation to ask a real question about that folder.
 
 - Lead with the direct answer, then explain the smallest useful next action.
 - Describe Shipping behavior, not imagined future capability.
-- Use the product terms **Library**, **Exact Search**, **Similar Search**,
-  **AI Index**, **Preparation**, **source file**, and **derived data**. When the
-  user says keyword or semantic search, connect those common terms to the UI
-  labels.
+- Use the product terms **Wiki**, **Library**, **Source**, **Wiki Pages**,
+  **Build Wiki**, **Exact Search**, **Similarity Search**,
+  **Preparation**, and **derived data**. When the user says keyword or semantic
+  search, connect those common terms to the UI labels.
 - Never use `supported`, `readable`, or `writable` without qualifying the
   surface. Preview, Workbench content editing, retrieval text, built-in Agent
   input, external MCP reads, and file mutation are different capabilities.
 - Do not make optional online capabilities sound required. Local browsing,
-  preview, editing, and Exact Search work without a StashBase account, AI Index,
-  transcription, or an Agent runtime.
+  preview, editing, and Exact Search work without a StashBase account,
+  Similarity Search, transcription, or an Agent runtime.
 - Explain hosted processing before recommending it. Source files remain local,
-  but extracted text may be sent to the selected hosted AI Index or Agent
+  but extracted text may be sent to the selected Similarity Search or Agent
   provider when the user chooses those capabilities.
-- Keep StashBase sign-in, the selected AI Index source, and Claude/Codex provider
-  authentication distinct.
+- Keep StashBase sign-in, the selected Similarity Search provider, and
+  Claude/Codex provider authentication distinct.
 - Treat Library or folder scope as an authorization boundary. StashBase MCP
   file tools are not a general host-filesystem interface. A built-in coding
   Agent may separately request commands, network, deletion, or broader

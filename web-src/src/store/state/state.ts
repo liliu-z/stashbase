@@ -321,7 +321,7 @@ export interface WorkspaceSlice {
    *  the sidebar's right edge; clamped to [SIDEBAR_MIN_WIDTH, MAX]. */
   sidebarWidth: number;
 
-  /** User-visible paths whose AI Index content is still being
+  /** User-visible paths whose Similarity Search content is still being
    *  embedded/indexed. Keyword search ignores this state and can search
    *  converted/source text without embeddings. */
   pendingSemanticNames: NameSet;

@@ -116,6 +116,41 @@ function runConfigMutation(home: string, statement: string) {
   );
 }
 
+test('removing library membership clears only its StashBase-owned Agent Instructions', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-agent-instructions-remove-'));
+  const configDir = path.join(home, '.stashbase');
+  const configPath = path.join(configDir, 'config.json');
+  const removed = path.join(home, 'removed');
+  const retained = path.join(home, 'retained');
+  fs.mkdirSync(configDir);
+  fs.mkdirSync(removed);
+  fs.mkdirSync(retained);
+  fs.writeFileSync(configPath, JSON.stringify({
+    recentFolders: [removed, retained].map((folder, index) => ({
+      path: folder,
+      openedAt: `2026-08-0${index + 1}T00:00:00.000Z`,
+    })),
+    agentInstructions: {
+      folders: [
+        { path: removed, text: 'Removed guidance' },
+        { path: retained, text: 'Retained guidance' },
+      ],
+    },
+  }));
+  try {
+    const result = runConfigMutation(home, `
+      const folder = await import('./server/folder.ts');
+      await folder.removeRecentAsync(${JSON.stringify(removed)});
+    `);
+    assert.equal(result.status, 0, result.stderr);
+    const saved = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    assert.deepEqual(saved.recentFolders.map((entry: { path: string }) => entry.path), [retained]);
+    assert.deepEqual(saved.agentInstructions.folders, [{ path: retained, text: 'Retained guidance' }]);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
 test('retired folder metadata does not escape library APIs or survive a membership write', () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-folder-metadata-test-'));
   const configDir = path.join(home, '.stashbase');
@@ -185,7 +220,7 @@ test('credential and source mutations never overwrite malformed config through a
   }
 });
 
-test('retired local AI Index cannot be selected again', () => {
+test('retired local embedding source cannot be selected again', () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-local-embedding-config-test-'));
   try {
     const result = runConfigMutation(home, `
@@ -198,7 +233,7 @@ test('retired local AI Index cannot be selected again', () => {
   }
 });
 
-test('retired local AI Index migrates to account, BYOK, or unconfigured state', () => {
+test('retired local embedding source migrates to account, BYOK, or unconfigured state', () => {
   const session = {
     accessToken: 'access',
     refreshToken: 'refresh',

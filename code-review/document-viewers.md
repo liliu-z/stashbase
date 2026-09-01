@@ -77,7 +77,9 @@ forwarding, and script confinement.
   that styles its scrollbars keeps them. None of it reaches the indexed
   plaintext.
 - Image viewing uses the shared lightbox and never turns the preview into an
-  editable managed asset.
+  editable managed asset. No recognizable OCR text is a normal image state;
+  the warning and Reprocess affordance are reserved for actual preparation
+  failures.
 - Audio and supported video use a compatible playback preview when necessary,
   while transcript state follows preparation freshness and source time.
 - JSON source text is authoritative. Strict, unique-key JSON at or below

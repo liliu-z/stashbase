@@ -28,7 +28,7 @@ export function ZeroFolderState() {
     <div className="flex flex-col items-start gap-3 px-4 pt-5 pb-4">
       <div className="size-9 *:size-full"><CubeLogoIcon /></div>
       <p className="m-0 text-sm leading-snug text-muted-foreground">
-        Add a folder to build an AI wiki over your files.
+        Add a folder to your Wiki.
       </p>
       {typeof bridge?.openFolderDialog === 'function' && (
         <Button onClick={() => { void addFolder(); }}>Add Folder…</Button>

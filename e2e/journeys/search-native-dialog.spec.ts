@@ -56,7 +56,7 @@ test('native folder dialog success, cancellation, and failure preserve their bou
     await stubOpenFolderDialog(app.electron, { kind: 'cancel' });
     await openFolderPickerMenu(app.page);
     await expect(app.page).toHaveTitle('StashBase');
-    await expect(app.page.getByText('Add a folder to build an AI wiki over your files.')).toBeVisible();
+    await expect(app.page.getByText('Add a folder to your Wiki.')).toBeVisible();
 
     await stubOpenFolderDialog(app.electron, { kind: 'error', message: 'fixture picker failed' });
     await openFolderPickerMenu(app.page);

@@ -26,7 +26,7 @@ const embedder = getEmbedderConfig();
 
 if (!embedder.apiKey) {
   throw new Error(
-    'Semantic retrieval eval requires an OpenAI or OpenRouter key saved in StashBase Settings > AI Index. Credentials are never read from environment variables.',
+    'Semantic retrieval eval requires an OpenAI or OpenRouter key saved in StashBase Settings > Similarity Search. Credentials are never read from environment variables.',
   );
 }
 const { stdout: commitOutput } = await run('git', ['rev-parse', 'HEAD'], { cwd: repoRoot });

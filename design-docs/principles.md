@@ -16,10 +16,10 @@ These are the stable rules used to evaluate product and technical decisions.
    escape hatch.
 6. **Machine-derived data stays invisible** — Extracted representations,
    chunks, and vectors can support reading and search without becoming
-   user-managed files. Agent-authored Wiki Markdown is different: it is a
-   visible, ordinary, user-owned file that links back to sources.
-7. **Useful before perfect** — Browsing, editing, and keyword retrieval should
-   remain useful while preparation is incomplete or AI Index is
+   user-managed files. Agent-authored Wiki Page Markdown is different: it is a
+   visible, ordinary, user-owned file that links back to Sources.
+7. **Useful before perfect** — Browsing, editing, and Exact Search should
+   remain useful while preparation is incomplete or Similarity Search is
    unavailable.
 8. **Broad capability, few concepts** — AI can improve many parts of the
    workflow, so capability breadth is welcome when it strengthens the same

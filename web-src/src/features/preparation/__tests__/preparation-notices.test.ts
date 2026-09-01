@@ -1,5 +1,5 @@
 /**
- * The Preparation feature's AI Index disclosure surface, asserted by
+ * The Preparation feature's Similarity Search disclosure surface, asserted by
  * rendering it. File-format visibility is now explained in the tree itself.
  */
 import '@/common/__tests__/domEnvironment';
@@ -58,7 +58,7 @@ function stubEmbedder(initial: EmbedderState | 'fail'): {
   };
 }
 
-test('the AI Index offer stays hidden until the server says it is needed', async () => {
+test('the Similarity Search offer stays hidden until the server says it is needed', async () => {
   // Unknown embedder state (the boot race) and an authorized one are both
   // silence — the offer only exists for a user who does NOT have it on.
   const failing = stubEmbedder('fail');
@@ -90,11 +90,11 @@ test('an unauthorized folder gets one quiet line that opens setup', async () => 
     await withDom(async (dom) => {
       await dom.render(h(EmbeddingSetupCallout));
       await dom.flush();
-      assert.match(visibleText(), /AI is off/);
+      assert.match(visibleText(), /Similarity Search isn't set up/);
 
       const buttons = dom.queryAll('button');
       assert.equal(buttons.length, 1, 'one action, no dismiss — the line IS the calm route');
-      assert.equal(buttons[0].textContent, 'Enable');
+      assert.equal(buttons[0].textContent, 'Set up');
 
       // It asks the Settings gate to open rather than owning a dialog.
       const opened: Event[] = [];
@@ -118,7 +118,7 @@ test('signing in re-reads the embedder so the offer clears itself', async () => 
     await withDom(async (dom) => {
       await dom.render(h(EmbeddingSetupCallout));
       await dom.flush();
-      assert.match(visibleText(), /AI is off/);
+      assert.match(visibleText(), /Similarity Search isn't set up/);
       const before = stub.reads();
 
       // An account change can authorize indexing without this component

@@ -134,7 +134,7 @@ export function saveStatus(page: Page): Locator {
 export async function dismissEmbeddingKeyPrompt(
   page: Page,
 ): Promise<void> {
-  // The first active folder offers AI setup once. Most journeys are about a
+  // The first active folder offers Similarity Search setup once. Most journeys are about a
   // different capability, so this compatibility helper deliberately takes
   // the durable Not now path before they continue. Query the same localhost
   // state the gate is resolving before deciding whether to wait: checking
@@ -143,7 +143,7 @@ export async function dismissEmbeddingKeyPrompt(
   const shouldOffer = await page.evaluate(async () => {
     if (window.localStorage.getItem('stashbase.ai-setup-seen') === '1') return false;
     const response = await fetch('/api/embedder');
-    if (!response.ok) throw new Error(`Could not resolve AI setup state: ${response.status}`);
+    if (!response.ok) throw new Error(`Could not resolve Similarity Search setup state: ${response.status}`);
     const embedder = await response.json() as { authorized?: unknown };
     return embedder.authorized !== true;
   });

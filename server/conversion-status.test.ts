@@ -81,6 +81,19 @@ test('conversion progress and durable failures use filesystem path identity', as
   assert.equal(status.listPreparationProblems()[0]?.entry.status, 'cancelled');
   assert.equal(status.isPendingOrFailed(source), true);
 
+  const textlessImage = path.join(temp, 'Folder', 'blank.png');
+  status.markFailed(
+    textlessImage,
+    `ocr_extract exit 3: [ocr_extract] no text found in image: ${textlessImage}`,
+  );
+  assert.equal(status.readAll()[textlessImage], undefined);
+  assert.equal(status.isPendingOrFailed(textlessImage), false);
+  assert.equal(status.hasFailed(textlessImage), false);
+  assert.equal(
+    status.listPreparationProblems().some(({ path: problemPath }) => problemPath === textlessImage),
+    false,
+  );
+
   status.clearRecordsUnder(folderVariant);
   assert.equal(status.isPendingOrFailed(source), false);
   assert.deepEqual(status.listFailed(), []);

@@ -23,7 +23,7 @@ test('J01: user can navigate Settings and persist appearance across relaunch', a
     await expect(settingsDialog(app.page)).toBeVisible();
     await expect(settingsTab(app.page, 'Appearance')).toHaveAttribute('aria-selected', 'true');
 
-    for (const section of ['General', 'AI Index', 'Transcription', 'MCP', 'Appearance']) {
+    for (const section of ['General', 'Similarity Search', 'Transcription', 'MCP', 'Appearance']) {
       await settingsTab(app.page, section).click();
       await expect(settingsTab(app.page, section)).toHaveAttribute('aria-selected', 'true');
     }
@@ -71,7 +71,7 @@ test('J01: user can navigate Settings and persist appearance across relaunch', a
   }
 });
 
-test('signed-in Google identity is consistent in the sidebar, account menu, and AI Index Settings', async ({}, testInfo) => {
+test('signed-in Google identity is consistent in the sidebar, account menu, and Similarity Search Settings', async ({}, testInfo) => {
   const fixture = await createAppFixture({ membership: 'empty' });
   let app: LaunchedApp | undefined;
   const account = {
@@ -121,7 +121,7 @@ test('signed-in Google identity is consistent in the sidebar, account menu, and 
     await app.page.keyboard.press('Escape');
 
     await settingsButton(app.page).click();
-    await settingsTab(app.page, 'AI Index').click();
+    await settingsTab(app.page, 'Similarity Search').click();
     await expect(settingsDialog(app.page)).toContainText('Ada Lovelace');
     await expect(settingsDialog(app.page)).toContainText('ada@example.com');
     await expect(settingsDialog(app.page).locator('img[src="/api/account/avatar"]')).toBeVisible();

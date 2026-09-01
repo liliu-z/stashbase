@@ -9,7 +9,7 @@ import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'rea
 import { Button } from '@/common/components/ui/button';
 import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from '@/common/components/ui/collapsible';
 import { AgentMarkdown } from '@/features/agent-panel/components/AgentMarkdown';
-import { ChevronDownIcon, CopyIcon } from '@/common/components/icons';
+import { ChevronDownIcon, CopyIcon, TrashIcon } from '@/common/components/icons';
 import { cn } from '@/common/lib/utils';
 import { SectionHeading } from '@/common/components/ui/section';
 import { StatusMessage } from '@/common/components/ui/status';
@@ -42,7 +42,7 @@ export interface QueuedTurnPreview {
 }
 
 export function MessageList({
-  blocks, queuedTurns, turnActive, turnMeta, phase, fatal, fatalRecoveryLabel, scopeRetired, agentKind, agentShortName, onPermission, onSteerQueued, onCopyUserMessage, onResendUserMessage, onRetry, onStartLibraryChat, onOpenArtifact, onTurnFailureAction,
+  blocks, queuedTurns, turnActive, turnMeta, phase, fatal, fatalRecoveryLabel, scopeRetired, agentKind, agentShortName, onPermission, onSteerQueued, onDeleteQueued, onCopyUserMessage, onResendUserMessage, onRetry, onStartLibraryChat, onOpenArtifact, onTurnFailureAction,
 }: {
   blocks: Block[];
   queuedTurns: QueuedTurnPreview[];
@@ -56,6 +56,7 @@ export function MessageList({
   agentShortName: string;
   onPermission: (toolBlockId: string, permId: string, allow: boolean) => void;
   onSteerQueued: (id: string) => void;
+  onDeleteQueued: (id: string) => void;
   onCopyUserMessage: (text: string) => void;
   onResendUserMessage: (text: string) => void;
   onRetry: () => void;
@@ -160,6 +161,7 @@ export function MessageList({
           key={turn.id}
           turn={turn}
           onSteer={onSteerQueued}
+          onDelete={onDeleteQueued}
         />
       ))}
       {blocks.length > 0 && phase === 'closed' && fatal && (
@@ -303,10 +305,11 @@ function WorkTrace({ blocks, meta, handlers, defaultOpen = false }: {
 }
 
 function QueuedTurn({
-  turn, onSteer,
+  turn, onSteer, onDelete,
 }: {
   turn: QueuedTurnPreview;
   onSteer: (id: string) => void;
+  onDelete: (id: string) => void;
 }) {
   const label = turn.status === 'steered'
     ? 'Steered'
@@ -336,6 +339,18 @@ function QueuedTurn({
             {turn.canSteer && turn.status === 'waiting' && (
               <Button variant="ghost" size="xs" className="h-auto p-0 text-sm font-semibold text-muted-foreground hover:bg-transparent hover:text-accent" onClick={() => onSteer(turn.id)}>
                 Steer
+              </Button>
+            )}
+            {turn.status === 'waiting' && (
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                className="-my-0.5 text-muted-foreground hover:bg-transparent hover:text-destructive"
+                aria-label="Delete queued message"
+                title="Delete queued message"
+                onClick={() => onDelete(turn.id)}
+              >
+                <TrashIcon />
               </Button>
             )}
           </span>

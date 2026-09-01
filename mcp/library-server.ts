@@ -56,26 +56,6 @@ export function createLibraryMcpServer(opts: LibraryMcpServerOptions): Server {
     { name: 'stashbase', version: '0.1.0' },
     {
       capabilities: { tools: {} },
-      instructions:
-        'StashBase exposes local files through host-side ' +
-        'MCP tools. External agent shells may be sandboxed and unable to read the ' +
-        'user\'s absolute filesystem paths, so DO NOT use shell/cat or generic ' +
-        'filesystem tools for StashBase paths. Use `list_directory`, `read_file`, ' +
-        '`write_file`, `edit_file`, `move_file`, and `delete_file` instead.\n\n' +
-        'At the start of a session, call `library_info`. It returns `folder_home` (the default ' +
-        'new-folder location) and `folders` — "Your Folders", each an ABSOLUTE path. ' +
-        'Folders can live anywhere on disk, not just under folder_home.\n\n' +
-        'All file tools take ABSOLUTE POSIX paths that live under one of those folders ' +
-        '(e.g. `/Users/me/notes/topic/note.md`); `search_library` returns paths in the same ' +
-        'form. When a returned path is a PDF, call `read_file` on that PDF path; StashBase ' +
-        'returns extracted Markdown when conversion has completed. `write_file`, `edit_file`, `move_file`, and `delete_file` update the ' +
-        'AI Index when an API key is configured. Call `reindex` after bulk ' +
-        'external changes or whenever a tool returns an index warning. When constructing Markdown or LaTeX ' +
-        'inside JavaScript, use `String.raw` or escape every backslash, then use `read_file` to verify generated math.\n\n' +
-        'When you CREATE a new generated note (e.g. a summary or report), add ' +
-        '`generated_by: stashbase-agent` to its Markdown YAML front-matter (or an HTML ' +
-        '`<meta name="generated_by" content="stashbase-agent">`) so the user can later ' +
-        'bulk-identify agent-generated output. Never put credentials in files.',
     },
   );
 
@@ -243,15 +223,12 @@ const BUILTIN_TOOLS = [
     {
       name: 'library_info',
       description:
-        'Orient yourself in the StashBase library. **Call this first** in a ' +
-        'new conversation. Returns `{folder_home, folders}` where `folder_home` is the ' +
+        'Return StashBase library locations as `{folder_home, folders}`, where `folder_home` is the ' +
         'default new-folder location and `folders` lists "Your ' +
         'Folders", each with an ABSOLUTE `path` (the identity the file tools and ' +
         'search_library use), a display `name`, and the embedder provider. Folders can ' +
-        'live anywhere on disk. Folder purpose and durable working instructions belong ' +
-        'in the visible `AGENTS.md`, which you can read with the file tools when needed. ' +
-        'Use StashBase file tools for these paths; sandboxed shells may not be able to ' +
-        'see those host files.',
+        'live anywhere on disk. Sandboxed runtime filesystem tools may not be able to ' +
+        'see these host paths; the StashBase file tools operate on them.',
       inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     },
     {
@@ -289,7 +266,7 @@ const BUILTIN_TOOLS = [
       name: 'write_file',
       description:
         'Create or overwrite a Markdown, HTML, JSON, or UTF-8 plain-text file. Creates parent folders as ' +
-        'needed, writes atomically, and updates AI Index when an API key is configured.',
+        'needed, writes atomically, and updates Similarity Search data when a provider is configured.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -322,7 +299,7 @@ const BUILTIN_TOOLS = [
       description:
         'Rename or move a file within the same folder. Keeps note attachment bundles together, ' +
         'regenerates PDF/image searchable text when needed, optionally cascades Markdown/HTML links, ' +
-        'and updates AI Index when possible.',
+        'and updates Similarity Search data when possible.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -337,7 +314,7 @@ const BUILTIN_TOOLS = [
       name: 'delete_file',
       description:
         'Delete a visible file by absolute path. Also removes note bundles or ' +
-        'PDF/image derived artifacts owned by that file, and cleans AI Index asynchronously.',
+        'PDF/image derived artifacts owned by that file, and cleans Similarity Search data asynchronously.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -351,28 +328,28 @@ const BUILTIN_TOOLS = [
       description:
         'Search opened local folders, including current prepared text for PDFs, DOCX, images, and media. ' +
         'Two modes: `semantic` (default) is hybrid ' +
-        '(vector + full-text) meaning-based search and needs AI Index; `keyword` is ' +
+        '(vector + full-text) meaning-based search and needs Similarity Search; `keyword` is ' +
         'exact literal search (ripgrep) for identifiers, error codes, config keys, or quoted ' +
-        'phrases that semantic search blurs, and it works before AI Index is set up. ' +
+        'phrases that Similarity Search may blur, and it works before Similarity Search is set up. ' +
         'In a StashBase panel chat, turning Similarity Search off resolves this tool to ' +
-        'keyword mode even when semantic mode was requested; the response `mode` is the strategy actually used. ' +
+        'keyword mode even when the `semantic` mode was requested; the response `mode` is the strategy actually used. ' +
         'Searches the **whole library** by default — every member folder from ' +
         '`library_info` — and scopes to one folder when `folder` is its absolute root (e.g. ' +
         '"/Users/me/notes"). For finer control, `path_prefix` restricts hits to sources ' +
         'starting with that prefix (e.g. "/Users/me/notes/transcripts/"). Each hit returns the absolute file path, ' +
-        'the matching content, optional heading and source line range, and (semantic) a fused ' +
+        'the matching content, optional heading and source line range, and (in `semantic` mode) a fused ' +
         'relevance score. PDF hits include a `read_hint`; use `read_file` on the PDF path to get ' +
         'extracted Markdown. Read full text documents with `read_file`.',
       inputSchema: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: 'Natural-language query (semantic) or literal text (keyword).' },
+          query: { type: 'string', description: 'Natural-language query for Similarity Search (`semantic` mode) or literal text for Exact Search (`keyword` mode).' },
           mode: {
             type: 'string',
             enum: [...SEARCH_MODES],
             description:
-              'Search mode. "semantic" (default) is meaning-based and needs AI Index. ' +
-              '"keyword" is exact literal matching over source and prepared text and works before AI Index setup.',
+              'Search mode. "semantic" (default) is meaning-based and needs Similarity Search. ' +
+              '"keyword" is exact literal matching over source and prepared text and works before Similarity Search setup.',
           },
           folder: {
             type: 'string',
@@ -447,7 +424,7 @@ const BUILTIN_TOOLS = [
     {
       name: 'reindex',
       description:
-        'Reconcile AI Index with the files currently on disk, then report ' +
+        'Reconcile Similarity Search data with the files currently on disk, then report ' +
         'index health. StashBase file tools update the index themselves when possible; ' +
         'call this after bulk external changes or when a file tool returns an index warning. ' +
         'You do NOT need to ' +

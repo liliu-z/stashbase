@@ -39,7 +39,8 @@ artifacts.
   search preparation.
 - Users see preparing, ready, blocked, failed, cancelled, and retryable states
   only when they change the next action. Missing optional capabilities do not
-  turn the source itself into a failed file.
+  turn the source itself into a failed file. An image with no recognizable text
+  is a normal completed OCR result, not a failure or a reason to Reprocess.
 - Reprocess is explicit. Large PDF and media work can reuse valid resumable
   checkpoints after transient interruption while manual retry resets the work
   that must be recomputed.
@@ -58,7 +59,7 @@ artifacts.
 - A derived result is current only when its format-specific completion and
   source-freshness contract succeeds. File existence or an in-memory status is
   not completion truth.
-- Conversion completion and AI Index readiness remain separate states.
+- Conversion completion and Similarity Search readiness remain separate states.
 - Explicit cancellation remains stopped until the user retries. Transient
   interruption is rediscoverable.
 - Optional native tools and state stores degrade to actionable status rather

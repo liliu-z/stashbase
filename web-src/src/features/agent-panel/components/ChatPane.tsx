@@ -11,14 +11,21 @@ import * as React from 'react';
 import type { ReactNode } from 'react';
 import '@/features/agent-panel/agent-panel.css';
 import { AgentView } from '@/features/agent-panel/components/AgentView';
+import { AgentInstructionsControl } from '@/features/agent-panel/components/AgentInstructionsControl';
+import { AgentInstructionsModal } from '@/features/agent-panel/components/AgentInstructionsModal';
+import { useAgentInstructionsPresence } from '@/features/agent-panel/hooks/useAgentInstructionsEditor';
 import { LazyLoadBoundary } from '@/common/components/ErrorBoundary';
 import { Button } from '@/common/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/common/components/ui/tabs';
 import { agentMeta, isAgentKind } from '@/common/lib/agentCatalog';
 import { cn } from '@/common/lib/utils';
-import { useAppActions, useChat } from '@/store/contexts/AppContext';
+import { useAppActions, useChat, useWorkspace } from '@/store/contexts/AppContext';
 import { rememberPreferredAgent } from '@/common/lib/agentPreference';
-import { LIBRARY_SCOPE } from '@/common/lib/libraryScope';
+import {
+  LIBRARY_SCOPE,
+  scopeDisplayName,
+} from '@/common/lib/libraryScope';
+import type { AgentInstructionsScope } from '@/common/api/api';
 
 /** The inside of one tab body; `status` styles the "no active chat" notice
  *  and the lazy-load error fallback. It has to stay a class string: one of
@@ -56,12 +63,24 @@ export function ChatSessionBoundary({
 
 export default function ChatPane() {
   const state = useChat();
+  const workspace = useWorkspace();
   const { dispatch } = useAppActions();
   // The panel renders with or without a window folder: chats are scoped
   // per tab (a library folder, or the whole library), so a no-folder
   // window can still hold library-wide chats.
   const tabs = state.chatTabs;
   const activeId = state.activeChatTabId;
+  const activeTab = tabs.find((tab) => tab.id === activeId);
+  const activeInstructionsScope = React.useMemo<AgentInstructionsScope | null>(() => {
+    const folderPath = typeof activeTab?.boundFolder === 'string'
+      ? activeTab.boundFolder
+      : activeTab?.boundFolder === null
+        ? null
+        : workspace.folderPath || null;
+    return folderPath ? { kind: 'folder', path: folderPath } : null;
+  }, [activeTab?.boundFolder, workspace.folderPath]);
+  const [instructionsScope, setInstructionsScope] = React.useState<AgentInstructionsScope | null>(null);
+  const instructionsPresence = useAgentInstructionsPresence(activeInstructionsScope);
 
   return (
     <aside
@@ -81,8 +100,8 @@ export default function ChatPane() {
       >
         {/* Cursor-style tab strip. Scrolls horizontally when many tabs are
           * open; new tabs come from the sidebar's New Chat button, so the
-          * list is tabs-only and nothing non-tab sits inside it. pr-10
-          * reserves the window's top-right corner for the shell's floating
+          * list itself is tabs-only. Agent Instructions is the one panel-level
+          * action beside it; pr-10 keeps both clear of the shell's floating
           * chat toggle (TitlebarControls).
           *
           * Geometry mirrors the document strip (`.tab-strip` in
@@ -178,6 +197,13 @@ export default function ChatPane() {
               </TabsTrigger>
             ))}
           </TabsList>
+          {activeTab && activeInstructionsScope && (
+            <AgentInstructionsControl
+              scopeName={scopeDisplayName(activeInstructionsScope)}
+              customized={instructionsPresence.customized}
+              onOpen={() => setInstructionsScope(activeInstructionsScope)}
+            />
+          )}
         </div>
         <div className="relative min-h-0 flex-1">
           {tabs.map((tab) => (
@@ -231,6 +257,13 @@ export default function ChatPane() {
           )}
         </div>
       </Tabs>
+      {instructionsScope && (
+        <AgentInstructionsModal
+          scope={instructionsScope}
+          onSaved={instructionsPresence.setCustomized}
+          onCancel={() => setInstructionsScope(null)}
+        />
+      )}
     </aside>
   );
 }

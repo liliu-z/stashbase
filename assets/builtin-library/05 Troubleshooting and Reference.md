@@ -10,17 +10,17 @@ Check each stage separately:
 1. **Library membership:** Is the expected folder still in the Library?
 2. **Scope:** Is Search covering the whole Library or narrowed to the correct
    folder?
-3. **Mode:** Use Exact for known wording; use Similar for related meaning.
+3. **Mode:** Use Exact for known wording; use Similarity for related meaning.
 4. **Retrieval capability:** Does the format provide direct text, or does it
    need current prepared text?
 5. **Preparation:** Is extraction, OCR, or transcription still running,
    blocked, failed, stale, or cancelled?
-6. **AI Index:** For Similar Search, is an indexing source configured and is
-   the expected content ready?
+6. **Similarity Search:** Is a provider configured, and is the expected content
+   ready?
 7. **Hosted availability:** Is the provider available, and does the hosted
    allowance remain?
 
-Switching to Exact Search is the normal fallback when AI Index cannot continue.
+Switching to Exact Search is the normal fallback when Similarity Search cannot continue.
 A true empty result, incomplete Preparation, incomplete indexing, wrong scope,
 provider failure, and exhausted allowance are different conditions.
 
@@ -41,27 +41,27 @@ For audio or video, download a local model under **Settings → Transcription**.
 If optional native support is missing, StashBase should explain the blocked or
 retryable stage without blocking the rest of the folder.
 
-## Similar Search Is Unavailable or Paused
+## Similarity Search Is Unavailable or Paused
 
-- Confirm the selected source under **Settings → AI Index**.
+- Confirm the selected provider under **Settings → Similarity Search**.
 - Hosted access requires a StashBase sign-in; bring-your-own access requires an
   OpenAI or OpenRouter key stored in Settings.
-- Hosted indexing and Similar queries share the displayed allowance.
+- Hosted indexing and Similarity Search queries share the displayed allowance.
 - Known stale semantic evidence is hidden rather than presented as current.
 - Pending work can resume after allowance refresh or after selecting an
   available bring-your-own source.
 
 Exact Search and ordinary local file work remain available throughout.
 
-## Create Wiki Is Waiting
+## Build Wiki Is Waiting
 
-Create Wiki may wait for the selected Agent runtime or its account. AI setup is
-independent and never blocks this action. Complete the visible Agent setup
+Build Wiki may wait for the selected Agent runtime or its account.
+Similarity Search setup is independent and never blocks this action. Complete the visible Agent setup
 action; the pending action stays pinned to its original folder and sends once
 when the Agent is ready. Use **Cancel** below the capsule to discard it.
 
-Create Wiki modifies only `wiki/`; it does not move, rename, delete, or broadly
-rewrite other source files. If
+Build Wiki modifies only `wiki/`; it does not move, rename, delete, or
+broadly rewrite Sources. If
 an Agent proposes physical reorganization, review and approve that as a
 separate action. If a partial `wiki/index.md` was written before failure, treat
 it as an ordinary visible file: inspect it, then retry or edit it directly.
@@ -81,7 +81,7 @@ Treat these stages separately:
 - **Turn failed:** use the in-conversation recovery card. The transcript and
   session remain available.
 
-StashBase sign-in and AI Index configuration do not sign in Claude Code or
+StashBase sign-in and Similarity Search configuration do not sign in Claude Code or
 Codex.
 
 ## A Chat Seems to Be Using the Wrong Folder
@@ -118,8 +118,8 @@ readable by every Agent client.
 - Restart clients that read MCP configuration only at startup.
 - Confirm the expected folder is a current Library member.
 - Confirm requested paths remain inside that member.
-- For Similar Search, confirm AI Index separately; Exact retrieval remains the
-  fallback.
+- For meaning-based retrieval, confirm Similarity Search separately; Exact
+  Search remains the fallback.
 
 Advanced configuration, URL access, Docker boundaries, CORS, and credential
 rotation are documented at

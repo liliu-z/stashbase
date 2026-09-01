@@ -39,9 +39,35 @@ import type { ConversionProgress } from '../shared/conversion.ts';
 const inFlight = new Set<string>();
 const progress = new Map<string, ConversionProgress>();
 
+function isLegacyTextlessOcrFailure(entry: ConversionStatusEntry): boolean {
+  return entry.status === 'failed'
+    && typeof entry.lastError === 'string'
+    && entry.lastError.includes('ocr_extract exit 3:')
+    && entry.lastError.includes('[ocr_extract] no text found in image:');
+}
+
+/** Before textless images became a successful OCR outcome, the extractor
+ * persisted exit 3 as a durable failure. Retire only that exact legacy shape
+ * on read so upgraded libraries stop showing Reprocess and reconcile can
+ * create the new marker-only completion result. */
+function actionableStatus(sourcePath: string): ConversionStatusEntry | undefined {
+  const entry = getConversionStatus(sourcePath);
+  if (entry && isLegacyTextlessOcrFailure(entry)) {
+    clearConversionStatus(sourcePath);
+    return undefined;
+  }
+  return entry;
+}
+
 /** Persisted failures only (the Retry surface). */
 export function readAll(): ConversionStatusMap {
-  return readConversionStatusMap();
+  const entries = readConversionStatusMap();
+  for (const [sourcePath, entry] of Object.entries(entries)) {
+    if (!isLegacyTextlessOcrFailure(entry)) continue;
+    clearConversionStatus(sourcePath);
+    delete entries[sourcePath];
+  }
+  return entries;
 }
 
 
@@ -49,11 +75,11 @@ export function readAll(): ConversionStatusMap {
  *  conversion is running right now, or a persisted failure says a human
  *  must press Retry first. */
 export function isPendingOrFailed(sourcePath: string): boolean {
-  return inFlight.has(filesystemPath.identity(sourcePath)) || getConversionStatus(sourcePath) !== undefined;
+  return inFlight.has(filesystemPath.identity(sourcePath)) || actionableStatus(sourcePath) !== undefined;
 }
 
 export function hasFailed(sourcePath: string): boolean {
-  return getConversionStatus(sourcePath)?.status === 'failed';
+  return actionableStatus(sourcePath)?.status === 'failed';
 }
 
 export function markInFlight(sourcePath: string): void {
@@ -106,11 +132,12 @@ export function clearRecordsUnder(sourcePathPrefix: string): void {
 }
 
 export function listFailed(): Array<{ path: string; entry: ConversionStatusEntry }> {
-  return listConversionStatus('failed');
+  return listConversionStatus('failed').filter(({ path }) => actionableStatus(path)?.status === 'failed');
 }
 
 export function listPreparationProblems(): Array<{ path: string; entry: ConversionStatusEntry }> {
   return [...listConversionStatus('failed'), ...listConversionStatus('cancelled')]
+    .filter(({ path, entry }) => actionableStatus(path)?.status === entry.status)
     .sort((left, right) => left.path.localeCompare(right.path));
 }
 

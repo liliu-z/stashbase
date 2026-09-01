@@ -42,6 +42,24 @@ test('bundled Start Here filenames preserve the intended reading order', () => {
   ]);
 });
 
+test('packaged Agent Instructions include the canonical default prompt', () => {
+  const prompt = fs.readFileSync(path.join(root, 'assets', 'agent-instructions', 'default.md'), 'utf8').trim();
+  assert.match(prompt, /🔎 \*\*Answer questions\*\*/);
+  assert.match(prompt, /Always search through my Wiki/);
+  assert.match(prompt, /plain, natural language/);
+  assert.match(prompt, /✏️ \*\*Make changes\*\*/);
+  assert.match(prompt, /📚 \*\*Maintain the Wiki\*\*/);
+  assert.match(prompt, /Keep all Wiki Pages in the `wiki\/` folder/);
+  assert.match(prompt, /follow its structure, naming, and linking conventions/);
+  assert.deepEqual(
+    pkg.build?.extraResources?.find((entry) => entry?.to === 'assets/agent-instructions'),
+    {
+      from: 'assets/agent-instructions',
+      to: 'assets/agent-instructions',
+    },
+  );
+});
+
 test('electron-builder includes local CommonJS dependencies outside electron/', () => {
   const missing = [];
   const relativeRequire = /require\(\s*['"](\.\.\/[^'"]+)['"]\s*\)/g;
@@ -74,7 +92,7 @@ test('Windows extractor build wires PyInstaller hide-console without switching o
   assert.doesNotMatch(source, /'--(?:no)?console'/);
 });
 
-test('packaged AI Index daemon includes the local ONNX embedding runtime', () => {
+test('packaged Similarity Search daemon includes the local ONNX embedding runtime', () => {
   const requirements = fs.readFileSync(path.join(root, 'python', 'requirements.txt'), 'utf8');
   const build = fs.readFileSync(path.join(root, 'scripts', 'build-python-sidecar.mjs'), 'utf8');
   const daemonExcludes = build.match(/const daemonExcludedModules = \[([\s\S]*?)\n\];/)?.[1] ?? '';

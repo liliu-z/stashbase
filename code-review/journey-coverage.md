@@ -61,7 +61,7 @@ aliases, and Journey E2E owns representative composition.
 | [J09 Bug report](../design-docs/user-journeys.md#j09-prepare-and-hand-off-a-bug-report) | [Bug Reporting](../design-docs/design/bug-reporting.md) | [Bug Reporting](bug-reporting.md), [Window Lifecycle](window-lifecycle.md), [Architecture](architecture.md) |
 | [J10 Core loop](../design-docs/user-journeys.md#j10-turn-a-local-project-into-durable-agent-assisted-work) | [Workspace](../design-docs/design/workspace.md), [Documents](../design-docs/design/documents.md), [Preparation](../design-docs/design/preparation.md), [Search](../design-docs/design/search.md), [Agent Panel](../design-docs/design/agent-panel.md) | [Renderer Workspace](renderer-workspace.md), [Data Lifecycle](data-lifecycle.md), [Agent Runtime](agent-runtime.md), [Agent Panel](agent-panel.md), [MCP Access](mcp-access.md), [File Transactions](file-transactions.md), [Markdown Rendering](markdown-rendering.md) |
 | [J11 Conversation to project](../design-docs/user-journeys.md#j11-turn-a-conversation-into-a-project) | [Workspace](../design-docs/design/workspace.md), [Agent Panel](../design-docs/design/agent-panel.md) | [Renderer Workspace](renderer-workspace.md), [Settings and Config](settings-config.md), [MCP Access](mcp-access.md), [Agent Runtime](agent-runtime.md), [Agent Panel](agent-panel.md), [File Transactions](file-transactions.md), [Data Lifecycle](data-lifecycle.md) |
-| [J12 Build AI Wiki](../design-docs/user-journeys.md#j12-build-an-ai-wiki-over-a-local-folder) | [Agent Panel](../design-docs/design/agent-panel.md), [Search](../design-docs/design/search.md), [Workspace](../design-docs/design/workspace.md) | [Agent Panel](agent-panel.md), [Settings and Config](settings-config.md), [Renderer Workspace](renderer-workspace.md), [File Transactions](file-transactions.md), [Data Lifecycle](data-lifecycle.md) |
+| [J12 Build Wiki Pages](../design-docs/user-journeys.md#j12-build-wiki-pages-from-a-local-folder) | [Agent Panel](../design-docs/design/agent-panel.md), [Search](../design-docs/design/search.md), [Workspace](../design-docs/design/workspace.md) | [Agent Panel](agent-panel.md), [Settings and Config](settings-config.md), [Renderer Workspace](renderer-workspace.md), [File Transactions](file-transactions.md), [Data Lifecycle](data-lifecycle.md) |
 
 ## J01: Onboarding
 
@@ -70,7 +70,7 @@ aliases, and Journey E2E owns representative composition.
 - **Contract Test:** renderer initialization, Settings state, workspace
   navigation, and Electron lifecycle are exercised by `pnpm test:renderer`,
   `pnpm test:config`, `pnpm test:updates`, and `pnpm test:electron:smoke`.
-  The Settings and config suites cover hosted and BYOK AI Index choices,
+  The Settings and config suites cover hosted and BYOK Similarity Search choices,
   rejection of new local selection, deterministic retirement of persisted
   local selection before daemon startup, and transactional source activation
   that keeps the prior source selected when runtime reset or binding fails.
@@ -86,7 +86,7 @@ aliases, and Journey E2E owns representative composition.
   utilities.
 - **Journey E2E:** [launch smoke](../e2e/smoke/launch.spec.ts) and
   [library navigation](../e2e/journeys/library-navigation.spec.ts) exercise
-  blank-workspace entry, quiet AI Index state, explicit setup/skip behavior,
+  blank-workspace entry, quiet Similarity Search state, explicit setup/skip behavior,
   folder selection, and local availability. [Navigation layout](../e2e/journeys/navigation-layout.spec.ts)
   verifies that Appearance Settings remains usable with the operating system's
   reduced-motion preference while transform movement is removed and quiet
@@ -109,21 +109,18 @@ aliases, and Journey E2E owns representative composition.
 
 ## J02: Folder
 
-**Status:** Gap and release-dependent.
+**Status:** Release-dependent.
 
 - **Contract Test:** workspace transitions, library mutation, cleanup, and
   window retirement run through `pnpm test:renderer`,
   `pnpm test:library-files`, and `pnpm test:electron`.
 - **Journey E2E:** [library navigation](../e2e/journeys/library-navigation.spec.ts)
   and [library mutations](../e2e/journeys/library-mutations.spec.ts) exercise
-  entry, switching, and removal without source deletion.
+  entry, switching, and removal without source deletion; navigation also proves
+  folder entry creates no `AGENTS.md` or `CLAUDE.md`.
 - **AI Eval:** not required.
 - **Release Check:** real operating-system folder picking and file drop remain
   release evidence.
-- **Gap:** ordinary folder entry currently creates a missing `AGENTS.md`
-  create-only. The file stays visible and user-owned, but the write is broader
-  than J02's ordinary-navigation promise. See the
-  [instruction-seeding Known Gap](file-transactions.md#known-gap--instruction-seeding-on-folder-entry).
 
 ## J03: Documents
 
@@ -226,12 +223,18 @@ aliases, and Journey E2E owns representative composition.
   permissions, failed-install external recheck without another download,
   managed Codex PowerShell path ownership and missing-output diagnostics,
   installed-but-signed-out Codex detection, same-executable browser login,
-  recovery, transcript, layout state, and structured folder-scope retirement
+  recovery, transcript, individually deletable waiting follow-ups, layout state,
+  and structured folder-scope retirement
   for blank, draft-only, queued, and active-tool Chats. Workspace reset tests
   pin Chat preservation through both direct folder loss and 412 recovery.
   Library-operation, route, keyword-search, and renderer composition tests pin
   the per-session Similarity Search policy, library-wide text fallback, and
-  prepared-PDF source remapping while the switch is Off.
+  prepared-PDF source remapping while the switch is Off. Agent Instructions
+  config tests pin bounded folder isolation, strict persistence, and membership
+  cleanup plus default restoration; Adapter tests pin verbatim runtime
+  injection; a renderer composition
+  test pins that a save remounts the sessions on that exact scope and leaves
+  every other scope's session alone.
   `pnpm test:opencode:native` starts the
   exact bundled OpenCode binary and completes an SDK session against a local
   fake OpenAI-compatible gateway; broker tests cover token isolation, streaming,
@@ -243,7 +246,8 @@ aliases, and Journey E2E owns representative composition.
   the Built-in Agent account gate and bring-your-own choices, then
   exercises the built-in panel against the deterministic fake Codex runtime,
   including the session-scope Similarity Search switch before and after scope
-  binding, and
+  binding plus folder-scoped Agent Instructions persistence, no source-file
+  creation, and exact native developer-instructions injection, and
   retaining a started cross-folder Chat through Library removal and opening a
   fresh explicitly Library-scoped Chat.
 - **AI Eval:** not required for panel and runtime correctness; actual
@@ -327,7 +331,7 @@ aliases, and Journey E2E owns representative composition.
 - **Contract Test:**
   [project creation tests](../server/__tests__/agent-projects.test.ts) prove
   name and location validation, owned-root and symlink confinement,
-  create-only instructions, membership failure cleanup, live Library-session
+  an empty project with no seeded instruction files, membership failure cleanup, live Library-session
   attribution, history override ordering, and rebind-race rollback.
   [MCP transport tests](../server/__tests__/mcp-http-transport.test.ts) prove
   attributed built-in calls and unattributed external calls remain distinct.
@@ -336,7 +340,7 @@ aliases, and Journey E2E owns representative composition.
 - **Journey E2E:** [Agent workflows](../e2e/journeys/agent-workflows.spec.ts)
   rejects one visible `create_project` approval and proves no directory or
   membership appears, then approves the same real MCP action and proves folder
-  creation, `AGENTS.md`, registration, same-Chat rebind, originating-window
+  creation without `AGENTS.md`, registration, same-Chat rebind, originating-window
   entry, transcript continuity, and a post-rebind real MCP write inside the
   new project. Adapter contract tests additionally prove Codex keeps its thread
   and Claude keeps its native session id while subsequent execution moves to
@@ -356,36 +360,36 @@ aliases, and Journey E2E owns representative composition.
   row remains under Library and this path needs separate evidence after that
   native limitation is resolved.
 
-## J12: Build AI Wiki
+## J12: Build Wiki Pages
 
 **Status:** Partial and release-dependent.
 
 - **Contract Test:** renderer tests cover the fixed folder CTA, concise visible
   turn versus safe wire preset, the one-time first-folder setup offer and
-  durable **Not now**, manual setup reopening, and Create Wiki's independence
-  from embedding authorization. Agent, file-transaction, and data-lifecycle
+  durable **Not now**, manual setup reopening, and the Build Wiki
+  action's independence from embedding authorization. Agent, file-transaction, and data-lifecycle
   suites cover approval, source confinement, write reconciliation, and index
   admission.
 - **Journey E2E:** [Agent workflows](../e2e/journeys/agent-workflows.spec.ts)
-  handles the first-folder AI offer, invokes Create Wiki independently through
-  the deterministic fake Codex runtime, approves a real MCP
+  handles the first-folder Similarity Search offer, invokes Build Wiki
+  independently through the deterministic fake Codex runtime, approves a real MCP
   **wiki/index.md** write, observes the directory in the tree, and proves an
   original source stayed
   byte-identical. [Library navigation](../e2e/journeys/library-navigation.spec.ts)
   separately proves the bare Library remains quiet, the first active folder
   offers setup, later folder switches stay quiet after **Not now**, and the
-  persistent Enable route can reopen setup.
+  persistent **Set up** route can reopen setup.
 - **AI Eval:** Gap. The deterministic Agent proves orchestration and safety,
-  not whether a real model produces a useful, complete, well-linked Wiki over
-  representative mixed-format folders.
+  not whether a real model produces useful, complete, well-linked Wiki Pages
+  over representative mixed-format folders.
 - **Release Check:** one packaged Built-in flow should cover independent
-  account-required Agent setup, hosted AI activation/backfill, and review of a
-  real generated Wiki. Bring-your-own-key plus a real external Agent is
-  representative secondary evidence.
+  account-required Agent setup, hosted Similarity Search activation/backfill,
+  and review of real generated Wiki Pages. Bring-your-own-key plus a real
+  external Agent is representative secondary evidence.
 - **Gap:** no real-Agent quality Eval yet covers folder-map completeness,
   source-link correctness, or preservation under ambiguous existing Wiki
   content. The first release intentionally claims no persistent ready/stale
-  state, Update Wiki label, or scheduled regeneration.
+  state, Update Wiki Pages label, or scheduled regeneration.
 
 ## Maintenance Rule
 
