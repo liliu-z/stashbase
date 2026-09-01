@@ -244,6 +244,9 @@ export function workspaceReducer(w: WorkspaceSlice, a: Action): WorkspaceSlice |
         folders: a.folders,
         folder: a.folder,
         folderPath,
+        // Only a listing that consulted the server carries the flag;
+        // optimistic local FILES_LOADED patches keep the last known value.
+        showHiddenFiles: a.showHiddenFiles ?? w.showHiddenFiles,
         ...(folderChanged
           ? { recentFilePaths: [], editorHistory: [] }
           : {}),

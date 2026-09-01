@@ -189,6 +189,18 @@ described by the
   folder — exposes **Show in Finder / File Explorer** on hover/focus and by
   keyboard, so reduced StashBase capability never implies that the source is
   unreachable. Hidden derived artifacts never surface.
+- The Files panel menu's checkable **Show Hidden Files** preference is
+  application-level and durable. Off (the default and the recovery for
+  invalid stored state) preserves the current view, including visible
+  ordinary dotfiles. On surfaces eligible user-owned dot-directories and
+  their descendants in the tree and Quick Open with their declared
+  capability and a subtle non-disabled distinction. `.git` and other VCS
+  databases, StashBase-derived artifacts, dot-notes, and junk metadata never
+  surface in either mode; hidden excluded caches stay bounded non-expandable
+  rows; and hidden-directory content remains outside Preparation, indexing,
+  Search, automatic Chat context, and Agent/MCP discovery. Turning the
+  option off removes hidden rows from the tree, keyboard order, selection,
+  and Quick Open without closing open tabs or discarding edits.
 - Writer/reader, JSON Tree/Source, and literal plain-text transitions preserve
   the same source content rather than creating a second document model.
 - Unsupported plain-text encoding keeps the source identifiable, read-only,

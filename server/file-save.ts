@@ -3,7 +3,7 @@ import { normalizeFolderRelativePath } from './folder-relative-path.ts';
 import { toSourcePath } from './folder.ts';
 import { detectFormat, isDerivedNoteName } from './format.ts';
 import { fileVersionAsync, readTextAsync, saveTextAsync } from './files.ts';
-import { contentSizeError } from './indexable.ts';
+import { contentSizeError, shouldIndexFilePath } from './indexable.ts';
 import { errorMessage, logger } from './log.ts';
 import { preserveTextSourceFormat } from './markdown-source-format.ts';
 import { indexer } from './state.ts';
@@ -36,6 +36,14 @@ export function validateEditableFileWrite(name: string): void {
 export async function upsertSavedFile(name: string, content: string): Promise<string | undefined> {
   if (!isEmbeddingAvailable()) {
     log.info(`save: skipped index update for ${name} because semantic embedding is unavailable`);
+    return undefined;
+  }
+  // Saves under hidden or excluded directories (reachable once hidden files
+  // are shown in the Workbench) stay outside the index: reconcile would
+  // delete such rows again, and hidden-directory content must never become
+  // Search or Chat context through a save side effect.
+  if (!shouldIndexFilePath(name)) {
+    log.info(`save: skipped index update for ${name} because the path is not indexable`);
     return undefined;
   }
   if (!content.trim()) {

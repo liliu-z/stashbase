@@ -43,6 +43,7 @@ import type {
   AudioPreviewStatus,
   UploadResult,
   OnboardingPreferences,
+  WorkspacePreferences,
 } from '@/common/api/apiTypes';
 import {
   ApiError,
@@ -105,6 +106,11 @@ export const api = {
   getOnboarding: () => getJson<OnboardingPreferences>('/api/onboarding'),
   putOnboarding: (patch: Partial<OnboardingPreferences>) =>
     send<OnboardingPreferences>('PUT', '/api/onboarding', patch),
+
+  /** Application-level Workbench visibility preference (hidden files).
+   *  Listings echo the effective value back in `FilesPayload`. */
+  putWorkspacePreferences: (patch: Partial<WorkspacePreferences>) =>
+    send<WorkspacePreferences>('PUT', '/api/workspace-preferences', patch),
 
   // CRUD ---------------------------------------------------------
   createNote: (content: string, dir: string) =>

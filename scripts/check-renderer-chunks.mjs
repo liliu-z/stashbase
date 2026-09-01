@@ -84,9 +84,16 @@ const manifestPath = path.join(outputRoot, '.vite', 'manifest.json');
  * before a row can be rendered or opened. The reveal also moved from a
  * tree.css descendant rule onto the row group, which is utilities rather
  * than a stylesheet the budget never counted.
+ * 437 → 438 for the Files panel's Show Hidden Files preference — the
+ * folder menu's checkable item, the tree's hidden-row marking, the toggle
+ * action, and the listing-carried visibility flag, ~0.9 KB of eager code.
+ * All of it is always-mounted chrome by the same rule as the folder menu's
+ * other items: the menu body stays in the lazy ManagedMenu chunk, but the
+ * item list, row classes, and the action they dispatch exist before any
+ * row renders.
  * Raise it only for shell UI that must load with the window — anything a
  * user can open on demand belongs in a dynamic entry above. */
-const initialJsBudgetBytes = 437 * 1024;
+const initialJsBudgetBytes = 438 * 1024;
 const expectedEntries = [
   'src/features/agent-panel/components/ChatPane.tsx',
   'src/features/agent-panel/components/AgentMathMarkdown.tsx',

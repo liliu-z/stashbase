@@ -46,8 +46,10 @@ export function isIndexExcludedDirName(name: string): boolean {
 }
 
 /** Dot-prefixed DIRECTORIES are tool/config internals (.claude, .git,
- *  .obsidian), never knowledge: the sidebar listing and the index skip
- *  them wholesale. Directory segments only — dot FILES keep their own
+ *  .obsidian), never knowledge: the index skips them wholesale, and the
+ *  sidebar listing skips them unless its explicit show-hidden option opts
+ *  eligible ones in (a Workbench visibility choice that never widens index
+ *  visibility). Directory segments only — dot FILES keep their own
  *  semantics (derived notes are dot-files). Deliberately separate from
  *  isIndexExcludedDirName: that predicate also gates writable paths,
  *  and writes into .claude (agent config) must stay allowed. */

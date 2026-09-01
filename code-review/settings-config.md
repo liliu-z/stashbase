@@ -7,9 +7,13 @@
 
 `server/app-config.ts` is the single persistent app-config Module and the Node
 server is its only writer. Domain routes expose narrow Interfaces for
-appearance, capture, onboarding, embedding, transcription, and MCP transport
-settings. Renderer panels are Adapters over those routes; they do not own
-durable truth.
+appearance, capture, workspace visibility, onboarding, embedding,
+transcription, and MCP transport settings. Renderer panels are Adapters over
+those routes; they do not own durable truth.
+The workspace hidden-files preference is application-level: reads fail safe
+to the default-off view so an unreadable config never blocks listings, the
+write path stays strict, and the toggle route bumps the shared tree version
+so every window's listing converges on the same durable value.
 Ambient capture is fail-closed: app config owns the opt-in, while Electron main
 only executes the current clipboard-monitoring state.
 Automatic desktop update checks are default-on: app config owns the preference,
@@ -130,7 +134,7 @@ access surface external clients copy from.
 |---|---|
 | Persistent Interface | strict/fallback read and write plus domain getters/setters in `server/app-config.ts` |
 | Domain owners | `server/mcp-http-settings.ts`, `server/hosted-account.ts`, `server/hosted-embedding-broker.ts`, `server/hosted-agent-broker.ts`, embedding and transcription configuration Modules |
-| HTTP Adapters | `server/routes/appearance.ts`, `capture.ts`, `updates.ts`, `onboarding.ts`, `account.ts`, `embedder.ts`, `transcription.ts`, `mcp.ts` |
+| HTTP Adapters | `server/routes/appearance.ts`, `capture.ts`, `updates.ts`, `workspace-preferences.ts`, `onboarding.ts`, `account.ts`, `embedder.ts`, `transcription.ts`, `mcp.ts` |
 | Renderer Adapters | `web-src/src/features/account/components/SidebarAccountRow.tsx`, `web-src/src/common/components/AccountIdentity.tsx`, and `web-src/src/features/settings/hooks/` — one controller per panel (`useGeneralSettings.ts`, `useEmbedderSettings.ts`, `useTranscriptionSettings.ts`, `useMcpAccess.ts`, `useAgentRuntimes.ts`, `useAppearanceSettings.ts`, `useApiKeyEntry.ts`), each owning its reads, its optimistic writes, and their ordering guards. The panels under `components/` render what a controller returns and hold only which dialog is open |
 | Authorization read | `web-src/src/common/hooks/useEmbedderState.ts` — shared with the Files-panel callout, which may not import this feature |
 | Appearance Adapter | `web-src/src/features/settings/lib/appearance.ts`, applied to a window by `hooks/useAppliedAppearance.ts` |

@@ -75,7 +75,21 @@ manager, or a primary graph-navigation tool.
   open through Quick Open or their tree row. Ordinary user dotfiles remain
   visible, while dot-notes retain the established hidden-note namespace;
   exact app-derived artifacts, bundle resources, junk metadata, and
-  dot-directories remain infrastructure rather than workspace content.
+  dot-directories remain infrastructure rather than workspace content by
+  default.
+- The Files panel menu offers a checkable **Show Hidden Files** action. It is
+  an application-level preference: every window applies the same durable
+  value, and a missing or invalid stored value recovers to the safe default
+  view. When enabled, eligible user-owned dot-directories such as `.github`
+  and `.vscode` and their descendants join the tree and Quick Open with
+  normal capability, distinguished by a subtle italic rather than a disabled
+  style. VCS databases such as `.git`, StashBase-derived state, dot-notes,
+  bundle resources, and junk metadata never surface in either mode, and
+  hidden excluded caches keep their bounded non-expandable rows. Turning the
+  option off removes hidden rows from the tree, keyboard order, selection,
+  and Quick Open without closing open tabs. Visibility here is a Workbench
+  choice only: hidden-directory content stays outside Preparation, indexing,
+  Search, automatic Chat context, and Agent/MCP discovery.
 - Dependency caches and generated build directories such as `node_modules`
   appear as non-expandable excluded-folder rows. StashBase does not recurse
   into them, so a project can explain their presence without paying the cost
@@ -132,7 +146,9 @@ manager, or a primary graph-navigation tool.
 - Tree completeness is scoped to user workspace content: excluded directory
   placeholders explain intentionally untraversed infrastructure, while hidden
   product-derived artifacts never surface. A collapsed or excluded directory
-  does not create descendant DOM.
+  does not create descendant DOM. The hidden-files preference widens only
+  Workbench visibility — retrieval, indexing, and Agent discovery scope are
+  server-owned policies it never changes.
 - Repeated or concurrent navigation to one source focuses its existing
   persistent tab. The same relative path in different Library folders remains
   a distinct source.

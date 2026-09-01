@@ -276,6 +276,12 @@ export interface WorkspaceSlice {
   files: FileMeta[];
   folders: FolderMeta[];
 
+  /** Server-owned application-level hidden-files visibility, as echoed by
+   *  the most recent listing. Drives the Files-panel menu's checked state
+   *  and the hidden-row presentation; the durable value lives in app
+   *  config, never here. */
+  showHiddenFiles: boolean;
+
   /** Manual sidebar ordering — map of `parentPath` → ordered list of
    *  child basenames. Empty map = use default (folders-first +
    *  alphabetical) for every folder. Mutated by drag-to-reorder in the
@@ -441,6 +447,7 @@ const initialWorkspace: WorkspaceSlice = {
   libraryFolderStatuses: {},
   files: [],
   folders: [],
+  showHiddenFiles: false,
   fileOrder: {},
   tabs: [],
   recentFilePaths: [],
@@ -500,7 +507,7 @@ export type Action =
   | { type: 'LIBRARY_FOLDER_STATUS'; path: string; status: LibraryFolderStatus }
   | { type: 'LIBRARY_FOLDER_STATUS_REMOVE'; path: string }
   | { type: 'FOLDER_CONTEXT'; folder: string; folderPath: string }
-  | { type: 'FILES_LOADED'; files: FileMeta[]; folders: FolderMeta[]; folder: string; folderPath?: string }
+  | { type: 'FILES_LOADED'; files: FileMeta[]; folders: FolderMeta[]; folder: string; folderPath?: string; showHiddenFiles?: boolean }
   | { type: 'FILE_ORDER_LOADED'; order: Record<string, string[]> }
   /** Replace one folder's ordered list (optimistic update before the
    *  PUT lands). Names list may include entries that no longer exist

@@ -59,6 +59,7 @@ import { mountInternalShutdownRoute } from './routes/internal-shutdown.ts';
 import { mount as mountLibraryRoutes } from './routes/library.ts';
 import { mount as mountEmbedderRoutes } from './routes/embedder.ts';
 import { mount as mountAppearanceRoutes } from './routes/appearance.ts';
+import { mount as mountWorkspacePreferenceRoutes } from './routes/workspace-preferences.ts';
 import { mount as mountCaptureRoutes } from './routes/capture.ts';
 import { mount as mountUpdateRoutes } from './routes/updates.ts';
 import { mount as mountTranscriptionRoutes } from './routes/transcription.ts';
@@ -336,6 +337,7 @@ app.use([
 
 // ----- mount routes -------------------------------------------------------
 mountAppearanceRoutes(app);
+mountWorkspacePreferenceRoutes(app);
 mountCaptureRoutes(app);
 mountUpdateRoutes(app);
 mountAccountRoutes(app, {

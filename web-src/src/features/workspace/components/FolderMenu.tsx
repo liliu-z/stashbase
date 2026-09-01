@@ -3,6 +3,7 @@ import {
   ExpandAllIcon,
   ExternalLinkIcon,
   NewFolderIcon,
+  PreviewIcon,
   StarIcon,
   SyncIcon,
   TrashIcon,
@@ -74,6 +75,13 @@ export function FolderMenu({
                 icon: <CollapseAllIcon />,
                 onSelect: () => dispatch({ type: 'COLLAPSE_ALL_FOLDERS' }),
               },
+          {
+            label: 'Show Hidden Files',
+            icon: <PreviewIcon />,
+            detail: 'Dot-folders such as .github, in every window',
+            checked: state.showHiddenFiles,
+            onSelect: () => { void actions.setShowHiddenFiles(!state.showHiddenFiles); },
+          },
           { separator: true },
         ] satisfies MenuItem[] : []),
         {

@@ -80,10 +80,25 @@ interface ScanResult {
   folders: FolderEntry[];
 }
 
+/** Listing behavior the server-owned folder Interface accepts. `showHidden`
+ *  widens WORKBENCH visibility only: eligible user-owned dot-directories join
+ *  the tree, while VCS databases, StashBase-derived artifacts, and excluded
+ *  caches keep their protections, and index/Search/Agent visibility is
+ *  untouched. */
+export interface FolderListingOptions {
+  showHidden?: boolean;
+}
+
+/** Hidden directories that never surface in the workspace even when hidden
+ *  files are shown: VCS databases are internal state, not browsable user
+ *  content. Distinct from `INDEX_EXCLUDED_DIRS` (whose other hidden members
+ *  surface as non-expandable excluded rows when hidden files are shown). */
+const PROTECTED_HIDDEN_DIRS = new Set<string>(['.git', '.hg', '.svn']);
+
 /** Workspace visibility is intentionally wider than index visibility. Hidden
  * product-derived artifacts and dot-directories remain infrastructure, while
  * ordinary dot-files and unknown source formats are real user content. */
-function workspaceDirectoryEntries(entries: fs.Dirent[]): fs.Dirent[] {
+function workspaceDirectoryEntries(entries: fs.Dirent[], opts: FolderListingOptions): fs.Dirent[] {
   const noteStems = new Set<string>();
   const legacyDerivedStems = new Set<string>();
   for (const entry of entries) {
@@ -95,7 +110,10 @@ function workspaceDirectoryEntries(entries: fs.Dirent[]): fs.Dirent[] {
   }
 
   return entries.filter((entry) => {
-    if (entry.isDirectory() && isHiddenDirName(entry.name)) return false;
+    if (entry.isDirectory() && isHiddenDirName(entry.name)) {
+      if (!opts.showHidden) return false;
+      if (PROTECTED_HIDDEN_DIRS.has(entry.name)) return false;
+    }
     if (entry.isFile() && HIDDEN_DOT_FILES.has(entry.name)) return false;
     if (entry.isFile() && entry.name.startsWith('.')) {
       // Dot-notes are part of the established hidden-note namespace. Keep
@@ -214,7 +232,7 @@ async function finishWorkspaceFileEntryAsync(
   }
 }
 
-function scanDirectory(dir: string, prefix: string): ScanResult {
+function scanDirectory(dir: string, prefix: string, opts: FolderListingOptions): ScanResult {
   let entries: fs.Dirent[];
   try {
     entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -229,7 +247,7 @@ function scanDirectory(dir: string, prefix: string): ScanResult {
   const files: FileEntry[] = [];
   const folders: FolderEntry[] = [];
 
-  for (const e of workspaceDirectoryEntries(entries)) {
+  for (const e of workspaceDirectoryEntries(entries, opts)) {
     const rel = prefix ? `${prefix}/${e.name}` : e.name;
     const full = path.join(dir, e.name);
 
@@ -238,7 +256,7 @@ function scanDirectory(dir: string, prefix: string): ScanResult {
         folders.push({ path: rel, kind: 'excluded' });
         continue;
       }
-      const subResult = scanDirectory(full, rel);
+      const subResult = scanDirectory(full, rel, opts);
       if (subResult.isKept) {
         files.push(...subResult.files);
         folders.push(...subResult.folders);
@@ -268,6 +286,7 @@ async function scanDirectoryAsync(
   dir: string,
   prefix: string,
   state: AsyncScanState,
+  opts: FolderListingOptions,
 ): Promise<ScanResult> {
   let entries: fs.Dirent[];
   try {
@@ -283,7 +302,7 @@ async function scanDirectoryAsync(
   const files: FileEntry[] = [];
   const folders: FolderEntry[] = [];
 
-  for (const e of workspaceDirectoryEntries(entries)) {
+  for (const e of workspaceDirectoryEntries(entries, opts)) {
     state.entriesSinceYield += 1;
     if (state.entriesSinceYield >= FILESYSTEM_SCAN_YIELD_EVERY) {
       state.entriesSinceYield = 0;
@@ -297,7 +316,7 @@ async function scanDirectoryAsync(
         folders.push({ path: rel, kind: 'excluded' });
         continue;
       }
-      const subResult = await scanDirectoryAsync(full, rel, state);
+      const subResult = await scanDirectoryAsync(full, rel, state, opts);
       if (subResult.isKept) {
         files.push(...subResult.files);
         folders.push(...subResult.folders);
@@ -326,14 +345,14 @@ function finishFolderListing(root: string, scanResult: ScanResult): FolderListin
   };
 }
 
-export function listFilesAndFolders(): FolderListing {
+export function listFilesAndFolders(opts: FolderListingOptions = {}): FolderListing {
   const root = folderRoot();
-  return finishFolderListing(root, scanDirectory(root, ''));
+  return finishFolderListing(root, scanDirectory(root, '', opts));
 }
 
-export async function listFilesAndFoldersAsync(): Promise<FolderListing> {
+export async function listFilesAndFoldersAsync(opts: FolderListingOptions = {}): Promise<FolderListing> {
   const root = folderRoot();
-  const scanResult = await scanDirectoryAsync(root, '', { entriesSinceYield: 0 });
+  const scanResult = await scanDirectoryAsync(root, '', { entriesSinceYield: 0 }, opts);
   return finishFolderListing(root, scanResult);
 }
 
@@ -509,7 +528,8 @@ async function readTextPrefixAsync(full: string, size: number, format: FileForma
 }
 
 /** Junk dot-FILES hidden from the workspace. Dot DIRECTORIES (.claude,
- *  .git, .stashbase, …) are hidden wholesale by `isHiddenDirName`. */
+ *  .git, .stashbase, …) are hidden wholesale by `isHiddenDirName` unless
+ *  the listing's explicit `showHidden` option opts eligible ones in. */
 export const HIDDEN_DOT_FILES = new Set<string>([
   '.DS_Store',
 ]);

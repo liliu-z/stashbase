@@ -112,6 +112,19 @@ export function buildTree(
 }
 
 /**
+ * Whether a row lives in the hidden-directory namespace the Show Hidden
+ * Files preference controls: a dot-prefixed DIRECTORY segment anywhere on
+ * its path. Ordinary dotfiles (`.env` at the root) are always-visible user
+ * content and deliberately do not match, so their presentation never
+ * changes with the preference.
+ */
+export function isHiddenEntryPath(path: string, kind: 'file' | 'folder'): boolean {
+  const segments = path.split('/');
+  const directorySegments = kind === 'file' ? segments.slice(0, -1) : segments;
+  return directorySegments.some((segment) => segment.startsWith('.'));
+}
+
+/**
  * The rows the user can actually see, in render order: a depth-first
  * walk that descends into a folder only while it is expanded.
  *

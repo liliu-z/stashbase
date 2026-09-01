@@ -6,7 +6,7 @@ import type { FileMeta } from '@/common/api/api';
 import { BotIcon, CancelledIcon, ChevronDownIcon, ClaudeIcon, ExternalLinkIcon, FolderIcon, WarningIcon } from '@/common/components/icons';
 import { useTreeRowDrag } from '@/features/workspace/hooks/useTreeRowDrag';
 import { TreeRovingContext, useTreeRoving, useTreeRow } from '@/features/workspace/hooks/useTreeRoving';
-import { buildTree, visibleNodePaths, type FolderNode, type TreeNode } from '@/features/workspace/lib/fileTreeModel';
+import { buildTree, isHiddenEntryPath, visibleNodePaths, type FolderNode, type TreeNode } from '@/features/workspace/lib/fileTreeModel';
 import { basename } from '@/common/lib/paths';
 import { useAppActions, useWorkspace } from '@/store/contexts/AppContext';
 import { hasName } from '@/store/state/state';
@@ -136,6 +136,7 @@ function FolderRow({
     'tree-row folder group/row' +
     (!isRestricted && !isExpanded ? ' collapsed' : '') +
     (isRestricted ? ' restricted' : '') +
+    (isHiddenEntryPath(node.path, 'folder') ? ' hidden-entry' : '') +
     (isActive ? ' active-folder' : '') +
     (dropEdge === 'into' ? ' drop-target' : '') +
     (dropEdge === 'above' ? ' drop-edge-above' : '') +
@@ -289,6 +290,7 @@ function FileRow({
     `tree-row file group/row format-${format}` +
     (isGeneric ? ' non-retrievable' : '') +
     (isRestricted ? ' restricted' : '') +
+    (isHiddenEntryPath(path, 'file') ? ' hidden-entry' : '') +
     (isActive ? ' active' : '') +
     (readiness.preparationFailure ? ' preparation-failed' : '') +
     (readiness.preparationCancellation ? ' preparation-cancelled' : '') +

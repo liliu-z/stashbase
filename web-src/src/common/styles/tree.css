@@ -162,6 +162,15 @@
   color: var(--muted);
 }
 
+/* Hidden-directory entries surfaced by Show Hidden Files. Italic, not the
+ * restricted dim: these rows keep FULL capability (open, edit, rename), so
+ * borrowing the reduced-capability ink would put two meanings on one dim.
+ * Italic is the familiar hidden/ignored idiom, composes with the muted ink
+ * a generic hidden file also carries, and costs no contrast. */
+.tree-row.hidden-entry .label {
+  font-style: italic;
+}
+
 /* Selection restores full ink. Muted text is `--text-secondary`, which
  * lands at 3.83:1 on the `--active` fill — under AA — and these rows are
  * the common case now that the tree lists every file. The dim only has to

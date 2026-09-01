@@ -71,6 +71,9 @@ export interface FilesPayload {
   files: FileMeta[];
   folders: FolderMeta[];
   folder: string;
+  /** Effective application-level hidden-files visibility this listing was
+   *  computed with, so every window's menu state tracks server truth. */
+  showHiddenFiles?: boolean;
 }
 
 /** A file's editable content. `version` is the concurrency token a save
