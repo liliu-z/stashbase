@@ -59,6 +59,7 @@ export interface ActiveFolderWorkspace {
   moveFile: (oldPath: string, targetDir: string) => Promise<boolean>;
   reprocessFile: (name: string, folder?: string) => Promise<void>;
   revealFile: (name: string) => void;
+  setShowHiddenFiles: (show: boolean) => Promise<void>;
   copyFileLink: (targetPath: string) => void;
   upload: (items: { file: File; relPath: string }[], dir: string) => Promise<boolean>;
   scheduleSave: () => void;

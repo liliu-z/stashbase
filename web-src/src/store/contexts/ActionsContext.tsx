@@ -135,6 +135,9 @@ export interface AppActions {
   reprocessFile: (name: string, folder?: string) => Promise<void>;
   /** Show the file in the OS file manager. */
   revealFile: (name: string) => void;
+  /** Persist the application-level hidden-files visibility and reload the
+   *  active listing. Other windows converge through the tree-version poll. */
+  setShowHiddenFiles: (show: boolean) => Promise<void>;
   /** Copy a pasteable Markdown link to the file at `targetPath` to the
    *  clipboard. Relative to the active Markdown note when one is open, else
    *  falls back to `targetPath`'s own workspace-relative form. */

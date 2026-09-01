@@ -20,6 +20,7 @@ import type {
   CapturePreferences,
   OnboardingPreferences,
   UpdatePreferences,
+  WorkspacePreferences,
 } from '../shared/preferences.ts';
 import type { EmbedderProvider, EmbeddingSource } from '../shared/embedding.ts';
 import { LOCAL_EMBEDDING_SOURCE } from '../shared/embedding.ts';
@@ -33,6 +34,7 @@ export type {
   CapturePreferences,
   OnboardingPreferences,
   UpdatePreferences,
+  WorkspacePreferences,
 } from '../shared/preferences.ts';
 export type { EmbedderProvider, EmbeddingSource } from '../shared/embedding.ts';
 
@@ -61,6 +63,10 @@ export const DEFAULT_CAPTURE_PREFERENCES: CapturePreferences = {
 
 export const DEFAULT_UPDATE_PREFERENCES: UpdatePreferences = {
   autoCheck: true,
+};
+
+export const DEFAULT_WORKSPACE_PREFERENCES: WorkspacePreferences = {
+  showHiddenFiles: false,
 };
 
 export interface EmbedderConfig {
@@ -161,6 +167,9 @@ export interface AppConfigFile {
   /** Explicit opt-ins for ambient capture. Absent and invalid values fail
    * closed so upgrades never begin reading the clipboard automatically. */
   capture?: Partial<CapturePreferences>;
+  /** Application-level Workbench visibility preferences. Absent and invalid
+   * values fail closed to the default safe view. */
+  workspace?: Partial<WorkspacePreferences>;
   /** Desktop release checks are enabled by default. The Electron main process
    * reads this through the local server so this process remains the sole
    * config writer. */
@@ -571,6 +580,36 @@ export function setCapturePreferences(next: Partial<CapturePreferences>): Captur
     ...next,
   });
   cfg.capture = resolved;
+  writeAppConfigStrict(cfg);
+  return resolved;
+}
+
+export function normalizeWorkspacePreferences(value: unknown): WorkspacePreferences {
+  const raw = value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Partial<WorkspacePreferences>
+    : {};
+  return {
+    showHiddenFiles: typeof raw.showHiddenFiles === 'boolean'
+      ? raw.showHiddenFiles
+      : DEFAULT_WORKSPACE_PREFERENCES.showHiddenFiles,
+  };
+}
+
+/** Fallback read: an unreadable config must fail safe to the default view
+ *  rather than block folder listings. */
+export function getWorkspacePreferences(): WorkspacePreferences {
+  return normalizeWorkspacePreferences(readAppConfig().workspace);
+}
+
+/** Strict read-modify-write: a malformed config fails the toggle instead of
+ *  being silently replaced with defaults. */
+export function setWorkspacePreferences(next: Partial<WorkspacePreferences>): WorkspacePreferences {
+  const cfg = readAppConfigStrict();
+  const resolved = normalizeWorkspacePreferences({
+    ...normalizeWorkspacePreferences(cfg.workspace),
+    ...next,
+  });
+  cfg.workspace = resolved;
   writeAppConfigStrict(cfg);
   return resolved;
 }

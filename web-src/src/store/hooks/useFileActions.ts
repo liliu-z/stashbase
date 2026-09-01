@@ -149,6 +149,33 @@ export function useFileActions(
     }
   }, [refreshIndexState, toast]);
 
+  /** Toggle the application-level hidden-files visibility. The server owns
+   *  the durable value and bumps the shared tree version, so other windows
+   *  converge on their next status poll; this window reloads immediately.
+   *  Open tabs keep their documents — only tree rows, keyboard order,
+   *  selection, and Quick Open (which reads the same listing) change. */
+  const setShowHiddenFiles = useCallback(async (show: boolean) => {
+    const targetFolderPath = stateRef.current.workspace.folderPath;
+    try {
+      await api.putWorkspacePreferences({ showHiddenFiles: show });
+    } catch (e: unknown) {
+      toast('Failed to update hidden files preference: ' + errorMessage(e), { level: 'error' });
+      return;
+    }
+    if (!targetFolderPath || stateRef.current.workspace.folderPath !== targetFolderPath) return;
+    const files = await loadFiles(targetFolderPath);
+    if (stateRef.current.workspace.folderPath !== targetFolderPath) return;
+    if (!show) {
+      // Rows that just left the listing also leave selection and the
+      // active-folder target so focus cannot rest on a removed row.
+      const w = stateRef.current.workspace;
+      const visible = new Set<string>(files.map((f) => f.name));
+      for (const f of w.folders) visible.add(f.path);
+      if (w.selectedPath && !visible.has(w.selectedPath)) dispatch({ type: 'SELECT_PATH', path: '' });
+      if (w.activeFolder && !visible.has(w.activeFolder)) dispatch({ type: 'ACTIVE_FOLDER', path: '' });
+    }
+  }, [loadFiles, toast]);
+
   const newFolder = useCallback(async (path: string) => {
     if (!path) return;
     const targetFolderPath = stateRef.current.workspace.folderPath;
@@ -521,6 +548,7 @@ export function useFileActions(
     renameFolder,
     reprocessFile,
     revealFile,
+    setShowHiddenFiles,
     upload,
   }), [
     copyFileLink,
@@ -533,6 +561,7 @@ export function useFileActions(
     renameFolder,
     reprocessFile,
     revealFile,
+    setShowHiddenFiles,
     upload,
   ]);
 }

@@ -8,6 +8,7 @@ import {
   ExternalLinkIcon,
   MoreHorizontalIcon,
   NewFolderIcon,
+  PreviewIcon,
   StarIcon,
   SyncIcon,
   TrashIcon,
@@ -122,11 +123,18 @@ export function FolderHeaderMenu({
           icon: <ExpandAllIcon />,
           onSelect: () => dispatch({ type: 'EXPAND_ALL_FOLDERS', paths: state.folders.map((f) => f.path) }),
         }
-      : {
-          label: 'Collapse All Folders',
-          icon: <CollapseAllIcon />,
-          onSelect: () => dispatch({ type: 'COLLAPSE_ALL_FOLDERS' }),
-        },
+        : {
+            label: 'Collapse All Folders',
+            icon: <CollapseAllIcon />,
+            onSelect: () => dispatch({ type: 'COLLAPSE_ALL_FOLDERS' }),
+          },
+    {
+      label: 'Show Hidden Files',
+      icon: <PreviewIcon />,
+      detail: 'Dot-folders such as .github, in every window',
+      checked: state.showHiddenFiles,
+      onSelect: () => { void actions.setShowHiddenFiles(!state.showHiddenFiles); },
+    },
     { separator: true },
     {
       label: favorite ? 'Remove from Favorites' : 'Add to Favorites',

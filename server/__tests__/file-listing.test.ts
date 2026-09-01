@@ -134,3 +134,70 @@ test('file-listing reports the truthful workbench tree without traversing exclud
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+test('show-hidden listings surface eligible dot-directories while protecting VCS, excluded, and derived state', async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-listing-hidden-dirs-'));
+  try {
+    fs.writeFileSync(path.join(tempDir, 'note.md'), '# Visible note');
+    fs.writeFileSync(path.join(tempDir, '.env'), 'TOKEN=local');
+
+    // Eligible user-owned hidden directory with nested content.
+    fs.mkdirSync(path.join(tempDir, '.github', 'workflows'), { recursive: true });
+    fs.writeFileSync(path.join(tempDir, '.github', 'README.md'), '# CI docs');
+    fs.writeFileSync(path.join(tempDir, '.github', 'workflows', 'ci.yml'), 'on: push');
+    // Junk metadata and the hidden dot-note namespace stay hidden even
+    // inside a surfaced hidden directory.
+    fs.writeFileSync(path.join(tempDir, '.github', '.DS_Store'), '');
+    fs.writeFileSync(path.join(tempDir, '.github', '.private.md'), '# hidden dot-note');
+
+    // VCS databases must never surface or be traversed in either mode.
+    fs.mkdirSync(path.join(tempDir, '.git'));
+    fs.writeFileSync(path.join(tempDir, '.git', 'HEAD'), 'ref: refs/heads/main');
+    fs.mkdirSync(path.join(tempDir, '.hg'));
+    fs.writeFileSync(path.join(tempDir, '.hg', 'requires'), 'store');
+
+    // A hidden excluded cache stays a bounded, non-expandable row.
+    fs.mkdirSync(path.join(tempDir, '.cache'));
+    fs.writeFileSync(path.join(tempDir, '.cache', 'blob.bin'), 'cache bytes');
+
+    const { hiddenOff, hiddenOn, hiddenOnAsync } = await runWithFolderRoot(tempDir, async () => ({
+      hiddenOff: listFilesAndFolders(),
+      hiddenOn: listFilesAndFolders({ showHidden: true }),
+      hiddenOnAsync: await listFilesAndFoldersAsync({ showHidden: true }),
+    }));
+    assert.deepEqual(hiddenOnAsync, hiddenOn, 'async HTTP listing must preserve hidden-visibility classification');
+
+    // Default view: current behavior exactly — dotfiles visible, every
+    // dot-directory absent.
+    const offFolders = hiddenOff.folders.map((f) => f.path);
+    const offFiles = hiddenOff.files.map((f) => f.name);
+    assert.deepEqual(offFolders, []);
+    assert.deepEqual(offFiles, ['.env', 'note.md']);
+
+    // Opted in: eligible hidden directories and their descendants join the
+    // tree with normal classification.
+    const onFolders = hiddenOn.folders;
+    const onFolderPaths = onFolders.map((f) => f.path);
+    const onFiles = hiddenOn.files.map((f) => f.name);
+    assert.ok(onFolderPaths.includes('.github'));
+    assert.ok(onFolderPaths.includes('.github/workflows'));
+    assert.equal(onFolders.find((f) => f.path === '.github')?.kind, undefined);
+    assert.ok(onFiles.includes('.github/README.md'));
+    assert.ok(onFiles.includes('.github/workflows/ci.yml'));
+    assert.ok(onFiles.includes('.env'), 'ordinary dotfiles keep their current behavior');
+    assert.equal(hiddenOn.files.find((f) => f.name === '.github/workflows/ci.yml')?.format, 'generic');
+
+    // Protected internals stay invisible and untraversed.
+    assert.ok(!onFolderPaths.includes('.git'), 'VCS databases never surface');
+    assert.ok(!onFolderPaths.includes('.hg'), 'VCS databases never surface');
+    assert.ok(!onFiles.some((name) => name.startsWith('.git/') || name.startsWith('.hg/')));
+    assert.ok(!onFiles.includes('.github/.DS_Store'), 'junk dot-files stay hidden');
+    assert.ok(!onFiles.includes('.github/.private.md'), 'the hidden dot-note namespace stays hidden');
+
+    // Hidden excluded caches remain bounded excluded rows, not traversals.
+    assert.equal(onFolders.find((f) => f.path === '.cache')?.kind, 'excluded');
+    assert.ok(!onFiles.includes('.cache/blob.bin'), 'excluded directory contents are never traversed');
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});

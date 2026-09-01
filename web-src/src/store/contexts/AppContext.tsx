@@ -157,6 +157,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       folders: j.folders ?? [],
       folder: j.folder ?? 'notes',
       folderPath: expectedFolderPath,
+      ...(typeof j.showHiddenFiles === 'boolean' ? { showHiddenFiles: j.showHiddenFiles } : {}),
     });
     return files;
   }, []);
@@ -367,7 +368,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     },
     newNote: workspace.newNote, newFolder: workspace.newFolder, deleteFile: workspace.deleteFile, deleteFolder: workspace.deleteFolder,
     renameFile: workspace.renameFile, renameFolder: workspace.renameFolder, moveFile: workspace.moveFile,
-    reprocessFile: workspace.reprocessFile, revealFile: workspace.revealFile, copyFileLink: workspace.copyFileLink, upload: workspace.upload,
+    reprocessFile: workspace.reprocessFile, revealFile: workspace.revealFile, setShowHiddenFiles: workspace.setShowHiddenFiles, copyFileLink: workspace.copyFileLink, upload: workspace.upload,
     scheduleSave: workspace.scheduleSave, flushSave: workspace.flushSave,
     resolveConflictOverwrite: workspace.resolveConflictOverwrite,
     resolveConflictReload: workspace.resolveConflictReload,

@@ -10,6 +10,7 @@ import {
   createUpdatePreferencesStore,
   normalizeCapturePreferences,
   normalizeUpdatePreferences,
+  normalizeWorkspacePreferences,
   type AppConfigFile,
 } from './app-config.ts';
 
@@ -29,6 +30,16 @@ test('clipboard image capture is default-off and persists only an explicit opt-i
   assert.deepEqual(normalizeCapturePreferences({ clipboardImageImport: 'yes' }), {
     clipboardImageImport: false,
   });
+});
+
+test('hidden-files visibility is default-off and invalid stored state recovers to the safe view', () => {
+  assert.deepEqual(normalizeWorkspacePreferences(undefined), { showHiddenFiles: false });
+  assert.deepEqual(normalizeWorkspacePreferences(null), { showHiddenFiles: false });
+  assert.deepEqual(normalizeWorkspacePreferences('yes'), { showHiddenFiles: false });
+  assert.deepEqual(normalizeWorkspacePreferences({ showHiddenFiles: 'yes' }), { showHiddenFiles: false });
+  assert.deepEqual(normalizeWorkspacePreferences({ showHiddenFiles: 1 }), { showHiddenFiles: false });
+  assert.deepEqual(normalizeWorkspacePreferences({ showHiddenFiles: true }), { showHiddenFiles: true });
+  assert.deepEqual(normalizeWorkspacePreferences({ showHiddenFiles: false }), { showHiddenFiles: false });
 });
 
 test('desktop update checks are default-on and preserve unrelated config', () => {

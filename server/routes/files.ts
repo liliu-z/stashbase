@@ -15,6 +15,7 @@ import {
   sanitizeFilename,
 } from '../files.ts';
 import { detectViewerFormat, isNoteName } from '../format.ts';
+import { getWorkspacePreferences } from '../app-config.ts';
 import { exactMemberFolderRootAsync, getCurrentFolderLabel, runWithFolderRoot } from '../folder.ts';
 import { filesystemPath } from '../filesystem-path.ts';
 import { sendError, revealInOsFileManager } from '../http.ts';
@@ -87,6 +88,10 @@ export function mount(app: express.Express): void {
   // is validated — an arbitrary filesystem path is rejected.
   app.get('/api/files', async (req, res) => {
     try {
+      // Application-level Workbench visibility: every window and every
+      // explicit-folder listing applies the same durable preference, and the
+      // listing Module owns which hidden paths remain protected.
+      const showHidden = getWorkspacePreferences().showHiddenFiles;
       const rawFolder = typeof req.query.folder === 'string' ? req.query.folder.trim() : '';
       if (rawFolder) {
         const member = filesystemPath.isAbsolute(rawFolder)
@@ -97,20 +102,22 @@ export function mount(app: express.Express): void {
         }
         const result = await runWithFolderRoot(member, async () => ({
           folder: getCurrentFolderLabel() ?? getCurrentFolderBasename(),
-          files: await listFilesAndFoldersAsync(),
+          files: await listFilesAndFoldersAsync({ showHidden }),
         }));
         res.json({
           folder: result.folder,
           files: result.files.files,
           folders: result.files.folders,
+          showHiddenFiles: showHidden,
         });
         return;
       }
-      const listing = await listFilesAndFoldersAsync();
+      const listing = await listFilesAndFoldersAsync({ showHidden });
       res.json({
         folder: getCurrentFolderLabel() ?? getCurrentFolderBasename(),
         files: listing.files,
         folders: listing.folders,
+        showHiddenFiles: showHidden,
       });
     } catch (err: unknown) {
       sendError(res, err);

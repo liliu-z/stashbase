@@ -138,7 +138,12 @@ aliases, and Journey E2E owns representative composition.
   ordinary saves, navigation, removal of native reload bypasses, save-gated
   recovery reload, shared renderer/Agent/MCP version authority, conflict
   decisions, format detection, content-write boundaries, and their
-  failure/confirmation paths.
+  failure/confirmation paths. `server/__tests__/file-listing.test.ts` locks
+  default and show-hidden listings, protected VCS/derived paths, bounded
+  hidden excluded rows, and sync/async parity; `pnpm test:config` locks the
+  default-off hidden-files preference recovery; renderer
+  `hidden-entries.test.ts` locks hidden-row marking and the listing-carried
+  visibility flag.
 - **Journey E2E:** [document editing smoke](../e2e/smoke/document-editing.spec.ts),
   [workspace navigation depth](../e2e/journeys/navigation-depth.spec.ts),
   [Markdown, JSON, and TXT](../e2e/journeys/markdown-json.spec.ts), focused
@@ -158,6 +163,9 @@ aliases, and Journey E2E owns representative composition.
   external-write recovery; separate save and mutation tests prove that renderer,
   Agent, and MCP writes share the same version authority. See
   [File Transactions](file-transactions.md#renderer-conflict-recovery).
+  The Show Hidden Files toggle is covered by the server and renderer contract
+  tests above; a functional journey E2E for the visible menu flow and the
+  protected-path boundary is not yet claimed.
 
 ## J04: Preparation
 

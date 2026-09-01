@@ -23,6 +23,18 @@ semantic readiness.
   without reading a preview prefix, represents excluded project directories
   without descending, and cannot monopolize the shared Node request loop while
   a folder is opening.
+- Hidden-directory visibility is an explicit option on the server-owned
+  listing Interface (`FolderListingOptions` in `server/file-listing.ts`), fed
+  from the durable application-level workspace preference. Classification —
+  which hidden paths are eligible, which stay protected (VCS databases,
+  derived state, junk), and which remain bounded excluded rows — lives in the
+  listing Module; the renderer never fetches a fully hidden tree and filters
+  policy in memory. The renderer owns the menu's accessible checked state,
+  the italic hidden-row presentation, and the toggle transition; the tree and
+  Quick Open both read the same listing, so their parity is structural. The
+  toggle route bumps the shared tree version, and every window's normal
+  status poll converges it; a toggle-off clears selection and active-folder
+  targets that left the listing but never closes an open tab.
 - One source identity owns at most one document tab in a window. The workspace
   reducer resolves concurrent open completions against its latest state; an
   asynchronous caller's earlier duplicate check is never the uniqueness
@@ -119,7 +131,7 @@ semantic readiness.
 
 The initial renderer contains only window chrome and the minimum workspace
 shell. Feature surfaces that open on demand remain dynamic entries. The
-authoritative budget is `443 KiB` of initial static JavaScript, and the current
+authoritative budget is `444 KiB` of initial static JavaScript, and the current
 required dynamic-entry set lives in `scripts/check-renderer-chunks.mjs`.
 Change that list or budget only when the ownership of eager shell behavior
 changes, never to make an accidental dependency pass.
@@ -132,9 +144,9 @@ changes, never to make an accidental dependency pass.
 | Primary owners | `web-src/src/store/state/state.ts`, `state/stateReducer.ts` and the `state/workspaceReducer.ts`, `state/chatReducer.ts`, `state/uiShellReducer.ts` sub-reducers it composes, `state/stateHelpers.ts`, `lib/folderScopedReset.ts`, `lib/folderPath.ts`, `lib/folderTransition.ts`, and the internal `hooks/useDocumentActions.ts`, `hooks/useFileActions.ts`, `hooks/useFolderActions.ts`, `hooks/useSearchActions.ts` Modules |
 | Shell Adapter | `web-src/src/store/contexts/AppContext.tsx` (the single `useReducer` composition root), `web-src/src/store/contexts/WorkspaceContext.tsx`, `ChatContext.tsx`, `UiShellContext.tsx`, `ActionsContext.tsx`, `web-src/src/app/App.tsx`, `web-src/src/app/components/MainPane.tsx`, the lazy `features/templates/TemplatesView.tsx` tab, and lazy `features/workspace/components/ImportGitHubModal.tsx` and `FolderHeaderMenu.tsx` boundaries |
 | Renderer tree model | `web-src/src/features/workspace/lib/fileTreeModel.ts` (nesting, manual-rank ordering, visible rows), `lib/treeKeyboard.ts` (roving-focus rules), `hooks/useTreeRoving.ts` (row registry and per-row binding) |
-| Server transport Adapter | `web-src/src/common/api/api.ts`, `apiTransport.ts`, `shared/library-files.ts`, `server/routes/files.ts`, the asynchronous request listing in `server/file-listing.ts`, and bounded selection-time inspection in `server/generic-file-preview.ts` |
+| Server transport Adapter | `web-src/src/common/api/api.ts`, `apiTransport.ts`, `shared/library-files.ts`, `server/routes/files.ts`, `server/routes/workspace-preferences.ts`, the asynchronous request listing in `server/file-listing.ts`, and bounded selection-time inspection in `server/generic-file-preview.ts` |
 | Electron lifecycle Adapter | `onPrepareContextRelease` and folder/library events consumed by `useActiveFolderWorkspace.ts` |
-| Focused evidence | `web-src/src/store/__tests__/` (including `index-status-request.test.ts`, `context-slice-stability.test.ts`, `folder-path.test.ts`, `folder-transition.test.ts`, `folder-scoped-reset.test.ts`), `web-src/src/features/workspace/__tests__/` (including `file-tree-model.test.ts`, `tree-keyboard.test.ts`, `workspace-surfaces.test.ts`, `accessibility-semantics.test.ts`), `web-src/src/features/preparation/__tests__/preparation-notices.test.ts`, `web-src/src/common/__tests__/workspace-layout.test.ts`, `web-src/src/common/__tests__/overlay-stack.test.ts`, `lazy-load.test.ts`, `api-transport.test.ts`, `server/__tests__/file-listing.test.ts`, `server/generic-file-preview.test.ts`, `e2e/journeys/formats-media.spec.ts`, and `scripts/check-renderer-chunks.mjs` |
+| Focused evidence | `web-src/src/store/__tests__/` (including `index-status-request.test.ts`, `context-slice-stability.test.ts`, `folder-path.test.ts`, `folder-transition.test.ts`, `folder-scoped-reset.test.ts`), `web-src/src/features/workspace/__tests__/` (including `file-tree-model.test.ts`, `tree-keyboard.test.ts`, `workspace-surfaces.test.ts`, `accessibility-semantics.test.ts`, `hidden-entries.test.ts`), `web-src/src/features/preparation/__tests__/preparation-notices.test.ts`, `web-src/src/common/__tests__/workspace-layout.test.ts`, `web-src/src/common/__tests__/overlay-stack.test.ts`, `lazy-load.test.ts`, `api-transport.test.ts`, `server/__tests__/file-listing.test.ts`, `server/generic-file-preview.test.ts`, `e2e/journeys/formats-media.spec.ts`, and `scripts/check-renderer-chunks.mjs` |
 
 The four action hooks are private Seams inside the workspace Module. Do not make
 components depend on them directly; that would create a second transition

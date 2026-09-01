@@ -94,9 +94,14 @@ const manifestPath = path.join(outputRoot, '.vite', 'manifest.json');
  * the template trigger latch are eager chrome — plus the AGENTS.md
  * robot returning alongside the Instructions scroll instead of
  * replacing it.
+ * 443 → 444 for the Files panel's Show Hidden Files preference — the
+ * folder menu's checkable item, the tree's hidden-row marking, the toggle
+ * action, and the listing-carried visibility flag, ~0.9 KB of eager code.
+ * The menu body stays behind the lazy `FolderHeaderMenu` boundary; only the
+ * row classes and action wiring are part of the eager shell.
  * Raise it only for shell UI that must load with the window — anything a
  * user can open on demand belongs in a dynamic entry above. */
-const initialJsBudgetBytes = 443 * 1024;
+const initialJsBudgetBytes = 444 * 1024;
 const expectedEntries = [
   'src/features/agent-panel/components/ChatPane.tsx',
   'src/features/agent-panel/components/AgentMathMarkdown.tsx',

@@ -68,6 +68,7 @@ export type {
   CapturePreferences,
   OnboardingPreferences,
   UpdatePreferences,
+  WorkspacePreferences,
 } from '@shared/preferences';
 export type {
   KeywordHitFile,
