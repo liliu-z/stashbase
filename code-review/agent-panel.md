@@ -52,6 +52,10 @@
   other windows receive membership only. If folder entry fails, keep the new
   project scope visible and report an actionable open failure rather than
   reverting to an ambiguous Library presentation.
+- Folder-scoped mention and attachment discovery always uses an explicit
+  member-folder listing with default-safe hidden filtering, including when the
+  Agent scope matches the window's active folder. Workbench Show Hidden Files
+  never widens Agent-visible paths; Library-scoped chats keep mentions disabled.
 
 ## Layout and Visibility
 

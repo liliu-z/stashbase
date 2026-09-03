@@ -23,6 +23,13 @@ type Toast = (message: string, opts?: {
   action?: { label: string; onClick: () => void };
 }) => string;
 
+/** A listing plus a live ownership check for continuations that perform more
+ * asynchronous work after the listing has been applied. */
+export interface LoadedFileListing {
+  files: WorkspaceSlice['files'];
+  isCurrent: () => boolean;
+}
+
 export interface ActiveFolderWorkspace {
   bootstrap: () => Promise<void>;
   openFolder: (path: string) => Promise<void>;
@@ -59,7 +66,7 @@ export interface ActiveFolderWorkspace {
   moveFile: (oldPath: string, targetDir: string) => Promise<boolean>;
   reprocessFile: (name: string, folder?: string) => Promise<void>;
   revealFile: (name: string) => void;
-  setShowHiddenFiles: (show: boolean) => Promise<void>;
+  toggleShowHiddenFiles: () => Promise<void>;
   copyFileLink: (targetPath: string) => void;
   upload: (items: { file: File; relPath: string }[], dir: string) => Promise<boolean>;
   scheduleSave: () => void;
@@ -75,7 +82,10 @@ interface WorkspaceDependencies {
   folderContextPath: MutableRefObject<string>;
   dispatch: Dispatch;
   loadFiles: (expectedFolderPath?: string, ownsRequest?: () => boolean) => Promise<WorkspaceSlice['files']>;
-  loadFilesFromServer: (expectedFolderPath?: string, ownsRequest?: () => boolean) => Promise<WorkspaceSlice['files'] | null>;
+  loadFilesFromServer: (
+    expectedFolderPath?: string,
+    ownsRequest?: () => boolean,
+  ) => Promise<LoadedFileListing | null>;
   loadFileOrder: (expectedFolderPath?: string, ownsRequest?: () => boolean) => Promise<void>;
   setFolderOrder: (parentPath: string, names: string[]) => Promise<void>;
   refreshActiveTabFromDisk: (opts?: { force?: boolean }) => Promise<void>;

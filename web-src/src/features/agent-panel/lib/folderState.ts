@@ -170,19 +170,16 @@ export function switchWelcomeTabPlan(
 
 /** The file listing that feeds `@` mentions and folder-file attachment
  * validation for a scope:
- * - window-folder scope → the window's own listing;
- * - another library folder → that folder's listing;
+ * - folder scope → an explicit, server-filtered folder listing;
  * - library scope → mentions disabled (no single folder listing exists).
  */
 export type MentionListingPlan =
-  | { kind: 'window' }
   | { kind: 'folder'; root: string }
   | { kind: 'disabled' };
 
-export function mentionListingPlan(scope: LibraryScope, windowFolder: string): MentionListingPlan {
+export function mentionListingPlan(scope: LibraryScope): MentionListingPlan {
   if (scope.kind === 'library') return { kind: 'disabled' };
-  if (windowFolder && scope.path !== windowFolder) return { kind: 'folder', root: scope.path };
-  return { kind: 'window' };
+  return { kind: 'folder', root: scope.path };
 }
 
 /** Locked exactly like the model menu — a transcript (including a resumed

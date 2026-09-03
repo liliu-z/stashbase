@@ -60,6 +60,14 @@ test('folder-explicit preparation routes work without an open window folder', as
   }
 });
 
+test('manual reprocess rejects hidden-directory content before scheduling work', async () => {
+  const { reprocessFileInFolder } = await import('./routes/indexing.ts');
+  await assert.rejects(
+    reprocessFileInFolder('.private/report.pdf'),
+    (err: any) => err?.status === 400 && err?.code === 'PATH_NOT_PREPARABLE',
+  );
+});
+
 test('embedder key validation uses the provider models endpoint', async () => {
   const originalFetch = globalThis.fetch;
   const calls: Array<{ url: string; authorization: string | null }> = [];

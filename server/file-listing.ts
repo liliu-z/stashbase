@@ -89,13 +89,22 @@ export interface FolderListingOptions {
   showHidden?: boolean;
 }
 
-/** Hidden directories that never surface in the workspace even when hidden
- *  files are shown: VCS databases are internal state, not browsable user
- *  content. Distinct from `INDEX_EXCLUDED_DIRS` (whose other hidden members
- *  surface as non-expandable excluded rows when hidden files are shown). */
-const PROTECTED_HIDDEN_DIRS = new Set<string>(['.git', '.hg', '.svn']);
+/** Product-owned hidden state is never a Workbench browsing surface, even
+ * when ordinary user dot-directories are visible. This classification lives
+ * beside traversal so renderers and tool callers cannot widen it. */
+function isProtectedHiddenDirName(name: string): boolean {
+  const normalized = name.toLowerCase();
+  return normalized === '.git'
+    || normalized === '.hg'
+    || normalized === '.svn'
+    || normalized === '.stashbase'
+    || normalized.startsWith('.stashbase-');
+}
 
-/** Workspace visibility is intentionally wider than index visibility. Hidden
+/** Workspace visibility is intentionally wider than index visibility.
+ * Protected hidden directories never surface even when hidden files are
+ * shown. This is distinct from `INDEX_EXCLUDED_DIRS`, whose other hidden
+ * members surface as bounded excluded rows when the option is enabled. Hidden
  * product-derived artifacts and dot-directories remain infrastructure, while
  * ordinary dot-files and unknown source formats are real user content. */
 function workspaceDirectoryEntries(entries: fs.Dirent[], opts: FolderListingOptions): fs.Dirent[] {
@@ -112,7 +121,7 @@ function workspaceDirectoryEntries(entries: fs.Dirent[], opts: FolderListingOpti
   return entries.filter((entry) => {
     if (entry.isDirectory() && isHiddenDirName(entry.name)) {
       if (!opts.showHidden) return false;
-      if (PROTECTED_HIDDEN_DIRS.has(entry.name)) return false;
+      if (isProtectedHiddenDirName(entry.name)) return false;
     }
     if (entry.isFile() && HIDDEN_DOT_FILES.has(entry.name)) return false;
     if (entry.isFile() && entry.name.startsWith('.')) {

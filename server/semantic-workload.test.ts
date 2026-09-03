@@ -8,7 +8,7 @@ import {
   LARGE_SEMANTIC_BYTES_THRESHOLD,
   LARGE_SEMANTIC_SOURCE_THRESHOLD,
 } from './semantic-workload.ts';
-import { publishSemanticPause, syncIndex } from './sync.ts';
+import { isLiveConvertedIndexRow, publishSemanticPause, syncIndex } from './sync.ts';
 import type { Indexer } from './indexer.ts';
 import { excludePausedPendingHits, pausedWriteDisposition, prepareForIndex } from './indexer.mfs.ts';
 import { filesystemPath } from './filesystem-path.ts';
@@ -25,6 +25,22 @@ function diff(root: string, count: number) {
     modified: [], deleted: [], renamed: [],
   };
 }
+
+test('existing converted rows are live only while their source path remains retrieval-eligible', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-hidden-converted-row-'));
+  try {
+    const visible = path.join(root, 'report.pdf');
+    const hiddenDir = path.join(root, '.private');
+    const hidden = path.join(hiddenDir, 'report.pdf');
+    fs.mkdirSync(hiddenDir);
+    fs.writeFileSync(visible, '%PDF');
+    fs.writeFileSync(hidden, '%PDF');
+    assert.equal(isLiveConvertedIndexRow(root, visible), true);
+    assert.equal(isLiveConvertedIndexRow(root, hidden), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
 
 test('semantic workload source threshold is inclusive and ignores hash-reused renames', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-preflight-count-'));

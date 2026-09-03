@@ -34,16 +34,19 @@ export function validateEditableFileWrite(name: string): void {
 }
 
 export async function upsertSavedFile(name: string, content: string): Promise<string | undefined> {
-  if (!isEmbeddingAvailable()) {
-    log.info(`save: skipped index update for ${name} because semantic embedding is unavailable`);
+  // Saves under hidden or excluded directories (reachable once hidden files
+  // are shown in the Workbench) stay outside the index. Delete any row from a
+  // formerly visible identity immediately; waiting for reconcile would leave
+  // hidden content available to Search or Chat after an edit.
+  if (!shouldIndexFilePath(name)) {
+    await indexer.deleteFile(toSourcePath(name)).catch((err) => {
+      log.warn(`save: failed to remove ineligible file from index ${name}: ${errorMessage(err)}`);
+    });
+    log.info(`save: removed/skipped index update for ${name} because the path is not indexable`);
     return undefined;
   }
-  // Saves under hidden or excluded directories (reachable once hidden files
-  // are shown in the Workbench) stay outside the index: reconcile would
-  // delete such rows again, and hidden-directory content must never become
-  // Search or Chat context through a save side effect.
-  if (!shouldIndexFilePath(name)) {
-    log.info(`save: skipped index update for ${name} because the path is not indexable`);
+  if (!isEmbeddingAvailable()) {
+    log.info(`save: skipped index update for ${name} because semantic embedding is unavailable`);
     return undefined;
   }
   if (!content.trim()) {

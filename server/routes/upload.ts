@@ -37,6 +37,7 @@ import {
 import { filesystemPath } from '../filesystem-path.ts';
 import { publishStagedImport, recoverInterruptedPublication } from '../import-publication.ts';
 import { queueConvertibleSource } from '../conversion-dispatch.ts';
+import { isRetrievalEligiblePath } from '../indexable.ts';
 import { indexer } from '../state.ts';
 import { noteTreeChanged } from '../watcher.ts';
 import type { UploadResult } from '../../shared/library-files.ts';
@@ -273,16 +274,17 @@ async function processUploadedFiles(
       // though they're not indexable. Only indexable formats go to
       // the indexer.
       const textFormat = detectFormat(name) != null;
+      const retrievalEligible = isRetrievalEligiblePath(name);
       const published = await publishStagedImport({
         folderRoot: folderAbs,
         relativePath: name,
         stagedPath: f.path,
         signal,
-        captureIndexText: textFormat,
+        captureIndexText: textFormat && retrievalEligible,
       });
       const savedAbs = published.path;
       out.push({ file: name });
-      if (textFormat) {
+      if (textFormat && retrievalEligible) {
         // Direct-text sources are saved and indexed
         // **exactly as dropped** — we never rewrite the user's file. Inline
         // `data:` resources stay inline (the preview renders them directly;
@@ -294,7 +296,7 @@ async function processUploadedFiles(
         } else if (published.indexSkipReason) {
           log.info(`upload: imported ${name} without indexing: ${published.indexSkipReason}`);
         }
-      } else if (folderAbs && isConvertibleSource(name)) {
+      } else if (!textFormat && retrievalEligible && folderAbs && isConvertibleSource(name)) {
         // The shared dispatcher owns PDF/OCR/DOCX/audio scheduling so import,
         // rename, move, and folder rediscovery cannot drift by format.
         toConvert.push({ abs: savedAbs, rel: name });

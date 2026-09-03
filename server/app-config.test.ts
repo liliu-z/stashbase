@@ -42,6 +42,28 @@ test('hidden-files visibility is default-off and invalid stored state recovers t
   assert.deepEqual(normalizeWorkspacePreferences({ showHiddenFiles: false }), { showHiddenFiles: false });
 });
 
+test('hidden-files visibility persists across fresh app-config processes', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-workspace-preferences-'));
+  const configDir = path.join(home, '.stashbase');
+  const configPath = path.join(configDir, 'config.json');
+  fs.mkdirSync(configDir);
+  fs.writeFileSync(configPath, JSON.stringify({ appearance: { theme: 'dark' } }));
+  try {
+    const write = runConfigMutation(home, `
+      config.setWorkspacePreferences({ showHiddenFiles: true });
+    `);
+    assert.equal(write.status, 0, write.stderr);
+    const read = runConfigMutation(home, `
+      process.stdout.write(JSON.stringify(config.getWorkspacePreferences()));
+    `);
+    assert.equal(read.status, 0, read.stderr);
+    assert.deepEqual(JSON.parse(read.stdout), { showHiddenFiles: true });
+    assert.equal(JSON.parse(fs.readFileSync(configPath, 'utf8')).appearance.theme, 'dark');
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
 test('desktop update checks are default-on and preserve unrelated config', () => {
   let config: AppConfigFile = { appearance: { theme: 'dark' } };
   const store = createUpdatePreferencesStore({
@@ -202,6 +224,7 @@ test('credential and source mutations never overwrite malformed config through a
     `config.setHostedAccountSession({ accessToken: 'access', refreshToken: 'refresh', expiresAt: 4102444800, userId: 'user', email: 'person@example.com' });`,
     `config.setEmbedderConfig({ provider: 'openai', apiKey: 'sk-test' });`,
     `config.setEmbeddingSource('openai');`,
+    `config.setWorkspacePreferences({ showHiddenFiles: true });`,
   ];
   for (const statement of statements) {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-config-corrupt-test-'));

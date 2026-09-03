@@ -128,6 +128,95 @@ test('Quick Open honors editor recency and command availability while Settings o
   }
 });
 
+test('J03 Show Hidden Files keeps protected state out and retains an open hidden tab when disabled', async ({}, testInfo) => {
+  const fixture = await createAppFixture({ membership: 'two-folders' });
+  fs.mkdirSync(`${fixture.workspaces.projectA}/.github/workflows`, { recursive: true });
+  fs.writeFileSync(`${fixture.workspaces.projectA}/.github/README.md`, '# Hidden workspace note\n');
+  fs.writeFileSync(`${fixture.workspaces.projectA}/.github/workflows/ci.yml`, 'on: push\n');
+  fs.mkdirSync(`${fixture.workspaces.projectA}/.stashbase`, { recursive: true });
+  fs.writeFileSync(`${fixture.workspaces.projectA}/.stashbase/state.md`, '# Internal state\n');
+  fs.mkdirSync(`${fixture.workspaces.projectA}/.stashbase-cache`, { recursive: true });
+  fs.writeFileSync(`${fixture.workspaces.projectA}/.stashbase-cache/index.md`, '# Internal cache\n');
+  fs.mkdirSync(`${fixture.workspaces.projectB}/.github`, { recursive: true });
+  fs.writeFileSync(`${fixture.workspaces.projectB}/.github/README.md`, '# Hidden beta note\n');
+  let app: LaunchedApp | undefined;
+  try {
+    app = await launchApp(fixture, testInfo);
+    await openLibraryFolder(app.page, 'project-alpha');
+    await dismissEmbeddingKeyPrompt(app.page);
+
+    await expect(fileTreeRow(app.page, '.github')).toHaveCount(0);
+    const secondWindowPromise = app.electron.waitForEvent('window');
+    await app.electron.evaluate(({ Menu }) => {
+      const fileMenu = Menu.getApplicationMenu()?.items.find((item) => item.label === 'File');
+      const newWindow = fileMenu?.submenu?.items.find((item) => item.label === 'New Window');
+      if (!newWindow) throw new Error('New Window menu item not found');
+      newWindow.click();
+    });
+    const secondPage = await secondWindowPromise;
+    await secondPage.locator('body').waitFor({ state: 'attached' });
+    await secondPage.waitForFunction(() => document.body.dataset.bootSettled === '1');
+    await openLibraryFolder(secondPage, 'project-beta');
+    await dismissEmbeddingKeyPrompt(secondPage);
+    await expect(fileTreeRow(secondPage, '.github')).toHaveCount(0);
+
+    await openFolderMenu(app, 'project-alpha');
+    const toggle = app.page.getByRole('menuitemradio', { name: /Show Hidden Files/ });
+    await expect(toggle).toHaveAttribute('aria-checked', 'false');
+    await toggle.click();
+
+    const hiddenFolder = fileTreeRow(app.page, '.github');
+    await expect(hiddenFolder).toBeVisible();
+    await expect(fileTreeRow(secondPage, '.github')).toBeVisible({ timeout: 12_000 });
+    await expect(hiddenFolder).toHaveClass(/hidden-entry/);
+    await expect(fileTreeRow(app.page, '.stashbase')).toHaveCount(0);
+    await expect(fileTreeRow(app.page, '.stashbase-cache')).toHaveCount(0);
+    const agentListing = await app.page.evaluate(async (folder) => {
+      const windowId = window.sessionStorage.getItem('stashbase.windowId') ?? 'web';
+      const response = await fetch(`/api/files?folder=${encodeURIComponent(folder)}`, {
+        headers: { 'x-stashbase-window-id': windowId },
+      });
+      return response.json() as Promise<{ files: Array<{ name: string }>; folders: Array<{ path: string }> }>;
+    }, fixture.workspaces.projectA);
+    expect(agentListing.folders.some((entry) => entry.path.startsWith('.github'))).toBe(false);
+    expect(agentListing.files.some((entry) => entry.name.startsWith('.github/'))).toBe(false);
+    await hiddenFolder.click();
+    await fileTreeRow(app.page, '.github/README.md').click();
+    await expect(documentTab(app.page, '.github/README.md')).toBeVisible();
+
+    await app.page.keyboard.press(`${primaryKey}+O`);
+    await quickOpenInput(app.page).fill('.github/README.md');
+    await expect(quickOpenDialog(app.page).getByRole('option', { name: /README\.md \.github/ })).toBeVisible();
+    await quickOpenInput(app.page).press('Escape');
+
+    await openFolderMenu(app, 'project-alpha');
+    const enabledToggle = app.page.getByRole('menuitemradio', { name: /Show Hidden Files/ });
+    await expect(enabledToggle).toHaveAttribute('aria-checked', 'true');
+    const retainedTabStat = app.page.waitForEvent('requestfinished', {
+      predicate: (request) => (
+        request.method() === 'GET'
+        && request.url().includes('/api/file-stat/.github/README.md')
+      ),
+      timeout: 12_000,
+    });
+    await enabledToggle.click();
+    await expect(fileTreeRow(app.page, '.github')).toHaveCount(0);
+    await expect(fileTreeRow(secondPage, '.github')).toHaveCount(0, { timeout: 12_000 });
+    await expect(documentTab(app.page, '.github/README.md')).toBeVisible();
+
+    await app.page.keyboard.press(`${primaryKey}+O`);
+    await quickOpenInput(app.page).fill('.github/README.md');
+    await expect(quickOpenDialog(app.page).getByRole('option', { name: /README\.md \.github/ })).toHaveCount(0);
+    await expect(quickOpenDialog(app.page)).toContainText('No matching files');
+    await quickOpenInput(app.page).press('Escape');
+    await retainedTabStat;
+    app.errors.assertNone();
+  } finally {
+    await app?.close();
+    await fixture.cleanup();
+  }
+});
+
 // Intent preserved: favoriting pins a member ahead of the rest of the
 // library list (now the switcher menu's Favorites section before its
 // Library section), and removing the ACTIVE folder returns the window

@@ -40,8 +40,10 @@ export function useAgentMentionListing({
   const listingPlan = disabled || scopeIsNoLongerMember
     ? { kind: 'disabled' as const }
     : connectedScope
-    ? mentionListingPlan(connectedScope, workspace.folderPath)
-    : { kind: 'window' as const };
+    ? mentionListingPlan(connectedScope)
+    : workspace.folderPath
+      ? { kind: 'folder' as const, root: workspace.folderPath }
+      : { kind: 'disabled' as const };
   const listingRoot = listingPlan.kind === 'folder' ? listingPlan.root : null;
   const mentionsDisabled = listingPlan.kind === 'disabled';
   const [sessionListing, setSessionListing] = useState<{ files: FileMeta[]; folders: FolderMeta[] } | null>(null);
@@ -51,6 +53,9 @@ export function useAgentMentionListing({
       setSessionListing(null);
       return;
     }
+    // Never render the previous scope's paths while the next authorized
+    // listing is in flight.
+    setSessionListing(null);
     let cancelled = false;
     void api.listFiles(listingRoot)
       .then((payload) => {
@@ -61,8 +66,8 @@ export function useAgentMentionListing({
       });
     return () => { cancelled = true; };
   }, [listingRoot, sessionListingNonce]);
-  const listedFiles = mentionsDisabled ? [] : listingRoot ? sessionListing?.files ?? [] : workspace.files;
-  const listedFolders = mentionsDisabled ? [] : listingRoot ? sessionListing?.folders ?? [] : workspace.folders;
+  const listedFiles = mentionsDisabled ? [] : sessionListing?.files ?? [];
+  const listedFolders = mentionsDisabled ? [] : sessionListing?.folders ?? [];
   const mentionFiles = listedFiles.filter((file) => isRetrievableViewerFormat(file.format));
   const mentionFolders = listedFolders.filter((folder) => !folder.kind || folder.kind === 'normal');
   const knownFilePaths = useMemo(() => new Set(mentionFiles.map((f) => f.name)), [mentionFiles]);

@@ -78,6 +78,16 @@ function dipsIntoIndexExcludedDir(relPath: string): boolean {
     || (i < segments.length - 1 && isHiddenDirName(seg)));
 }
 
+/** Directory-scope form of the retrieval boundary. Unlike file paths, every
+ * segment is a directory segment, so a hidden final basename is excluded too. */
+export function isRetrievalEligibleDirectoryPath(relPath: string): boolean {
+  if (pathHasCloudPlaceholder(relPath)) return false;
+  const segments = relPath.replace(/\\/g, '/').split('/').filter(Boolean);
+  return !segments.some((seg) => INDEX_EXCLUDED_DIRS.has(seg)
+    || isGeneratedPdfBatchCacheDir(seg)
+    || isHiddenDirName(seg));
+}
+
 function isGeneratedPdfBatchCacheDir(seg: string): boolean {
   return /^\.[^/]+\.pdf\.md\.batches$/i.test(seg);
 }
@@ -91,8 +101,14 @@ const EXCLUDED_BASENAMES = new Set<string>([
 ]);
 
 export function shouldIndexFilePath(relPath: string): boolean {
-  if (pathHasCloudPlaceholder(relPath)) return false;
   if (!detectFormat(relPath)) return false;
+  return isRetrievalEligiblePath(relPath);
+}
+
+/** Path-only eligibility shared by direct-text indexing and prepared formats.
+ * Format dispatch remains the caller's responsibility. */
+export function isRetrievalEligiblePath(relPath: string): boolean {
+  if (pathHasCloudPlaceholder(relPath)) return false;
   const base = relPath.replace(/\\/g, '/').split('/').pop() ?? '';
   if (EXCLUDED_BASENAMES.has(base)) return false;
   return !dipsIntoIndexExcludedDir(relPath);

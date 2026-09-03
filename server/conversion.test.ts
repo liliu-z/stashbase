@@ -3,7 +3,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { INDEX_EXCLUDED_DIRS } from './indexable.ts';
+import {
+  INDEX_EXCLUDED_DIRS,
+  isRetrievalEligibleDirectoryPath,
+  isRetrievalEligiblePath,
+  shouldIndexFilePath,
+} from './indexable.ts';
 import { closeStateDb } from './state-db.ts';
 
 function deferred(): { promise: Promise<void>; resolve: () => void } {
@@ -15,6 +20,18 @@ function deferred(): { promise: Promise<void>; resolve: () => void } {
 function tick(): Promise<void> {
   return new Promise((resolve) => setImmediate(resolve));
 }
+
+test('path eligibility applies hidden exclusions to both direct and prepared formats', () => {
+  assert.equal(isRetrievalEligiblePath('report.pdf'), true);
+  assert.equal(isRetrievalEligiblePath('recordings/interview.wav'), true);
+  assert.equal(isRetrievalEligiblePath('.private/report.pdf'), false);
+  assert.equal(isRetrievalEligiblePath('docs/.cache/interview.wav'), false);
+  assert.equal(isRetrievalEligibleDirectoryPath('docs'), true);
+  assert.equal(isRetrievalEligibleDirectoryPath('.private'), false);
+  assert.equal(isRetrievalEligibleDirectoryPath('docs/.cache'), false);
+  assert.equal(shouldIndexFilePath('note.md'), true);
+  assert.equal(shouldIndexFilePath('report.pdf'), false, 'prepared sources are not direct-text index inputs');
+});
 
 test('conversion discovery skips project directories excluded from indexing', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-conversion-discovery-'));

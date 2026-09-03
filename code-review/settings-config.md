@@ -13,7 +13,10 @@ those routes; they do not own durable truth.
 The workspace hidden-files preference is application-level: reads fail safe
 to the default-off view so an unreadable config never blocks listings, the
 write path stays strict, and the toggle route bumps the shared tree version
-so every window's listing converges on the same durable value.
+so every window's listing converges on the same durable value. Renderer writes
+are serialized as user intents, only the latest toggle may reload the active
+tree, and a failed final write reloads durable server truth, so slow or failed
+responses cannot leave a rapid sequence at an older assumed preference.
 Ambient capture is fail-closed: app config owns the opt-in, while Electron main
 only executes the current clipboard-monitoring state.
 Automatic desktop update checks are default-on: app config owns the preference,

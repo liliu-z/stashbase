@@ -97,7 +97,8 @@ manager, or a primary graph-navigation tool.
   view. When enabled, eligible user-owned dot-directories such as `.github`
   and `.vscode` and their descendants join the tree and Quick Open with
   normal capability, distinguished by a subtle italic rather than a disabled
-  style. VCS databases such as `.git`, StashBase-derived state, dot-notes,
+  style. VCS databases such as `.git`, StashBase-owned `.stashbase` and
+  `.stashbase-*` state, other derived state, dot-notes,
   bundle resources, and junk metadata never surface in either mode, and
   hidden excluded caches keep their bounded non-expandable rows. Turning the
   option off removes hidden rows from the tree, keyboard order, selection,

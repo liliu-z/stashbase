@@ -295,6 +295,23 @@ $$`;
   assert.deepEqual(fs.readFileSync(audioTarget), Buffer.from([0x52, 0x49, 0x46, 0x46, 0xff, 0x00, 0x80]));
   assert.equal(fs.existsSync(staleAudioNote), false);
   assert.equal(fs.existsSync(staleAudioTranscript), false);
+
+  // Workbench-visible hidden directories remain outside semantic and
+  // Preparation lifecycles when a source is moved into them.
+  fs.mkdirSync(path.join(root, '.private'), { recursive: true });
+  const hiddenTextSource = path.join(root, 'Archive', 'hidden-bound.md');
+  const hiddenTextTarget = path.join(root, '.private', 'hidden-bound.md');
+  fs.writeFileSync(hiddenTextSource, '# Hidden-bound note\n');
+  const movedHiddenText = await libraryMutations.moveLibraryFile(hiddenTextSource, hiddenTextTarget);
+  assert.equal(movedHiddenText.indexWarning, undefined);
+  assert.equal(fs.readFileSync(hiddenTextTarget, 'utf8'), '# Hidden-bound note\n');
+
+  const hiddenAudioSource = path.join(root, 'Archive', 'hidden-bound.wav');
+  const hiddenAudioTarget = path.join(root, '.private', 'hidden-bound.wav');
+  fs.writeFileSync(hiddenAudioSource, Buffer.from([0x52, 0x49, 0x46, 0x46]));
+  const movedHiddenAudio = await libraryMutations.moveLibraryFile(hiddenAudioSource, hiddenAudioTarget);
+  assert.equal(movedHiddenAudio.indexWarning, undefined);
+  assert.equal(fs.existsSync(hiddenAudioTarget), true);
   assert.equal(folder.getCurrentFolder(), null);
 });
 

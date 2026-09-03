@@ -1,4 +1,4 @@
-import { useCallback, useMemo, type MutableRefObject } from 'react';
+import { useCallback, useMemo, useRef, type MutableRefObject } from 'react';
 import {
   CONVERTIBLE_SOURCE_EXTENSION_ALTERNATION,
   DIRECT_TEXT_EXTENSION_ALTERNATION,
@@ -70,6 +70,9 @@ export function useFileActions(
     refreshIndexState,
     toast,
   } = dependencies;
+  const hiddenVisibilityGeneration = useRef(0);
+  const hiddenVisibilityIntent = useRef<boolean | null>(null);
+  const hiddenPreferenceWrites = useRef<Promise<void>>(Promise.resolve());
   const newNote = useCallback(async () => {
     if (!(await flushSave())) return;
     const targetFolderPath = stateRef.current.workspace.folderPath;
@@ -154,26 +157,36 @@ export function useFileActions(
    *  converge on their next status poll; this window reloads immediately.
    *  Open tabs keep their documents — only tree rows, keyboard order,
    *  selection, and Quick Open (which reads the same listing) change. */
-  const setShowHiddenFiles = useCallback(async (show: boolean) => {
+  const toggleShowHiddenFiles = useCallback(async () => {
     const targetFolderPath = stateRef.current.workspace.folderPath;
-    try {
+    const show = !(hiddenVisibilityIntent.current ?? stateRef.current.workspace.showHiddenFiles);
+    hiddenVisibilityIntent.current = show;
+    const generation = ++hiddenVisibilityGeneration.current;
+    const write = hiddenPreferenceWrites.current.then(async () => {
       await api.putWorkspacePreferences({ showHiddenFiles: show });
+    });
+    // Preserve invocation order at the durable owner even when requests have
+    // very different latency. A failed write does not poison later toggles.
+    hiddenPreferenceWrites.current = write.catch(() => undefined);
+    try {
+      await write;
     } catch (e: unknown) {
-      toast('Failed to update hidden files preference: ' + errorMessage(e), { level: 'error' });
+      if (generation === hiddenVisibilityGeneration.current) {
+        toast('Failed to update hidden files preference: ' + errorMessage(e), { level: 'error' });
+        // An earlier queued write may have succeeded. Reload server truth so
+        // the checked state converges instead of assuming the failed intent.
+        if (targetFolderPath && stateRef.current.workspace.folderPath === targetFolderPath) {
+          await loadFiles(targetFolderPath);
+        }
+        if (generation === hiddenVisibilityGeneration.current) hiddenVisibilityIntent.current = null;
+      }
       return;
     }
-    if (!targetFolderPath || stateRef.current.workspace.folderPath !== targetFolderPath) return;
-    const files = await loadFiles(targetFolderPath);
-    if (stateRef.current.workspace.folderPath !== targetFolderPath) return;
-    if (!show) {
-      // Rows that just left the listing also leave selection and the
-      // active-folder target so focus cannot rest on a removed row.
-      const w = stateRef.current.workspace;
-      const visible = new Set<string>(files.map((f) => f.name));
-      for (const f of w.folders) visible.add(f.path);
-      if (w.selectedPath && !visible.has(w.selectedPath)) dispatch({ type: 'SELECT_PATH', path: '' });
-      if (w.activeFolder && !visible.has(w.activeFolder)) dispatch({ type: 'ACTIVE_FOLDER', path: '' });
+    if (generation !== hiddenVisibilityGeneration.current) return;
+    if (targetFolderPath && stateRef.current.workspace.folderPath === targetFolderPath) {
+      await loadFiles(targetFolderPath);
     }
+    if (generation === hiddenVisibilityGeneration.current) hiddenVisibilityIntent.current = null;
   }, [loadFiles, toast]);
 
   const newFolder = useCallback(async (path: string) => {
@@ -235,9 +248,11 @@ export function useFileActions(
       await loadFiles(targetFolderPath);
     } catch (e: unknown) {
       if (e instanceof ApiError && e.status === 404) {
-        const files = await loadFiles(targetFolderPath);
+        await loadFiles(targetFolderPath);
         if (stateRef.current.workspace.folderPath !== targetFolderPath) return;
-        dispatch({ type: 'PRUNE_MISSING_FILE_TABS', names: files.map((f) => f.name) });
+        for (const tab of stateRef.current.workspace.tabs.filter((t) => isFolderFileTab(t, name))) {
+          dispatch({ type: 'CLOSE_TAB', id: tab.id });
+        }
         return;
       }
       await loadFiles(targetFolderPath);
@@ -286,9 +301,13 @@ export function useFileActions(
       await loadFiles(targetFolderPath);
     } catch (e: unknown) {
       if (e instanceof ApiError && e.status === 404) {
-        const files = await loadFiles(targetFolderPath);
+        await loadFiles(targetFolderPath);
         if (stateRef.current.workspace.folderPath !== targetFolderPath) return;
-        dispatch({ type: 'PRUNE_MISSING_FILE_TABS', names: files.map((f) => f.name) });
+        for (const tab of stateRef.current.workspace.tabs.filter(
+          (t) => t.file && !t.file.folder && t.file.name.startsWith(path + '/'),
+        )) {
+          dispatch({ type: 'CLOSE_TAB', id: tab.id });
+        }
         return;
       }
       await loadFiles(targetFolderPath);
@@ -548,7 +567,7 @@ export function useFileActions(
     renameFolder,
     reprocessFile,
     revealFile,
-    setShowHiddenFiles,
+    toggleShowHiddenFiles,
     upload,
   }), [
     copyFileLink,
@@ -561,7 +580,7 @@ export function useFileActions(
     renameFolder,
     reprocessFile,
     revealFile,
-    setShowHiddenFiles,
+    toggleShowHiddenFiles,
     upload,
   ]);
 }

@@ -202,7 +202,8 @@ described by the
   ordinary dotfiles. On surfaces eligible user-owned dot-directories and
   their descendants in the tree and Quick Open with their declared
   capability and a subtle non-disabled distinction. `.git` and other VCS
-  databases, StashBase-derived artifacts, dot-notes, and junk metadata never
+  databases, `.stashbase` and `.stashbase-*` product state, StashBase-derived
+  artifacts, dot-notes, and junk metadata never
   surface in either mode; hidden excluded caches stay bounded non-expandable
   rows; and hidden-directory content remains outside Preparation, indexing,
   Search, automatic Chat context, and Agent/MCP discovery. Turning the

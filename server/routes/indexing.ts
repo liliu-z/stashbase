@@ -35,6 +35,7 @@ import {
 import { noteTreeChanged } from '../watcher.ts';
 import { sendError } from '../http.ts';
 import { filesystemPath } from '../filesystem-path.ts';
+import { isRetrievalEligibleDirectoryPath, isRetrievalEligiblePath } from '../indexable.ts';
 import {
   parseSearchTypes,
   SEARCH_TYPES_VALIDATION_ERROR,
@@ -133,6 +134,12 @@ export async function reprocessFileInFolder(
     (err as any).status = 400;
     throw err;
   }
+  if (!isRetrievalEligiblePath(rel)) {
+    const err = new Error('hidden and excluded paths are not eligible for Preparation');
+    (err as any).status = 400;
+    (err as any).code = 'PATH_NOT_PREPARABLE';
+    throw err;
+  }
 
   const { folderRoot } = await requireRequestFolder(folderName?.trim() || undefined);
 
@@ -197,6 +204,12 @@ async function prepareConvertibleInFolder(relPath: string, folderName?: string):
   if (!rel) {
     const err = new Error('path required');
     (err as any).status = 400;
+    throw err;
+  }
+  if (!isRetrievalEligiblePath(rel)) {
+    const err = new Error('hidden and excluded paths are not eligible for Preparation');
+    (err as any).status = 400;
+    (err as any).code = 'PATH_NOT_PREPARABLE';
     throw err;
   }
   const { folderRoot } = await requireRequestFolder(folderName?.trim() || undefined);
@@ -432,6 +445,7 @@ async function resolveScopePrefix(folderRoot: string, raw: unknown): Promise<str
   if (typeof raw !== 'string') return false;
   const rel = raw.trim().replace(/^\/+|\/+$/g, '');
   if (!rel) return undefined;
+  if (!isRetrievalEligibleDirectoryPath(rel)) return false;
   try {
     const abs = await filesystemPath.resolveUnderAsync(folderRoot, rel, { access: 'existing' });
     return (await fs.promises.stat(abs)).isDirectory() ? abs : false;

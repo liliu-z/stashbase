@@ -85,6 +85,11 @@ For one folder it must:
   one yielding asynchronous directory traversal for all prepared formats, and
   keep code dependency and build trees from blocking folder navigation or
   becoming format-specific discovery work;
+- apply that same eligibility before upload, save, move, folder-rename link
+  rewrites, sync reconciliation, and manual Preparation scheduling; moving
+  content into an excluded or hidden namespace removes stale semantic rows
+  and derived conversion state rather than creating new conversion or indexing
+  work, and directory-scoped Search rejects that namespace too;
 - validate current format-specific derived output;
 - preserve durable failure or cancellation gates;
 - schedule missing work without blocking navigation;

@@ -140,10 +140,12 @@ aliases, and Journey E2E owns representative composition.
   decisions, format detection, content-write boundaries, and their
   failure/confirmation paths. `server/__tests__/file-listing.test.ts` locks
   default and show-hidden listings, protected VCS/derived paths, bounded
-  hidden excluded rows, and sync/async parity; `pnpm test:config` locks the
-  default-off hidden-files preference recovery; renderer
-  `hidden-entries.test.ts` locks hidden-row marking and the listing-carried
-  visibility flag.
+  hidden excluded rows, sync/async parity, and large-scan yielding;
+  `pnpm test:config` locks default-off recovery, strict failure, and durable
+  hidden-files persistence; renderer `hidden-entries.test.ts`,
+  `hidden-files-menu.test.ts`, `hidden-visibility-actions.test.ts`, and
+  `file-listing-generation.test.ts` lock row marking, checked semantics,
+  rapid/failing writes, and stale continuation ownership.
 - **Journey E2E:** [document editing smoke](../e2e/smoke/document-editing.spec.ts),
   [workspace navigation depth](../e2e/journeys/navigation-depth.spec.ts),
   [Markdown, JSON, and TXT](../e2e/journeys/markdown-json.spec.ts), focused
@@ -153,6 +155,8 @@ aliases, and Journey E2E owns representative composition.
   [format and media](../e2e/journeys/formats-media.spec.ts) cover representative
   format classes and document work, including preview-only affordances,
   truthful generic-file and excluded-folder visibility, Quick Open parity,
+  the Show Hidden Files menu flow and cross-window convergence, protected
+  `.stashbase*` state, retained hidden document tabs, and Agent-safe explicit listings,
   strict read-only text versus binary fallback, `.txt` authoring capability,
   explicit PDF/DOCX preview-failure identity, external-write conflict recovery,
   and a live edit flushed through recovery reload.
@@ -164,8 +168,7 @@ aliases, and Journey E2E owns representative composition.
   Agent, and MCP writes share the same version authority. See
   [File Transactions](file-transactions.md#renderer-conflict-recovery).
   The Show Hidden Files toggle is covered by the server and renderer contract
-  tests above; a functional journey E2E for the visible menu flow and the
-  protected-path boundary is not yet claimed.
+  tests above plus the J03 navigation-depth Journey.
 
 ## J04: Preparation
 

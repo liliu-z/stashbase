@@ -23,7 +23,12 @@ import { isEmbeddingConfigured } from './app-config.ts';
 import { isEmbeddingAvailable } from './embedding-availability.ts';
 import type { Indexer } from './indexer.ts';
 import { logger, errorMessage } from './log.ts';
-import { hasNoExtractableText, indexableFileSizeError, shouldIndexFilePath } from './indexable.ts';
+import {
+  hasNoExtractableText,
+  indexableFileSizeError,
+  isRetrievalEligiblePath,
+  shouldIndexFilePath,
+} from './indexable.ts';
 import { isConvertibleSource } from './format.ts';
 import { cancelConversion } from './conversion.ts';
 import { clearRecord } from './conversion-status.ts';
@@ -167,9 +172,12 @@ function syncIndexCandidates(root: string, paths: string[]): string[] {
   });
 }
 
-function isLiveConvertedIndexRow(root: string, sourcePath: string): boolean {
+export function isLiveConvertedIndexRow(root: string, sourcePath: string): boolean {
   const folderRel = folderRelOf(root, sourcePath);
-  return folderRel != null && isConvertibleSource(folderRel) && fs.existsSync(sourcePath);
+  return folderRel != null
+    && isRetrievalEligiblePath(folderRel)
+    && isConvertibleSource(folderRel)
+    && fs.existsSync(sourcePath);
 }
 
 async function deleteStaleRenameSource(
@@ -209,7 +217,8 @@ function invalidateModifiedConvertedSource(sourcePath: string): void {
 
 function cleanupMissingConvertedSources(root: string): void {
   for (const sourcePath of knownDerivedSourcesUnderFolder(root)) {
-    if (fs.existsSync(sourcePath)) continue;
+    const folderRel = folderRelOf(root, sourcePath);
+    if (folderRel != null && isRetrievalEligiblePath(folderRel) && fs.existsSync(sourcePath)) continue;
     cleanupRemovedSource(sourcePath);
   }
 }
@@ -306,6 +315,13 @@ export async function syncIndex(indexer: Indexer, root: string, opts: SyncOption
       const folderRel = folderRelOf(root, r.new);
       if (folderRel == null) {
         failed.push({ name: r.new, error: `path not under synced folder ""` });
+        continue;
+      }
+      if (!isRetrievalEligiblePath(folderRel)) {
+        cleanupRemovedSource(r.old);
+        cleanupRemovedSource(r.new);
+        await deleteStaleRenameSource(indexer, r.old, failed);
+        try { await indexer.deleteFile(r.new); } catch { /* best-effort stale target cleanup */ }
         continue;
       }
       if (isConvertibleSource(folderRel)) {
@@ -459,7 +475,7 @@ async function indexFreshConvertedSources(
     if (shouldStop(opts)) return { done, cancelled: true };
     if (!canEmbed(opts)) return { done, cancelled: false, semanticPaused: true };
     const folderRel = folderRelOf(root, sourcePath);
-    if (folderRel == null || !isConvertibleSource(folderRel)) continue;
+    if (folderRel == null || !isRetrievalEligiblePath(folderRel) || !isConvertibleSource(folderRel)) continue;
     try {
       const indexed = await indexFreshConvertibleSource(sourcePath, folderRel);
       if (indexed) done.push(sourcePath);
@@ -534,7 +550,7 @@ async function removeExcludedIndexedFiles(
     // the derived markdown as content; `shouldIndexFilePath` is false for it
     // (its raw bytes aren't index-readable), but as long as the source file
     // still exists the entry is legitimate — the conversion path owns it.
-    if (isConvertibleSource(folderRel) && fs.existsSync(sourcePath)) continue;
+    if (isRetrievalEligiblePath(folderRel) && isConvertibleSource(folderRel) && fs.existsSync(sourcePath)) continue;
     try {
       cleanupRemovedSource(sourcePath);
       await indexer.deleteFile(sourcePath);

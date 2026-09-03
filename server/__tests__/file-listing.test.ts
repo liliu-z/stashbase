@@ -155,6 +155,10 @@ test('show-hidden listings surface eligible dot-directories while protecting VCS
     fs.writeFileSync(path.join(tempDir, '.git', 'HEAD'), 'ref: refs/heads/main');
     fs.mkdirSync(path.join(tempDir, '.hg'));
     fs.writeFileSync(path.join(tempDir, '.hg', 'requires'), 'store');
+    fs.mkdirSync(path.join(tempDir, '.stashbase'));
+    fs.writeFileSync(path.join(tempDir, '.stashbase', 'state.json'), '{}');
+    fs.mkdirSync(path.join(tempDir, '.stashbase-cache'));
+    fs.writeFileSync(path.join(tempDir, '.stashbase-cache', 'index.bin'), 'internal');
 
     // A hidden excluded cache stays a bounded, non-expandable row.
     fs.mkdirSync(path.join(tempDir, '.cache'));
@@ -190,13 +194,44 @@ test('show-hidden listings surface eligible dot-directories while protecting VCS
     // Protected internals stay invisible and untraversed.
     assert.ok(!onFolderPaths.includes('.git'), 'VCS databases never surface');
     assert.ok(!onFolderPaths.includes('.hg'), 'VCS databases never surface');
-    assert.ok(!onFiles.some((name) => name.startsWith('.git/') || name.startsWith('.hg/')));
+    assert.ok(!onFolderPaths.includes('.stashbase'), 'product state never surfaces');
+    assert.ok(!onFolderPaths.includes('.stashbase-cache'), 'product state variants never surface');
+    assert.ok(!onFiles.some((name) =>
+      name.startsWith('.git/')
+      || name.startsWith('.hg/')
+      || name.startsWith('.stashbase/')
+      || name.startsWith('.stashbase-')
+    ));
     assert.ok(!onFiles.includes('.github/.DS_Store'), 'junk dot-files stay hidden');
     assert.ok(!onFiles.includes('.github/.private.md'), 'the hidden dot-note namespace stays hidden');
 
     // Hidden excluded caches remain bounded excluded rows, not traversals.
     assert.equal(onFolders.find((f) => f.path === '.cache')?.kind, 'excluded');
     assert.ok(!onFiles.includes('.cache/blob.bin'), 'excluded directory contents are never traversed');
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('show-hidden async traversal yields while scanning a large eligible dot-directory', async (t) => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-listing-hidden-yield-'));
+  try {
+    const hiddenDir = path.join(tempDir, '.github');
+    fs.mkdirSync(hiddenDir);
+    for (let i = 0; i < 2_050; i += 1) {
+      fs.writeFileSync(path.join(hiddenDir, `file-${String(i).padStart(4, '0')}.md`), '# note');
+    }
+    const originalSetImmediate = setImmediate;
+    let explicitYieldCount = 0;
+    const instrumentedSetImmediate = ((callback: (...args: unknown[]) => void, ...args: unknown[]) => {
+      explicitYieldCount += 1;
+      return originalSetImmediate(callback, ...args);
+    }) as unknown as typeof setImmediate;
+    t.mock.method(globalThis, 'setImmediate', instrumentedSetImmediate);
+
+    const listing = await runWithFolderRoot(tempDir, () => listFilesAndFoldersAsync({ showHidden: true }));
+    assert.ok(explicitYieldCount >= 1, 'large hidden traversal must invoke the shared event-loop yield');
+    assert.equal(listing.files.length, 2_050);
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }

@@ -242,6 +242,12 @@ export function workspaceReducer(w: WorkspaceSlice, a: Action): WorkspaceSlice |
     case 'FILES_LOADED': {
       const folderPath = a.folderPath ?? (a.folder ? w.folderPath : '');
       const folderChanged = folderPath !== w.folderPath;
+      const hidesPreviouslyVisibleEntries = !folderChanged
+        && w.showHiddenFiles
+        && a.showHiddenFiles === false;
+      const visiblePaths = hidesPreviouslyVisibleEntries
+        ? new Set([...a.files.map((file) => file.name), ...a.folders.map((folder) => folder.path)])
+        : null;
       return {
         ...w,
         files: a.files,
@@ -251,6 +257,13 @@ export function workspaceReducer(w: WorkspaceSlice, a: Action): WorkspaceSlice |
         // Only a listing that consulted the server carries the flag;
         // optimistic local FILES_LOADED patches keep the last known value.
         showHiddenFiles: a.showHiddenFiles ?? w.showHiddenFiles,
+        ...(visiblePaths
+          ? {
+              expanded: toNameSet(Object.keys(w.expanded).filter((path) => visiblePaths.has(path))),
+              selectedPath: w.selectedPath && !visiblePaths.has(w.selectedPath) ? '' : w.selectedPath,
+              activeFolder: w.activeFolder && !visiblePaths.has(w.activeFolder) ? '' : w.activeFolder,
+            }
+          : {}),
         ...(folderChanged
           ? { recentFilePaths: [], editorHistory: [] }
           : {}),

@@ -27,6 +27,10 @@ import { clearRecordsUnder } from '../conversion-status.ts';
 import { cancelConversionsUnderAndWait } from '../conversion.ts';
 import { discoverConvertibleSources } from '../conversion-dispatch.ts';
 import { deleteDerivedUnderFolder } from '../derived-store.ts';
+import {
+  isRetrievalEligibleDirectoryPath,
+  shouldIndexFilePath,
+} from '../indexable.ts';
 
 const log = logger('routes/folders');
 
@@ -100,6 +104,8 @@ export function mount(app: express.Express): void {
     }
     const oldSourcePrefix = toSourcePath(oldPath);
     const newSourcePrefix = toSourcePath(newPath);
+    const oldPrefixIsRetrievalEligible = isRetrievalEligibleDirectoryPath(oldPath);
+    const newPrefixIsRetrievalEligible = isRetrievalEligibleDirectoryPath(newPath);
     await cancelConversionsUnderAndWait(oldSourcePrefix);
     const cascadeOn = req.body?.cascade !== false;
     const linkPlan = cascadeOn
@@ -117,7 +123,7 @@ export function mount(app: express.Express): void {
         // A queued task may have observed the source missing while the index
         // update was in progress and retired its old identity. Re-scan the
         // restored prefix so rollback restores background work as well as disk.
-        scheduleConversionRediscovery(oldSourcePrefix, oldPath);
+        if (oldPrefixIsRetrievalEligible) scheduleConversionRediscovery(oldSourcePrefix, oldPath);
       },
       doIndex: async () => {
         const applied = cascadeOn ? await applyRenamePlanAsync(linkPlan) : null;
@@ -126,29 +132,43 @@ export function mount(app: express.Express): void {
             throw new Error(`failed to update links in ${applied.failed.map((f) => f.name).join(', ')}`);
           }
 
+          for (const updated of applied?.updated ?? []) {
+            if (!shouldIndexFilePath(updated.name)) {
+              await indexer.deleteFile(toSourcePath(updated.name));
+            }
+          }
           if (!isEmbeddingAvailable()) {
+            if (!newPrefixIsRetrievalEligible) await indexer.deletePathPrefix(oldSourcePrefix);
             log.info(`rename_folder: skipped index update for ${oldPath} -> ${newPath} because no embedding key is configured`);
             return;
           }
-          // Cascade BEFORE the index call so files whose links we rewrite
-          // are embedded with their fresh content — saves a second round of
-          // embed for everything inside the renamed folder.
-          // Re-collect bodies from the new locations (cascade may have
-          // rewritten some). renamePathPrefix's contract takes OLD-keyed
-          // entries, so we map new → old names.
-          const filesUnder = (await listIndexableTextFilesUnderAsync(newPath))
-            .map((f) => ({
-              // Indexer's renamePathPrefix takes OLD-keyed absolute paths.
-              path: toSourcePath(oldPath + f.name.slice(newPath.length)),
-              content: f.content,
-            }));
-          await indexer.renamePathPrefix(toSourcePath(oldPath), toSourcePath(newPath), filesUnder);
+          if (!newPrefixIsRetrievalEligible) {
+            // The disk move is valid Workbench behavior, but the retrieval
+            // owner must forget the old identity and must not traverse the
+            // newly hidden subtree to build a replacement payload.
+            await indexer.deletePathPrefix(oldSourcePrefix);
+          } else {
+            // Cascade BEFORE the index call so files whose links we rewrite
+            // are embedded with their fresh content — saves a second round of
+            // embed for everything inside the renamed folder.
+            // Re-collect bodies from the new locations (cascade may have
+            // rewritten some). renamePathPrefix's contract takes OLD-keyed
+            // entries, so we map new → old names.
+            const filesUnder = (await listIndexableTextFilesUnderAsync(newPath))
+              .map((f) => ({
+                // Indexer's renamePathPrefix takes OLD-keyed absolute paths.
+                path: toSourcePath(oldPath + f.name.slice(newPath.length)),
+                content: f.content,
+              }));
+            await indexer.renamePathPrefix(toSourcePath(oldPath), toSourcePath(newPath), filesUnder);
+          }
 
           // Files OUTSIDE the renamed folder that had links rewritten
           // need a separate upsert — the prefix rename only touches rows
           // under oldPath.
           for (const u of applied?.updated ?? []) {
             if (u.name === newPath || u.name.startsWith(newPath + '/')) continue;
+            if (!shouldIndexFilePath(u.name)) continue;
             const body = await readTextAsync(u.name);
             if (body == null) continue;
             await indexer.upsertFile(toSourcePath(u.name), body);
@@ -161,7 +181,7 @@ export function mount(app: express.Express): void {
       okResponse: () => {
         try { deleteDerivedUnderFolder(oldSourcePrefix); }
         catch (err: unknown) { log.warn(`rename_folder: old derived cleanup failed for ${oldPath}: ${errorMessage(err)}`); }
-        scheduleConversionRediscovery(newSourcePrefix, newPath);
+        if (newPrefixIsRetrievalEligible) scheduleConversionRediscovery(newSourcePrefix, newPath);
         noteTreeChanged();
         try { remapFileOrderPath(oldPath, newPath, 'folder'); }
         catch (err: unknown) { log.warn(`file-order remap failed for ${oldPath} -> ${newPath}: ${errorMessage(err)}`); }

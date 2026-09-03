@@ -53,7 +53,6 @@ import {
   encodePath,
   getWindowId,
   getJson,
-  head,
   parseJsonOrThrow,
   requestHeaders,
   send,
@@ -101,16 +100,15 @@ export const api = {
     send<Record<string, never>>('PUT', '/api/file-order', { parentPath, names }),
 
   // Files / folders listing --------------------------------------
-  // `folder` (optional) lists an explicit library-member folder instead of
-  // the window's current one — used by cross-folder chat tabs for mention
-  // and attachment scoping.
+  // `folder` (optional) requests the default-safe listing for Agent mentions
+  // and attachments. It never inherits the Workbench show-hidden preference.
   listFiles: (folder?: string) => getJson<FilesPayload>(
     folder ? `/api/files?folder=${encodeURIComponent(folder)}` : '/api/files',
   ),
   // `folder` (optional, also on getFile below) reads from an explicit member
   // folder — out-of-folder tabs view files without switching the window.
   statFile: (name: string, opts?: { folder?: string }) =>
-    head('/api/files/' + encodePath(name) + folderQuery(opts?.folder)),
+    getJson<{ version?: string }>('/api/file-stat/' + encodePath(name) + folderQuery(opts?.folder)),
 
   getOnboarding: () => getJson<OnboardingPreferences>('/api/onboarding'),
   putOnboarding: (patch: Partial<OnboardingPreferences>) =>

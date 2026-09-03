@@ -235,17 +235,14 @@ test('newChatPlan creates a fresh tab when no completely blank tab exists', () =
 });
 
 test('mention/attachment scoping follows the session scope', () => {
-  // Cross-folder chat → the session folder's own listing.
+  // Every folder-bound session gets its own explicit server-filtered listing,
+  // so Workbench hidden visibility cannot widen Agent discovery.
   assert.deepEqual(
-    mentionListingPlan(folderScope('/tmp/scratch'), '/Users/me/Projects/Research'),
+    mentionListingPlan(folderScope('/tmp/scratch')),
     { kind: 'folder', root: '/tmp/scratch' },
   );
-  // Matching folder → the window's listing.
-  assert.deepEqual(mentionListingPlan(folderScope('/tmp/scratch'), '/tmp/scratch'), { kind: 'window' });
-  assert.deepEqual(mentionListingPlan(folderScope('/tmp/scratch'), ''), { kind: 'window' });
   // Library chats have no single folder listing — mentions disabled.
-  assert.deepEqual(mentionListingPlan(LIBRARY_SCOPE, '/Users/me/Projects/Research'), { kind: 'disabled' });
-  assert.deepEqual(mentionListingPlan(LIBRARY_SCOPE, ''), { kind: 'disabled' });
+  assert.deepEqual(mentionListingPlan(LIBRARY_SCOPE), { kind: 'disabled' });
 });
 
 test('connection URL carries the scope: folder=<abs> vs scope=library', () => {

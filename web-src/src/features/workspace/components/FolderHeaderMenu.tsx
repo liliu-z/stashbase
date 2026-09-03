@@ -133,7 +133,7 @@ export function FolderHeaderMenu({
       icon: <PreviewIcon />,
       detail: 'Dot-folders such as .github, in every window',
       checked: state.showHiddenFiles,
-      onSelect: () => { void actions.setShowHiddenFiles(!state.showHiddenFiles); },
+      onSelect: () => { void actions.toggleShowHiddenFiles(); },
     },
     { separator: true },
     {

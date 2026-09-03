@@ -19,6 +19,7 @@ import { folderScopedPreparationResetActions } from '@/store/lib/folderScopedRes
 import type { ToastOptions } from './useFeedbackActions';
 import { hasAggregatePreparationFailure } from '@/store/lib/fileReadiness';
 import { runIndexStatusRequest } from '@/store/lib/indexStatusRequest';
+import type { LoadedFileListing } from './useActiveFolderWorkspace';
 
 const POLL_PENDING_MS = 1500;
 const POLL_IDLE_MS = 8000;
@@ -66,7 +67,7 @@ interface SearchActionDependencies {
   loadFiles: (expectedFolderPath?: string) => Promise<WorkspaceSlice['files']>;
   loadFilesFromServer: (
     expectedFolderPath?: string,
-  ) => Promise<WorkspaceSlice['files'] | null>;
+  ) => Promise<LoadedFileListing | null>;
   refreshActiveTabFromDisk: (opts?: { force?: boolean }) => Promise<void>;
   toast: Toast;
 }
@@ -363,9 +364,33 @@ export function useSearchActions(
         if (treeChanged) {
           const expectedFolderPath = folderPathAtStart;
           void loadFilesFromServer(expectedFolderPath)
-            .then((files) => {
-              if (!files) return;
-              dispatch({ type: 'PRUNE_MISSING_FILE_TABS', names: files.map((f) => f.name) });
+            .then(async (listing) => {
+              if (!listing) return;
+              const present = new Set(listing.files.map((file) => file.name));
+              const absentFromVisibleListing = stateRef.current.workspace.tabs
+                .filter((tab) => tab.file && !tab.file.folder && !tab.dirty && !present.has(tab.file.name))
+                .map((tab) => tab.file!.name);
+              const confirmedMissing = new Set<string>();
+              // A hidden-visibility change in another window also bumps the
+              // tree version. Confirm absence on disk before pruning tabs;
+              // omission from the visible listing is not deletion.
+              await Promise.all(absentFromVisibleListing.map(async (name) => {
+                try {
+                  await api.statFile(name, { folder: expectedFolderPath });
+                } catch (err: unknown) {
+                  // Fail closed for tab lifetime: only a definite 404 proves
+                  // the file disappeared. Transient/server errors retain it.
+                  if (err instanceof ApiError && err.status === 404) confirmedMissing.add(name);
+                }
+              }));
+              if (!listing.isCurrent() || stateRef.current.workspace.folderPath !== expectedFolderPath) return;
+              // Close only tabs that this still-current batch proved missing.
+              // A tab opened or dirtied while HEAD requests were in flight
+              // was not part of that proof and keeps its lifetime.
+              for (const tab of stateRef.current.workspace.tabs) {
+                if (!tab.file || tab.file.folder || tab.dirty || !confirmedMissing.has(tab.file.name)) continue;
+                dispatch({ type: 'CLOSE_TAB', id: tab.id });
+              }
             })
             .catch((err) => {
               console.warn('[files] refresh after tree change failed:', err);
