@@ -35,22 +35,28 @@
   border-left: 2px solid transparent;
   border-radius: var(--radius-ui);
   font-size: var(--text-base);
-  color: var(--fg);
+  /* Secondary ink at rest — sidebar chrome speaks a tier under the
+   * document, and full-ink rows read as content instead of navigation.
+   * Selection pays full ink back below. */
+  color: var(--muted);
   min-width: 0;
   user-select: none;
 }
 
 .tree-row:hover {
   background: var(--hover);
+  color: var(--fg);
 }
 
 .tree-row.active {
   background: var(--active);
+  color: var(--fg);
   font-weight: 500;
 }
 
 .tree-row.folder.active-folder {
   background: var(--active);
+  color: var(--fg);
   font-weight: 500;
 }
 

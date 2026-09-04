@@ -230,6 +230,7 @@
       --overlay-w-lg: min(480px, var(--overlay-fit));  /* wide modal */
       --overlay-w-xl: min(640px, var(--overlay-fit));  /* wide picker, crash report */
       --overlay-w-2xl: min(760px, var(--overlay-fit)); /* Settings */
+      --overlay-w-3xl: min(1080px, var(--overlay-w-stage)); /* Gallery entry detail */
 
       /* Max-height for a surface that scrolls. The px step is what the
        * surface wants; `70vh` is the single answer to "and never more than
@@ -629,8 +630,9 @@
      * look alike, or the primitive's design is silently overridden). An
      * opaque line set 2px off the control reads as a heavy detached box
      * on 28px icon chrome, which is where focus most often lands:
-     * closing an overlay with Esc restores focus to its trigger, and
-     * that keyboard modality correctly re-shows the ring.
+     * closing a keyboard-navigated overlay with Esc restores focus to
+     * its trigger, and the still-armed `kbd-nav` gate below correctly
+     * re-shows the ring there.
      *
      * Text fields (input, textarea) are deliberately NOT in the list:
      * the caret and the echo of typing are a text field's focus
@@ -638,10 +640,28 @@
      * session-history rename each used to carry their own suppression
      * rule against exactly this outline). A halo that lit up on every
      * click into every field was the loudest recurring accent in the
-     * app for its most routine act. */
-    :where(button, select, [tabindex]):focus-visible {
+     * app for its most routine act.
+     *
+     * Gated on `html.kbd-nav` (common/lib/keyboardModality.ts): Chromium
+     * flips :focus-visible to keyboard modality on ANY keydown — a bare
+     * modifier is enough, and the macOS screenshot chords deliver theirs
+     * to the focused window — so the last mouse-clicked row or button lit
+     * up cyan exactly when a screenshot was being taken. The class arms
+     * only on focus-moving keys and disarms on pointerdown, so the ring
+     * appears for real keyboard navigation and never as a side effect of
+     * a chord. */
+    html.kbd-nav :where(button, select, [tabindex]):focus-visible {
       outline: 2px solid rgba(var(--focus-ring-rgb), 0.55);
       outline-offset: 1px;
+    }
+
+    /* The gate's other half. Without it, whenever `kbd-nav` is off the
+     * UA stylesheet's own `:focus-visible { outline: auto }` resurfaces
+     * — the same stray ring in the platform's blue instead of the
+     * app's cyan. The pair fully owns the ring: the app draws it under
+     * keyboard navigation and nothing draws it otherwise. */
+    html:not(.kbd-nav) :where(button, select, [tabindex]):focus-visible {
+      outline: none;
     }
 
     /* `tabindex="-1"` marks an element the keyboard can NEVER tab to —
@@ -663,6 +683,14 @@
     .scrollbar-quiet {
       scrollbar-width: thin;
       scrollbar-color: var(--scrollbar-thumb) transparent;
+    }
+
+    /* Fully hidden bar for gesture-first strips (the Gallery detail's
+     * thumbnail scroller): arrows and snap already say "this slides",
+     * and a bar under 80px-tall thumbs reads as clutter. Reserve for
+     * scrollers that have another visible affordance. */
+    .scrollbar-none {
+      scrollbar-width: none;
     }
 
     /* Working shimmer (Cursor register): a soft light band sweeps through

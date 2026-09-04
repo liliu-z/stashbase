@@ -1,25 +1,28 @@
 /**
- * All SVG icons used in the UI, drawn from Phosphor (MIT).
+ * All SVG icons used in the UI, drawn from Lucide (ISC).
  *
  * Sized via parent CSS so each component stays a pure shape — no
  * width/height props. Colour follows `currentColor`, so the parent's
  * `color` rule wins.
  *
- * Phosphor ships every icon as a 256-viewBox FILLED path, not a stroked
- * one. There is therefore no stroke width to tune and no way for two icons
- * to disagree about weight — the property the old hand-drawn Lucide set had
- * to enforce by convention is now structural. Weight is chosen by picking a
- * different asset (`regular` for chrome, `fill` where a solid silhouette
- * carries meaning), never by restyling one.
+ * Lucide is a STROKED set — 24-viewBox, round caps and round joins —
+ * which is where the app's rounded icon voice comes from. The envelope
+ * owns every stroke property, so two icons cannot disagree about
+ * weight: 1.5, one step under Lucide's 2px default, for the light
+ * hairline chrome weight (the Codex/Cursor register) rather than a
+ * bold pictogram one. A solid state (send/stop, the set favorite star)
+ * is the same geometry painted with a currentColor fill, never a
+ * restyled stroke.
  *
- * Paths are inlined rather than imported from `@phosphor-icons/react`:
- * that package carries six weights per icon and the renderer's entry chunk
- * has a hard budget (`scripts/check-renderer-chunks.mjs`). The assets
- * package is a devDependency, and `scripts/gen-icons.mjs` regenerates this
- * file from it — edit the map there, not the paths here.
+ * The assets are PINNED IN-REPO under `assets/icons/lucide/` and
+ * `scripts/gen-icons.mjs` regenerates this file from them — edit the map
+ * there, not the paths here. Two families sit deliberately off-set:
+ * brand marks (GitHub, Discord — Lucide ships no brands) keep their
+ * Phosphor filled geometry on their own envelope, and the file-format
+ * glyphs in `FileTypeIcon.tsx` stay their own set.
  *
  * Product brand marks (Claude, Codex, the StashBase cube) and the two
- * 16-box preparation status glyphs have no Phosphor equivalent and stay
+ * 16-box preparation status glyphs have no set equivalent and stay
  * hand-authored at the bottom; the generator lifts them across verbatim.
  */
 
@@ -27,8 +30,27 @@ import * as React from 'react';
 
 type IconProps = { className?: string };
 
-/** Every Phosphor asset shares this envelope. */
-function Icon({ className, children }: IconProps & { children: React.ReactNode }) {
+/** Every Lucide asset shares this envelope; `filled` paints the same
+ * geometry as a solid currentColor silhouette. */
+function Icon({ className, filled, children }: IconProps & { filled?: boolean; children: React.ReactNode }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill={filled ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {children}
+    </svg>
+  );
+}
+
+/** Brand marks keep Phosphor's 256-viewBox filled geometry. */
+function PhosphorIcon({ className, children }: IconProps & { children: React.ReactNode }) {
   return (
     <svg className={className} viewBox="0 0 256 256" fill="currentColor" aria-hidden="true">
       {children}
@@ -36,408 +58,408 @@ function Icon({ className, children }: IconProps & { children: React.ReactNode }
   );
 }
 
-/** Search — titlebar control and Command Palette entry. (phosphor `magnifying-glass`, regular) */
+/** Search — titlebar control and Command Palette entry. (lucide `search`) */
 export function SearchIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"/>
+      <path d="m21 21-4.34-4.34"/> <circle cx="11" cy="11" r="8"/>
     </Icon>
   );
 }
 
-/** Disclosure caret: menus, pills, section headers. (phosphor `caret-down`, regular) */
+/** Disclosure caret: menus, pills, section headers. (lucide `chevron-down`) */
 export function ChevronDownIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/>
+      <path d="m6 9 6 6 6-6"/>
     </Icon>
   );
 }
 
-/** Past sessions — the chat panel’s History dropdown. (phosphor `clock-counter-clockwise`, regular) */
+/** Past sessions — the chat panel’s History dropdown. (lucide `history`) */
 export function HistoryIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M136,80v43.47l36.12,21.67a8,8,0,0,1-8.24,13.72l-40-24A8,8,0,0,1,120,128V80a8,8,0,0,1,16,0Zm-8-48A95.44,95.44,0,0,0,60.08,60.15C52.81,67.51,46.35,74.59,40,82V64a8,8,0,0,0-16,0v40a8,8,0,0,0,8,8H72a8,8,0,0,0,0-16H49c7.15-8.42,14.27-16.35,22.39-24.57a80,80,0,1,1,1.66,114.75,8,8,0,1,0-11,11.64A96,96,0,1,0,128,32Z"/>
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/> <path d="M3 3v5h5"/> <path d="M12 7v5l4 2"/>
     </Icon>
   );
 }
 
-/** Composer send. (phosphor `arrow-up`, regular) */
+/** Composer send. (lucide `arrow-up`) */
 export function ArrowUpIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M205.66,117.66a8,8,0,0,1-11.32,0L136,59.31V216a8,8,0,0,1-16,0V59.31L61.66,117.66a8,8,0,0,1-11.32-11.32l72-72a8,8,0,0,1,11.32,0l72,72A8,8,0,0,1,205.66,117.66Z"/>
+      <path d="m5 12 7-7 7 7"/> <path d="M12 19V5"/>
     </Icon>
   );
 }
 
-/** Stop a streaming Agent turn. Fill weight: a solid block reads as a hard stop where an outline reads as a frame. (phosphor `stop`, fill) */
+/** Stop a streaming Agent turn. Filled: a solid block reads as a hard stop where an outline reads as a frame. (lucide `square`, filled) */
 export function StopIcon({ className }: IconProps) {
   return (
-    <Icon className={className}>
-      <path d="M216,56V200a16,16,0,0,1-16,16H56a16,16,0,0,1-16-16V56A16,16,0,0,1,56,40H200A16,16,0,0,1,216,56Z"/>
+    <Icon className={className} filled>
+      <rect width="18" height="18" x="3" y="3" rx="2"/>
     </Icon>
   );
 }
 
-/** New chat / add. (phosphor `plus`, regular) */
+/** New chat / add. (lucide `plus`) */
 export function PlusIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z"/>
+      <path d="M5 12h14"/> <path d="M12 5v14"/>
     </Icon>
   );
 }
 
-/** Edit permission mode. (phosphor `code`, regular) */
+/** Edit permission mode. (lucide `code`) */
 export function CodeIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M69.12,94.15,28.5,128l40.62,33.85a8,8,0,1,1-10.24,12.29l-48-40a8,8,0,0,1,0-12.29l48-40a8,8,0,0,1,10.24,12.3Zm176,27.7-48-40a8,8,0,1,0-10.24,12.3L227.5,128l-40.62,33.85a8,8,0,1,0,10.24,12.29l48-40a8,8,0,0,0,0-12.29ZM162.73,32.48a8,8,0,0,0-10.25,4.79l-64,176a8,8,0,0,0,4.79,10.26A8.14,8.14,0,0,0,96,224a8,8,0,0,0,7.52-5.27l64-176A8,8,0,0,0,162.73,32.48Z"/>
+      <path d="m16 18 6-6-6-6"/> <path d="m8 6-6 6 6 6"/>
     </Icon>
   );
 }
 
-/** Ask-before-each-edit permission mode. (phosphor `hand`, regular) */
+/** Ask-before-each-edit permission mode. (lucide `hand`) */
 export function HandIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M188,48a27.75,27.75,0,0,0-12,2.71V44a28,28,0,0,0-54.65-8.6A28,28,0,0,0,80,60v64l-3.82-6.13a28,28,0,0,0-48.6,27.82c16,33.77,28.93,57.72,43.72,72.69C86.24,233.54,103.2,240,128,240a88.1,88.1,0,0,0,88-88V76A28,28,0,0,0,188,48Zm12,104a72.08,72.08,0,0,1-72,72c-20.38,0-33.51-4.88-45.33-16.85C69.44,193.74,57.26,171,41.9,138.58a6.36,6.36,0,0,0-.3-.58,12,12,0,0,1,20.79-12,1.76,1.76,0,0,0,.14.23l18.67,30A8,8,0,0,0,96,152V60a12,12,0,0,1,24,0v60a8,8,0,0,0,16,0V44a12,12,0,0,1,24,0v76a8,8,0,0,0,16,0V76a12,12,0,0,1,24,0Z"/>
+      <path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2"/> <path d="M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2"/> <path d="M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8"/> <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>
     </Icon>
   );
 }
 
-/** Plan mode — explore, then present a plan. (phosphor `clipboard-text`, regular) */
+/** Plan mode — explore, then present a plan. (lucide `clipboard-list`) */
 export function ClipboardListIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M168,152a8,8,0,0,1-8,8H96a8,8,0,0,1,0-16h64A8,8,0,0,1,168,152Zm-8-40H96a8,8,0,0,0,0,16h64a8,8,0,0,0,0-16Zm56-64V216a16,16,0,0,1-16,16H56a16,16,0,0,1-16-16V48A16,16,0,0,1,56,32H92.26a47.92,47.92,0,0,1,71.48,0H200A16,16,0,0,1,216,48ZM96,64h64a32,32,0,0,0-64,0ZM200,48H173.25A47.93,47.93,0,0,1,176,64v8a8,8,0,0,1-8,8H88a8,8,0,0,1-8-8V64a47.93,47.93,0,0,1,2.75-16H56V216H200Z"/>
+      <rect width="8" height="4" x="8" y="2" rx="1" ry="1"/> <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/> <path d="M12 11h4"/> <path d="M12 16h4"/> <path d="M8 11h.01"/> <path d="M8 16h.01"/>
     </Icon>
   );
 }
 
-/** Effort (thinking depth) in the Modes dropdown. (phosphor `barbell`, regular) */
+/** Effort (thinking depth) in the Modes dropdown. (lucide `dumbbell`) */
 export function DumbbellIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M248,120h-8V88a16,16,0,0,0-16-16H208V64a16,16,0,0,0-16-16H168a16,16,0,0,0-16,16v56H104V64A16,16,0,0,0,88,48H64A16,16,0,0,0,48,64v8H32A16,16,0,0,0,16,88v32H8a8,8,0,0,0,0,16h8v32a16,16,0,0,0,16,16H48v8a16,16,0,0,0,16,16H88a16,16,0,0,0,16-16V136h48v56a16,16,0,0,0,16,16h24a16,16,0,0,0,16-16v-8h16a16,16,0,0,0,16-16V136h8a8,8,0,0,0,0-16ZM32,168V88H48v80Zm56,24H64V64H88V192Zm104,0H168V64h24V175.82c0,.06,0,.12,0,.18s0,.12,0,.18V192Zm32-24H208V88h16Z"/>
+      <path d="M17.596 12.768a2 2 0 1 0 2.829-2.829l-1.768-1.767a2 2 0 0 0 2.828-2.829l-2.828-2.828a2 2 0 0 0-2.829 2.828l-1.767-1.768a2 2 0 1 0-2.829 2.829z"/> <path d="m2.5 21.5 1.4-1.4"/> <path d="m20.1 3.9 1.4-1.4"/> <path d="M5.343 21.485a2 2 0 1 0 2.829-2.828l1.767 1.768a2 2 0 1 0 2.829-2.829l-6.364-6.364a2 2 0 1 0-2.829 2.829l1.768 1.767a2 2 0 0 0-2.828 2.829z"/> <path d="m9.6 14.4 4.8-4.8"/>
     </Icon>
   );
 }
 
-/** Auto mode — the model picks the permission mode. (phosphor `lightning`, regular) */
+/** Auto mode — the model picks the permission mode. (lucide `zap`) */
 export function BoltIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M215.79,118.17a8,8,0,0,0-5-5.66L153.18,90.9l14.66-73.33a8,8,0,0,0-13.69-7l-112,120a8,8,0,0,0,3,13l57.63,21.61L88.16,238.43a8,8,0,0,0,13.69,7l112-120A8,8,0,0,0,215.79,118.17ZM109.37,214l10.47-52.38a8,8,0,0,0-5-9.06L62,132.71l84.62-90.66L136.16,94.43a8,8,0,0,0,5,9.06l52.8,19.8Z"/>
+      <path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z"/>
     </Icon>
   );
 }
 
-/** New note. (phosphor `file-plus`, regular) */
+/** New note. (lucide `file-plus`) */
 export function NewFileIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M213.66,82.34l-56-56A8,8,0,0,0,152,24H56A16,16,0,0,0,40,40V216a16,16,0,0,0,16,16H200a16,16,0,0,0,16-16V88A8,8,0,0,0,213.66,82.34ZM160,51.31,188.69,80H160ZM200,216H56V40h88V88a8,8,0,0,0,8,8h48V216Zm-40-64a8,8,0,0,1-8,8H136v16a8,8,0,0,1-16,0V160H104a8,8,0,0,1,0-16h16V128a8,8,0,0,1,16,0v16h16A8,8,0,0,1,160,152Z"/>
+      <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/> <path d="M14 2v5a1 1 0 0 0 1 1h5"/> <path d="M9 15h6"/> <path d="M12 18v-6"/>
     </Icon>
   );
 }
 
-/** New folder. (phosphor `folder-plus`, regular) */
+/** New folder. (lucide `folder-plus`) */
 export function NewFolderIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M216,72H131.31L104,44.69A15.86,15.86,0,0,0,92.69,40H40A16,16,0,0,0,24,56V200.62A15.4,15.4,0,0,0,39.38,216H216.89A15.13,15.13,0,0,0,232,200.89V88A16,16,0,0,0,216,72ZM92.69,56l16,16H40V56ZM216,200H40V88H216Zm-88-88a8,8,0,0,1,8,8v16h16a8,8,0,0,1,0,16H136v16a8,8,0,0,1-16,0V152H104a8,8,0,0,1,0-16h16V120A8,8,0,0,1,128,112Z"/>
+      <path d="M12 10v6"/> <path d="M9 13h6"/> <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>
     </Icon>
   );
 }
 
-/** Import from GitHub. (phosphor `github-logo`, regular) */
-export function GithubLogoIcon({ className }: IconProps) {
-  return (
-    <Icon className={className}>
-      <path d="M208.31,75.68A59.78,59.78,0,0,0,202.93,28,8,8,0,0,0,196,24a59.75,59.75,0,0,0-48,24H124A59.75,59.75,0,0,0,76,24a8,8,0,0,0-6.93,4,59.78,59.78,0,0,0-5.38,47.68A58.14,58.14,0,0,0,56,104v8a56.06,56.06,0,0,0,48.44,55.47A39.8,39.8,0,0,0,96,192v8H72a24,24,0,0,1-24-24A40,40,0,0,0,8,136a8,8,0,0,0,0,16,24,24,0,0,1,24,24,40,40,0,0,0,40,40H96v16a8,8,0,0,0,16,0V192a24,24,0,0,1,48,0v40a8,8,0,0,0,16,0V192a39.8,39.8,0,0,0-8.44-24.53A56.06,56.06,0,0,0,216,112v-8A58.14,58.14,0,0,0,208.31,75.68ZM200,112a40,40,0,0,1-40,40H112a40,40,0,0,1-40-40v-8a41.74,41.74,0,0,1,6.9-22.48A8,8,0,0,0,80,73.83a43.81,43.81,0,0,1,.79-33.58,43.88,43.88,0,0,1,32.32,20.06A8,8,0,0,0,119.82,64h32.35a8,8,0,0,0,6.74-3.69,43.87,43.87,0,0,1,32.32-20.06A43.81,43.81,0,0,1,192,73.83a8.09,8.09,0,0,0,1,7.65A41.72,41.72,0,0,1,200,104Z"/>
-    </Icon>
-  );
-}
-
-/** Document Outline section header. (phosphor `text-align-left`, regular) */
+/** Document Outline section header. (lucide `align-left`) */
 export function OutlineIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M32,64a8,8,0,0,1,8-8H216a8,8,0,0,1,0,16H40A8,8,0,0,1,32,64Zm8,48H168a8,8,0,0,0,0-16H40a8,8,0,0,0,0,16Zm176,24H40a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16Zm-48,40H40a8,8,0,0,0,0,16H168a8,8,0,0,0,0-16Z"/>
+      <path d="M21 5H3"/> <path d="M15 12H3"/> <path d="M17 19H3"/>
     </Icon>
   );
 }
 
-/** Library section header. (phosphor `books`, regular) */
+/** Library section header. (lucide `library`) */
 export function LibraryIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M231.65,194.55,198.46,36.75a16,16,0,0,0-19-12.39L132.65,34.42a16.08,16.08,0,0,0-12.3,19l33.19,157.8A16,16,0,0,0,169.16,224a16.25,16.25,0,0,0,3.38-.36l46.81-10.06A16.09,16.09,0,0,0,231.65,194.55ZM136,50.15c0-.06,0-.09,0-.09l46.8-10,3.33,15.87L139.33,66Zm6.62,31.47,46.82-10.05,3.34,15.9L146,97.53Zm6.64,31.57,46.82-10.06,13.3,63.24-46.82,10.06ZM216,197.94l-46.8,10-3.33-15.87L212.67,182,216,197.85C216,197.91,216,197.94,216,197.94ZM104,32H56A16,16,0,0,0,40,48V208a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V48A16,16,0,0,0,104,32ZM56,48h48V64H56Zm0,32h48v96H56Zm48,128H56V192h48v16Z"/>
+      <path d="m16 6 4 14"/> <path d="M12 6v14"/> <path d="M8 8v12"/> <path d="M4 4v16"/>
     </Icon>
   );
 }
 
-/** Folder — Library rows and the tree. (phosphor `folder`, regular) */
+/** Folder — Library rows and the tree. (lucide `folder`) */
 export function FolderIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M216,72H131.31L104,44.69A15.86,15.86,0,0,0,92.69,40H40A16,16,0,0,0,24,56V200.62A15.4,15.4,0,0,0,39.38,216H216.89A15.13,15.13,0,0,0,232,200.89V88A16,16,0,0,0,216,72ZM40,56H92.69l16,16H40ZM216,200H40V88H216Z"/>
+      <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>
     </Icon>
   );
 }
 
-/** Reindex / sync. (phosphor `arrows-clockwise`, regular) */
+/** Reindex / sync. (lucide `refresh-cw`) */
 export function SyncIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M224,48V96a8,8,0,0,1-8,8H168a8,8,0,0,1,0-16h28.69L182.06,73.37a79.56,79.56,0,0,0-56.13-23.43h-.45A79.52,79.52,0,0,0,69.59,72.71,8,8,0,0,1,58.41,61.27a96,96,0,0,1,135,.79L208,76.69V48a8,8,0,0,1,16,0ZM186.41,183.29a80,80,0,0,1-112.47-.66L59.31,168H88a8,8,0,0,0,0-16H40a8,8,0,0,0-8,8v48a8,8,0,0,0,16,0V179.31l14.63,14.63A95.43,95.43,0,0,0,130,222.06h.53a95.36,95.36,0,0,0,67.07-27.33,8,8,0,0,0-11.18-11.44Z"/>
+      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/> <path d="M21 3v5h-5"/> <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/> <path d="M8 16H3v5"/>
     </Icon>
   );
 }
 
-/** Fold every open folder in the tree. (phosphor `arrows-in-line-vertical`, regular) */
+/** Fold every open folder in the tree. (lucide `fold-vertical`) */
 export function CollapseAllIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M224,128a8,8,0,0,1-8,8H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,128ZM122.34,101.66a8,8,0,0,0,11.32,0l32-32a8,8,0,0,0-11.32-11.32L136,76.69V16a8,8,0,0,0-16,0V76.69L101.66,58.34A8,8,0,0,0,90.34,69.66Zm11.32,52.68a8,8,0,0,0-11.32,0l-32,32a8,8,0,0,0,11.32,11.32L120,179.31V240a8,8,0,0,0,16,0V179.31l18.34,18.35a8,8,0,0,0,11.32-11.32Z"/>
+      <path d="M12 22v-6"/> <path d="M12 8V2"/> <path d="M4 12H2"/> <path d="M10 12H8"/> <path d="M16 12h-2"/> <path d="M22 12h-2"/> <path d="m15 19-3-3-3 3"/> <path d="m15 5-3 3-3-3"/>
     </Icon>
   );
 }
 
-/** Unfold the tree. (phosphor `arrows-out-line-vertical`, regular) */
+/** Unfold the tree. (lucide `unfold-vertical`) */
 export function ExpandAllIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M224,128a8,8,0,0,1-8,8H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,128ZM101.66,53.66,120,35.31V96a8,8,0,0,0,16,0V35.31l18.34,18.35a8,8,0,0,0,11.32-11.32l-32-32a8,8,0,0,0-11.32,0l-32,32a8,8,0,0,0,11.32,11.32Zm52.68,148.68L136,220.69V160a8,8,0,0,0-16,0v60.69l-18.34-18.35a8,8,0,0,0-11.32,11.32l32,32a8,8,0,0,0,11.32,0l32-32a8,8,0,0,0-11.32-11.32Z"/>
+      <path d="M12 22v-6"/> <path d="M12 8V2"/> <path d="M4 12H2"/> <path d="M10 12H8"/> <path d="M16 12h-2"/> <path d="M22 12h-2"/> <path d="m15 19-3 3-3-3"/> <path d="m15 5-3-3-3 3"/>
     </Icon>
   );
 }
 
-/** A file with no format-specific mark. (phosphor `file`, regular) */
+/** A file with no format-specific mark — chrome surfaces (tool activity, mentions). The tree’s format glyphs live in FileTypeIcon.tsx and stay on their own set. (lucide `file`) */
 export function FileGenericIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M213.66,82.34l-56-56A8,8,0,0,0,152,24H56A16,16,0,0,0,40,40V216a16,16,0,0,0,16,16H200a16,16,0,0,0,16-16V88A8,8,0,0,0,213.66,82.34ZM160,51.31,188.69,80H160ZM200,216H56V40h88V88a8,8,0,0,0,8,8h48V216Z"/>
+      <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/> <path d="M14 2v5a1 1 0 0 0 1 1h5"/>
     </Icon>
   );
 }
 
-/** Files view — same document frame as NewFileIcon so the two read as a family. (phosphor `file-text`, regular) */
+/** Files view — same document frame as NewFileIcon so the two read as a family. (lucide `file-text`) */
 export function FilesViewIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M213.66,82.34l-56-56A8,8,0,0,0,152,24H56A16,16,0,0,0,40,40V216a16,16,0,0,0,16,16H200a16,16,0,0,0,16-16V88A8,8,0,0,0,213.66,82.34ZM160,51.31,188.69,80H160ZM200,216H56V40h88V88a8,8,0,0,0,8,8h48V216Zm-32-80a8,8,0,0,1-8,8H96a8,8,0,0,1,0-16h64A8,8,0,0,1,168,136Zm0,32a8,8,0,0,1-8,8H96a8,8,0,0,1,0-16h64A8,8,0,0,1,168,168Z"/>
+      <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/> <path d="M14 2v5a1 1 0 0 0 1 1h5"/> <path d="M10 9H8"/> <path d="M16 13H8"/> <path d="M16 17H8"/>
     </Icon>
   );
 }
 
-/** Sidebar toggle, titlebar left. (phosphor `sidebar-simple`, regular) */
+/** Sidebar toggle, titlebar left. (lucide `panel-left`) */
 export function PanelLeftIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40ZM40,56H80V200H40ZM216,200H96V56H216V200Z"/>
+      <rect width="18" height="18" x="3" y="3" rx="2"/> <path d="M9 3v18"/>
     </Icon>
   );
 }
 
-/** Chat-panel toggle, titlebar right. Phosphor ships one side only, so this is the same mark mirrored — drawing a near-copy by hand would drift from it on the next icon-set update. (phosphor `sidebar-simple`, regular) */
+/** Chat-panel toggle, titlebar right. Lucide ships both sides, so this is its own asset rather than a mirror. (lucide `panel-right`) */
 export function PanelRightIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <g transform="translate(256,0) scale(-1,1)"><path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40ZM40,56H80V200H40ZM216,200H96V56H216V200Z"/></g>
+      <rect width="18" height="18" x="3" y="3" rx="2"/> <path d="M15 3v18"/>
     </Icon>
   );
 }
 
-/** Report a bug, in the sidebar’s bottom row. (phosphor `bug`, regular) */
+/** Report a bug, in Settings → General. (lucide `bug`) */
 export function BugIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M144,92a12,12,0,1,1,12,12A12,12,0,0,1,144,92ZM100,80a12,12,0,1,0,12,12A12,12,0,0,0,100,80Zm116,64A87.76,87.76,0,0,1,213,167l22.24,9.72A8,8,0,0,1,232,192a7.89,7.89,0,0,1-3.2-.67L207.38,182a88,88,0,0,1-158.76,0L27.2,191.33A7.89,7.89,0,0,1,24,192a8,8,0,0,1-3.2-15.33L43,167A87.76,87.76,0,0,1,40,144v-8H16a8,8,0,0,1,0-16H40v-8a87.76,87.76,0,0,1,3-23L20.8,79.33a8,8,0,1,1,6.4-14.66L48.62,74a88,88,0,0,1,158.76,0l21.42-9.36a8,8,0,0,1,6.4,14.66L213,89.05a87.76,87.76,0,0,1,3,23v8h24a8,8,0,0,1,0,16H216ZM56,120H200v-8a72,72,0,0,0-144,0Zm64,95.54V136H56v8A72.08,72.08,0,0,0,120,215.54ZM200,144v-8H136v79.54A72.08,72.08,0,0,0,200,144Z"/>
+      <path d="M12 20v-9"/> <path d="M14 7a4 4 0 0 1 4 4v3a6 6 0 0 1-12 0v-3a4 4 0 0 1 4-4z"/> <path d="M14.12 3.88 16 2"/> <path d="M21 21a4 4 0 0 0-3.81-4"/> <path d="M21 5a4 4 0 0 1-3.55 3.97"/> <path d="M22 13h-4"/> <path d="M3 21a4 4 0 0 1 3.81-4"/> <path d="M3 5a4 4 0 0 0 3.55 3.97"/> <path d="M6 13H2"/> <path d="m8 2 1.88 1.88"/> <path d="M9 7.13V6a3 3 0 1 1 6 0v1.13"/>
     </Icon>
   );
 }
 
-/** Community Discord, beside Report a bug. Phosphor carries the brand mark itself, so it stays on-set instead of being a lone hand-traced logo. FILL weight: the regular outline’s thin face features smear into a robot at 16px; the solid mark stays legible. (phosphor `discord-logo`, fill) */
-export function DiscordIcon({ className }: IconProps) {
-  return (
-    <Icon className={className}>
-      <path d="M247.51,174.39,218,58a16.08,16.08,0,0,0-13-11.88l-36.06-5.92a16.22,16.22,0,0,0-18.26,11.88l-.21.85a4,4,0,0,0,3.27,4.93,155.62,155.62,0,0,1,24.41,5.62,8.2,8.2,0,0,1,5.62,9.7,8,8,0,0,1-10.19,5.64,155.4,155.4,0,0,0-90.8-.1,8.22,8.22,0,0,1-10.28-4.81,8,8,0,0,1,5.08-10.33,156.85,156.85,0,0,1,24.72-5.72,4,4,0,0,0,3.27-4.93l-.21-.85A16.21,16.21,0,0,0,87.08,40.21L51,46.13A16.08,16.08,0,0,0,38,58L8.49,174.39a15.94,15.94,0,0,0,9.06,18.51l67,29.71a16.17,16.17,0,0,0,21.71-9.1l3.49-9.45a4,4,0,0,0-3.27-5.35,158.13,158.13,0,0,1-28.63-6.2,8.2,8.2,0,0,1-5.61-9.67,8,8,0,0,1,10.2-5.66,155.59,155.59,0,0,0,91.12,0,8,8,0,0,1,10.19,5.65,8.19,8.19,0,0,1-5.61,9.68,157.84,157.84,0,0,1-28.62,6.2,4,4,0,0,0-3.27,5.35l3.49,9.45a16.18,16.18,0,0,0,21.71,9.1l67-29.71A15.94,15.94,0,0,0,247.51,174.39ZM92,152a12,12,0,1,1,12-12A12,12,0,0,1,92,152Zm72,0a12,12,0,1,1,12-12A12,12,0,0,1,164,152Z"/>
-    </Icon>
-  );
-}
-
-/** Rename / edit. (phosphor `pencil-simple`, regular) */
+/** Rename / edit. (lucide `pencil`) */
 export function EditIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M227.31,73.37,182.63,28.68a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.31,96a16,16,0,0,0,0-22.63ZM92.69,208H48V163.31l88-88L180.69,120ZM192,108.68,147.31,64l24-24L216,84.68Z"/>
+      <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/> <path d="m15 5 4 4"/>
     </Icon>
   );
 }
 
-/** Delete. (phosphor `trash`, regular) */
+/** Delete. (lucide `trash-2`) */
 export function TrashIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192ZM112,104v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Zm48,0v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Z"/>
+      <path d="M10 11v6"/> <path d="M14 11v6"/> <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/> <path d="M3 6h18"/> <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
     </Icon>
   );
 }
 
-/** Overflow menu trigger. (phosphor `dots-three`, regular) */
+/** Overflow menu trigger. (lucide `ellipsis`) */
 export function MoreHorizontalIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M140,128a12,12,0,1,1-12-12A12,12,0,0,1,140,128Zm56-12a12,12,0,1,0,12,12A12,12,0,0,0,196,116ZM60,116a12,12,0,1,0,12,12A12,12,0,0,0,60,116Z"/>
+      <circle cx="12" cy="12" r="1"/> <circle cx="19" cy="12" r="1"/> <circle cx="5" cy="12" r="1"/>
     </Icon>
   );
 }
 
-/** MCP connectors. (phosphor `plug`, regular) */
+/** MCP connectors. (lucide `plug`) */
 export function PlugIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M237.66,66.34a8,8,0,0,0-11.32,0L192,100.69,155.31,64l34.35-34.34a8,8,0,1,0-11.32-11.32L144,52.69,117.66,26.34a8,8,0,0,0-11.32,11.32L112.69,44l-53,53a40,40,0,0,0,0,56.57l15.71,15.71L26.34,218.34a8,8,0,0,0,11.32,11.32l49.09-49.09,15.71,15.71a40,40,0,0,0,56.57,0l53-53,6.34,6.35a8,8,0,0,0,11.32-11.32L203.31,112l34.35-34.34A8,8,0,0,0,237.66,66.34ZM147.72,185a24,24,0,0,1-33.95,0L71,142.23a24,24,0,0,1,0-33.95l53-53L200.69,132Z"/>
+      <path d="M12 22v-5"/> <path d="M15 8V2"/> <path d="M17 8a1 1 0 0 1 1 1v4a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1z"/> <path d="M9 8V2"/>
     </Icon>
   );
 }
 
-/** Preview / read-only view. (phosphor `eye`, regular) */
+/** Preview / read-only view. (lucide `eye`) */
 export function PreviewIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M247.31,124.76c-.35-.79-8.82-19.58-27.65-38.41C194.57,61.26,162.88,48,128,48S61.43,61.26,36.34,86.35C17.51,105.18,9,124,8.69,124.76a8,8,0,0,0,0,6.5c.35.79,8.82,19.57,27.65,38.4C61.43,194.74,93.12,208,128,208s66.57-13.26,91.66-38.34c18.83-18.83,27.3-37.61,27.65-38.4A8,8,0,0,0,247.31,124.76ZM128,192c-30.78,0-57.67-11.19-79.93-33.25A133.47,133.47,0,0,1,25,128,133.33,133.33,0,0,1,48.07,97.25C70.33,75.19,97.22,64,128,64s57.67,11.19,79.93,33.25A133.46,133.46,0,0,1,231.05,128C223.84,141.46,192.43,192,128,192Zm0-112a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Z"/>
+      <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/> <circle cx="12" cy="12" r="3"/>
     </Icon>
   );
 }
 
-/** Selected row in a menu. (phosphor `check`, regular) */
+/** Selected row in a menu. (lucide `check`) */
 export function CheckIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z"/>
+      <path d="M20 6 9 17l-5-5"/>
     </Icon>
   );
 }
 
-/** Opens outside the app. (phosphor `arrow-square-out`, regular) */
+/** Opens outside the app. (lucide `external-link`) */
 export function ExternalLinkIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M224,104a8,8,0,0,1-16,0V59.32l-66.33,66.34a8,8,0,0,1-11.32-11.32L196.68,48H152a8,8,0,0,1,0-16h64a8,8,0,0,1,8,8Zm-40,24a8,8,0,0,0-8,8v72H48V80h72a8,8,0,0,0,0-16H48A16,16,0,0,0,32,80V208a16,16,0,0,0,16,16H176a16,16,0,0,0,16-16V136A8,8,0,0,0,184,128Z"/>
+      <path d="M15 3h6v6"/> <path d="M10 14 21 3"/> <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
     </Icon>
   );
 }
 
-/** Favorite, unset. (phosphor `star`, regular) */
+/** Favorite, unset. (lucide `star`) */
 export function StarIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M239.18,97.26A16.38,16.38,0,0,0,224.92,86l-59-4.76L143.14,26.15a16.36,16.36,0,0,0-30.27,0L90.11,81.23,31.08,86a16.46,16.46,0,0,0-9.37,28.86l45,38.83L53,211.75a16.38,16.38,0,0,0,24.5,17.82L128,198.49l50.53,31.08A16.4,16.4,0,0,0,203,211.75l-13.76-58.07,45-38.83A16.43,16.43,0,0,0,239.18,97.26Zm-15.34,5.47-48.7,42a8,8,0,0,0-2.56,7.91l14.88,62.8a.37.37,0,0,1-.17.48c-.18.14-.23.11-.38,0l-54.72-33.65a8,8,0,0,0-8.38,0L69.09,215.94c-.15.09-.19.12-.38,0a.37.37,0,0,1-.17-.48l14.88-62.8a8,8,0,0,0-2.56-7.91l-48.7-42c-.12-.1-.23-.19-.13-.5s.18-.27.33-.29l63.92-5.16A8,8,0,0,0,103,91.86l24.62-59.61c.08-.17.11-.25.35-.25s.27.08.35.25L153,91.86a8,8,0,0,0,6.75,4.92l63.92,5.16c.15,0,.24,0,.33.29S224,102.63,223.84,102.73Z"/>
+      <path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/>
     </Icon>
   );
 }
 
-/** Favorite, set. Its own export rather than a `fill-current` class on StarIcon: Phosphor’s regular weight IS the outline path, so filling it does nothing — the filled state is a different asset. (phosphor `star`, fill) */
+/** Favorite, set. Its own export rather than a class toggle: the filled state is the same Lucide star painted with a currentColor fill. (lucide `star`, filled) */
 export function StarFilledIcon({ className }: IconProps) {
   return (
-    <Icon className={className}>
-      <path d="M234.29,114.85l-45,38.83L203,211.75a16.4,16.4,0,0,1-24.5,17.82L128,198.49,77.47,229.57A16.4,16.4,0,0,1,53,211.75l13.76-58.07-45-38.83A16.46,16.46,0,0,1,31.08,86l59-4.76,22.76-55.08a16.36,16.36,0,0,1,30.27,0l22.75,55.08,59,4.76a16.46,16.46,0,0,1,9.37,28.86Z"/>
+    <Icon className={className} filled>
+      <path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/>
     </Icon>
   );
 }
 
-/** Agent Instructions / system prompt — the panel-toolbar control. A scroll with text lines (the lucide scroll-text shape, on-set in Phosphor): the concept is the standing orders an agent reads. Deliberately NOT shared with the AGENTS.md tree glyph, which stays the robot — the file marks the agent contract, the control edits the orders. (phosphor `scroll`, regular) */
+/** Agent Instructions / system prompt — the panel-toolbar control. A scroll with text lines: the standing orders an agent reads. Deliberately NOT shared with the AGENTS.md tree glyph, which stays the robot — the file marks the agent contract, the control edits the orders. (lucide `scroll-text`) */
 export function InstructionsIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M96,104a8,8,0,0,1,8-8h64a8,8,0,0,1,0,16H104A8,8,0,0,1,96,104Zm8,40h64a8,8,0,0,0,0-16H104a8,8,0,0,0,0,16Zm128,48a32,32,0,0,1-32,32H88a32,32,0,0,1-32-32V64a16,16,0,0,0-32,0c0,5.74,4.83,9.62,4.88,9.66h0A8,8,0,0,1,24,88a7.89,7.89,0,0,1-4.79-1.61h0C18.05,85.54,8,77.61,8,64A32,32,0,0,1,40,32H176a32,32,0,0,1,32,32V168h8a8,8,0,0,1,4.8,1.6C222,170.46,232,178.39,232,192ZM96.26,173.48A8.07,8.07,0,0,1,104,168h88V64a16,16,0,0,0-16-16H67.69A31.71,31.71,0,0,1,72,64V192a16,16,0,0,0,32,0c0-5.74-4.83-9.62-4.88-9.66A7.82,7.82,0,0,1,96.26,173.48ZM216,192a12.58,12.58,0,0,0-3.23-8h-94a26.92,26.92,0,0,1,1.21,8,31.82,31.82,0,0,1-4.29,16H200A16,16,0,0,0,216,192Z"/>
+      <path d="M15 12h-5"/> <path d="M15 8h-5"/> <path d="M19 17V5a2 2 0 0 0-2-2H4"/> <path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"/>
     </Icon>
   );
 }
 
-/** The AGENTS.md tree glyph — a vendor-neutral agent contract file; the robot marks the agent itself, distinct from the Instructions scroll. (phosphor `robot`, regular) */
+/** The AGENTS.md tree glyph — a vendor-neutral agent contract file; the robot marks the agent itself, distinct from the Instructions scroll. (lucide `bot`) */
 export function BotIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M200,48H136V16a8,8,0,0,0-16,0V48H56A32,32,0,0,0,24,80V192a32,32,0,0,0,32,32H200a32,32,0,0,0,32-32V80A32,32,0,0,0,200,48Zm16,144a16,16,0,0,1-16,16H56a16,16,0,0,1-16-16V80A16,16,0,0,1,56,64H200a16,16,0,0,1,16,16Zm-52-56H92a28,28,0,0,0,0,56h72a28,28,0,0,0,0-56Zm-24,16v24H116V152ZM80,164a12,12,0,0,1,12-12h8v24H92A12,12,0,0,1,80,164Zm84,12h-8V152h8a12,12,0,0,1,0,24ZM72,108a12,12,0,1,1,12,12A12,12,0,0,1,72,108Zm88,0a12,12,0,1,1,12,12A12,12,0,0,1,160,108Z"/>
+      <path d="M12 8V4H8"/> <rect width="16" height="12" x="4" y="8" rx="2"/> <path d="M2 14h2"/> <path d="M20 14h2"/> <path d="M15 13v2"/> <path d="M9 13v2"/>
     </Icon>
   );
 }
 
-/** Templates — the sidebar entry and its gallery tab (the marketplace-gallery glyph). (phosphor `squares-four`, regular) */
+/** Templates — the sidebar entry and its gallery tab (the marketplace-gallery glyph). (lucide `layout-grid`) */
 export function SquaresFourIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M104,40H56A16,16,0,0,0,40,56v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V56A16,16,0,0,0,104,40Zm0,64H56V56h48v48Zm96-64H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V56A16,16,0,0,0,200,40Zm0,64H152V56h48v48Zm-96,32H56a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V152A16,16,0,0,0,104,136Zm0,64H56V152h48v48Zm96-64H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V152A16,16,0,0,0,200,136Zm0,64H152V152h48v48Z"/>
+      <rect width="7" height="7" x="3" y="3" rx="1"/> <rect width="7" height="7" x="14" y="3" rx="1"/> <rect width="7" height="7" x="14" y="14" rx="1"/> <rect width="7" height="7" x="3" y="14" rx="1"/>
     </Icon>
   );
 }
 
-/** The switcher mark (macOS/VS Code select idiom) — the sidebar folder header’s Change-folder trigger; distinct on purpose from the single fold chevron beside it. (phosphor `caret-up-down`, regular) */
+/** The switcher mark (macOS/VS Code select idiom) — the sidebar folder header’s Change-folder trigger; distinct on purpose from the single fold chevron beside it. (lucide `chevrons-up-down`) */
 export function CaretUpDownIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M181.66,170.34a8,8,0,0,1,0,11.32l-48,48a8,8,0,0,1-11.32,0l-48-48a8,8,0,0,1,11.32-11.32L128,212.69l42.34-42.35A8,8,0,0,1,181.66,170.34Zm-96-84.68L128,43.31l42.34,42.35a8,8,0,0,0,11.32-11.32l-48-48a8,8,0,0,0-11.32,0l-48,48A8,8,0,0,0,85.66,85.66Z"/>
+      <path d="m7 15 5 5 5-5"/> <path d="m7 9 5-5 5 5"/>
     </Icon>
   );
 }
 
-/** Copy to clipboard. (phosphor `copy`, regular) */
+/** Copy to clipboard. (lucide `copy`) */
 export function CopyIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M216,32H88a8,8,0,0,0-8,8V80H40a8,8,0,0,0-8,8V216a8,8,0,0,0,8,8H168a8,8,0,0,0,8-8V176h40a8,8,0,0,0,8-8V40A8,8,0,0,0,216,32ZM160,208H48V96H160Zm48-48H176V88a8,8,0,0,0-8-8H96V48H208Z"/>
+      <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/> <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
     </Icon>
   );
 }
 
-/** Settings, in the sidebar’s bottom account row. (phosphor `gear-six`, regular) */
+/** Settings, in the sidebar’s bottom account row. (lucide `settings`) */
 export function SettingsIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Zm109.94-52.79a8,8,0,0,0-3.89-5.4l-29.83-17-.12-33.62a8,8,0,0,0-2.83-6.08,111.91,111.91,0,0,0-36.72-20.67,8,8,0,0,0-6.46.59L128,41.85,97.88,25a8,8,0,0,0-6.47-.6A112.1,112.1,0,0,0,54.73,45.15a8,8,0,0,0-2.83,6.07l-.15,33.65-29.83,17a8,8,0,0,0-3.89,5.4,106.47,106.47,0,0,0,0,41.56,8,8,0,0,0,3.89,5.4l29.83,17,.12,33.62a8,8,0,0,0,2.83,6.08,111.91,111.91,0,0,0,36.72,20.67,8,8,0,0,0,6.46-.59L128,214.15,158.12,231a7.91,7.91,0,0,0,3.9,1,8.09,8.09,0,0,0,2.57-.42,112.1,112.1,0,0,0,36.68-20.73,8,8,0,0,0,2.83-6.07l.15-33.65,29.83-17a8,8,0,0,0,3.89-5.4A106.47,106.47,0,0,0,237.94,107.21Zm-15,34.91-28.57,16.25a8,8,0,0,0-3,3c-.58,1-1.19,2.06-1.81,3.06a7.94,7.94,0,0,0-1.22,4.21l-.15,32.25a95.89,95.89,0,0,1-25.37,14.3L134,199.13a8,8,0,0,0-3.91-1h-.19c-1.21,0-2.43,0-3.64,0a8.08,8.08,0,0,0-4.1,1l-28.84,16.1A96,96,0,0,1,67.88,201l-.11-32.2a8,8,0,0,0-1.22-4.22c-.62-1-1.23-2-1.8-3.06a8.09,8.09,0,0,0-3-3.06l-28.6-16.29a90.49,90.49,0,0,1,0-28.26L61.67,97.63a8,8,0,0,0,3-3c.58-1,1.19-2.06,1.81-3.06a7.94,7.94,0,0,0,1.22-4.21l.15-32.25a95.89,95.89,0,0,1,25.37-14.3L122,56.87a8,8,0,0,0,4.1,1c1.21,0,2.43,0,3.64,0a8.08,8.08,0,0,0,4.1-1l28.84-16.1A96,96,0,0,1,188.12,55l.11,32.2a8,8,0,0,0,1.22,4.22c.62,1,1.23,2,1.8,3.06a8.09,8.09,0,0,0,3,3.06l28.6,16.29A90.49,90.49,0,0,1,222.9,142.12Z"/>
+      <path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/> <circle cx="12" cy="12" r="3"/>
     </Icon>
   );
 }
 
-/** Account — the avatar chip’s content while nobody is signed in. (phosphor `user`, regular) */
+/** Account — the avatar chip’s content while nobody is signed in. (lucide `user`) */
 export function UserIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M230.92,212c-15.23-26.33-38.7-45.21-66.09-54.16a72,72,0,1,0-73.66,0C63.78,166.78,40.31,185.66,25.08,212a8,8,0,1,0,13.85,8c18.84-32.56,52.14-52,89.07-52s70.23,19.44,89.07,52a8,8,0,1,0,13.85-8ZM72,96a56,56,0,1,1,56,56A56.06,56.06,0,0,1,72,96Z"/>
+      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/> <circle cx="12" cy="7" r="4"/>
     </Icon>
   );
 }
 
-/** An API key the user supplies. (phosphor `key`, regular) */
+/** An API key the user supplies. (lucide `key`) */
 export function KeyIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M216.57,39.43A80,80,0,0,0,83.91,120.78L28.69,176A15.86,15.86,0,0,0,24,187.31V216a16,16,0,0,0,16,16H72a8,8,0,0,0,8-8V208H96a8,8,0,0,0,8-8V184h16a8,8,0,0,0,5.66-2.34l9.56-9.57A79.73,79.73,0,0,0,160,176h.1A80,80,0,0,0,216.57,39.43ZM224,98.1c-1.09,34.09-29.75,61.86-63.89,61.9H160a63.7,63.7,0,0,1-23.65-4.51,8,8,0,0,0-8.84,1.68L116.69,168H96a8,8,0,0,0-8,8v16H72a8,8,0,0,0-8,8v16H40V187.31l58.83-58.82a8,8,0,0,0,1.68-8.84A63.72,63.72,0,0,1,96,95.92c0-34.14,27.81-62.8,61.9-63.89A64,64,0,0,1,224,98.1ZM192,76a12,12,0,1,1-12-12A12,12,0,0,1,192,76Z"/>
+      <path d="m2 21 9.6-9.6"/> <path d="m7.5 15.5 2.3 2.3a1 1 0 0 1 0 1.4l-2.1 2.1a1 1 0 0 1-1.4 0L4 19"/> <circle cx="15.5" cy="7.5" r="5.5"/>
     </Icon>
   );
 }
 
-/** Proceed / drill in. (phosphor `arrow-right`, regular) */
+/** Proceed / drill in. (lucide `arrow-right`) */
 export function ArrowRightIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M221.66,133.66l-72,72a8,8,0,0,1-11.32-11.32L196.69,136H40a8,8,0,0,1,0-16H196.69L138.34,61.66a8,8,0,0,1,11.32-11.32l72,72A8,8,0,0,1,221.66,133.66Z"/>
+      <path d="M5 12h14"/> <path d="m12 5 7 7-7 7"/>
     </Icon>
   );
 }
 
-/** Dismiss a dialog, toast, or card. Replaces the lone `lucide-react` import that was pulling in a second icon library for this one glyph. (phosphor `x`, regular) */
+/** Dismiss a dialog, toast, or card. (lucide `x`) */
 export function CloseIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/>
+      <path d="M18 6 6 18"/> <path d="m6 6 12 12"/>
     </Icon>
+  );
+}
+
+/** Import from GitHub. Brand mark, on-set in Phosphor. (phosphor `github-logo`, regular) */
+export function GithubLogoIcon({ className }: IconProps) {
+  return (
+    <PhosphorIcon className={className}>
+      <path d="M208.31,75.68A59.78,59.78,0,0,0,202.93,28,8,8,0,0,0,196,24a59.75,59.75,0,0,0-48,24H124A59.75,59.75,0,0,0,76,24a8,8,0,0,0-6.93,4,59.78,59.78,0,0,0-5.38,47.68A58.14,58.14,0,0,0,56,104v8a56.06,56.06,0,0,0,48.44,55.47A39.8,39.8,0,0,0,96,192v8H72a24,24,0,0,1-24-24A40,40,0,0,0,8,136a8,8,0,0,0,0,16,24,24,0,0,1,24,24,40,40,0,0,0,40,40H96v16a8,8,0,0,0,16,0V192a24,24,0,0,1,48,0v40a8,8,0,0,0,16,0V192a39.8,39.8,0,0,0-8.44-24.53A56.06,56.06,0,0,0,216,112v-8A58.14,58.14,0,0,0,208.31,75.68ZM200,112a40,40,0,0,1-40,40H112a40,40,0,0,1-40-40v-8a41.74,41.74,0,0,1,6.9-22.48A8,8,0,0,0,80,73.83a43.81,43.81,0,0,1,.79-33.58,43.88,43.88,0,0,1,32.32,20.06A8,8,0,0,0,119.82,64h32.35a8,8,0,0,0,6.74-3.69,43.87,43.87,0,0,1,32.32-20.06A43.81,43.81,0,0,1,192,73.83a8.09,8.09,0,0,0,1,7.65A41.72,41.72,0,0,1,200,104Z"/>
+    </PhosphorIcon>
+  );
+}
+
+/** Community Discord, in Settings → General. Brand mark, on-set in Phosphor. FILL weight: the regular outline’s thin face features smear into a robot at 16px; the solid mark stays legible. (phosphor `discord-logo`, fill) */
+export function DiscordIcon({ className }: IconProps) {
+  return (
+    <PhosphorIcon className={className}>
+      <path d="M247.51,174.39,218,58a16.08,16.08,0,0,0-13-11.88l-36.06-5.92a16.22,16.22,0,0,0-18.26,11.88l-.21.85a4,4,0,0,0,3.27,4.93,155.62,155.62,0,0,1,24.41,5.62,8.2,8.2,0,0,1,5.62,9.7,8,8,0,0,1-10.19,5.64,155.4,155.4,0,0,0-90.8-.1,8.22,8.22,0,0,1-10.28-4.81,8,8,0,0,1,5.08-10.33,156.85,156.85,0,0,1,24.72-5.72,4,4,0,0,0,3.27-4.93l-.21-.85A16.21,16.21,0,0,0,87.08,40.21L51,46.13A16.08,16.08,0,0,0,38,58L8.49,174.39a15.94,15.94,0,0,0,9.06,18.51l67,29.71a16.17,16.17,0,0,0,21.71-9.1l3.49-9.45a4,4,0,0,0-3.27-5.35,158.13,158.13,0,0,1-28.63-6.2,8.2,8.2,0,0,1-5.61-9.67,8,8,0,0,1,10.2-5.66,155.59,155.59,0,0,0,91.12,0,8,8,0,0,1,10.19,5.65,8.19,8.19,0,0,1-5.61,9.68,157.84,157.84,0,0,1-28.62,6.2,4,4,0,0,0-3.27,5.35l3.49,9.45a16.18,16.18,0,0,0,21.71,9.1l67-29.71A15.94,15.94,0,0,0,247.51,174.39ZM92,152a12,12,0,1,1,12-12A12,12,0,0,1,92,152Zm72,0a12,12,0,1,1,12-12A12,12,0,0,1,164,152Z"/>
+    </PhosphorIcon>
   );
 }
 

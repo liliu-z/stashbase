@@ -114,6 +114,7 @@
   --container-overlay-lg: var(--overlay-w-lg);
   --container-overlay-xl: var(--overlay-w-xl);
   --container-overlay-2xl: var(--overlay-w-2xl);
+  --container-overlay-3xl: var(--overlay-w-3xl);
   --container-measure-xs: var(--measure-xs);
   --container-measure-sm: var(--measure-sm);
   --container-measure-md: var(--measure-md);
@@ -208,6 +209,21 @@
     :root[data-theme='system'] & {
       @slot;
     }
+  }
+}
+
+/* Focus styling is gated on real keyboard navigation, app-wide.
+ * Chromium's :focus-visible flips to keyboard modality on ANY keydown —
+ * a bare modifier is enough, and macOS screenshot chords deliver theirs
+ * to the focused window — so the last mouse-clicked control lit up in
+ * screenshots. globals.css already gates its unlayered outline rule on
+ * `html.kbd-nav` (see common/lib/keyboardModality.ts); redefining the
+ * variant here walks every `focus-visible:` utility — the Button ring,
+ * the checkbox halo, all of them — through the same gate, so no
+ * primitive needs to know it exists. */
+@custom-variant focus-visible {
+  html.kbd-nav &:focus-visible {
+    @slot;
   }
 }
 

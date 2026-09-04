@@ -36,8 +36,9 @@ StashBase has three stable visual voices:
   and chat replies. Bundled Geist Mono carries paths, code, and
   structured data on every platform. Documents may carry their own
   typography (a styled HTML file keeps its fonts).
-- **Icons:** one coherent Phosphor family for product controls, with separate
-  marks only for brands that have no equivalent icon.
+- **Icons:** one coherent Lucide family — rounded caps and joins — for
+  product controls, with separate marks only for brands and the file-format
+  glyphs, which keep their own sets.
 
 Repeated elements must not multiply accent, brand color, or visual noise. File
 type is carried primarily by shape and label rather than a rainbow of colors.
