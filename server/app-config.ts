@@ -176,9 +176,11 @@ export interface AppConfigFile {
   updates?: Partial<UpdatePreferences>;
   onboarding?: OnboardingPreferences;
   /** User-authored Chat guidance owned by StashBase. Folder entries use the
-   * exact spelling of library membership paths; no project file is created. */
+   * exact spelling of library membership paths; `library` customizes the
+   * Library-wide default; no project file is created. */
   agentInstructions?: {
     folders?: Array<{ path: string; text: string }>;
+    library?: string;
   };
 }
 

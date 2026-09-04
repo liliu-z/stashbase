@@ -3,7 +3,9 @@ import test from 'node:test';
 import { MAX_AGENT_INSTRUCTIONS_LENGTH } from '../shared/agent-instructions.ts';
 import {
   createAgentInstructionsStore,
+  getAgentInstructions,
   readDefaultAgentInstructions,
+  readDefaultLibraryAgentInstructions,
   resolveAgentInstructions,
 } from './agent-instructions.ts';
 import type { AppConfigFile } from './app-config.ts';
@@ -16,6 +18,7 @@ function fixture(initial: AppConfigFile = {}) {
     write: (next) => { config = structuredClone(next); },
     equalPath: (left, right) => left.toLocaleLowerCase('en-US') === right.toLocaleLowerCase('en-US'),
     defaultText: 'Default Wiki guidance.',
+    defaultLibraryText: 'Default Library guidance.',
   });
   return { store, config: () => config };
 }
@@ -48,8 +51,39 @@ test('the packaged default applies until a folder is customized and blank restor
   assert.equal(config().agentInstructions, undefined);
 });
 
-test('a Library Chat resolves the packaged default without a customizable scope', () => {
-  assert.equal(resolveAgentInstructions(null), readDefaultAgentInstructions());
+test('the Library scope has its own default and customization, independent of folders', () => {
+  const { store, config } = fixture();
+  assert.deepEqual(store.get({ kind: 'library' }), {
+    scope: { kind: 'library' },
+    text: 'Default Library guidance.',
+    customized: false,
+  });
+
+  store.set({ kind: 'folder', path: '/Work/Alpha' }, 'Folder guidance');
+  store.set({ kind: 'library' }, 'Find things across my library.');
+  assert.equal(store.get({ kind: 'library' }).text, 'Find things across my library.');
+  assert.equal(store.get({ kind: 'folder', path: '/Work/Alpha' }).text, 'Folder guidance');
+  assert.deepEqual(config().agentInstructions, {
+    folders: [{ path: '/Work/Alpha', text: 'Folder guidance' }],
+    library: 'Find things across my library.',
+  });
+
+  // Clearing one scope never disturbs the other, and clearing both
+  // compacts the config key away entirely.
+  store.set({ kind: 'library' }, '   ');
+  assert.equal(store.get({ kind: 'library' }).customized, false);
+  assert.equal(store.get({ kind: 'folder', path: '/Work/Alpha' }).text, 'Folder guidance');
+  store.set({ kind: 'folder', path: '/Work/Alpha' }, '');
+  assert.equal(config().agentInstructions, undefined);
+});
+
+test('a Library Chat resolves the Library scope, and the packaged defaults are two distinct texts', () => {
+  // Runtime injection and the editor must agree on what a Library Chat reads.
+  assert.equal(resolveAgentInstructions(null), getAgentInstructions({ kind: 'library' }).text);
+  const folderDefault = readDefaultAgentInstructions();
+  const libraryDefault = readDefaultLibraryAgentInstructions();
+  assert.ok(libraryDefault.length > 0);
+  assert.notEqual(libraryDefault, folderDefault);
 });
 
 test('Agent Instructions reject unbounded input and defensively bound hand-edited config', () => {

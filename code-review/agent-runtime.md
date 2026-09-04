@@ -209,14 +209,16 @@ Missing scope uses the window's current folder or Library when none is active;
 it is not a third scope.
 
 - A library session uses the reserved folder-home cwd and retrieves through
-  library MCP. Because it has no concrete working directory, its Runtime
-  Adapter injects the packaged default Agent Instructions verbatim.
+  library MCP. Its Runtime Adapter injects the Library scope's resolved Agent
+  Instructions verbatim — the saved Library-wide customization, or the
+  packaged Library default.
 - A folder session uses that folder's cwd. Its Runtime Adapter injects that
   exact member's resolved Agent Instructions verbatim. Runtime startup never creates
   `AGENTS.md`, `CLAUDE.md`, or another source file; existing runtime-native
   files remain visible, user-owned inputs under that runtime's native rules.
-- `assets/agent-instructions/default.md` is the one packaged default. The
-  Agent Instructions Interface resolves it or a working folder's saved customization;
+- `assets/agent-instructions/default.md` (folder Chats) and `library.md`
+  (Library-wide Chats) are the two packaged defaults. The Agent Instructions
+  Interface resolves the session scope's default or its saved customization;
   that exact text is the ONLY StashBase-owned Agent prompt. Codex receives it
   as `developerInstructions`, Claude as the native preset append, and Wiki Agent
   as its OpenCode Agent prompt. No Adapter wraps it, and MCP advertises tools

@@ -60,6 +60,17 @@ test('packaged Agent Instructions include the canonical default prompt', () => {
   );
 });
 
+test('packaged Agent Instructions include the Library default prompt', () => {
+  // Rides the same extraResources directory copy as default.md; this pins
+  // the file's presence and its orientation-first shape.
+  const prompt = fs.readFileSync(path.join(root, 'assets', 'agent-instructions', 'library.md'), 'utf8').trim();
+  assert.match(prompt, /Wiki assistant for my whole library/);
+  assert.match(prompt, /🔎 \*\*Find and orient\*\*/);
+  assert.match(prompt, /name the folder and the file/);
+  assert.match(prompt, /🌱 \*\*Start new work\*\*/);
+  assert.match(prompt, /needs a new project, ask me/);
+});
+
 test('electron-builder includes local CommonJS dependencies outside electron/', () => {
   const missing = [];
   const relativeRequire = /require\(\s*['"](\.\.\/[^'"]+)['"]\s*\)/g;

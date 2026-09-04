@@ -389,8 +389,11 @@ export const api = {
     send<Record<string, never>>('DELETE', agentSessionBase(agent) + '/' + encodeURIComponent(id) + sessionScopeQuery(scope)),
 };
 
-function agentInstructionsScopeValue(scope: AgentInstructionsScope): string {
-  return scope.path;
+/** One primitive per scope — the request param and the identity key
+ *  effects depend on (`useAgentInstructionsPresence`), so the two can
+ *  never disagree on what distinguishes scopes. */
+export function agentInstructionsScopeValue(scope: AgentInstructionsScope): string {
+  return scope.kind === 'library' ? 'library' : scope.path;
 }
 
 function agentSessionBase(agent: import('@shared/agent-protocol').AgentId): string {

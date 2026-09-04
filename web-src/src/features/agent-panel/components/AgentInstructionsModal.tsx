@@ -50,14 +50,16 @@ export function AgentInstructionsModal({
        * accent it read as a link in the middle of a sentence, and nothing
        * happens when you press it.
        *
-       * The FOLDER owns this, not the Chats — "guides every Chat in X" put
+       * The SCOPE owns this, not the Chats — "guides every Chat in X" put
        * the conversation in the subject where the place belongs, and the
        * consequence people need is that walking into another folder means
        * other guidance. That is also why it reads like the `AGENTS.md`
        * people already know: a file in a directory, governing work done
-       * there. Library retrieval scope deliberately has no editor: it is not
-       * a working directory and receives the packaged default. */
-      description={<>Agents working in <strong className="font-semibold text-foreground">{scopeName}</strong> follow this.</>}
+       * there. The Library scope phrases itself around the Chats instead:
+       * "working in Library" would name a place that is not a directory. */
+      description={scope.kind === 'library'
+        ? <>Chats across your whole <strong className="font-semibold text-foreground">Library</strong> follow this.</>
+        : <>Agents working in <strong className="font-semibold text-foreground">{scopeName}</strong> follow this.</>}
       initialFocus={textareaRef}
       onCancel={editor.saving ? () => { /* wait for the config write */ } : onCancel}
       wide

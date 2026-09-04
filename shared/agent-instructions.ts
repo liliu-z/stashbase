@@ -1,7 +1,8 @@
-/** A concrete working directory whose product-owned Agent Instructions can
- * customize the packaged default. Instructions never belong to Library-wide
- * retrieval scope and are never stored in the user's source folder. */
-export type AgentInstructionsScope = { kind: 'folder'; path: string };
+/** The scope whose product-owned Agent Instructions can customize a packaged
+ * default: a concrete working directory, or the Library as a whole (a Chat
+ * with no working folder). Each kind has its own packaged default, and
+ * instructions are never stored in the user's source folder. */
+export type AgentInstructionsScope = { kind: 'folder'; path: string } | { kind: 'library' };
 
 export interface AgentInstructionsState {
   scope: AgentInstructionsScope;

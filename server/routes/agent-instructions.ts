@@ -13,8 +13,10 @@ function requestError(message: string, status = 400): Error {
 
 async function resolveScope(value: unknown): Promise<AgentInstructionsScope> {
   if (typeof value !== 'string' || !value.trim()) {
-    throw requestError('scope must be an absolute library-folder path');
+    throw requestError("scope must be 'library' or an absolute library-folder path");
   }
+  // The literal Library scope, mirroring the session routes' `scope=library`.
+  if (value === 'library') return { kind: 'library' };
   if (!filesystemPath.isAbsolute(value)) {
     throw requestError('folder scope must be an absolute path');
   }

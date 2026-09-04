@@ -1,25 +1,29 @@
 import { useEffect, useState } from 'react';
-import { api, errorMessage, type AgentInstructionsScope } from '@/common/api/api';
+import { agentInstructionsScopeValue, api, errorMessage, type AgentInstructionsScope } from '@/common/api/api';
 
 /** Lightweight toolbar status for the active scope. This stays separate from
  * the editor so the persistent launcher can be informative without keeping a
  * dialog controller mounted. */
 export function useAgentInstructionsPresence(scope: AgentInstructionsScope | null) {
   const [customized, setCustomized] = useState<boolean | null>(null);
-  const folderPath = scope?.path ?? null;
+  // Scope identity as a primitive so the effect re-runs on real scope
+  // changes only, not on every render's fresh object.
+  const scopeKey = scope ? agentInstructionsScopeValue(scope) : null;
 
   useEffect(() => {
     let current = true;
     setCustomized(null);
-    if (!folderPath) return () => { current = false; };
-    const requestScope: AgentInstructionsScope = { kind: 'folder', path: folderPath };
+    if (scopeKey === null) return () => { current = false; };
+    const requestScope: AgentInstructionsScope = scopeKey === 'library'
+      ? { kind: 'library' }
+      : { kind: 'folder', path: scopeKey };
     void api.getAgentInstructions(requestScope).then((state) => {
       if (current) setCustomized(state.customized);
     }).catch(() => {
       if (current) setCustomized(null);
     });
     return () => { current = false; };
-  }, [folderPath]);
+  }, [scopeKey]);
 
   return { customized, setCustomized };
 }

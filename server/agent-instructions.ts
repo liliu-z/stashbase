@@ -29,9 +29,12 @@ const RESOURCES_ROOT = process.env.STASHBASE_RESOURCES_PATH
     ? path.resolve(process.env.STASHBASE_APP_ROOT)
     : path.resolve(import.meta.dirname, '..');
 
-/** The prompt is product content, not runtime implementation. Keeping it as
- * one packaged Markdown resource lets product changes edit the one thing the
- * user sees while every Adapter consumes the exact same bytes. */
+/** The prompts are product content, not runtime implementation. Keeping each
+ * as one packaged Markdown resource lets product changes edit the one thing
+ * the user sees while every Adapter consumes the exact same bytes. There are
+ * two: `default.md` for folder Chats, `library.md` for Library-wide Chats —
+ * a Chat with no working folder is oriented toward finding and starting
+ * work, not maintaining one folder's Wiki. */
 export function readDefaultAgentInstructions(
   file = path.join(RESOURCES_ROOT, 'assets', 'agent-instructions', 'default.md'),
 ): string {
@@ -41,6 +44,12 @@ export function readDefaultAgentInstructions(
     throw new Error(`Default Agent Instructions exceed ${MAX_AGENT_INSTRUCTIONS_LENGTH.toLocaleString('en-US')} characters: ${file}`);
   }
   return text;
+}
+
+export function readDefaultLibraryAgentInstructions(): string {
+  return readDefaultAgentInstructions(
+    path.join(RESOURCES_ROOT, 'assets', 'agent-instructions', 'library.md'),
+  );
 }
 
 function readableText(value: unknown): string {
@@ -71,6 +80,14 @@ function storedFolders(config: AppConfigFile): StoredFolderInstructions[] {
   ));
 }
 
+function storedLibrary(config: AppConfigFile): string {
+  const value: unknown = config.agentInstructions;
+  const library = value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as { library?: unknown }).library
+    : undefined;
+  return readableText(library);
+}
+
 function inputError(message: string): Error {
   const error = new Error(message) as Error & { code: string; status: number };
   error.code = 'INVALID_AGENT_INSTRUCTIONS';
@@ -86,35 +103,51 @@ export function createAgentInstructionsStore(io: {
   write(config: AppConfigFile): void;
   equalPath(left: string, right: string): boolean;
   defaultText: string;
+  defaultLibraryText: string;
 }): AgentInstructionsStore {
   const pathsEqual = (left: string, right: string): boolean => {
     try { return io.equalPath(left, right); }
     catch { return false; }
   };
 
+  const defaultFor = (scope: AgentInstructionsScope): string => (
+    scope.kind === 'library' ? io.defaultLibraryText : io.defaultText
+  );
+
   function get(scope: AgentInstructionsScope): AgentInstructionsState {
     const config = io.read();
-    const stored = storedFolders(config).find((entry) => pathsEqual(entry.path, scope.path))?.text;
-    const text = readableText(stored);
-    return text ? { scope, text, customized: true } : { scope, text: io.defaultText, customized: false };
+    const text = scope.kind === 'library'
+      ? storedLibrary(config)
+      : readableText(storedFolders(config).find((entry) => pathsEqual(entry.path, scope.path))?.text);
+    return text ? { scope, text, customized: true } : { scope, text: defaultFor(scope), customized: false };
   }
 
   function set(scope: AgentInstructionsScope, rawText: string): AgentInstructionsState {
     const text = normalizedInput(rawText);
     const config = io.readStrict();
-    const retained = storedFolders(config).filter((entry) => !pathsEqual(entry.path, scope.path));
-    if (text) retained.push({ path: scope.path, text });
+    const folders = scope.kind === 'library'
+      ? storedFolders(config)
+      : storedFolders(config).filter((entry) => !pathsEqual(entry.path, scope.path));
+    if (scope.kind === 'folder' && text) folders.push({ path: scope.path, text });
+    const library = scope.kind === 'library' ? text : storedLibrary(config);
 
-    if (retained.length) config.agentInstructions = { folders: retained };
-    else delete config.agentInstructions;
+    if (folders.length || library) {
+      config.agentInstructions = {
+        ...(folders.length ? { folders } : {}),
+        ...(library ? { library } : {}),
+      };
+    } else {
+      delete config.agentInstructions;
+    }
     io.write(config);
-    return text ? { scope, text, customized: true } : { scope, text: io.defaultText, customized: false };
+    return text ? { scope, text, customized: true } : { scope, text: defaultFor(scope), customized: false };
   }
 
   return { get, set };
 }
 
 const defaultAgentInstructions = readDefaultAgentInstructions();
+const defaultLibraryInstructions = readDefaultLibraryAgentInstructions();
 
 const store = createAgentInstructionsStore({
   // Reads used while starting an Agent fail soft, matching other optional
@@ -125,6 +158,7 @@ const store = createAgentInstructionsStore({
   write: writeAppConfigStrict,
   equalPath: filesystemPath.equal,
   defaultText: defaultAgentInstructions,
+  defaultLibraryText: defaultLibraryInstructions,
 });
 
 export function getAgentInstructions(scope: AgentInstructionsScope): AgentInstructionsState {
@@ -136,10 +170,8 @@ export function setAgentInstructions(scope: AgentInstructionsScope, text: string
 }
 
 /** Runtime-facing read. A Library Chat has no concrete working directory, so
- * it receives the same packaged default without inventing a Library-wide
- * customization scope. */
+ * it resolves the Library scope — its own packaged default, or the saved
+ * Library-wide customization. */
 export function resolveAgentInstructions(folderPath: string | null): string {
-  return folderPath
-    ? store.get({ kind: 'folder', path: folderPath }).text
-    : defaultAgentInstructions;
+  return store.get(folderPath ? { kind: 'folder', path: folderPath } : { kind: 'library' }).text;
 }
