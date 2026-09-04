@@ -260,10 +260,12 @@ test('Favorites pin above recents and removing the active folder returns to Home
     await expect(app.page.getByRole('button', { name: 'Select project-alpha folder root' })).toHaveCount(0);
     // Returning to the bare window stays uninterrupted too.
     await dismissEmbeddingKeyPrompt(app.page);
-    // The launcher column offers the add-folder flows; membership
-    // browsing (and reopening project-beta) belongs to the switcher menu,
-    // asserted below.
-    await expect(app.page.getByRole('button', { name: 'Open Folder…', exact: true })).toBeVisible();
+    // The bare window lands its blank Chat back on the Gallery band
+    // (derived from window state, no flag), and the sidebar regrows its
+    // Choose Folder row; membership browsing (and reopening
+    // project-beta) belongs to the switcher menu, asserted below.
+    await expect(app.page.getByRole('heading', { name: 'Explore Gallery' })).toBeVisible();
+    await expect(app.page.getByRole('button', { name: 'Choose Folder…', exact: true })).toBeVisible();
     // The removed folder is gone from the switcher menu; the remaining
     // member is still offered.
     await openFolderSwitcher(app.page);

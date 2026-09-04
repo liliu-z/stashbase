@@ -48,17 +48,7 @@ import { useAgentRuntimeCatalog } from '@/features/agent-panel/hooks/useAgentRun
 import { useAgentSkills } from '@/features/agent-panel/hooks/useAgentSkills';
 import { useAgentTabRegistration } from '@/features/agent-panel/hooks/useAgentTabRegistration';
 import { useSessionFolderReconcile } from '@/features/agent-panel/hooks/useSessionFolderReconcile';
-import { BUILD_WIKI_PAGES_PROMPT } from '@/features/agent-panel/lib/buildWikiPagesPrompt';
 import type { Attachment, Block, RetiredAgentScope, ServerEvent } from '@/features/agent-panel/lib/types';
-
-interface PendingBuildWikiPages {
-  scope: Extract<LibraryScope, { kind: 'folder' }>;
-  previousPickedScope: LibraryScope | undefined;
-  /** The visible preset request this staged draft will place in the
-   *  composer — a Wiki Template's prompt, or the classic Build Wiki line
-   *  by default. The user sends it; nothing goes to the wire from here. */
-  prompt: string;
-}
 
 /** The whole "talk to the runtime" concern for one AgentView tab: WebSocket
  *  connection lifecycle, server-event routing, session reset/resume, and
@@ -176,12 +166,6 @@ export function useAgentSession({
   // recovery stuck, a fresh failure card when it did not. Any other session
   // reset clears it so a stale retry can never land in a different session.
   const pendingRetryRef = useRef<{ text: string; attachments: Attachment[] } | null>(null);
-  // A Build Wiki click is a tab-local intent. It survives Agent setup and
-  // runtime reconnect, but never app restart, and pins the folder scope until
-  // it sends or the user cancels. Semantic indexing has an independent lifecycle.
-  const [pendingBuildWikiPages, setPendingBuildWikiPages, pendingBuildWikiPagesRef] = useStateWithRef<PendingBuildWikiPages | null>(null);
-  // A placed-but-unacknowledged Template draft on its way to the composer.
-  const [composerSeed, setComposerSeed] = useState<string | null>(null);
   // null follows product availability: search by meaning starts on once
   // configured; an explicitly disabled chat stays off even if credentials later change.
   // The effective policy is always false while no embedding source exists,
@@ -275,20 +259,6 @@ export function useAgentSession({
     sessionFolder,
   });
 
-  /** A staged Template prompt is PLACED in the composer, never sent: the
-   * user reviews, edits, and sends it themselves. Placement waits only for
-   * the session to be ready on the pinned scope — a draft is safe to hold
-   * during an active turn, so no turn gate. */
-  function maybePlacePendingBuildWikiPages() {
-    const pending = pendingBuildWikiPagesRef.current;
-    if (!pending || !readyRef.current) return;
-    if (!libraryScopesEqual(controls.connectedScopeRef.current, pending.scope)) return;
-    // Clear before the hand-off so a repeated ready event cannot place the
-    // prompt twice.
-    setPendingBuildWikiPages(null);
-    setComposerSeed(pending.prompt);
-  }
-
   /* Agent Instructions edited for some scope. The resolved text is injected
    * when a native session MOUNTS, so there is no live setter to call — applying
    * an edit means remounting, exactly the move a thinking-effort change
@@ -312,9 +282,9 @@ export function useAgentSession({
     }
   }
 
-  function handleAgentInstructionsSaved(scope: Extract<LibraryScope, { kind: 'folder' }>) {
-    // The editor edits a scope; this session only cares when that scope is
-    // the one it actually connected with.
+  function handleAgentInstructionsSaved(scope: LibraryScope) {
+    // The editor edits a scope — a folder or the Library; this session only
+    // cares when that scope is the one it actually connected with.
     if (!libraryScopesEqual(controls.connectedScopeRef.current, scope)) return;
     setInstructionsStale(true);
     maybeApplyAgentInstructions();
@@ -326,30 +296,6 @@ export function useAgentSession({
     [agentInstructionsSavedRef],
   );
 
-  /** Pin this blank chat to its folder and stage one preset wiki prompt
-   *  for the composer — the classic Build Wiki request by default, or a
-   *  Wiki Template's visible prompt. */
-  function requestBuildWikiPages(prompt: string = BUILD_WIKI_PAGES_PROMPT): boolean {
-    const scope = controls.sessionScope;
-    if (scope.kind !== 'folder' || pendingBuildWikiPagesRef.current) return false;
-    setPendingBuildWikiPages({
-      scope,
-      previousPickedScope: controls.pickedScopeRef.current,
-      prompt,
-    });
-    // Even when this is the window-default folder, retain an explicit pick so
-    // Agent setup or a window-folder switch cannot redirect the intent.
-    controls.setPickedScope(scope);
-    maybePlacePendingBuildWikiPages();
-    return true;
-  }
-
-  function cancelBuildWikiPages() {
-    const pending = pendingBuildWikiPagesRef.current;
-    if (!pending) return;
-    controls.setPickedScope(pending.previousPickedScope);
-    setPendingBuildWikiPages(null);
-  }
   const skills = useAgentSkills({ phase, wsRef });
   const reconcileSessionFolder = useSessionFolderReconcile({
     sessionFolder,
@@ -546,7 +492,6 @@ export function useAgentSession({
    * Library sessions in place; every form of user work stays visible in a
    * retired, non-reconnectable conversation. */
   function retireRemovedScope(folder: string) {
-    if (pendingBuildWikiPagesRef.current?.scope.path === folder) setPendingBuildWikiPages(null);
     const completelyBlank = isBlankChatTab({
       hasContent: blocksRef.current.length > 0 || queuedPromptsRef.current.length > 0,
       turnActive: turnActiveRef.current,
@@ -808,7 +753,6 @@ export function useAgentSession({
           pendingRetryRef.current = null;
           if (retry) promptQueue.resendFailedPrompt(retry);
         }
-        maybePlacePendingBuildWikiPages();
         maybeApplyAgentInstructions();
         break;
       case 'session-id':
@@ -924,7 +868,6 @@ export function useAgentSession({
           (message) => setBlocks((bs) => [...bs, { kind: 'error', id: nextBlockId(), text: message }]),
           promptQueue.runNextQueuedPrompt,
         );
-        maybePlacePendingBuildWikiPages();
         maybeApplyAgentInstructions();
         break;
       }
@@ -1066,13 +1009,6 @@ export function useAgentSession({
     queue: promptQueue,
     mentions,
     skills,
-    wiki: {
-      pending: pendingBuildWikiPages !== null,
-      requestBuildWikiPages,
-      cancelBuildWikiPages,
-      composerSeed,
-      consumeComposerSeed: () => setComposerSeed(null),
-    },
     similaritySearch: {
       enabled: similaritySearchEnabled,
       availabilityKnown: workspace.embedderHasKey !== null,

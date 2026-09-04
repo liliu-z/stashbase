@@ -705,17 +705,15 @@ independently; selected Agent readiness may be absent.
 
 ### Primary Flow
 
-1. Open **Templates** from its sidebar row under New Chat. The singleton
-   gallery tab groups curated wiki presets by intent, and each card shows the
-   one visible request it places in Chat.
-2. Choose **Knowledge Base**, the classic Build Wiki preset in the organize
-   section. A blank Chat opens (or is reused), pins to that folder, and retains
-   one pending intent while any selected-Agent setup completes. Once ready,
-   the request appears as an editable draft for the user to review and send.
-   Setup for search by meaning neither opens nor blocks this action.
+1. In the blank folder-scoped Chat, write the Build Wiki request — typed
+   directly, or reused from a Gallery entry's **How it's built** tab via
+   **Copy prompt** (the Gallery never places or sends composer text).
+2. Send it. The visible request is exactly what the Agent receives; the
+   durable Wiki Pages contract (write scope, linking, maintenance) comes
+   from Agent Instructions. Setup for search by meaning neither opens nor
+   blocks the send.
 3. If the selected Agent still needs installation or sign-in, complete that
-   stage. The original draft appears once, in the original tab and folder;
-   the user may cancel while waiting (the progress line below the composer).
+   stage first; the composer keeps the draft while the gate stands.
 4. The Agent inspects the folder and creates or improves `wiki/index.md`,
    adding focused pages under `wiki/` only when a single map would be
    unwieldy. Wiki Pages use relative links to visible Sources.
@@ -731,10 +729,7 @@ independently; selected Agent readiness may be absent.
   reorganization is a separate proposal requiring explicit approval.
 - Building Wiki Pages and activating search by meaning can succeed
   independently. Skipping or failing that activation does not discard the
-  Build Wiki intent.
-- A pending intent is renderer-local, folder-pinned, cancellable, and sent at
-  most once after runtime readiness. It is not restored after an app
-  restart and cannot follow an unrelated window-folder switch.
+  Build Wiki request.
 - Wiki Page Markdown is ordinary visible content and re-enters browsing,
   keyword search, semantic indexing, and future Agent work. Machine-derived
   text, chunks, and vectors remain invisible AppData.
@@ -744,11 +739,9 @@ independently; selected Agent readiness may be absent.
 
 ### Degradation and Recovery
 
-Setup state for search by meaning does not affect building Wiki Pages. The
-waiting capsule retains a clear cancel path during selected-Agent setup.
-Agent setup failure keeps the pending capability visible beside its
-stage-specific recovery. Folder removal cancels the pending intent rather than
-silently widening it to Library. A partial Agent write remains an ordinary,
+Setup state for search by meaning does not affect building Wiki Pages.
+Agent setup failure keeps the composer draft visible beside the gate's
+stage-specific recovery. A partial Agent write remains an ordinary,
 inspectable file transaction and never authorizes source reorganization.
 
 ### Evidence
@@ -756,3 +749,62 @@ inspectable file transaction and never authorizes source reorganization.
 See [J12 evidence](../code-review/journey-coverage.md#j12-build-wiki-pages). This
 journey composes J02 folder scope, J05 activation of search by meaning, J06
 Agent lifecycle, and J07 ordinary file writeback.
+
+## J13: Download a ready-made Wiki from the Gallery
+
+### Outcome
+
+A user browses curated, ready-made Wikis, understands what one contains and
+how it was built before taking it, and lands in a working copy — a real
+folder in the Library, open in its own window — without any setup, sign-in,
+or folder being open first.
+
+### Entry State
+
+Any window. A bare window's blank Chat already shows the Gallery band; a
+folder window reaches the same Gallery through its sidebar row as an
+overlay. Network may be unavailable.
+
+### Primary Flow
+
+1. **Browse.** The Gallery renders immediately from the app's bundled
+   snapshot; the published index replaces it when the network answers.
+   Every entry is a real public folder with a wiki built from it.
+2. **Inspect.** A card opens the entry's detail page: **What's inside**
+   lists the copy's files (the entry's inventory line stands in until the
+   list is published), **How it's built** shows the exact request that
+   produced the wiki with **Copy prompt**, and published screenshots
+   preview the result.
+3. **Take a copy.** **Make a copy** downloads the entry's public repository
+   into the folder home through the existing public-GitHub import and opens
+   the copy in a new window. The shop window stays put for the next entry.
+4. **Continue.** The copy is an ordinary Library folder: browse its wiki,
+   chat over it, or reuse the copied prompt on a folder of your own.
+
+### Required Observable Results
+
+- Browsing and downloading need no open folder, no account, and no Agent
+  runtime; the band never blocks the Chat above it.
+- The Gallery is read-only toward the user's data and never places or sends
+  composer text; its one prompt affordance is explicit copy.
+- The renderer reaches the published index and screenshots only through the
+  local daemon's gallery proxy; the image proxy refuses non-gallery hosts.
+- A copy is a plain folder registered in the Library, opened in a new
+  window; two clicks cannot race one download into two copies.
+- With no network, the bundled snapshot still renders the shop and the
+  detail page's unpublished slots state themselves without reshaping the
+  page.
+
+### Degradation and Recovery
+
+An unreachable index falls back whole to the bundled snapshot — never a
+half-parsed list. A failed download reports one visible error on the detail
+page and leaves the Library unchanged; the entry can be retried. A copy
+created but not opened remains an ordinary Library folder reachable through
+the switcher.
+
+### Evidence
+
+See [J13 evidence](../code-review/journey-coverage.md#j13-gallery-download).
+This journey composes J02 folder registration and window entry, and the
+GitHub import path it shares with the switcher menu's import flow.

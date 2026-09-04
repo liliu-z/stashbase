@@ -95,7 +95,7 @@ this file records the mechanics a change must respect.
    does. All three live in the base `:root` only.
    The chrome type scale lives here too — `--text-2xs` … `--text-5xl`,
    10/11/12/13/14/16/20/24/30/40px, every step multiplied by `--ui-scale`.
-   The final display step is reserved for the site-styled Templates page
+   The final display step is reserved for the site-styled Gallery page
    headline; ordinary workbench hierarchy remains on the earlier steps.
    It sits in globals' plain `:root` rather than in the `@theme inline`
    block that spends it, and that placement is load-bearing: `inline`
@@ -257,6 +257,13 @@ this file records the mechanics a change must respect.
    change to one feature's CSS never means opening a shared file. Deleting a
    component's file deletes its CSS import at the same time — there is no
    separate "did we leave rules behind" step.
+
+   The Gallery measures its pane container rather than the
+   viewport. Its `minmax(0)` grid cells and whole-card buttons both permit
+   shrinking: the cell constraint alone cannot override a button's intrinsic
+   minimum, so omitting the card button's `min-w-0` would let its content
+   widen the control and paint across the neighbouring card when Chat
+   narrows the pane. The workspace empty-state visual test owns this geometry.
 
    **The bar is "no utility can own this", and each surviving block says
    which of five reasons it is.** `agent-panel.css` is the worked example:
@@ -930,22 +937,26 @@ opens fifty times a day must never feel like it is catching up with them.
 ## Icons
 
 `web-src/src/common/components/icons.tsx` is generated — run `node scripts/gen-icons.mjs` and
-edit the map in that script, never the paths in the output. Icons are
-inlined from the `@phosphor-icons/core` devDependency rather than imported
-from `@phosphor-icons/react`, which ships six weights per icon and would not
-fit the entry-chunk budget. Phosphor assets are 256-viewBox filled paths, so
-there is no stroke width to keep consistent and no `fill-current` trick for a
-solid state — a filled variant is a different asset (`StarIcon` /
-`StarFilledIcon`). Size comes from the parent's CSS in every case.
+edit the map in that script, never the paths in the output. The UI set is
+Lucide — a stroked set (24-viewBox, 2px stroke, round caps/joins), which is
+where the app's rounded icon voice comes from — inlined from assets pinned
+in-repo under `assets/icons/lucide/` so the geometry cannot drift on a
+registry update. The shared envelope owns every stroke property; a solid
+state is the same geometry painted with a currentColor fill (`StopIcon`,
+`StarFilledIcon`), never a restyled stroke. Size comes from the parent's
+CSS in every case.
 
-Product brand marks keep their own native geometry. Normalize surplus source
+Two families sit deliberately off-set: brand marks (GitHub, Discord —
+Lucide ships no brands) keep their Phosphor 256-viewBox filled geometry on
+a separate envelope in the same generated file, and the file-format glyphs
+in `FileTypeIcon.tsx` stay their own set. Product brand marks (Claude,
+Codex, the cube) keep their own native geometry. Normalize surplus source
 whitespace in their SVG viewBoxes so marks sharing one CSS slot retain
 comparable painted footprints; do not compensate with an off-ramp size at one
 caller.
 
-Adding icons is not free: the budget below has little headroom, and each
-Phosphor path is bulkier than the hand-drawn strokes it replaced. Prefer
-reusing an existing export over adding a near-duplicate.
+Adding icons is not free: the entry-chunk budget below is the constraint.
+Prefer reusing an existing export over adding a near-duplicate.
 
 ### Assigning an icon size
 
@@ -1071,9 +1082,12 @@ strip, the shell band, the transcript.
   except that it pins the VALUES rather than a count: an exempt
   stylesheet cannot grow a second unreasoned literal, a value that moved
   fails as a mismatch, and an entry with no argument written out fails on
-  its own length. One entry: the sidebar splitter's `margin-left: -3px`,
-  which is `-width/2` — the offset that straddles its 6px grab area
-  evenly across the boundary `left` puts it on, not an amount of air.
+  its own length. Two entries remain. The sidebar splitter's
+  `margin-left: -3px` is `-width/2` — the offset that straddles its 6px grab
+  area evenly across the boundary `left` puts it on, not an amount of air.
+  The Gallery's dot-ground gradient carries a `1.5px`
+  coordinate that softens the dot rasterization with a half-pixel
+  antialias ramp; it neither positions content nor adds surrounding space.
   Snapping is a judgement per surface, not a substitution: 9 is neither 8
   nor 10, and nothing we run would catch a bad mass rewrite.
 - *font size in colocated CSS comes off the type scale, never a literal* —
@@ -1105,7 +1119,7 @@ because the layer is only worth its cost while both halves are true.
   written out fails on its own length. The thirteen entries are the
   ErrorBoundary trio, the four palette query fields, the two tree-row
   inline editors, the composer's hidden file picker, the two setup cards
-  for search by meaning, the Templates gallery's whole-card buttons, the
+  for search by meaning, the Gallery's whole-card buttons, the
   transcription radios, the two outline row controls, and the sidebar
   section-header toggle — every one of them reasoned above and repeated
   inline where it lives.
@@ -1303,12 +1317,15 @@ deletes its CSS import in the same change.
   `Field` rather than a bare `aria-label`.
 - Works in light, dark, and system themes (tokens flip — verify no raw
   `dark:` media assumptions) and at all `--ui-scale` steps.
-- Focus ring visible and non-layout-shifting on pressable controls. Text
-  fields (`Input`, `Textarea`, the palette query fields, the composer)
-  deliberately paint NO focus ring — the caret and the echo of typing are
-  the focus affordance; the aria-invalid ring is validation state and
-  stays. Reduced-motion policy holds (no transform/layout animation under
-  it).
+- Focus ring visible and non-layout-shifting on pressable controls, and
+  only under keyboard navigation: the global outline is gated on the
+  `kbd-nav` class (`common/lib/keyboardModality.ts`) because Chromium
+  flips `:focus-visible` on any keydown — a screenshot chord's modifier
+  was enough to ring the last-clicked row. Text fields (`Input`,
+  `Textarea`, the palette query fields, the composer) deliberately paint
+  NO focus ring — the caret and the echo of typing are the focus
+  affordance; the aria-invalid ring is validation state and stays.
+  Reduced-motion policy holds (no transform/layout animation under it).
 - Deleting a component deletes its styles; anything left behind in
   styles/*.css needs an exemption category above, or it is a defect.
 

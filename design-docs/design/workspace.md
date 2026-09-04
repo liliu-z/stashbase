@@ -32,16 +32,23 @@ manager, or a primary graph-navigation tool.
   deleting the seeded folder does not recreate it, and application updates
   never overwrite the user's copy.
 - Files exposes Chat, the active folder tree, and account utilities without
-  making sign-in a condition of local work. A bare window boots with the
-  Templates gallery open in the main pane — the product leads with what it
-  does, cards disabled until a folder opens — while the SIDEBAR's launcher
-  column owns getting one open with the fewest rows that can: Open Folder…
-  and New Folder… as quiet command rows (the same flows the titlebar
-  switcher menu serves). The launcher deliberately lists no membership, no
-  scope explainer, and no GitHub import row — browsing members and the
-  import flow belong to the titlebar Library switcher. Closing the
-  boot-opened gallery tab sticks; boot never reopens it over restored tabs
-  or an open folder.
+  making sign-in a condition of local work. A bare window boots
+  chat-primary with the Gallery band below the blank Chat's composer — the
+  product leads with what it does, and no folder is required to browse or
+  download an entry. The sidebar's launcher group under New Chat carries
+  the two standing routes: a **Gallery** row (in a folder window it raises
+  the Gallery as a near-fullscreen overlay instead of the band — a folder
+  window never lends a chat tab to the shop) and, in a bare window only, a
+  **Choose Folder…** row serving the same native-picker flow as the
+  titlebar switcher menu. The rest of the bare sidebar stays empty — no
+  membership, no scope explainer; browsing members and the GitHub import
+  flow belong to the titlebar Library switcher. A window whose folder is
+  removed lands its completely blank Chat back on that same gallery
+  surface; a folder window keeps its restored work instead. The band
+  itself is the [Agent Panel](agent-panel.md)'s surface; the entries and
+  their downloads are the Gallery's own contract (see
+  [Agent Panel](agent-panel.md) and the engineering contract in
+  `code-review/agent-panel.md`).
 - Packaged builds check the official stable release channel when the default-on
   preference permits it. An available update floats a dismissible announcement
   above the account row with one explicit Update action; the Settings utility
@@ -70,10 +77,6 @@ manager, or a primary graph-navigation tool.
   sidebar column truncates within that column instead of crossing onto the
   document tab strip. Folder-level actions remain attributable to the active
   folder.
-- The document tab strip can also hold the singleton **Templates** tab — the
-  gallery of preset wiki activations, opened from its sidebar row under New
-  Chat. It closes like any tab; reopening focuses the existing one, and
-  opening a file while it is active lands in a fresh tab, never inside it.
 - Multiple windows share one library and runtime services while retaining
   independent active folders, tabs, search presentation, and Chat tabs.
 - Folder switches reset folder-scoped documents but preserve library search
@@ -130,10 +133,11 @@ manager, or a primary graph-navigation tool.
   hidden tool infrastructure and derived data do not surface as workspace
   content.
 - Durable guidance for StashBase Chats lives in the Agent panel's **Agent
-  Instructions** editor as working-folder application metadata. Library-wide
-  Chats use the packaged default and expose no Library-wide editor. Opening a
-  folder never creates, migrates, or edits instruction files in the user's
-  source tree.
+  Instructions** editor as application metadata: each working folder edits its
+  own, and Library-wide Chats edit one Library-scope guidance with its own
+  packaged default oriented toward finding work and starting new projects.
+  Opening a folder never creates, migrates, or edits instruction files in the
+  user's source tree.
 
 ## Experience Contract
 
@@ -221,8 +225,9 @@ manager, or a primary graph-navigation tool.
 ## Related Journeys and Contracts
 
 Journeys: [J01](../user-journeys.md#j01-complete-onboarding-and-reach-first-value),
-[J02](../user-journeys.md#j02-add-and-open-a-folder), and
-[J03](../user-journeys.md#j03-read-and-edit-source-documents). The core loop is
+[J02](../user-journeys.md#j02-add-and-open-a-folder),
+[J03](../user-journeys.md#j03-read-and-edit-source-documents), and
+[J13](../user-journeys.md#j13-download-a-ready-made-wiki-from-the-gallery). The core loop is
 [J10](../user-journeys.md#j10-turn-a-local-project-into-durable-agent-assisted-work).
 Cross-area
 routes also include [J05](../user-journeys.md#j05-search-and-open-source-evidence)

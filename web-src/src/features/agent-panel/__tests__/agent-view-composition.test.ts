@@ -4,10 +4,8 @@ import * as React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { AgentView } from '@/features/agent-panel/components/AgentView';
 import { AgentComposer } from '@/features/agent-panel/components/AgentComposer';
-import { BuildWikiPagesAction } from '@/features/agent-panel/components/AgentEmptyState';
 import { ScopeMenu } from '@/common/components/ScopeMenu';
 import { notifyAgentInstructionsSaved } from '@/common/lib/agentInstructionsTrigger';
-import { requestTemplate } from '@/common/lib/templateTrigger';
 import type { LibraryScope } from '@/common/lib/libraryScope';
 import { SimilaritySearchControl } from '@/features/agent-panel/components/SimilaritySearchControl';
 import { AGENT_META } from '@/common/lib/agentCatalog';
@@ -128,7 +126,12 @@ test('AgentRuntimeGate renders the checking card while useAgentSession has no ru
   const output = JSON.stringify(renderer.toJSON());
   assert.match(output, /Checking whether its local CLI is installed/);
   assert.match(output, /"Codex"/);
-  assert.throws(() => renderer.root.findByType(AgentComposer));
+  // The gate no longer hides the composer: the disabled bar renders under
+  // the card, and its agent pill stays live — an unclaimed chat's way out
+  // of a gated agent (rebinding is renderer-local and sends nothing).
+  const composer = renderer.root.findByType(AgentComposer);
+  assert.equal(composer.props.disabled, true);
+  assert.equal(composer.props.agentPick.show, true);
 });
 
 test('useAgentSession wires connected scope/model/effort state into the composer once a runtime is available', async (t) => {
@@ -202,31 +205,5 @@ test('saving Agent Instructions for the connected scope remounts that session, a
   assert.ok(
     StubWebSocket.instances.length > mounted,
     'the connected scope remounts so the next turn runs with the new guidance',
-  );
-});
-
-test('a used Template stages its visible request without auto-sending a turn', async (t) => {
-  const { renderer, first } = await mountAgentView(t, true);
-  await act(async () => { first!.event({ t: 'ready' }); });
-
-  // Nothing stands below the hero composer at rest — the armed-turn
-  // progress line only appears while a preset waits on Agent setup.
-  assert.throws(() => renderer.root.findByType(BuildWikiPagesAction));
-  // The gallery's path end to end: latch + broadcast; the ACTIVE mounted
-  // session consumes the request into its composer handoff. It must not send
-  // anything over the wire until the user reviews and submits the draft.
-  await act(async () => { requestTemplate('Build or update Wiki Pages from these Sources.', 'codex'); });
-
-  const prompt = first!.sent.map((value) => JSON.parse(value) as { t: string; text?: string }).find((message) => message.t === 'prompt');
-  assert.equal(prompt, undefined);
-  const output = JSON.stringify(renderer.toJSON());
-  assert.doesNotMatch(output, /Build or update Wiki Pages from these Sources\./);
-  // The handoff is observable as the composer's armed seed: under
-  // react-test-renderer no CodeMirror view mounts, so the seed stays
-  // offered rather than consumed — which is also the real contract
-  // (a seed is acknowledged only once it lands in a live editor).
-  assert.equal(
-    (renderer.root.findByType(AgentComposer).props as { seedText?: string | null }).seedText,
-    'Build or update Wiki Pages from these Sources.',
   );
 });

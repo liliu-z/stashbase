@@ -188,7 +188,9 @@ function startTurn(requestId, params) {
     });
     return;
   }
-  if (/Build or update Wiki Pages from these Sources\./i.test(prompt)) {
+  // Every organize template's prompt opens with the classic Build Wiki
+  // verb; match the opening rather than one preset's full sentence.
+  if (/Build or update Wiki Pages/i.test(prompt)) {
     requestMcpApproval({
       turnId,
       threadId: String(params.threadId || 'fake-thread-1'),

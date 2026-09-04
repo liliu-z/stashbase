@@ -44,10 +44,13 @@ document appears, the same Chat adapts into a side panel alongside the source.
 It is a convenient client of StashBase context, not a separate AI workspace
 and not a replacement for external Agent clients.
 
-For a folder, the **Templates** gallery is the fixed way into building a
-wiki, and its **Knowledge Base** preset is the classic Build Wiki action.
-It asks the selected Agent to create or improve source-linked `wiki/index.md` and,
-only when needed, focused pages beside it. The first release does not infer a
+Building a wiki over the user's own folder is a plain Build Wiki request
+in Chat; the **Gallery** teaches it by example — every entry is a real
+folder with a wiki built from it, downloadable as a copy, its detail page
+showing the exact request that produced it.
+The request asks the selected Agent to create or improve source-linked
+`wiki/index.md` and, only when needed, focused pages beside it. The first
+release does not infer a
 persistent built/stale state or schedule refreshes. It preserves source files:
 moving, renaming, deletion, and broad source rewrites require a separate
 explicit user decision.

@@ -16,16 +16,18 @@
  *
  * See design-docs/architecture.md §8 for the shared library path.
  */
-import { useEffect, useState } from 'react';
+import { Suspense, useState } from 'react';
 import type { AgentKind } from '@/common/lib/agentCatalog';
+import { rememberPreferredAgent } from '@/common/lib/agentPreference';
+import { LazyLoadBoundary } from '@/common/components/ErrorBoundary';
+import { TemplatesView } from '@/features/templates';
 import { FILE_MIME } from '@/common/lib/dragMime';
-import { consumePendingTemplate, onTemplateRequested } from '@/common/lib/templateTrigger';
 import { acceptsAgentContextDrop, dragPayloadKinds } from '@/common/lib/dragRouting';
 import { useAppActions, useChat, useWorkspace } from '@/store/contexts/AppContext';
 import { Button } from '@/common/components/ui/button';
 import { AgentComposer } from '@/features/agent-panel/components/AgentComposer';
 import { AgentRuntimeGate } from '@/features/agent-panel/components/AgentRuntimeGate';
-import { BuildWikiPagesAction, EmptyChatGreeting } from '@/features/agent-panel/components/AgentEmptyState';
+import { EmptyChatGreeting } from '@/features/agent-panel/components/AgentEmptyState';
 import { MessageList } from '@/features/agent-panel/components/AgentMessages';
 import { useAgentAttachments } from '@/features/agent-panel/hooks/useAgentAttachments';
 import { useAgentSession } from '@/features/agent-panel/hooks/useAgentSession';
@@ -38,12 +40,17 @@ export function AgentView({
   title,
   agent = 'claude',
   initialScope,
+  galleryEligible = false,
 }: {
   active: boolean;
   id: string;
   title: string;
   agent?: AgentKind;
   initialScope?: LibraryScope;
+  /** The window is bare, so this chat may carry the Gallery band below
+   *  its hero (ChatPane derives this from window state). Honoured only
+   *  while the chat has no content. */
+  galleryEligible?: boolean;
 }) {
   const workspace = useWorkspace();
   const chat = useChat();
@@ -70,7 +77,7 @@ export function AgentView({
   });
   // The session groups its state by owner; destructure the namespaces once
   // so the JSX below reads as composition rather than prop threading.
-  const { controls, mentions, queue, runtime, similaritySearch, skills, transcript, wiki } = session;
+  const { controls, mentions, queue, runtime, similaritySearch, skills, transcript } = session;
 
   const [dragOver, setDragOver] = useState(false);
 
@@ -122,43 +129,137 @@ export function AgentView({
   // standard transcript-over-bottom-composer layout. The composer keeps its
   // `key` so the same mounted instance moves between the two layouts.
   const emptyChat = transcript.blocks.length === 0 && queue.queuedTurns.length === 0 && transcript.phase !== 'closed' && !transcript.fatal;
-  const folderScoped = controls.sessionScope.kind === 'folder';
+  /* No conversation has claimed this tab yet. Deliberately NOT
+   * `emptyChat`: while the runtime gate is up the session never
+   * connected and the phase reads `closed`, yet that gated first run is
+   * exactly when the unclaimed affordances (agent pill, Gallery band)
+   * must stand. */
+  const chatUnclaimed = transcript.blocks.length === 0
+    && queue.queuedTurns.length === 0
+    && !transcript.fatal;
 
-  function requestBuildWikiPages(prompt?: string) {
-    if (!wiki.requestBuildWikiPages(prompt)) return;
-    // Building the Wiki is independent of semantic indexing, but the
-    // Wiki Agent still needs its own model source before it can write.
-    if (agent === 'stashbase' && runtime.runtime?.bootstrap?.failure?.code === 'account-required') {
-      openSettings('agents');
-    }
-  }
-
-  /* A Template card was used. Only the ACTIVE session OF THE LATCH'S
-   * AGENT takes the preset — every mounted AgentView subscribes, and
-   * consuming clears the latch, so exactly one arms it (see
-   * templateTrigger for the reused-blank-tab race the agent gate closes).
-   * Runs both on becoming active (the tab activateChatTab just created,
-   * reused, or re-agented) and on the broadcast (this tab already
-   * active). */
-  useEffect(() => {
-    if (!active) return undefined;
-    const tryConsume = () => {
-      const prompt = consumePendingTemplate(agent);
-      if (prompt) requestBuildWikiPages(prompt);
-    };
-    tryConsume();
-    return onTemplateRequested(tryConsume);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- consume is
-    // event-driven; re-subscribing on every render identity would churn.
-  }, [active, agent]);
-
-  /* Nothing stands below the hero composer any more — the Templates
-   * gallery (sidebar row) is the sole way into starting a wiki. Only an
-   * ARMED turn surfaces here: its progress + cancel must live where the
-   * send will land. */
-  const buildWikiPagesAction = wiki.pending ? (
-    <BuildWikiPagesAction onCancel={wiki.cancelBuildWikiPages} />
+  /* The Gallery band under this chat, whenever the window is bare. Only
+   * a contentless chat shows it — the first turn replaces the band with
+   * the transcript. Lazily loaded: most conversations never show it, and
+   * the chunk stays out of the panel's initial load. */
+  const templatesGallery = galleryEligible && chatUnclaimed ? (
+    <LazyLoadBoundary
+      className="flex min-h-24 items-center justify-center text-sm text-muted-foreground"
+      label="templates"
+    >
+      <Suspense fallback={null}>
+        <TemplatesView />
+      </Suspense>
+    </LazyLoadBoundary>
   ) : null;
+
+  /* Empty chat: the composer is the hero. The greeting bottoms out the
+   * flex-[3] band above it; in the plain hero an equal empty band below
+   * the composer + Build Wiki action centers the whole action group.
+   * Only the VERTICAL placement changes on send — the composer holds one
+   * width in both states, and the transcript adopts it. */
+  const heroGreeting = (
+    <div key="empty-above" className="flex min-h-0 flex-[3] flex-col justify-end overflow-hidden px-2">
+      <div className="mx-auto w-measure-md">
+        <EmptyChatGreeting
+          agentShortName={session.meta.shortName}
+          connecting={transcript.phase === 'connecting'}
+        />
+      </div>
+    </div>
+  );
+
+  const composer = (
+    <AgentComposer
+      key="composer"
+      hero={emptyChat}
+      phase={transcript.phase}
+      disabled={transcript.phase !== 'live'}
+      turnActive={transcript.turnActive}
+      active={active}
+      agentShortName={session.meta.shortName}
+      /* The chat's agent, chosen at the point of use: a blank chat's
+       * composer leads with the agent pill; picking rebinds THIS tab
+       * (ChatPane keys the view by tab+agent, so the session remounts
+       * onto the new runtime) and records the preference New Chat
+       * reads. A started conversation belongs to its agent — no pill.
+       * `chatUnclaimed`, not `emptyChat`: a runtime-gated chat reads
+       * phase `closed`, and the pill is exactly its way out of a gated
+       * agent. */
+      agentPick={{
+        show: chatUnclaimed,
+        current: agent,
+        onPick: (next) => {
+          rememberPreferredAgent(next);
+          dispatch({ type: 'CHAT_TAB_SET_AGENT', id, agent: next });
+        },
+      }}
+      closedPlaceholder={transcript.scopeRetired ? 'Folder removed — start a Library chat to continue…' : undefined}
+      mode={{ show: runtime.capabilities?.modes === true, value: controls.mode, onSet: controls.changeMode }}
+      effort={{
+        show: runtime.capabilities?.effort === true,
+        level: controls.effort,
+        inherited: controls.effortInherited,
+        locked: controls.effortLocked,
+        supported: controls.supportedEfforts,
+        onSet: controls.changeEffort,
+      }}
+      model={{
+        show: controls.modelVisible,
+        selected: controls.modelControl.selectedModel,
+        active: controls.modelControl.activeModel,
+        models: controls.modelControl.models,
+        locked: controls.modelLockReason !== null,
+        lockReason: controls.modelLockReason,
+        notice: controls.modelControl.notice,
+        resumedSession: controls.modelControl.resumedSession,
+        onSet: controls.changeModel,
+      }}
+      scope={{
+        current: controls.sessionScope,
+        entries: controls.folderEntries,
+        homeDir: workspace.homeDir,
+        locked: controls.folderLocked,
+        onSet: controls.changeScope,
+      }}
+      similaritySearch={{
+        enabled: similaritySearch.enabled,
+        availabilityKnown: similaritySearch.availabilityKnown,
+        onChange: similaritySearch.change,
+      }}
+      mentions={{ files: mentions.mentionFiles, folders: mentions.mentionFolders }}
+      skills={{ list: skills.skills, state: skills.skillState, onRefresh: skills.refreshSkills }}
+      attachments={{
+        enabled: runtime.capabilities.attachments,
+        items: attach.attachments,
+        uploading: attach.uploading,
+        onPick: attach.uploadFiles,
+        onPasteImages: attach.pasteImages,
+        onRemove: attach.removeAttachment,
+      }}
+      onDraftChange={controls.handleDraftChange}
+      onFocusChange={transcript.setAgentComposerFocused}
+      onSend={queue.send}
+      onStop={transcript.stop}
+    />
+  );
+
+  const runtimeGate = (
+    <AgentRuntimeGate
+      runtime={runtime.runtime}
+      fallbackName={session.meta.name}
+      bootstrapActive={runtime.bootstrapActive}
+      bootstrapFailed={runtime.bootstrapFailed}
+      runtimeUnavailable={runtime.runtimeUnavailable}
+      onRefresh={() => void runtime.refreshRuntimes()}
+      onCheck={() => void runtime.checkRuntime()}
+      onInstall={() => void runtime.startRuntimeBootstrap()}
+      onLogin={() => void runtime.loginToCodex()}
+      onOpenAccount={() => openSettings('agents')}
+      onCopyInstall={runtime.copyInstallHint}
+      onOpenMcpSetup={() => openSettings('mcp')}
+    />
+  );
 
   return (
     // `agent-view` stays as a routing hook: useGlobalDragDrop uses
@@ -185,38 +286,50 @@ export function AgentView({
         * the composer's scope pill carries the binding — repeating either
         * here was pure noise. */}
       {showRuntimeGate ? (
-        <AgentRuntimeGate
-          runtime={runtime.runtime}
-          fallbackName={session.meta.name}
-          bootstrapActive={runtime.bootstrapActive}
-          bootstrapFailed={runtime.bootstrapFailed}
-          runtimeUnavailable={runtime.runtimeUnavailable}
-          onRefresh={() => void runtime.refreshRuntimes()}
-          onCheck={() => void runtime.checkRuntime()}
-          onInstall={() => void runtime.startRuntimeBootstrap()}
-          onLogin={() => void runtime.loginToCodex()}
-          onOpenAccount={() => openSettings('agents')}
-          onCopyInstall={runtime.copyInstallHint}
-          onOpenMcpSetup={() => openSettings('mcp')}
-          footer={buildWikiPagesAction}
-        />
-      ) : <>
-        {emptyChat ? (
-          // Empty chat: the composer is the hero. The greeting bottoms out
-          // this flex-[3] band. Folder scope balances it with an equal empty
-          // band below the fixed composer + Build Wiki action, centering the
-          // whole action group. Only the VERTICAL placement changes on send — the
-          // composer holds one width in both states, and the transcript
-          // adopts it.
-          <div key="empty-above" className="flex min-h-0 flex-[3] flex-col justify-end overflow-hidden px-2">
-            <div className="mx-auto w-measure-md">
-              <EmptyChatGreeting
-                agentShortName={session.meta.shortName}
-                connecting={transcript.phase === 'connecting'}
-              />
+        templatesGallery ? (
+          /* A gated chat still leads with its gate, but a gallery-bearing
+           * chat keeps the band reachable below it — first run commonly
+           * lands here (runtime discovery, install, sign-in), and the
+           * gallery is that landing's content. One scroller for both: with
+           * no live composer there is nothing to hold fixed, and a tall
+           * failure card must be able to scroll rather than crush the
+           * band below it. The disabled composer still renders under the
+           * card: its agent pill is an unclaimed chat's way OUT of a
+           * gated agent, and hiding the bar left no route to switch. */
+          <div className="scrollbar-quiet min-h-0 flex-1 overflow-auto">
+            <div className="flex min-h-[55%] flex-col">
+              {runtimeGate}
+              {chatUnclaimed && composer}
             </div>
+            {templatesGallery}
           </div>
         ) : (
+          /* Same escape hatch in the docked shape: gate card above, the
+           * disabled composer's control bar pinned below. */
+          <>
+            {runtimeGate}
+            {chatUnclaimed && composer}
+          </>
+        )
+      ) : emptyChat && templatesGallery ? (
+        /* A gallery-bearing chat is ONE scrolling page, not a fixed hero over a
+         * private scroller: the greeting + composer keep their centered
+         * geometry in the upper ~70% of the first viewport, the gallery's
+         * headline AND a sliver of the first card row peek below the fold
+         * as the invitation to scroll, and the whole page moves together.
+         * The composer scrolls with it; on the first send the pinned
+         * transcript layout remounts it, and its active-focus effect
+         * re-grabs the caret. */
+        <div className="scrollbar-quiet min-h-0 flex-1 overflow-auto">
+          <div className="flex min-h-[70%] flex-col">
+            {heroGreeting}
+            {composer}
+            <div className="min-h-0 flex-[3]" aria-hidden="true" />
+          </div>
+          {templatesGallery}
+        </div>
+      ) : <>
+        {emptyChat ? heroGreeting : (
           <MessageList
             key="messages"
             blocks={transcript.blocks}
@@ -246,65 +359,7 @@ export function AgentView({
             <Button variant="outline" size="sm" onClick={transcript.reconnect}>Reconnect</Button>
           </div>
         )}
-      <AgentComposer
-        key="composer"
-        hero={emptyChat}
-        phase={transcript.phase}
-        disabled={transcript.phase !== 'live'}
-        turnActive={transcript.turnActive}
-        active={active}
-        agentShortName={session.meta.shortName}
-        closedPlaceholder={transcript.scopeRetired ? 'Folder removed — start a Library chat to continue…' : undefined}
-        mode={{ show: runtime.capabilities?.modes === true, value: controls.mode, onSet: controls.changeMode }}
-        effort={{
-          show: runtime.capabilities?.effort === true,
-          level: controls.effort,
-          inherited: controls.effortInherited,
-          locked: controls.effortLocked,
-          supported: controls.supportedEfforts,
-          onSet: controls.changeEffort,
-        }}
-        model={{
-          show: controls.modelVisible,
-          selected: controls.modelControl.selectedModel,
-          active: controls.modelControl.activeModel,
-          models: controls.modelControl.models,
-          locked: controls.modelLockReason !== null,
-          lockReason: controls.modelLockReason,
-          notice: controls.modelControl.notice,
-          resumedSession: controls.modelControl.resumedSession,
-          onSet: controls.changeModel,
-        }}
-        scope={{
-          current: controls.sessionScope,
-          entries: controls.folderEntries,
-          homeDir: workspace.homeDir,
-          locked: controls.folderLocked || wiki.pending,
-          onSet: controls.changeScope,
-        }}
-        similaritySearch={{
-          enabled: similaritySearch.enabled,
-          availabilityKnown: similaritySearch.availabilityKnown,
-          onChange: similaritySearch.change,
-        }}
-        mentions={{ files: mentions.mentionFiles, folders: mentions.mentionFolders }}
-        skills={{ list: skills.skills, state: skills.skillState, onRefresh: skills.refreshSkills }}
-        attachments={{
-          enabled: runtime.capabilities.attachments,
-          items: attach.attachments,
-          uploading: attach.uploading,
-          onPick: attach.uploadFiles,
-          onPasteImages: attach.pasteImages,
-          onRemove: attach.removeAttachment,
-        }}
-        seedText={wiki.composerSeed}
-        onSeedConsumed={wiki.consumeComposerSeed}
-        onDraftChange={controls.handleDraftChange}
-        onFocusChange={transcript.setAgentComposerFocused}
-        onSend={queue.send}
-        onStop={transcript.stop}
-      />
-      {emptyChat && folderScoped && buildWikiPagesAction}
+      {composer}
       {emptyChat && <div key="empty-below" className="min-h-0 flex-[3]" aria-hidden="true" />}
       </>}
     </div>

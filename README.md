@@ -77,20 +77,22 @@ For a portable build, download `StashBase-*-linux-*.AppImage`, make it executabl
 
 ### First Launch
 
-The first window opens with no folder selected, the Templates gallery, and one
-reusable blank Chat.
+The first window opens with no folder selected and one reusable blank Chat,
+with the Gallery below its composer — ready-made Wikis you can download
+and open, each a real folder with a wiki built from it.
 
 1. **Open a folder and choose whether to set up search by meaning**: The first
    folder you activate offers StashBase sign-in or your own OpenAI/OpenRouter
    key. Choose **Not now** to continue with keyword search and local file work.
    StashBase remembers the choice; the Files-panel **Set up** action and
    Settings remain available later.
-2. **Build Wiki**: Open **Templates** from the sidebar and choose a preset such
-   as **Knowledge Base**. StashBase opens or reuses a folder-scoped Chat and
-   places the card's visible request as an editable draft. Review and send it
-   to create or improve `wiki/index.md` and,
-   when useful, focused pages under `wiki/`, without changing Sources outside
-   that directory. This action is independent from setup and preparation for
+2. **Build Wiki**: In the folder-scoped Chat, ask for it — for example
+   “Build or update Wiki Pages from these Sources.” An entry in the
+   **Gallery** shows the same move by example: its detail page carries the
+   exact request that built that wiki, with **Copy prompt** to reuse it.
+   Sending the request creates or improves `wiki/index.md` and, when
+   useful, focused pages under `wiki/`, without changing Sources outside
+   that directory. This is independent from setup and preparation for
    search by meaning.
 3. **Ask how StashBase works**: In the Chat that is already open, ask **“How do
    I use StashBase?”** It starts against the whole Library, including Start
@@ -285,11 +287,13 @@ separate knowledge base. It adds:
   `AGENTS.md` or `CLAUDE.md` in your folders.
 - New Chat reuses a completely blank conversation when possible; Wiki Agent is
   selected initially and later chats use the Agent you last selected.
-- **Templates** opens a gallery of preset Wiki activations. Choosing a card
-  opens or reuses a blank folder Chat and places its visible request as an
-  editable draft; after you send it, the Knowledge Base preset in the organize
-  section creates or improves linked Markdown pages only under `wiki/` while
-  preserving all Sources and their layout.
+- The **Gallery** shows ready-made Wikis below a bare window's blank Chat
+  (and behind the sidebar's Gallery row in a folder window). **Make a
+  copy** downloads an entry's public folder into your folder home and
+  opens it in a new window; the detail page's **How it's built** tab holds
+  the request that produced it, with **Copy prompt** to reuse on your own
+  folder. A sent Build Wiki request creates or improves linked Markdown
+  pages only under `wiki/` while preserving all Sources and their layout.
 - Tool calls and file edits can be reviewed in the app.
 - Session history stays in the selected runtime's native local storage.
 - Agent replies render GFM and offline LaTeX math without changing the copied

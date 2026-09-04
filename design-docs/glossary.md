@@ -81,14 +81,17 @@ explain Sources through relative links. They are ordinary user-owned files,
 not hidden StashBase derived data, and they re-enter browsing, search, and
 future Agent work.
 
-Use **Build Wiki** for the explicit folder-scoped action that asks an
-Agent to create or improve these pages from Sources. The action never grants
+Use **Build Wiki** for the explicit folder-scoped request that asks an
+Agent to create or improve these pages from Sources. The request never grants
 permission to move, rename, delete, or broadly rewrite Sources.
 
-Use **Templates** for the curated gallery of such folder-scoped preset
-actions (a singleton main-pane tab entered from the sidebar). Every Template
-places one visible, editable request in Chat; **Knowledge Base** is the classic
-Build Wiki preset in the organize section.
+Use **Gallery** for the curated shop of ready-made Wikis — real folders
+with a wiki built from them, each downloadable as a copy that opens in its
+own window. A bare window's blank Chat derives the Gallery band below its
+composer; the sidebar's Gallery row raises it as an overlay inside a
+folder window. An entry's detail page shows what is inside the copy and
+the request that built it (**Copy prompt** is its one prompt affordance —
+the Gallery never places or sends composer text).
 
 ## Canvas
 

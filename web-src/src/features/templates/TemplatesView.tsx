@@ -1,171 +1,146 @@
-import { useAppActions, useWorkspace } from '@/store/contexts/AppContext';
-import { readPreferredAgent } from '@/common/lib/agentPreference';
-import { requestTemplate } from '@/common/lib/templateTrigger';
-import { ArrowRightIcon } from '@/common/components/icons';
-import { cn } from '@/common/lib/utils';
-import { TEMPLATES, type Template, type TemplateCategory } from '@/features/templates/templates';
+import { useEffect, useState } from 'react';
+import { GALLERY_SNAPSHOT, loadGalleryWikis, type GalleryWiki } from '@/features/templates/gallery';
+import { GalleryDetailOverlay } from '@/features/templates/detail/GalleryDetailOverlay';
 import './templates.css';
 
 /**
- * The Templates gallery — the singleton `kind: 'templates'` tab.
+ * The Gallery — the scrollable band below a blank Chat's hero composer.
+ * AgentView renders it for a tab carrying the gallery request (a bare
+ * window's boot chat, or the sidebar's Gallery row); a started
+ * conversation replaces it with the transcript.
  *
- * A tab, not a modal: picking a template starts an agent run the user will
- * watch in the chat panel beside it, so the gallery must not be a layer
- * that has to close first. Default export for the lazy chunk (MainPane
- * loads it through `lazyWithRetry` like the other rare panes).
+ * Every entry is a ready-made Wiki living in a public GitHub repository
+ * (see `gallery.ts` — the index itself is a GitHub-hosted file, this
+ * band renders the bundled snapshot immediately and swaps in the
+ * fetched copy). A card opens the entry's detail overlay, where the one
+ * big action downloads the whole folder through the existing public-
+ * GitHub import and opens it in a new window. No open folder is
+ * required to browse or download; "bring your own" stays with the
+ * sidebar's Choose Folder row, never a precondition here.
  *
- * This surface is deliberately drawn in the MARKETING SITE's print
- * language — hairline-grid cells, mono index tiles, corner-tick frames,
- * square corners — because the same gallery ships on the site
- * (stashbase-web home-page.css is the reference). Everything is spelled
- * through the semantic tokens, so the idiom holds in dark; the square
- * frame is this one surface's voice, not a new app-wide corner step.
- *
- * "Use template" latches the preset prompt, then opens/focuses a blank chat
- * for the preferred agent. The ACTIVE session consumes the latch into an
- * editable composer draft (see templateTrigger for why latch + broadcast);
- * the user remains the party who sends it. With no folder open the actions
- * are disabled: templates are folder activations, the same constraint Build
- * Wiki always had.
+ * Part of the chat pane, not a tab or a modal, and deliberately drawn
+ * in the MARKETING SITE's print language — hairline-grid cells, mono
+ * ticks, corner-tick frames, square corners — because the same gallery
+ * ships on the site (stashbase-web home-page.css is the reference).
+ * Everything is spelled through the semantic tokens, so the idiom holds
+ * in dark. Default export for the lazy chunk (AgentView loads it
+ * through the `features/templates` barrel inside its own Suspense
+ * boundary).
  */
 
-const SECTIONS: {
-  category: TemplateCategory;
-  title: string;
-  detail: string;
-}[] = [
-  {
-    category: 'start',
-    title: 'Start a project.',
-    detail: 'Give a brand-new folder its first pages.',
-  },
-  {
-    category: 'organize',
-    title: 'Organize this folder into a wiki.',
-    detail: 'Turn the files already here into wiki pages that link back to them.',
-  },
-];
+export default function TemplatesView({ heading = 'Explore Gallery' }: { heading?: string } = {}) {
+  // Snapshot first, published index when the fetch lands: the band is
+  // never empty and never waits on the network to render.
+  const [wikis, setWikis] = useState<readonly GalleryWiki[]>(GALLERY_SNAPSHOT);
+  // The card's click target opens this entry's detail overlay.
+  const [detailWiki, setDetailWiki] = useState<GalleryWiki | null>(null);
 
-/** Blank cells that complete the last hairline row at one column count —
- *  the frame never ends mid-row, the way the site's grids never do. */
-function fillerCells(columns: number, items: number): number {
-  return (columns - (items % columns)) % columns;
-}
-
-export default function TemplatesView() {
-  const state = useWorkspace();
-  const { actions } = useAppActions();
-  const folderOpen = Boolean(state.folderPath);
-
-  function useTemplate(template: Template) {
-    // Latch for the agent being activated, then open/focus its chat: the
-    // session that ends up active for THIS agent consumes and sends.
-    const agent = readPreferredAgent();
-    requestTemplate(template.prompt, agent);
-    actions.activateChatTab(agent);
-  }
+  useEffect(() => {
+    let stale = false;
+    void loadGalleryWikis().then((loaded) => {
+      if (!stale) setWikis(loaded);
+    });
+    return () => { stale = true; };
+  }, []);
 
   return (
-    <div className="scrollbar-quiet min-h-0 flex-1 overflow-auto">
-      {/* The site's page column (--max), responding to its own width via
-        * the container queries in templates.css. */}
-      <div className="templates-page mx-auto w-measure-xl px-6 py-10">
-        {/* No page-level kicker and no section eyebrows: the tab and the
-          * sidebar row already say "Templates", and the headings carry the
-          * structure — the mono-print accent lives on the cards instead.
-          * Benefit-led headline at the site's display step: sentence case,
-          * weight 400, a period. */}
-        <h1 className="m-0 text-5xl font-normal tracking-tight text-foreground">
-          Start faster with a template.
-        </h1>
-        <p className="m-0 mt-2 text-base text-muted-foreground">
-          {folderOpen
-            ? 'Every template drops one editable request into Chat.'
-            : 'Open a folder first — templates build its wiki in place.'}
-        </p>
+    /* Full-width host = the container that the queries in templates.css
+     * answer; the column inside is the site's page measure with a
+     * breathing gutter. The HOST owns scrolling: in the chat pane this
+     * is the content of the band under the composer. */
+    <div className="templates-page">
+      <div className="templates-column mx-auto w-measure-xl py-10">
+        {/* One display-size title + one small grey sub-line, in the
+          * app's own heading voice. An h2, stated: pane-level surfaces
+          * top the chat pane's outline at h2 (the greeting holds the
+          * same level above); the display size is presentation, not
+          * outline rank. */}
+        {/* "Explore Gallery" on the landing band (an invitation), plain
+          * "Gallery" when the overlay hosts this view (a place the user
+          * already chose to enter — places take noun titles). */}
+        <h2 className="m-0 text-5xl font-normal tracking-tight text-foreground">
+          {heading}
+        </h2>
+        {/* One grey body size page-wide: this sub-line and the card
+          * descriptions both sit on text-base. One standing line in
+          * both folder states, speaking the GALLERY model: what an
+          * entry is (a real folder and its wiki) and how to take one. */}
+        <div className="mt-3 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-3">
+          <p className="m-0 text-base text-muted-foreground">
+            Every entry is a real folder with a wiki built from it.
+            Make a copy to explore it, or copy the prompt for your own folder.
+          </p>
+        </div>
 
-        {SECTIONS.map((section, sectionIndex) => {
-          const items = TEMPLATES.filter((template) => template.category === section.category);
-          return (
-            <section key={section.category}>
-              {sectionIndex > 0 && (
-                /* The site's hatched divider between printed sections. */
-                <div aria-hidden className="templates-separator mt-10" />
-              )}
-              {/* The site's type ladder is deliberately steep — headings
-                * clearly outrank body text (48/24/16 on the site maps to
-                * 40/30/20 on the chrome ramp here). */}
-              <h2 className="mt-10 mb-1 text-4xl font-normal tracking-tight text-foreground">
-                {section.title}
-              </h2>
-              <p className="m-0 text-sm text-muted-foreground">{section.detail}</p>
-              {/* The site's resource grid: one hairline frame with corner
-                * ticks, cells separated by the 1px grid gap showing the
-                * border colour through — dividers, not per-card boxes. */}
-              <ul className="templates-frame templates-grid mt-5 grid list-none gap-px bg-border p-0">
-                {items.map((template) => {
-                  return (
-                    <li key={template.id} className="flex min-w-0">
-                      {/* Raw button, same reasoning as the setup cards for
-                        * search by meaning: the whole CARD is the target —
-                        * multi-line, left-aligned, square-cornered, full
-                        * opacity when disabled (the header line above
-                        * already says why nothing is clickable). `Button`
-                        * is a centred single-line -ui-cornered item;
-                        * adopting it would start by cancelling display,
-                        * height, alignment, wrapping, and corner. */}
-                      <button
-                        type="button"
-                        disabled={!folderOpen}
-                        onClick={() => useTemplate(template)}
-                        className={cn(
-                          'group flex flex-1 flex-col border-0 bg-background p-5 text-left transition-tint',
-                          folderOpen ? 'cursor-pointer hover:bg-muted' : 'cursor-default',
-                        )}
-                      >
-                        {/* No index tile: the site numbers STEPS, which
-                          * have an order — templates do not, so a count
-                          * implied a ranking. The illustration is the
-                          * card's anchor. Placeholder art on the site's
-                          * dotted ground — a generic wireframe mini-card
-                          * stands in until each template gets its real
-                          * print-style illustration (see template-visual
-                          * in templates.css). */}
-                        <span aria-hidden className="template-visual grid h-32 w-full flex-none place-items-center border border-border">
-                          <span className="block w-24 border border-border bg-card p-2">
-                            <span className="block h-1 w-full bg-border" />
-                            <span className="mt-1.5 block h-1 w-2/3 bg-border" />
-                            <span className="mt-1.5 block h-1 w-full bg-border" />
-                          </span>
-                        </span>
-                        <span className="mt-5 block text-2xl font-normal tracking-tight text-foreground">
-                          {template.name}
-                        </span>
-                        <span className="mt-2 block flex-1 text-sm leading-relaxed text-muted-foreground">
-                          {template.description}
-                        </span>
-                        <span className="mt-5 flex w-full items-center justify-between gap-3 font-mono text-2xs tracking-[0.12em] text-placeholder uppercase">
-                          Use template
-                          <ArrowRightIcon className="size-3.5 flex-none text-foreground transition-control group-hover:group-enabled:translate-x-0.5" />
-                        </span>
-                      </button>
-                    </li>
-                  );
-                })}
-                {/* Blank paper cells complete the hairline grid's last
-                  * row; one set per column count, shown by the container
-                  * query that picks the layout. */}
-                {Array.from({ length: fillerCells(2, items.length) }, (_, index) => (
-                  <li aria-hidden key={`filler-two-${index}`} className="templates-filler-two bg-background" />
-                ))}
-                {Array.from({ length: fillerCells(3, items.length) }, (_, index) => (
-                  <li aria-hidden key={`filler-three-${index}`} className="templates-filler-three bg-background" />
-                ))}
-              </ul>
-            </section>
-          );
-        })}
+        {/* Standalone rounded media cards with real gaps: a FIXED 16:9
+          * cover on top — the screenshot is why a person picks an
+          * entry, so it stays a complete untreated picture (overflow
+          * crops) — and the caption on the card's own paper below.
+          * Text never sits on the image: a wiki's cover is a document
+          * screenshot, mostly white, and any overlay either fogs it
+          * (dark scrim) or hides it (caption block). Columns still
+          * come from the container queries on .templates-grid. */}
+        <ul className="templates-grid mt-8 grid list-none gap-5 p-0">
+          {wikis.map((wiki) => {
+            const cover = wiki.screenshots?.[0];
+            return (
+              <li key={wiki.id} className="flex min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setDetailWiki(wiki)}
+                  className="group/card relative m-0 flex min-w-0 flex-1 cursor-pointer flex-col overflow-hidden rounded-2xl border border-border bg-card p-0 text-left font-sans shadow-low outline-none transition-control focus-visible:ring-3 focus-visible:ring-ring/50 active:scale-[0.99]"
+                >
+                  {/* Fixed 16:9 cover; a gentle zoom is the hover
+                    * affordance. `object-top` because a wiki screenshot
+                    * leads with its own title banner — the crop keeps
+                    * that and drops the tail. The hairline below is
+                    * load-bearing: a mostly white screenshot on the
+                    * card's white caption would otherwise read as one
+                    * unbounded blob. */}
+                  <span aria-hidden className="relative block aspect-video w-full flex-none overflow-hidden border-b border-border">
+                    {cover ? (
+                      <img
+                        src={cover}
+                        alt=""
+                        className="absolute inset-0 size-full object-cover object-top transition-transform duration-standard group-hover/card:scale-[1.03]"
+                      />
+                    ) : (
+                      <span className="template-visual-card absolute inset-0" />
+                    )}
+                  </span>
+                  {/* Caption on the card's own paper — no eyebrow;
+                    * title leads (it is also the button's accessible
+                    * name), one short description under it, and the
+                    * category as a quiet mono small-caps label pinned
+                    * to the foot. The caption is a flex column and the
+                    * card a stretching flex item, so labels in one grid
+                    * row bottom-align without reserving a dead line
+                    * under short descriptions. Not a capsule: the
+                    * capsule budget is for identity/status/terminal
+                    * actions, and a passive category marker is the
+                    * site's mono-tick voice. One ink treatment whether
+                    * or not a cover exists. */}
+                  <span className="flex flex-1 flex-col p-5">
+                    <span className="block truncate text-lg leading-tight font-medium tracking-tight text-foreground">
+                      {wiki.name}
+                    </span>
+                    {/* A fixed two-line window: short copy leaves air,
+                      * long copy ellipsizes — every card holds one
+                      * geometry. min-h = 2 lines at leading-relaxed. */}
+                    <span className="mt-1.5 line-clamp-2 block min-h-[3.25em] text-base leading-relaxed text-muted-foreground">
+                      {wiki.description}
+                    </span>
+                    <span className="mt-auto block pt-3 font-mono text-2xs tracking-wider text-muted-foreground uppercase">
+                      {wiki.category}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
       </div>
+      <GalleryDetailOverlay wiki={detailWiki} onClose={() => setDetailWiki(null)} />
     </div>
   );
 }

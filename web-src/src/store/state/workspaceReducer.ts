@@ -86,11 +86,7 @@ function openFile(w: WorkspaceSlice, a: Extract<Action, { type: 'FILE_OPEN' }>):
     if (existing) return activateTab(w, existing);
   }
 
-  // A kind tab (the Wiki Templates gallery) holds `file: null` like a blank
-  // tab but is a PLACE, not an empty slot — filling it in place would leave
-  // a stale `kind` under a document. Route those opens to a fresh tab.
-  const activeIsKindTab = Boolean(getActiveTab(w)?.kind);
-  if (a.newTab || w.activeTabId == null || !getActiveTab(w) || activeIsKindTab) {
+  if (a.newTab || w.activeTabId == null || !getActiveTab(w)) {
     const tab = makeTab();
     tab.file = file;
     tab.editMode = liveEditing;
@@ -302,20 +298,6 @@ export function workspaceReducer(w: WorkspaceSlice, a: Action): WorkspaceSlice |
       return remapPaths(w, a);
     case 'NEW_TAB': {
       const tab = makeTab();
-      return {
-        ...w,
-        tabs: [...w.tabs, tab],
-        editorHistory: rememberActivatedTab(w.editorHistory, tab.id),
-        activeTabId: tab.id,
-        selectedPath: '',
-      };
-    }
-    case 'TEMPLATES_OPEN': {
-      // Singleton: the gallery is a place you return to, not a document
-      // you multiply — reopening focuses the existing tab.
-      const existing = w.tabs.find((t) => t.kind === 'templates');
-      if (existing) return activateTab(w, existing);
-      const tab: Tab = { ...makeTab(), kind: 'templates' };
       return {
         ...w,
         tabs: [...w.tabs, tab],

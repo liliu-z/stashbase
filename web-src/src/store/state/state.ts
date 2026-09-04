@@ -170,12 +170,6 @@ export interface TabConflict {
  *  required cost more to learn than it saved. */
 export interface Tab {
   id: string;
-  /** Special standing page rendered in the main pane instead of a file.
-   *  `templates` is the Wiki Templates gallery — a singleton tab
-   *  (`TEMPLATES_OPEN` focuses the existing one). A kind tab keeps
-   *  `file: null` but is NOT a blank tab: sidebar opens must never fill
-   *  it in place (see `openFile`'s guard). */
-  kind?: 'templates';
   file: OpenFile | null;
   editMode: boolean;
   /** True only after the user changes the live editor buffer. */
@@ -531,7 +525,6 @@ export type Action =
   /** Push an empty tab and activate it (Obsidian-style `+`). The next
    *  single-click in the sidebar lands here. */
   | { type: 'NEW_TAB' }
-  | { type: 'TEMPLATES_OPEN' }
   | { type: 'CLOSE_TAB'; id: string }
   | { type: 'ACTIVATE_TAB'; id: string }
   /** Close every open tab — used on folder switch / "go home". */

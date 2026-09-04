@@ -32,9 +32,13 @@ function configureFakeAgent(fixture: Awaited<ReturnType<typeof createAppFixture>
   fixture.env.STASHBASE_FAKE_MCP_PORT = String(fixture.port);
 }
 
+/** Agent choice moved from the sidebar picker to the blank chat's
+ *  composer pill: open a chat, then rebind it to Codex at the point of
+ *  use (which also records the preference later New Chats read). */
 async function selectCodex(page: LaunchedApp['page']): Promise<void> {
-  await page.getByRole('button', { name: 'Choose agent for new chat' }).click();
-  await page.getByRole('menuitem', { name: 'Codex' }).click();
+  await page.getByRole('button', { name: 'New Chat', exact: true }).click();
+  await page.getByRole('button', { name: /^Agent: / }).click();
+  await page.getByRole('menuitemradio', { name: 'Codex' }).click();
 }
 
 test('J12 builds source-linked Wiki Pages independently from the first-folder setup for search by meaning', async ({}, testInfo) => {
@@ -56,20 +60,17 @@ test('J12 builds source-linked Wiki Pages independently from the first-folder se
     const heading = panel.getByRole('heading', { name: 'Your Wiki is here.' });
     await expect(heading).toBeVisible();
 
-    // The standing Build Wiki capsule retired: starting a wiki lives in
-    // the Templates gallery, entered from its sidebar row under New Chat.
-    await app.page.getByRole('button', { name: 'Templates', exact: true }).click();
-    const gallery = app.page.getByRole('heading', { name: 'Start faster with a template.' });
-    await expect(gallery).toBeVisible();
-    // Knowledge Base leads the organize section (templates.ts) — the
-    // classic Build Wiki action. The start-a-project section precedes it
-    // on the page, so the card is targeted by name rather than by order.
-    await app.page.getByRole('button', { name: /Knowledge Base/ }).click();
-    await expect(app.page.getByRole('heading', { name: 'Set up search by meaning' })).toHaveCount(0);
+    // Starting a wiki is a plain conversation now: the user asks in the
+    // composer (the Gallery's detail page offers the same request through
+    // Copy prompt), and Agent Instructions carry the durable contract —
+    // the visible request is exactly what the Agent receives.
     const composer = panel.locator('[aria-label="Message agent"]');
-    await expect(composer).toContainText('Build or update Wiki Pages from these Sources.');
+    await expect(composer).toHaveAttribute('contenteditable', 'true');
+    await composer.fill('Build or update Wiki Pages organizing these notes: one page per topic, linked into a browsable wiki.');
     await panel.getByRole('button', { name: 'Send message' }).click();
-    await expect(panel.getByText('Build or update Wiki Pages from these Sources.', { exact: true })).toBeVisible();
+    // Building a wiki neither opens nor blocks search-by-meaning setup.
+    await expect(app.page.getByRole('heading', { name: 'Set up search by meaning' })).toHaveCount(0);
+    await expect(panel.getByText('Build or update Wiki Pages organizing these notes: one page per topic, linked into a browsable wiki.', { exact: true })).toBeVisible();
     await expect(panel.getByText('Allow Codex to write wiki/index.md?')).toBeVisible();
 
     await panel.getByRole('button', { name: 'Allow', exact: true }).click();

@@ -189,7 +189,6 @@ export function AgentRuntimeGate({
   onOpenAccount,
   onCopyInstall,
   onOpenMcpSetup,
-  footer,
 }: {
   runtime: Agent | undefined;
   fallbackName: string;
@@ -207,8 +206,6 @@ export function AgentRuntimeGate({
   onOpenAccount: () => void;
   onCopyInstall: () => void;
   onOpenMcpSetup: () => void;
-  /** A capability action that remains visible while setup blocks Chat. */
-  footer?: ReactNode;
 }) {
   let card: ReactNode;
   if (!runtime) {
@@ -243,7 +240,6 @@ export function AgentRuntimeGate({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {card}
-      {footer && <div className="shrink-0 px-3 pb-8">{footer}</div>}
     </div>
   );
 }

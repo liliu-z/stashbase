@@ -19,7 +19,13 @@
  * so the current values read back one click deep and a default effort
  * claims no bar space at all.
  */
-import { useState, type ReactNode } from 'react';
+import { useState, useSyncExternalStore, type ReactNode } from 'react';
+import {
+  AGENTS, AGENT_META, wikiAgentLauncherDetail, type AgentKind,
+} from '@/common/lib/agentCatalog';
+import {
+  accountSignedInSnapshot, subscribeAccountSignedIn,
+} from '@/common/lib/accountEvents';
 import {
   Menu, MenuPopup, MenuPortal, MenuPositioner, MenuTrigger,
 } from '@/common/components/ui/menu';
@@ -316,6 +322,68 @@ export function ModeMenu({ mode, disabled }: {
               {MODES.map((m) => (
                 <MenuRadioItem key={m.id} value={m.id}>
                   <MenuOptionContent icon={m.Icon} title={m.label} description={m.desc} />
+                </MenuRadioItem>
+              ))}
+            </MenuRadioGroup>
+          </MenuPopup>
+        </MenuPositioner>
+      </MenuPortal>
+    </Menu>
+  );
+}
+
+/** Agent control for the composer bar's leading pill — which agent this
+ *  not-yet-started chat talks to. Only a blank chat shows it: a started
+ *  conversation belongs to its agent, so the pill leaves the bar rather
+ *  than sit disabled forever. Picking rebinds the CURRENT tab (the
+ *  choice is visible at the point of use, unlike the old sidebar picker
+ *  that silently set "the next chat"). */
+export interface ComposerAgentControl {
+  show: boolean;
+  current: AgentKind;
+  onPick: (agent: AgentKind) => void;
+}
+
+export function AgentMenu({ agentPick, disabled }: {
+  agentPick: ComposerAgentControl;
+  disabled: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const accountSignedIn = useSyncExternalStore(
+    subscribeAccountSignedIn,
+    accountSignedInSnapshot,
+    accountSignedInSnapshot,
+  );
+  const current = AGENT_META[agentPick.current];
+
+  return (
+    <Menu open={open} onOpenChange={setOpen}>
+      <MenuTrigger
+        render={<Pill className="max-w-40" />}
+        disabled={disabled}
+        aria-label={`Agent: ${current.launcherLabel}`}
+        title="Choose the agent for this chat"
+      >
+        {current.launcherLabel}
+      </MenuTrigger>
+      <MenuPortal>
+        <MenuPositioner side="top" align="start" sideOffset={6}>
+          <MenuPopup className="w-72">
+            <MenuRadioGroup
+              value={agentPick.current}
+              onValueChange={(value) => {
+                agentPick.onPick(value as AgentKind);
+                setOpen(false);
+              }}
+            >
+              <MenuGroupLabel>Agent</MenuGroupLabel>
+              {AGENTS.map((agent) => (
+                <MenuRadioItem key={agent.id} value={agent.id}>
+                  <MenuOptionContent
+                    icon={agent.Icon}
+                    title={agent.launcherLabel}
+                    description={agent.id === 'stashbase' ? wikiAgentLauncherDetail(accountSignedIn) : undefined}
+                  />
                 </MenuRadioItem>
               ))}
             </MenuRadioGroup>

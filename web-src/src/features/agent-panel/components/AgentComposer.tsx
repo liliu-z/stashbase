@@ -23,8 +23,8 @@ import { ScopeMenu } from '@/common/components/ScopeMenu';
 import { MentionComposer, type MentionComposerHandle } from '@/features/agent-panel/components/MentionComposer';
 import { SimilaritySearchControl } from '@/features/agent-panel/components/SimilaritySearchControl';
 import {
-  ModelEffortMenu, ModeMenu, nextPermMode,
-  type ComposerEffortControl, type ComposerModeControl, type ComposerModelControl,
+  AgentMenu, ModelEffortMenu, ModeMenu, nextPermMode,
+  type ComposerAgentControl, type ComposerEffortControl, type ComposerModeControl, type ComposerModelControl,
 } from '@/features/agent-panel/components/ComposerPills';
 import {
   MentionSuggestions, useMentionSuggestions,
@@ -35,7 +35,7 @@ import type { AgentSkill, Attachment } from '@/features/agent-panel/lib/types';
 /* The composer's prop contract stays readable from one place even though
  * the pill and mention halves are owned by the modules that render them. */
 export type {
-  ComposerEffortControl, ComposerModeControl, ComposerModelControl,
+  ComposerAgentControl, ComposerEffortControl, ComposerModeControl, ComposerModelControl,
 } from '@/features/agent-panel/components/ComposerPills';
 export type {
   ComposerMentionSources, ComposerSkillSource,
@@ -130,13 +130,17 @@ export interface ComposerAttachments {
 export function AgentComposer({
   phase, disabled, turnActive, active, agentShortName, hero,
   mode, effort, model, scope, similaritySearch, mentions, skills, attachments,
-  closedPlaceholder, seedText, onSeedConsumed, onDraftChange, onFocusChange, onSend, onStop,
+  agentPick,
+  closedPlaceholder, onDraftChange, onFocusChange, onSend, onStop,
 }: {
   phase: 'connecting' | 'live' | 'closed';
   disabled: boolean;
   turnActive: boolean;
   active: boolean;
   agentShortName: string;
+  /** The leading agent pill — who this not-yet-started chat talks to.
+   *  Absent (or `show: false`) once a conversation exists. */
+  agentPick?: ComposerAgentControl;
   /** Empty-chat PRESENTATION only — the resting height and the one
    * sanctioned shadow. Width is deliberately NOT part of it: both layouts
    * mount the same instance at the same measure. */
@@ -153,12 +157,6 @@ export function AgentComposer({
   mentions: ComposerMentionSources;
   skills: ComposerSkillSource;
   attachments: ComposerAttachments;
-  /** One-shot text the session asks the composer to hold — a Template's
-   * staged prompt placed as an editable draft, never auto-sent. Consumed
-   * (and acknowledged) the moment it lands, so a later remount cannot
-   * place it twice. */
-  seedText?: string | null;
-  onSeedConsumed?: () => void;
   /** Reports whether the composer holds unsent draft text, so the tab
    * model can freeze a drafted tab's scope and exclude it from blank-tab
    * reuse. */
@@ -180,19 +178,6 @@ export function AgentComposer({
   });
 
   useEffect(() => { if (active) composerRef.current?.focus(); }, [active]);
-
-  /* A staged Template prompt lands as an editable draft the moment it is
-   * offered (including on mount, when the session armed it while a
-   * runtime gate stood where this composer now is). Acknowledged only
-   * once it actually LANDS — the editor mounts in a child effect, so it
-   * exists by the time this runs, but a not-yet-mounted view must leave
-   * the seed armed rather than swallow it. */
-  useEffect(() => {
-    if (seedText == null) return;
-    if (composerRef.current?.insertText(seedText)) onSeedConsumed?.();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the ack
-    // callback's identity must not re-run a consumed seed.
-  }, [seedText]);
 
   function cycleMode() {
     mode.onSet(nextPermMode(mode.value));
@@ -347,6 +332,12 @@ export function AgentComposer({
             * how it compares. Durable Agent Instructions live in the panel
             * toolbar rather than this conversation-control popup. Only the
             * scope itself is worth the docked bar's width. */}
+          {/* WHO leads the bar: the agent pill sits before where and
+            * how, and only while the chat is still unclaimed. Never
+            * disabled with the composer: rebinding an unclaimed tab is
+            * renderer-local (no wire), and a runtime-gated chat NEEDS
+            * the pill live — it is the way out of a gated agent. */}
+          {agentPick?.show && <AgentMenu agentPick={agentPick} disabled={false} />}
           <ScopeMenu
             scope={scope.current}
             entries={scope.entries}

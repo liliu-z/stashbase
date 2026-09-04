@@ -15,7 +15,7 @@
  */
 import { lazyWithRetry } from '@/common/components/ErrorBoundary';
 
-export { NewChatButton } from '@/features/agent-panel/components/NewChatButton';
+export { NewChatButton, launcherRowClass } from '@/features/agent-panel/components/NewChatButton';
 export { ScopeHistoryButton } from '@/features/agent-panel/components/ScopeHistoryButton';
 
 export { useAgentCatalogPrime } from '@/features/agent-panel/hooks/useAgentCatalogPrime';

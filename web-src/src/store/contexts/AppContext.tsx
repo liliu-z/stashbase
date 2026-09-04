@@ -37,6 +37,7 @@ import {
   type WorkspaceSlice,
 } from '@/store/state/state';
 import { rememberPreferredAgent } from '@/common/lib/agentPreference';
+import { openGalleryOverlay } from '@/common/lib/galleryTrigger';
 import { newChatPlan } from '@/store/lib/chatTabPlan';
 import { useLatestRef } from '@/common/hooks/useLatestRef';
 import { useFeedbackActions } from '@/store/hooks/useFeedbackActions';
@@ -354,7 +355,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     primeFind,
   });
 
-  const actions = useMemo<AppActions>(() => ({
+  const actions = useMemo<AppActions>(() => {
+    const activateChatTab: AppActions['activateChatTab'] = (agent) => {
+      rememberPreferredAgent(agent);
+      const current = stateRef.current.chat;
+      const plan = newChatPlan(current.chatTabs, agent);
+      if (plan.kind === 'reuse') {
+        if (plan.switchAgent) dispatch({ type: 'CHAT_TAB_SET_AGENT', id: plan.id, agent });
+        dispatch({ type: 'CHAT_TAB_ACTIVATE', id: plan.id });
+      } else {
+        dispatch({ type: 'CHAT_TAB_NEW', tab: makeChatTab(agent, current.chatTabs) });
+      }
+      if (!current.chatOpen) dispatch({ type: 'CHAT_TOGGLE' });
+    };
+    return {
     bootstrap: workspace.bootstrap, openFolder: workspace.openFolder, openFolderByName: workspace.openFolderByName,
     loadFiles: workspace.loadFiles, markVisibleFilesPendingForSearch: workspace.markVisibleFilesPendingForSearch,
     refreshIndexState: workspace.refreshIndexState, runSync: workspace.runSync,
@@ -381,18 +395,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         tab: hasOpenTab ? undefined : makeChatTab(agent, current.chatTabs),
       });
     },
-    activateChatTab: (agent) => {
-      rememberPreferredAgent(agent);
-      const current = stateRef.current.chat;
-      const plan = newChatPlan(current.chatTabs, agent);
-      if (plan.kind === 'reuse') {
-        if (plan.switchAgent) dispatch({ type: 'CHAT_TAB_SET_AGENT', id: plan.id, agent });
-        dispatch({ type: 'CHAT_TAB_ACTIVATE', id: plan.id });
-      } else {
-        dispatch({ type: 'CHAT_TAB_NEW', tab: makeChatTab(agent, current.chatTabs) });
-      }
-      if (!current.chatOpen) dispatch({ type: 'CHAT_TOGGLE' });
-    },
+    activateChatTab,
+    openGallery: () => openGalleryOverlay(),
     newNote: workspace.newNote, newFolder: workspace.newFolder, deleteFile: workspace.deleteFile, deleteFolder: workspace.deleteFolder,
     renameFile: workspace.renameFile, renameFolder: workspace.renameFolder, moveFile: workspace.moveFile,
     reprocessFile: workspace.reprocessFile, revealFile: workspace.revealFile, toggleShowHiddenFiles: workspace.toggleShowHiddenFiles, copyFileLink: workspace.copyFileLink, upload: workspace.upload,
@@ -403,7 +407,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     registerEditor: workspace.registerEditor,
     registerFindController, openFind, closeFind, setFindQuery,
     toggleFindCaseSensitive, toggleFindWholeWord, findNext, findPrev,
-  }), [
+    };
+  }, [
     workspace,
     resolveCascadePrompt,
     showAlert, askConfirm, resolveModal, toast,

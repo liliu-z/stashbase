@@ -23,13 +23,20 @@ and uses a hosted service only as its metered model provider.
 - Chat begins expanded. With no document it is the primary work surface;
   opening a source docks the same mounted session beside it, and closing the
   last source expands an open Chat again.
-- A blank Chat keeps the durable greeting **Your Wiki is here**. Starting a
-  wiki lives in the **Templates** gallery — a singleton main-pane tab opened
-  from its sidebar row under New Chat — where each card places one complete
-  product-owned preset as an editable draft (the Knowledge Base card in the
-  organize section is the classic Build Wiki request). Nothing stands below
-  the composer at rest; while a used Template waits on Agent setup, its
-  progress line (with cancel) sits there.
+- A blank Chat keeps the durable greeting **Your Wiki is here**. In a bare
+  window every contentless Chat derives the **Gallery** band below its
+  composer, one scrolling page with the hero: ready-made Wikis to download
+  and open (see [Workspace](workspace.md) for the shop's two forms and the
+  no-folder contract). The first sent turn replaces the band with the
+  transcript, a folder window never shows the band, and a runtime gate
+  keeps it reachable beneath its card. A gated contentless Chat also keeps
+  its composer bar visible with the agent pill live: switching a chat that
+  has not started to another Agent never requires resolving the gated
+  one's install or sign-in first. Starting a wiki over the user's own
+  files is a plain conversation: the user asks in the composer (an entry's
+  detail page offers its exact request through **Copy prompt**), and the
+  durable Wiki behavior lives in Agent Instructions, so the visible
+  request is exactly what the Agent receives.
   The greeting and composer remain one vertically centered action group. A
   Library-scoped blank Chat stays focused on the greeting and composer without
   a bottom suggestion carousel.
@@ -42,12 +49,14 @@ and uses a hosted service only as its metered model provider.
   `search_library` text-only. Both states retain direct and prepared document
   retrieval; asking to turn it On while searching by meaning isn't set up
   opens the explicit setup path.
-- For a Chat with a concrete working folder, **Agent Instructions** is a glyph
-  action at the right of the Chat tab strip, separate from conversation controls
-  and sharing a centre line with the chat-panel toggle beside it. It edits that
-  concrete working folder — named in its tooltip — and a quiet dot shows when that folder
-  customizes the default. Library-wide Chats use the packaged default and do
-  not show a misleading Library-wide editor.
+- **Agent Instructions** is a glyph action at the right of the Chat tab strip,
+  separate from conversation controls and sharing a centre line with the
+  chat-panel toggle beside it. It edits the active Chat's scope — the concrete
+  working folder, or the Library scope for a Library-wide Chat — named in its
+  tooltip, and a quiet dot shows when that scope customizes its packaged
+  default. The Library scope has its own default, oriented toward locating
+  work across folders and starting new projects (asking before creating one),
+  rather than maintaining one folder's Wiki.
   The editor saves in StashBase rather than the source tree, and saving takes
   effect from the next message in every open Chat already using that folder,
   not only in Chats started afterwards — the editor opens from the tab strip,
@@ -94,8 +103,6 @@ and uses a hosted service only as its metered model provider.
   An idle Codex conversation can change the model used by its next turn without
   replacing its native thread; the picker pauses while a turn is active. Claude
   keeps its selected model fixed after the conversation has content.
-  A Template places a complete capability request in the composer rather than
-  sending it automatically; the user may edit it before sending.
 - Streaming, tool activity, permissions, runtime-supported attachments, skills, recovery, and
   file artifacts remain inspectable. Collapsed tool summaries omit exact
   counts while using grammatical singular or plural category labels. Editing
@@ -146,13 +153,10 @@ and uses a hosted service only as its metered model provider.
 - Opening, switching, or resuming an Agent tab is not installation consent.
   The included runtime needs no install action; each missing bring-your-own
   runtime waits for its own explicit setup action.
-- A used Template (the classic Build Wiki preset included) pins its blank
-  tab to the shown folder and retains one cancellable, renderer-local
-  pending intent across selected-Agent setup or reconnect. Once the runtime
-  is ready, the preset is placed as an editable draft exactly once in that tab;
-  the user remains the party who sends it. Setup for search by meaning is
-  independent and never blocks this intent. Folder removal cancels it; app
-  restart never restores it.
+- The Gallery never speaks for the user: its one prompt affordance is
+  **Copy prompt** on an entry's detail page, and nothing the Gallery does
+  places or sends composer text. Setup for search by meaning is independent
+  of building a wiki and never blocks a sent request.
 - The **Search by meaning** switch is live session policy, not Agent
   permission mode. The renderer sends the effective value before any
   ready-transition prompt and reapplies it when searching by meaning becomes
@@ -165,9 +169,9 @@ and uses a hosted service only as its metered model provider.
   default. The resolved text is the only StashBase-owned Agent prompt; Runtime
   Adapters inject it verbatim without another product preamble or hidden MCP
   instruction.
-- Every Template preset (Build Wiki included) places only its visible concise
-  request in the composer. Wiki Page placement and maintenance behavior live
-  in Agent Instructions rather than a second hidden wire prompt.
+- The user's visible request is exactly what the Agent receives. Wiki Page
+  placement and maintenance behavior live in Agent Instructions rather than
+  a second hidden wire prompt.
 - A runtime, transport, or turn failure leaves one persistent explanation and
   a truthful, stage-specific recovery path. Retrying preparation resumes from
   the first incomplete stage. After an installation failure, **Check again**
@@ -265,7 +269,8 @@ Codex and Claude Code retain the full native cwd and history migration contract.
 Journeys: [J01](../user-journeys.md#j01-complete-onboarding-and-reach-first-value),
 [J06](../user-journeys.md#j06-start-and-continue-an-agent-chat), and
 [J07](../user-journeys.md#j07-converge-chat-into-a-document), plus
-[J12](../user-journeys.md#j12-build-wiki-pages-from-a-local-folder). The complete
+[J12](../user-journeys.md#j12-build-wiki-pages-from-a-local-folder) and
+[J13](../user-journeys.md#j13-download-a-ready-made-wiki-from-the-gallery). The complete
 source-to-Agent-to-source route is the
 [J10](../user-journeys.md#j10-turn-a-local-project-into-durable-agent-assisted-work)
 core loop. A Library Chat becomes a new durable project through

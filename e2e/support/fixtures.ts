@@ -189,6 +189,10 @@ export async function createAppFixture(
     // credential-free Agent journey opts into its fake executable explicitly.
     STASHBASE_AGENT_DEBUG: '1',
     STASHBASE_AGENT_DISCOVERY_POLICY: 'managed-only',
+    // Pin the Gallery's index upstream to an unreachable port: the daemon
+    // proxy fails fast, the renderer falls back to its bundled snapshot,
+    // and journeys/screenshots never follow the published index.
+    STASHBASE_GALLERY_INDEX_URL: 'http://127.0.0.1:9/gallery.json',
     TZ: 'UTC',
     LANG: 'en_US.UTF-8',
   };

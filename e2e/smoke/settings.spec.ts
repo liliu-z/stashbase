@@ -114,8 +114,9 @@ test('signed-in Google identity is consistent in the sidebar, account menu, and 
     await expect(accountButton).toBeVisible();
     await expect(accountButton).toContainText('Ada Lovelace');
 
-    await app.page.getByRole('button', { name: 'Choose agent for new chat' }).click();
-    const wikiAgent = app.page.getByRole('menuitem').filter({ hasText: 'Wiki Agent' });
+    await app.page.getByRole('button', { name: 'New Chat', exact: true }).click();
+    await app.page.getByRole('button', { name: /^Agent: / }).click();
+    const wikiAgent = app.page.getByRole('menuitemradio').filter({ hasText: 'Wiki Agent' });
     await expect(wikiAgent).toContainText('Free credits included');
     await app.page.keyboard.press('Escape');
     await expect(accountButton.locator('img[src="/api/account/avatar"]')).toBeVisible();

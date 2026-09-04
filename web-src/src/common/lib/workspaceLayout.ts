@@ -4,9 +4,9 @@ export type WorkspaceLayout = 'document' | 'split' | 'chat-primary';
 
 /** Presentation-only layout policy. RAG and CoWork share the same workspace;
  * the presence of a document is enough to choose between chat-first and
- * side-by-side collaboration. (A bare window still boots into `split`
- * through this rule with no special case: boot opens the Templates tab
- * there, and a kind tab counts as a document.) */
+ * side-by-side collaboration. (A bare window boots into `chat-primary`
+ * through this rule with no special case: nothing opens in the main pane,
+ * and the boot chat leads with the Gallery band under its composer.) */
 export function resolveWorkspaceLayout({
   chatOpen,
   hasDocument,

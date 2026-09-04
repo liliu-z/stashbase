@@ -123,6 +123,10 @@ export interface AppActions {
    *  AgentView's explicit "Install and continue" gate; tab activation
    *  alone is never consent to download another Agent. */
   activateChatTab: (agent: AgentKind) => void;
+  /** The sidebar's Gallery row: raise the Gallery overlay over the
+   *  workspace. The inline band under a bare window's blank chat needs
+   *  no action — it derives from window state. */
+  openGallery: () => void;
 
   newNote: () => Promise<void>;
   newFolder: (path: string) => Promise<void>;

@@ -62,6 +62,7 @@ aliases, and Journey E2E owns representative composition.
 | [J10 Core loop](../design-docs/user-journeys.md#j10-turn-a-local-project-into-durable-agent-assisted-work) | [Workspace](../design-docs/design/workspace.md), [Documents](../design-docs/design/documents.md), [Preparation](../design-docs/design/preparation.md), [Search](../design-docs/design/search.md), [Agent Panel](../design-docs/design/agent-panel.md) | [Renderer Workspace](renderer-workspace.md), [Data Lifecycle](data-lifecycle.md), [Agent Runtime](agent-runtime.md), [Agent Panel](agent-panel.md), [MCP Access](mcp-access.md), [File Transactions](file-transactions.md), [Markdown Rendering](markdown-rendering.md) |
 | [J11 Conversation to project](../design-docs/user-journeys.md#j11-turn-a-conversation-into-a-project) | [Workspace](../design-docs/design/workspace.md), [Agent Panel](../design-docs/design/agent-panel.md) | [Renderer Workspace](renderer-workspace.md), [Settings and Config](settings-config.md), [MCP Access](mcp-access.md), [Agent Runtime](agent-runtime.md), [Agent Panel](agent-panel.md), [File Transactions](file-transactions.md), [Data Lifecycle](data-lifecycle.md) |
 | [J12 Build Wiki Pages](../design-docs/user-journeys.md#j12-build-wiki-pages-from-a-local-folder) | [Agent Panel](../design-docs/design/agent-panel.md), [Search](../design-docs/design/search.md), [Workspace](../design-docs/design/workspace.md) | [Agent Panel](agent-panel.md), [Settings and Config](settings-config.md), [Renderer Workspace](renderer-workspace.md), [File Transactions](file-transactions.md), [Data Lifecycle](data-lifecycle.md) |
+| [J13 Gallery download](../design-docs/user-journeys.md#j13-download-a-ready-made-wiki-from-the-gallery) | [Agent Panel](../design-docs/design/agent-panel.md), [Workspace](../design-docs/design/workspace.md) | [Agent Panel](agent-panel.md) |
 
 ## J01: Onboarding
 
@@ -374,17 +375,16 @@ aliases, and Journey E2E owns representative composition.
 
 **Status:** Partial and release-dependent.
 
-- **Contract Test:** renderer tests cover the Templates handoff, the concise
-  editable draft with no automatic wire send, the one-time first-folder setup
-  offer and durable **Not now**, manual setup reopening, and the preset's
-  independence from embedding authorization. Agent, file-transaction, and
-  data-lifecycle suites cover approval, source confinement, write
-  reconciliation, and index admission.
+- **Contract Test:** renderer tests cover the one-time first-folder setup
+  offer and durable **Not now**, manual setup reopening, and the send
+  path's independence from embedding authorization. Agent,
+  file-transaction, and data-lifecycle suites cover approval, source
+  confinement, write reconciliation, and index admission.
 - **Journey E2E:** [Agent workflows](../e2e/journeys/agent-workflows.spec.ts)
-  handles the first-folder setup offer for search by meaning, uses the
-  Knowledge Base Template independently through the deterministic fake Codex runtime,
-  reviews and sends its draft, approves a real MCP **wiki/index.md** write,
-  observes the directory in the tree, and
+  handles the first-folder setup offer for search by meaning, sends a
+  typed Build Wiki request through the deterministic fake Codex runtime,
+  approves a real MCP **wiki/index.md** write, observes the directory in
+  the tree, and
   proves an original source stayed byte-identical. [Library navigation](../e2e/journeys/library-navigation.spec.ts)
   separately proves the bare Library remains quiet, the first active folder
   offers setup, later folder switches stay quiet after **Not now**, and the
@@ -400,6 +400,34 @@ aliases, and Journey E2E owns representative composition.
   source-link correctness, or preservation under ambiguous existing Wiki
   content. The first release intentionally claims no persistent ready/stale
   state, Update Wiki Pages label, or scheduled regeneration.
+
+## J13: Gallery download
+
+**Status:** Partial.
+
+- **Contract Test:** renderer tests
+  ([gallery.test.ts](../web-src/src/features/templates/__tests__/gallery.test.ts))
+  cover the index contract: whole-parse-or-whole-fallback, session
+  caching, fallback-not-cached, and snapshot enrichment of unpublished
+  fields. [server/routes/gallery.test.ts](../server/routes/gallery.test.ts)
+  covers the daemon proxy: upstream proxying with cache, the offline
+  unsupported-schema envelope, and the image route refusing non-gallery
+  hosts. [github-import tests](../server/__tests__/github-import.test.ts)
+  cover the shared acquisition path.
+- **Journey E2E:** [Gallery](../e2e/journeys/gallery.spec.ts) proves the
+  bare window's inline band renders the snapshot offline, a card opens the
+  entry detail with **Make a copy**, the file tree, and the copy-only
+  prompt, and a folder window reaches the same Gallery as an overlay from
+  its sidebar row. The fixture pins the index upstream unreachable, so
+  E2E never follows the published index.
+- **AI Eval:** none needed — the journey is deterministic acquisition and
+  presentation; no model produces its content.
+- **Release Check:** a packaged build should download one real entry
+  end-to-end (published index, CDN screenshots, GitHub acquisition, new
+  window on the copy).
+- **Gap:** no automated evidence exercises a real download or the
+  published index; both stay release sanity. `learnMore` and
+  `starterPrompts` ride the index contract but have no app surface yet.
 
 ## Maintenance Rule
 

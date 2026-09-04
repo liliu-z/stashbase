@@ -492,8 +492,8 @@ const CSS_OFF_RAMP_EXEMPTIONS: Record<string, { values: string[]; why: string }>
     why: 'The sidebar splitter’s `margin-left` is -width/2, the offset that straddles its 6px grab area evenly across the sidebar/main boundary that `left` puts it on. Not an amount of air: any other value hands more of the grab zone to one pane than the other.',
   },
   'features/templates/templates.css': {
-    values: ['1.5px', '1.5px', '1.5px', '1.5px', '3.5px', '5px'],
-    why: 'The four 1.5px values are the optical stroke width of the template illustration’s tiny crop marks. The gradient coordinates tune rasterization too: 3.5px begins its half-pixel antialias ramp and 5px ends its one-pixel ink stripe. None answers how much layout space surrounds an element.',
+    values: ['1.5px'],
+    why: 'A gradient coordinate tuning rasterization rather than layout: 1.5px softens the template dot edge with a half-pixel antialias ramp. It does not answer how much layout space surrounds an element.',
   },
 };
 
@@ -788,7 +788,11 @@ const RAW_CONTROL_EXEMPTIONS: Record<string, { count: number; why: string }> = {
   },
   'features/templates/TemplatesView.tsx': {
     count: 1,
-    why: 'Template cards — the setup-card reasoning again: the whole card is the target, multi-line, left-aligned, square-cornered in the site-styled gallery, full opacity when disabled. Adopting `Button` would start by cancelling display, height, alignment, wrapping, and corner.',
+    why: 'The gallery card — one whole-card click target (cover strip over caption) opening the entry detail. `Button` is a centred single-line -ui-cornered ITEM; a media card face cancels its display, padding, corner, and type before it helps.',
+  },
+  'features/templates/detail/GalleryDetailOverlay.tsx': {
+    count: 2,
+    why: 'The read-only file tree’s folder-toggle rows and the screenshot thumbnails. Both are content-shaped targets (an indented tree row, an image tile), not centred single-line items — `Button` would be cancelled wholesale before it contributed.',
   },
   'features/settings/components/TranscriptionPanel.tsx': {
     count: 1,

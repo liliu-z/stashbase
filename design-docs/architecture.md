@@ -149,6 +149,12 @@ Format completion, scheduler, freshness, quota, and cleanup rules live in
   exception tracked in
   [Document Viewers](../code-review/document-viewers.md#trust-boundary).
 - External URLs and local-file navigation follow explicit, validated paths.
+- The renderer never reaches the open internet: its CSP pins network and
+  image loading to the local daemon. The Gallery's published index and
+  screenshots arrive only through the daemon's gallery proxy, which pins
+  its upstreams to the gallery's own CDN hosts and refuses any other
+  source, so it cannot be bent into a general-purpose proxy (engineering
+  contract in [Agent Panel](../code-review/agent-panel.md#gallery)).
 - Network, commands, deletion, rename, and broader filesystem access remain
   explicit approval decisions in the Agent Panel.
 - Every Wiki Agent panel session receives a private OpenCode server

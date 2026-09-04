@@ -12,6 +12,7 @@ import {
   shouldOpenInitialChatOnWindowEntry,
   switchWelcomeTabPlan,
 } from '@/features/agent-panel/lib/folderState';
+import { blankTabToReuse } from '@/store/lib/chatTabPlan';
 import { makeChatTab, type Action, type ChatSlice, type WorkspaceSlice } from '@/store/state/state';
 import { shouldAutoCollapseChat } from '@/common/lib/workspaceLayout';
 
@@ -41,18 +42,34 @@ export function useChatLayoutFollowUp(
       );
       defaultChatFolderRef.current = '';
       if (shouldOpen) {
-        const agent = readPreferredAgent();
+        // A bare window's boot opens its one chat; the Gallery band
+        // under the composer needs no flag here — every contentless
+        // chat in a bare window derives it from window state.
         dispatch({
           type: 'CHAT_AGENT_OPEN',
-          agent,
-          tab: makeChatTab(agent, state.chatTabs),
+          agent: readPreferredAgent(),
+          tab: makeChatTab(readPreferredAgent(), state.chatTabs),
         });
+      } else {
+        // The window just went bare with chats still open (folder removal /
+        // library retirement). Land back on a completely blank tab — bare,
+        // it derives the Gallery band, and the sidebar keeps its Choose
+        // Folder row, so the window keeps a visible way into a folder.
+        // Started chats are user work and are never re-purposed.
+        const blankId = blankTabToReuse(state.chatTabs, readPreferredAgent());
+        if (blankId && state.activeChatTabId !== blankId) {
+          dispatch({ type: 'CHAT_TAB_ACTIVATE', id: blankId });
+        }
       }
       return;
     }
     if (defaultChatFolderRef.current === state.folderPath) return;
     defaultChatFolderRef.current = state.folderPath;
     const agent = readPreferredAgent();
+    // No Gallery bookkeeping on folder bind: the bare-window band is
+    // derived from window state and stops by itself the moment the
+    // folder is set; the summoned form is an app-level overlay that
+    // never touches chat tabs.
     // Chat tabs (and their scope-bound sessions) survive folder switches. A
     // switch with existing chats activates a welcome tab for the new
     // folder without touching panel visibility — reusing a completely

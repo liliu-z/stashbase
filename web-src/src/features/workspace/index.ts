@@ -8,8 +8,8 @@
  *
  * Everything here is eager on purpose: each surface is either always
  * mounted (splitters, folder switcher) or mounted the moment the window
- * resolves its folder state (the file tree, the bare window's folder
- * actions) or opens a tab, so a lazy boundary would only add a flash.
+ * resolves its folder state (the file tree) or opens a tab, so a lazy
+ * boundary would only add a flash.
  */
 import { lazyWithRetry } from '@/common/components/ErrorBoundary';
 import './workspace.css';
@@ -22,7 +22,6 @@ export { EmptyTabLanding } from '@/features/workspace/components/EmptyTabLanding
  * a hover-revealed trigger tolerates a late mount invisibly. */
 export const FolderHeaderMenu = lazyWithRetry(() =>
   import('@/features/workspace/components/FolderHeaderMenu').then((mod) => ({ default: mod.FolderHeaderMenu })));
-export { SidebarFolderActions } from '@/features/workspace/components/SidebarFolderActions';
 export { FileTree } from '@/features/workspace/components/FileTree';
 export { FolderSwitcher } from '@/features/workspace/components/FolderSwitcher';
 export { MoveFilePicker } from '@/features/workspace/components/MoveFilePicker';
@@ -37,6 +36,9 @@ export { useLibraryReconcile } from '@/features/workspace/hooks/useLibraryReconc
 export { useOpenFolderWindow } from '@/features/workspace/hooks/useOpenFolderWindow';
 
 export { openMoveFilePicker } from '@/features/workspace/lib/moveFilePickerTrigger';
+/* The two core add-folder flows, shared so the sidebar's Choose Folder
+ * row and the switcher menu serve the same implementation. */
+export { folderPickerFlows } from '@/features/workspace/lib/addFolderMenu';
 
 /* `refreshLibraryMembership` (lib/libraryMembership.ts) is deliberately
  * absent: the membership resync is a consequence of a folder mutation,

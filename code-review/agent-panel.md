@@ -14,11 +14,11 @@
   required. Otherwise it creates a new tab. No started tab is hijacked.
 - A blank tab may follow a window folder switch. Draft or attachments freeze
   the scope visible to the user; content and resumed history remain pinned.
-- A used Template promotes the shown folder to an explicit pick immediately.
-  Its renderer-local pending intent counts as non-blank, locks the scope
-  control, survives the setup/runtime reconnects it initiated, and clears
-  before its one preset send. Cancel restores the prior pick; folder retirement
-  drops the intent; no reducer or native history persists it across restart.
+- The Gallery holds no chat state: the inline band is DERIVED (bare window
+  and contentless chat — no tab flag, no reducer field), the overlay is an
+  app-level dialog outside chat tabs, and nothing the Gallery does places,
+  pins, or sends composer text. Its one prompt affordance is explicit
+  clipboard copy on the entry detail.
 - A structured `scope-removed` exit retires only Chats bound to that member. A
   completely blank tab reconnects in place with an explicit Library scope. A
   tab containing any user work preserves its tab, draft, attachments,
@@ -46,6 +46,10 @@
 - Tab activation and history resume only select renderer state. A missing
   runtime remains on the setup gate until **Install and continue**; activation
   code must not call the preparation endpoint speculatively.
+- A runtime-gated contentless chat still renders its composer bar under the
+  gate card with the agent pill ENABLED (rebinding an unclaimed tab is
+  renderer-local and sends nothing): the pill is the gated agent's way out,
+  and hiding or disabling it would strand the chat on install/sign-in.
 - A validated `scope-changed` event may migrate only the same live
   Library-scoped Chat that created a project. Update the tab binding before the
   owning window enters the new member so the conversation stays selected;
@@ -122,16 +126,15 @@
   the conversation. The binding lock is a rule about the scope VALUE, so a bound
   Chat dims and disables the scope rows in place and says why, rather than
   killing the trigger and taking the retrieval setting down with it.
-- For a Chat with a concrete working folder, Agent Instructions is an action
-  beside the Chat tab list, outside the APG `tablist` and the conversation's
-  scope popup. It resolves the active tab's connected folder (or its visible
-  window folder before binding), opens a
-  managed modal, and loads and saves through the folder-scoped HTTP contract.
-  A Library-wide Chat has no concrete working directory, uses the packaged
-  default, and shows no Instructions editor. A quiet customized marker updates
-  after reads and saves; the absence of that marker means the packaged default
-  is active. Copy says a save applies from the next message and never claims to
-  edit `AGENTS.md` or `CLAUDE.md`.
+- Agent Instructions is an action beside the Chat tab list, outside the APG
+  `tablist` and the conversation's scope popup. It resolves the active tab's
+  scope — its connected folder (or its visible window folder before binding),
+  or the Library scope for a library-bound tab — opens a managed modal, and
+  loads and saves through the scope-addressed HTTP contract (`scope=library`
+  or an absolute member path). A quiet customized marker updates
+  after reads and saves; the absence of that marker means the scope's packaged
+  default is active. Copy says a save applies from the next message and never
+  claims to edit `AGENTS.md` or `CLAUDE.md`.
 - It is a glyph, not a labelled button: it shares a row whose purpose is
   showing which conversations are open, and a label there costs tab width that
   a docked panel does not have. Its one tooltip doubles as the accessible name
@@ -146,12 +149,12 @@
   the conversation has content so the transcript survives, plain reconnect when
   it is blank. This is the same move a thinking-effort change makes, which is
   why it needs no adapter-specific server path. A session remounts only for its
-  own connected folder, and defers to turn-end while a turn is in flight rather
+  own connected scope, and defers to turn-end while a turn is in flight rather
   than stranding a streaming reply.
-- The save is announced as a folder-addressed broadcast, not a callback to the
-  tab that opened the editor. Several mounted Chats can share one folder, so
-  each session decides for itself whether the saved
-  folder is its own; a threaded callback would reach one session and silently
+- The save is announced as a scope-addressed broadcast, not a callback to the
+  tab that opened the editor. Several mounted Chats can share one folder — or
+  the Library scope — so each session decides for itself whether the saved
+  scope is its own; a threaded callback would reach one session and silently
   miss its siblings.
 - The editor is a text field, not a form of caveats. One line under it carries
   the only non-obvious consequence (guidance takes effect from the next
@@ -159,21 +162,27 @@
   names the working folder and stops. The folder name is emphasis by weight —
   accent there read as a link to
   somewhere the press does not go.
-- An unwritten folder opens with the packaged default as real editable text.
-  Clearing and saving removes the customization and reloads that default. The
-  default is short, user-visible Markdown organized around answering questions,
-  making changes, and maintaining Wiki Pages; it states no permission rule,
+- An unwritten scope opens with its packaged default as real editable text.
+  Clearing and saving removes the customization and reloads that default. Both
+  defaults are short, user-visible Markdown; the folder default is organized
+  around answering questions, making changes, and maintaining Wiki Pages,
+  while the Library default is organized around locating work across folders
+  and asking before starting a new project. Neither states a permission rule,
   which is the Mode control's to enforce.
 - CodeMirror owns composer text, selection, undo, and `@`/`/` key handoff. The
   UI remains a capped-height chat input, not an editor workbench.
-- An empty composition renders no rotating suggestion carousel. Starting a
-  wiki lives in the singleton **Templates** gallery opened from the sidebar;
-  nothing stands below the composer at rest. After a card is used, that space
-  carries only the pending Agent-setup progress and cancel action until the
-  preset reaches the composer.
-- The preset places the same concise text in the editable composer that will
-  appear in the transcript if the user sends it. Durable Wiki behavior lives
-  only in Agent Instructions; the action must not carry a second hidden prompt.
+- An empty composition renders no rotating suggestion carousel. The
+  **Gallery** band renders below the hero as one scrolling page with the
+  greeting and composer whenever the window is bare and the chat has no
+  content — derived in `ChatPane` from window state, never a tab flag — and
+  the first sent turn replaces it with the transcript. A runtime gate
+  shares one scroller with the band instead of hiding it. Directly below
+  the composer at rest stands nothing. In a folder window the sidebar's
+  Gallery row raises the app-level overlay (`GalleryOverlayGate`) instead;
+  no chat tab is lent to the shop.
+- The user's visible request is exactly what the Agent receives. Durable Wiki
+  behavior lives only in Agent Instructions; no surface carries a second
+  hidden prompt.
 - File and image context is explicit through mentions and each runtime's
   advertised attachment capability. Selection, drag/drop, and composer-focused
   paste are available only when that runtime can actually read the uploaded
@@ -275,6 +284,28 @@
 - Active thinking or tool work has one liveness cue at a time and becomes
   static under reduced motion.
 
+## Gallery
+
+- The index is a remote contract: `gallery.ts` parses the published gallery
+  index whole or rejects it whole (`schemaVersion` gates shape
+  changes; a broken or future index falls back entirely to the bundled
+  snapshot, never renders half). Snapshot first, one fetch per session;
+  a fallback answer is not cached so the next load retries. Same-id
+  snapshot entries may fill optional fields the published entry has not
+  published; published values win where present.
+- The renderer's CSP keeps `connect-src`/`img-src` at `'self'`: the index
+  and screenshots travel only through the daemon's gallery proxy.
+  `server/routes/gallery.ts` pins the upstream hosts; the image route
+  refuses any `src` outside the gallery CDN prefixes so it cannot become a
+  general-purpose proxy. Total index failure answers a 200 envelope with
+  an unsupported `schemaVersion` (a 5xx would only stamp a console error
+  into every offline session for identical client behavior).
+- Download rides the existing public-GitHub import
+  (`api.importPublicGitHubRepository`) into the folder home and opens the
+  copy in a NEW window; an in-flight latch keeps a double click one
+  download, and failure surfaces one toast. No dialog, no location picker,
+  and the shop window is never taken over.
+
 ## Implementation Map
 
 | Role | Stable entry points |
@@ -284,7 +315,7 @@
 | Account-state projection | `web-src/src/common/lib/accountEvents.ts` publishes the last resolved signed-in state from the lazy `useHostedAccount` owner; eager `NewChatButton.tsx` subscribes to that narrow snapshot so its Wiki Agent credit line changes with identity without pulling account API or OAuth code into the initial bundle |
 | Sidebar entry points | `web-src/src/features/agent-panel/components/NewChatButton.tsx` (the split button, and the only reader of the next-chat agent preference) and `ScopeHistoryButton.tsx` (the per-scope history clock, which owns the `SessionHistoryMenu` lazy boundary). Both are exported from the feature barrel and merely placed by `app/components/Sidebar.tsx`; the sidebar holds no Agent logic of its own |
 | Session state Interface | `web-src/src/features/agent-panel/hooks/useAgentSession.ts` owns transport, event routing, session reset/resume, and the tab-local pending Build Wiki intent, and composes the focused sub-hooks beside it in `web-src/src/features/agent-panel/hooks/`. It returns those owners as named groups (controls, queue, mentions, skills, runtime, transcript, wiki) rather than one flat surface; the transcript rules its events imply are pure Modules in `lib/transcriptEvents.ts` |
-| Transcript/composer Modules | `web-src/src/features/agent-panel/components/AgentMessages.tsx` owns the block list and turn layout over the pure turn model in `lib/turnModel.ts`, with the user half in `AgentUserTurn.tsx` and the tool surface in `AgentToolActivity.tsx`; `AgentComposer.tsx` owns the draft, its send predicate, and the control bar, passing only `SimilaritySearchControl.tsx` into the shared `ScopeMenu` footer; `ChatPane.tsx` places `AgentInstructionsControl.tsx` beside the tab list and owns the captured scope for `AgentInstructionsModal.tsx`; `useAgentInstructionsEditor.ts` owns presence reads plus dialog API ordering and errors; `AgentEmptyState.tsx` owns the blank-chat greeting and pending Template progress, `features/templates/` owns the curated gallery, `common/lib/templateTrigger.ts` owns its one-shot handoff, and `lib/buildWikiPagesPrompt.ts` retains the default preset contract; `MentionComposer.tsx`, `ComposerPills.tsx`, and `SessionHistoryMenu.tsx` own their focused controls |
+| Transcript/composer Modules | `web-src/src/features/agent-panel/components/AgentMessages.tsx` owns the block list and turn layout over the pure turn model in `lib/turnModel.ts`, with the user half in `AgentUserTurn.tsx` and the tool surface in `AgentToolActivity.tsx`; `AgentComposer.tsx` owns the draft, its send predicate, and the control bar, passing only `SimilaritySearchControl.tsx` into the shared `ScopeMenu` footer; `ChatPane.tsx` places `AgentInstructionsControl.tsx` beside the tab list and owns the captured scope for `AgentInstructionsModal.tsx`; `useAgentInstructionsEditor.ts` owns presence reads plus dialog API ordering and errors; `AgentEmptyState.tsx` owns the blank-chat greeting; `features/templates/` owns the Gallery (`gallery.ts` the snapshot-plus-fetch index contract, `TemplatesView.tsx` the band, `detail/GalleryDetailOverlay.tsx` + `detail/useDownloadWiki.ts` the entry detail and download, `GalleryOverlayGate.tsx` + `common/lib/galleryTrigger.ts` the app-level overlay) with `server/routes/gallery.ts` as its daemon proxy; `MentionComposer.tsx`, `ComposerPills.tsx`, and `SessionHistoryMenu.tsx` own their focused controls |
 | State Interfaces | Chat tab state/actions in `web-src/src/store/state/state.ts` and `state/stateReducer.ts`; activation consent in the `activateChatTab` action (`store/contexts/AppContext.tsx`) over `store/lib/chatTabPlan.ts`; focused pure state Modules under `features/agent-panel/lib/` |
 | Runtime transport Adapter | connection URL/lifecycle Modules and `runtimeFailurePresentation.ts` under `features/agent-panel/lib/` over the normalized [Agent Runtime](agent-runtime.md) protocol |
 | Attachment HTTP Adapter | `web-src/src/common/api/api.ts` and `server/routes/attach.ts` |
@@ -299,9 +330,13 @@ Run:
 pnpm typecheck
 pnpm test:renderer
 pnpm test:agent
+pnpm test:library-files
 pnpm build:web
 ```
 
+`pnpm test:renderer` covers the gallery index contract
+(`features/templates/__tests__/`); `pnpm test:library-files` covers the
+daemon's gallery proxy guard (`server/routes/gallery.test.ts`).
 Run `pnpm test:e2e:functional` for the affected Agent journey and
 `pnpm test:e2e:visual` for covered composition changes. Exact protocol fixture
 sequences belong in tests. Real credentials, packaged discovery, and
@@ -310,7 +345,8 @@ clipboard/native Seams remain in release sanity.
 Related journeys: [J01](../design-docs/user-journeys.md#j01-complete-onboarding-and-reach-first-value),
 [J06](../design-docs/user-journeys.md#j06-start-and-continue-an-agent-chat), and
 [J07](../design-docs/user-journeys.md#j07-converge-chat-into-a-document),
-[J12](../design-docs/user-journeys.md#j12-build-wiki-pages-from-a-local-folder), plus
+[J12](../design-docs/user-journeys.md#j12-build-wiki-pages-from-a-local-folder),
+[J13](../design-docs/user-journeys.md#j13-download-a-ready-made-wiki-from-the-gallery), plus
 the [J10](../design-docs/user-journeys.md#j10-turn-a-local-project-into-durable-agent-assisted-work)
 core loop and
 [J11](../design-docs/user-journeys.md#j11-turn-a-conversation-into-a-project)

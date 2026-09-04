@@ -1,27 +1,28 @@
 import '@/common/styles/tree.css';
 import {
   ChevronDownIcon,
+  FolderIcon,
   MoreHorizontalIcon,
   NewFileIcon,
   OutlineIcon,
   SquaresFourIcon,
   StarIcon,
 } from '@/common/components/icons';
+import { electronBridge } from '@/common/lib/electronBridge';
 import { useAppActions, useWorkspace } from '@/store/contexts/AppContext';
 import { useSemanticIndexingNotice } from '@/store/hooks/useSemanticIndexingNotice';
-import { folderScope } from '@/common/lib/libraryScope';
 import { folderRefsEqual } from '@/store/lib/folderPath';
 import { basename, shortenFolderPath } from '@/common/lib/paths';
 import { SidebarAccountRow } from '@/features/account';
-import { NewChatButton, ScopeHistoryButton } from '@/features/agent-panel';
+import { NewChatButton, launcherRowClass } from '@/features/agent-panel';
 import { EmbeddingSetupCallout } from '@/features/preparation';
 import {
   FileTree,
   FolderHeaderMenu,
   RemoveFolderModal,
-  SidebarFolderActions,
   useFolderFavorite,
   useFolderRemoval,
+  folderPickerFlows,
   useLibraryReconcile,
   useOpenFolderWindow,
 } from '@/features/workspace';
@@ -107,7 +108,7 @@ const sectionToggleClass =
 function FilesPanel() {
   const state = useWorkspace();
   const { activeTab } = state;
-  const { dispatch } = useAppActions();
+  const { actions } = useAppActions();
   const { outline } = useDocumentOutline();
 
   const hasMarkdownDocument = activeTab?.file?.format === 'md';
@@ -130,24 +131,50 @@ function FilesPanel() {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden" id="sidebar-panel-files">
       <NewChatButton />
-      {/* Templates — a PLACE (a singleton main-pane tab), so it lives
-        * as a quiet standing row under New Chat, mirroring that row's
-        * geometry: same min-h-7 ghost row, same 16px leading slot around a
-        * 14px glyph, so both labels land on the shared gutter line. The
-        * negative top margin closes New Chat's own bottom padding down to
-        * the 4px sibling gap. */}
-      <div className="-mt-2 flex-none px-1.5 pb-3">
+      {/* One launcher group under New Chat: every row shares the New Chat
+        * row's launcher recipe (`launcherRowClass` — same ghost row, same
+        * 16px leading slot around a 14px glyph, labels on the shared
+        * gutter line), and gap-1 repeats the 4px step the -mt-2 already
+        * sets between New Chat and this group. pb-1 keeps that same step
+        * below, so in a folder window the folder header lands exactly
+        * where the (hidden) Choose Folder row would sit — one rhythm down
+        * the whole column. */}
+      <div className="-mt-2 flex flex-none flex-col gap-1 px-1.5 pb-1">
+        {/* Gallery — a quiet standing row that raises the Gallery OVERLAY
+          * over the workspace (`openGallery`), a side-effect-free
+          * destination rather than a place of its own in the sidebar. */}
         <Button
           variant="ghost"
           size="sm"
-          className="h-auto min-h-7 w-full min-w-0 justify-start gap-2 px-2 text-left text-base font-normal text-foreground"
-          onClick={() => dispatch({ type: 'TEMPLATES_OPEN' })}
+          className={launcherRowClass}
+          onClick={() => actions.openGallery()}
         >
           <span className="inline-flex size-4 flex-none items-center justify-center">
             <SquaresFourIcon className="size-3.5 text-muted-foreground" />
           </span>
-          <span className="min-w-0 truncate">Templates</span>
+          <span className="min-w-0 truncate">Gallery</span>
         </Button>
+        {/* Choose Folder — the launcher row for "bring your own", the
+          * Gallery's sibling on a BARE window's first screen. Gone once
+          * a folder is open: there it would mean an in-place switch,
+          * which is the titlebar Library switcher's job — unlike the
+          * Gallery row above (a side-effect-free destination), a
+          * workspace-mutating action does not earn a standing seat.
+          * Same row idiom; the ellipsis is the opens-a-dialog
+          * convention (native picker, which can also create). */}
+        {!state.folderPath && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className={launcherRowClass}
+            onClick={() => { void folderPickerFlows(actions, electronBridge())?.openExistingFolder(); }}
+          >
+            <span className="inline-flex size-4 flex-none items-center justify-center">
+              <FolderIcon className="size-3.5 text-muted-foreground" />
+            </span>
+            <span className="min-w-0 truncate">Choose Folder…</span>
+          </Button>
+        )}
       </div>
       {/* Explorer sections mirror VS Code's compact disclosure rows. The
         * folder zones and the active document's outline intentionally share
@@ -248,9 +275,10 @@ function FilesPanel() {
  *  beneath. It shares the sidebar's one pane surface — the inset pill rows,
  *  not a surface split, carry the hierarchy.
  *
- *  NO-FOLDER ZONE — otherwise: the quiet Open Folder… and New Folder…
- *  launcher rows. Membership lives in the titlebar switcher, so the sidebar
- *  renders NO list of other member folders.
+ *  NO-FOLDER ZONE — otherwise: an empty spacer. The way into a folder is
+ *  the Choose Folder launcher row in the top group (bare windows only)
+ *  and the titlebar Library switcher; membership lives in the switcher,
+ *  so the sidebar renders NO list of other member folders.
  *
  *  `children` (the Document Outline section) renders after the zone, which
  *  is what puts it below the working context and above the bottom-most
@@ -322,15 +350,12 @@ function ActiveFolderSection({ children }: { children?: React.ReactNode }) {
           )}
         </section>
       ) : (
-        /* NO-FOLDER ZONE — the launcher column: just the two add-folder
-         * command rows (SidebarFolderActions), set off from the chat
-         * group above by whitespace alone (the doc-tool grouping idiom —
-         * no explainer paragraph, no hairline). Membership browsing and
-         * the GitHub import stay in the titlebar Library switcher; the
-         * main pane meanwhile leads with the Templates gallery. */
-        <section className="flex min-h-0 flex-1 flex-col overflow-hidden pt-4">
-          <SidebarFolderActions />
-        </section>
+        /* NO-FOLDER ZONE — deliberately empty: the add-folder flows live
+         * in the top launcher group's Choose Folder row and in the
+         * titlebar Library switcher, so this zone carries no second
+         * launcher column. The spacer keeps the chat group pinned to the
+         * top of the column. */
+        <section aria-hidden className="min-h-0 flex-1" />
       )}
       {children}
       {removeTarget && (
@@ -384,10 +409,8 @@ function ActiveFolderHeader({
   const state = useWorkspace();
   const { actions, dispatch } = useAppActions();
   const [sideHeadDrop, setSideHeadDrop] = useState(false);
-  // Either popup open (chat history, the ⋯ menu): hold the
-  // hover-revealed action cluster visible while a portalled popover is
-  // up.
-  const [historyOpen, setHistoryOpen] = useState(false);
+  // The ⋯ menu open: hold the hover-revealed action cluster visible
+  // while its portalled popover is up.
   const [menuOpen, setMenuOpen] = useState(false);
 
   function onSideHeadDragOver(e: DragEvent<HTMLDivElement>) {
@@ -460,18 +483,14 @@ function ActiveFolderHeader({
           </span>
         )}
       </span>
-      {/* Only the high-frequency actions stay on the row — new note,
-        * history, and the ⋯ menu (which carries new-folder / sync /
-        * fold-all for this folder). Six icons here crushed the name. */}
-      <div className={menuOpen || historyOpen ? 'flex gap-0.5' : sideActionsClass}>
+      {/* Only the high-frequency actions stay on the row — new note and
+        * the ⋯ menu (which carries new-folder / sync / fold-all for
+        * this folder). Chat history moved to its ONE standing entry in
+        * the chat pane's header: sessions are the chat pane's material,
+        * and a hover-revealed copy here was a second rule for the same
+        * function. */}
+      <div className={menuOpen ? 'flex gap-0.5' : sideActionsClass}>
         <NewNoteButton />
-        {/* This folder's chat sessions — history lives on the scope
-          * headers, not in the chat pane. */}
-        <ScopeHistoryButton
-          scope={folderScope(path)}
-          label={'Chat history in ' + name}
-          onOpenChange={setHistoryOpen}
-        />
         {/* Static ⋯ placeholder while the lazy menu chunk loads — same
           * footprint, so the hover-revealed cluster never shifts. */}
         <Suspense fallback={

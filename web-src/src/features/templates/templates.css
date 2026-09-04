@@ -1,101 +1,61 @@
-/* The Templates gallery's two site idioms — this surface is deliberately
- * drawn in the marketing site's print language (stashbase-web
- * home-page.css is the reference) because the same gallery will be
- * published there. Both rules are geometry no utility spells: layered
- * corner-tick gradients on pseudo-elements, and a repeating hatch
- * gradient. Colours name globals roles, so both hold in dark. */
+/* The Gallery's site idioms — this surface is deliberately drawn in the
+ * marketing site's print language (stashbase-web home-page.css is the
+ * reference) because the same gallery ships there. The rules are
+ * geometry no utility spells: the dotted illustration ground and the
+ * container-query column steps. Colours name global roles, so both hold
+ * in dark. */
 
-/* The site's `.framed` registration marks: 10×2px ink ticks sitting just
- * OUTSIDE the frame, inner edge pressed against the hairline's outer edge
- * (the -1px offsets are the frame's own border width, not air), so the
- * tick covers the border's corner instead of letting it peek past. */
-.templates-frame {
-  position: relative;
-  border: 1px solid var(--stroke-subtle);
+/* Placeholder illustration card — the site's white rounded map ground
+ * (`.scatter-map` / `.dotgrid` in home-page.css): a raised card with a
+ * dotted ground that fades out toward the bottom. Deliberately empty
+ * for now; each template's real print-style drawing lands ON this card
+ * later. The dot pattern is geometry no utility spells; the card's box
+ * (corner, fill, shadow) stays at the call site as utilities. */
+.template-visual-card {
+  /* Position comes from the call site (an absolute layer under the
+   * foreground drawing). The site's `.fade-out` dissolve: the GROUND —
+   * border, fill, shadow, dots — washes into the page toward its bottom
+   * instead of closing with an edge. A mask rather than an overlay
+   * painted in the page colour, so the dissolve stays honest on every
+   * cell fill (the resting paper and the hover wash alike). */
+  -webkit-mask-image: linear-gradient(180deg, #000 50%, transparent 95%);
+  mask-image: linear-gradient(180deg, #000 50%, transparent 95%);
 }
-.templates-frame::before,
-.templates-frame::after {
+/* The dot ground, the site's `.dotgrid` — its fade comes from the card's
+ * own dissolve above. */
+.template-visual-card::before {
   content: "";
   position: absolute;
-  z-index: 1;
-  left: -1px;
-  right: -1px;
-  height: 10px;
+  /* Inset from the card edge so no clipped half-dot ever rides the
+   * hairline border; the parent's dissolve still owns the bottom. */
+  inset: 8px;
+  border-radius: inherit;
   pointer-events: none;
-}
-.templates-frame::before {
-  top: -1px;
-  background:
-    linear-gradient(var(--text-primary), var(--text-primary)) left top / 10px 2px no-repeat,
-    linear-gradient(var(--text-primary), var(--text-primary)) left top / 2px 10px no-repeat,
-    linear-gradient(var(--text-primary), var(--text-primary)) right top / 10px 2px no-repeat,
-    linear-gradient(var(--text-primary), var(--text-primary)) right top / 2px 10px no-repeat;
-}
-.templates-frame::after {
-  bottom: -1px;
-  background:
-    linear-gradient(var(--text-primary), var(--text-primary)) left bottom / 10px 2px no-repeat,
-    linear-gradient(var(--text-primary), var(--text-primary)) left bottom / 2px 10px no-repeat,
-    linear-gradient(var(--text-primary), var(--text-primary)) right bottom / 10px 2px no-repeat,
-    linear-gradient(var(--text-primary), var(--text-primary)) right bottom / 2px 10px no-repeat;
+  /* The site's `.dotgrid` density and weight: sparse (26px there, the
+   * ramp's 24 here) and a whisper of grey, with a half-pixel ramp so the
+   * dots anti-alias instead of shimmering. */
+  background-image: radial-gradient(var(--stroke-subtle) 1px, transparent 1.5px);
+  background-size: 24px 24px;
 }
 
-/* Placeholder illustration ground — the site's dotted print ground
- * (`.step-visual` / `.dotgrid` in home-page.css) with small crop marks,
- * one ⌐ top-left and one ⌟ bottom-right, the way the site's maps mark
- * their frames. Each template's real wireframe art will sit on this
- * same ground; the generic mini-card inside is a stand-in. */
-.template-visual {
-  position: relative;
-  background: radial-gradient(var(--stroke-strong) 1px, transparent 1px);
-  background-size: 12px 12px;
-  background-position: 6px 6px;
-}
-.template-visual::before,
-.template-visual::after {
-  content: "";
-  position: absolute;
-  width: 8px;
-  height: 8px;
-  pointer-events: none;
-}
-.template-visual::before {
-  top: 4px;
-  left: 4px;
-  border-top: 1.5px solid var(--text-primary);
-  border-left: 1.5px solid var(--text-primary);
-}
-.template-visual::after {
-  right: 4px;
-  bottom: 4px;
-  border-right: 1.5px solid var(--text-primary);
-  border-bottom: 1.5px solid var(--text-primary);
-}
-
-/* The gallery answers ITS OWN column's width, not the window's — docking
- * the chat narrows the main pane without any viewport change, which is
- * exactly the case a media query cannot see. Two columns in a docked
- * pane; the site's three once the gallery has room for site-sized cards.
- * The blank cells completing each hairline row are column-count-specific,
- * so each set renders only in its own layout. */
+/* The gallery answers ITS PANE's width (the full-width `.templates-page`
+ * host is the container), not the window's — it lives in the chat pane,
+ * whose width follows the layout (full-window in a chat-primary blank
+ * workspace, the docked column beside a document), which is exactly the
+ * case a media query cannot see. One column in a narrow docked pane (the
+ * pane can shrink to ~280px, where two 1fr cells crush the card
+ * drawings), two once cards get card-sized room, the site's three at the
+ * site's own scale. The page gutter breathes with the same container: a
+ * docked pane needs every pixel for the cells, while a pane the column
+ * nearly fills earns the site's generous page margin — without it the
+ * cards press against the pane edges and the whole page reads cramped. */
 .templates-page { container-type: inline-size; }
-.templates-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.templates-filler-three { display: none; }
-@container (min-width: 880px) {
-  .templates-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .templates-filler-two { display: none; }
-  .templates-filler-three { display: block; }
+.templates-column { padding-inline: 24px; }
+.templates-grid { grid-template-columns: minmax(0, 1fr); }
+@container (min-width: 600px) {
+  .templates-column { padding-inline: 64px; }
+  .templates-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-
-/* The site's hatched separator between the two sections. Soft-edged
- * stops (0.5px ramps around the 1px stripe) so the diagonals anti-alias
- * instead of shimmering on 1x screens. */
-.templates-separator {
-  height: 28px;
-  background: repeating-linear-gradient(
-    135deg,
-    transparent 0 3.5px,
-    var(--stroke-strong) 4px 5px,
-    transparent 6px
-  );
+@container (min-width: 1000px) {
+  .templates-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }

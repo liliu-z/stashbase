@@ -46,10 +46,6 @@ semantic readiness.
   asynchronous caller's earlier duplicate check is never the uniqueness
   authority. Active-folder relative paths and out-of-folder folder-plus-path
   pairs remain distinct identities.
-- A `kind` tab (the Templates gallery) is a singleton place, not a blank
-  slot: `TEMPLATES_OPEN` focuses the existing tab instead of adding one, and
-  a file open landing on an active kind tab routes to a fresh tab rather
-  than filling it in place (`openFile`'s guard in the workspace reducer).
 - Folder switching resets folder-scoped documents and readiness without
   clearing library search or silently rebinding a started or drafted Chat.
 - Folder loss and the 412 recovery ladder also preserve Chat tabs. They clear
@@ -148,7 +144,7 @@ changes, never to make an accidental dependency pass.
 |---|---|
 | Interface | `ActiveFolderWorkspace` in `web-src/src/store/hooks/useActiveFolderWorkspace.ts` |
 | Primary owners | `web-src/src/store/state/state.ts`, `state/stateReducer.ts` and the `state/workspaceReducer.ts`, `state/chatReducer.ts`, `state/uiShellReducer.ts` sub-reducers it composes, `state/stateHelpers.ts`, `lib/folderScopedReset.ts`, `lib/folderPath.ts`, `lib/folderTransition.ts`, and the internal `hooks/useDocumentActions.ts`, `hooks/useFileActions.ts`, `hooks/useFolderActions.ts`, `hooks/useSearchActions.ts` Modules |
-| Shell Adapter | `web-src/src/store/contexts/AppContext.tsx` (the single `useReducer` composition root), `web-src/src/store/contexts/WorkspaceContext.tsx`, `ChatContext.tsx`, `UiShellContext.tsx`, `ActionsContext.tsx`, `web-src/src/app/App.tsx`, `web-src/src/app/components/MainPane.tsx`, the lazy `features/templates/TemplatesView.tsx` tab, and lazy `features/workspace/components/ImportGitHubModal.tsx` and `FolderHeaderMenu.tsx` boundaries |
+| Shell Adapter | `web-src/src/store/contexts/AppContext.tsx` (the single `useReducer` composition root), `web-src/src/store/contexts/WorkspaceContext.tsx`, `ChatContext.tsx`, `UiShellContext.tsx`, `ActionsContext.tsx`, `web-src/src/app/App.tsx`, `web-src/src/app/components/MainPane.tsx`, and lazy `features/workspace/components/ImportGitHubModal.tsx` and `FolderHeaderMenu.tsx` boundaries |
 | Renderer tree model | `web-src/src/features/workspace/lib/fileTreeModel.ts` (nesting, manual-rank ordering, visible rows), `lib/treeKeyboard.ts` (roving-focus rules), `hooks/useTreeRoving.ts` (row registry and per-row binding) |
 | Server transport Adapter | `web-src/src/common/api/api.ts`, `apiTransport.ts`, `shared/library-files.ts`, `server/routes/files.ts`, `server/routes/workspace-preferences.ts`, the asynchronous request listing in `server/file-listing.ts`, and bounded selection-time inspection in `server/generic-file-preview.ts` |
 | Electron lifecycle Adapter | `onPrepareContextRelease` and folder/library events consumed by `useActiveFolderWorkspace.ts` |

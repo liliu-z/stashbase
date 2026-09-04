@@ -23,8 +23,8 @@ test('user can launch into the empty library workspace', async ({}, testInfo) =>
     await expect(appShell(app.page)).toBeVisible();
     await expect(app.page.getByRole('button', { name: 'New Chat', exact: true })).toBeVisible();
     await expect(settingsButton(app.page)).toBeVisible();
-    await expect(app.page.getByRole('heading', { name: 'Start faster with a template.' })).toBeVisible();
-    await expect(app.page.getByRole('button', { name: 'Open Folder…', exact: true })).toBeVisible();
+    await expect(app.page.getByRole('heading', { name: 'Explore Gallery' })).toBeVisible();
+    await expect(app.page.getByRole('button', { name: 'Choose Folder…', exact: true })).toBeVisible();
     await expectChatExpanded(app.page);
     app.errors.assertNone();
   } finally {

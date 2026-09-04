@@ -1,6 +1,5 @@
-import { Suspense, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { EditIcon, PreviewIcon } from '@/common/components/icons';
-import { LazyLoadBoundary } from '@/common/components/ErrorBoundary';
 import { useAppActions, useWorkspace } from '@/store/contexts/AppContext';
 import { DocumentViewer } from '@/features/documents';
 import { EmptyTabLanding, TabStrip } from '@/features/workspace';
@@ -10,7 +9,6 @@ import { electronBridge } from '@/common/lib/electronBridge';
 import { basename } from '@/common/lib/paths';
 import { Button } from '@/common/components/ui/button';
 import { StatusMessage } from '@/common/components/ui/status';
-import { TemplatesView } from '@/features/templates';
 import { cn } from '@/common/lib/utils';
 
 /**
@@ -44,10 +42,7 @@ export function MainPane({ workspaceHidden = false }: { workspaceHidden?: boolea
     return () => clearTimeout(timer);
   }, [saveStatus.cls, saveStatus.text, state.activeTabId]);
   const hasTabs = state.tabs.length > 0;
-  // A kind tab (the Templates gallery) holds no file but is not the
-  // blank "Untitled" landing — it renders its own pane.
-  const templatesTab = activeTab?.kind === 'templates';
-  const emptyTab = !!activeTab && !cur && !templatesTab;
+  const emptyTab = !!activeTab && !cur;
   // Out-of-folder tab (a library search hit viewed without switching the
   // window's folder): a quiet identity banner with the one escape hatch —
   // open that folder in its own window.
@@ -125,12 +120,12 @@ export function MainPane({ workspaceHidden = false }: { workspaceHidden?: boolea
         aria-labelledby={activeTab ? `document-tab-${activeTab.id}` : undefined}
       >
         {!hasTabs && !state.folderPath && (
-          /* Bare window with every tab closed (boot opens the Templates
-           * gallery here; this is the state after the user closes it).
-           * The sidebar's folder zone owns the actions — this stays a
-           * quiet pointer. */
+          /* Bare window with no open document (chat leads the layout;
+           * this pane only shows once the chat panel is hidden). The
+           * Library switcher and the chat's Templates gallery own the
+           * add-folder actions — this stays a quiet pointer. */
           <div className="grid h-full place-items-center p-10 text-center text-base text-muted-foreground">
-            <p className="m-0 leading-loose">Open a folder from the sidebar to get started.</p>
+            <p className="m-0 leading-loose">Open a folder from the Library switcher to get started.</p>
           </div>
         )}
         {!hasTabs && !!state.folderPath && (
@@ -175,16 +170,6 @@ export function MainPane({ workspaceHidden = false }: { workspaceHidden?: boolea
           </div>
         )}
         {emptyTab && <EmptyTabLanding />}
-        {templatesTab && (
-          <LazyLoadBoundary
-            className="flex min-h-0 flex-1 items-center justify-center text-sm text-muted-foreground"
-            label="templates"
-          >
-            <Suspense fallback={null}>
-              <TemplatesView />
-            </Suspense>
-          </LazyLoadBoundary>
-        )}
         {/* One Documents surface, whatever the open file is. Which viewer
           * a format gets, and which of them load lazily, is the Documents
           * feature's business — this pane only supplies the tab state and

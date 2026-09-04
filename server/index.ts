@@ -57,6 +57,7 @@ import { requireFolder, withWindowContext } from './http.ts';
 import { mount as mountWindowContextRoutes } from './routes/window-context.ts';
 import { mountInternalShutdownRoute } from './routes/internal-shutdown.ts';
 import { mount as mountLibraryRoutes } from './routes/library.ts';
+import { mount as mountGalleryRoutes } from './routes/gallery.ts';
 import { mount as mountEmbedderRoutes } from './routes/embedder.ts';
 import { mount as mountAppearanceRoutes } from './routes/appearance.ts';
 import { mount as mountWorkspacePreferenceRoutes } from './routes/workspace-preferences.ts';
@@ -317,6 +318,8 @@ if (!DEV_VITE) {
 // before a window has an open folder, so mount them before the gate.
 mountWindowContextRoutes(app);
 mountLibraryRoutes(app);
+// Gallery browsing works before any folder is open too.
+mountGalleryRoutes(app);
 mountOnboardingRoutes(app);
 
 // Route-prefix gate: every API path under these roots needs an open

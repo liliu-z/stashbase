@@ -38,10 +38,32 @@ test('empty library keeps the redesigned zero-state composition', async ({}, tes
     await setVisualViewport(page, 1280, 820);
 
     await expect(page.getByRole('complementary', { name: 'Agent chat' }).getByRole('tab', { selected: true })).toBeInViewport();
-    // Empty library: boot opens the Templates gallery in the main pane
-    // while the sidebar's launcher column carries the add-folder flows.
-    await expect(page.getByRole('heading', { name: 'Start faster with a template.' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Open Folder…', exact: true })).toBeVisible();
+    // Empty library: the boot chat leads with the Gallery band under its
+    // composer while the sidebar's launcher group carries Gallery and
+    // Choose Folder (the menu duplicates stay in the titlebar Library
+    // switcher).
+    await expect(page.getByRole('heading', { name: 'Explore Gallery' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Choose Folder…', exact: true })).toBeVisible();
+    // The first grid cell is the snapshot's download card: one whole-card
+    // button, a fixed 16:9 cover strip over the caption, fully enabled
+    // with no folder open — browsing and downloading need no precondition.
+    const galleryCell = page.locator('.templates-grid > li').first();
+    const galleryCard = galleryCell.getByRole('button', { name: /How to Start a Startup/ });
+    await expect(galleryCard).toBeVisible();
+    await expect(galleryCard).toBeEnabled();
+    const coverStrip = galleryCard.locator('span[aria-hidden="true"]').first();
+    const [cellBox, cardBox, coverBox] = await Promise.all([
+      galleryCell.boundingBox(),
+      galleryCard.boundingBox(),
+      coverStrip.boundingBox(),
+    ]);
+    expect(cellBox).not.toBeNull();
+    expect(cardBox).not.toBeNull();
+    expect(coverBox).not.toBeNull();
+    expect(cardBox!.x).toBeGreaterThanOrEqual(cellBox!.x);
+    expect(cardBox!.x + cardBox!.width).toBeLessThanOrEqual(cellBox!.x + cellBox!.width);
+    expect(coverBox!.x).toBeGreaterThanOrEqual(cardBox!.x);
+    expect(coverBox!.x + coverBox!.width).toBeLessThanOrEqual(cardBox!.x + cardBox!.width);
     // With no folder open the switcher trigger reads "Library".
     await expect(folderSwitcherTrigger(page)).toContainText('Library');
     await expect(page.getByRole('button', { name: 'Settings', exact: true })).toBeVisible();

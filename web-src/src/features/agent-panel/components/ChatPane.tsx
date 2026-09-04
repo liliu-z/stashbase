@@ -22,9 +22,11 @@ import { cn } from '@/common/lib/utils';
 import { useAppActions, useChat, useWorkspace } from '@/store/contexts/AppContext';
 import { rememberPreferredAgent } from '@/common/lib/agentPreference';
 import {
+  ALL_HISTORY_SCOPE,
   LIBRARY_SCOPE,
   scopeDisplayName,
 } from '@/common/lib/libraryScope';
+import { ScopeHistoryButton } from '@/features/agent-panel/components/ScopeHistoryButton';
 import type { AgentInstructionsScope } from '@/common/api/api';
 
 /** The inside of one tab body; `status` styles the "no active chat" notice
@@ -71,13 +73,16 @@ export default function ChatPane() {
   const tabs = state.chatTabs;
   const activeId = state.activeChatTabId;
   const activeTab = tabs.find((tab) => tab.id === activeId);
-  const activeInstructionsScope = React.useMemo<AgentInstructionsScope | null>(() => {
+  const activeInstructionsScope = React.useMemo<AgentInstructionsScope>(() => {
     const folderPath = typeof activeTab?.boundFolder === 'string'
       ? activeTab.boundFolder
       : activeTab?.boundFolder === null
         ? null
         : workspace.folderPath || null;
-    return folderPath ? { kind: 'folder', path: folderPath } : null;
+    // A library-bound tab edits the Library scope: it has real packaged
+    // guidance of its own, and "no folder" is where orientation guidance
+    // matters most.
+    return folderPath ? { kind: 'folder', path: folderPath } : { kind: 'library' };
   }, [activeTab?.boundFolder, workspace.folderPath]);
   const [instructionsScope, setInstructionsScope] = React.useState<AgentInstructionsScope | null>(null);
   const instructionsPresence = useAgentInstructionsPresence(activeInstructionsScope);
@@ -204,6 +209,18 @@ export default function ChatPane() {
               onOpen={() => setInstructionsScope(activeInstructionsScope)}
             />
           )}
+          {/* THE chat-history entry — one, standing, where sessions
+            * live. The sidebar copies (the New Chat row's icon, the
+            * folder header's hover-revealed one) are gone: one
+            * function, one place, always visible. */}
+          {/* Same band-centring compensation as the instructions
+            * control beside it (see its comment): these two and the
+            * floating chat toggle share one centre line. */}
+          <ScopeHistoryButton
+            scope={ALL_HISTORY_SCOPE}
+            label="Chat history"
+            className="-mt-0.5 shrink-0 self-start"
+          />
         </div>
         <div className="relative min-h-0 flex-1">
           {tabs.map((tab) => (
@@ -245,6 +262,15 @@ export default function ChatPane() {
                   title={tab.title}
                   agent={isAgentKind(tab.agent) ? tab.agent : 'claude'}
                   initialScope={tab.boundFolder === null ? LIBRARY_SCOPE : undefined}
+                  /* The Gallery band is DERIVED from window state, never
+                   * flagged on a tab: any contentless chat in a bare
+                   * window carries it (chat-first first impression, shop
+                   * below the fold — the agent-app convention), which is
+                   * also what lands a folder-removed window back on the
+                   * Gallery. With a folder open the band never appears —
+                   * the sidebar row raises the Gallery OVERLAY instead.
+                   * AgentView drops the band once the chat has content. */
+                  galleryEligible={!workspace.folderPath}
                 />
               </ChatSessionBoundary>
             </TabsContent>

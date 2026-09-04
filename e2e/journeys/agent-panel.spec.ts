@@ -47,8 +47,9 @@ test('J06 lists bring-your-own Agents before the zero-install Wiki Agent', async
     await expect(panel.getByText('Sign in to StashBase', { exact: true })).toBeVisible();
     await expect(panel.getByRole('button', { name: 'Open account settings' })).toBeVisible();
 
-    await app.page.getByRole('button', { name: 'Choose agent for new chat' }).click();
-    const agents = app.page.getByRole('menuitem');
+    // The agent list lives on the blank chat's composer pill now.
+    await app.page.getByRole('button', { name: /^Agent: / }).click();
+    const agents = app.page.getByRole('menuitemradio');
     await expect(agents).toHaveCount(3);
     await expect(agents.nth(0)).toHaveText('Codex');
     await expect(agents.nth(1)).toHaveText('Claude Code');
@@ -98,9 +99,9 @@ test('J06 keeps the Search by meaning toggle in session scope and Agent Instruct
     await app.page.waitForFunction(() => document.body.dataset.bootSettled === '1');
     await openLibraryFolder(app.page, 'project-alpha');
 
-    await app.page.getByRole('button', { name: 'Choose agent for new chat' }).click();
-    await app.page.getByRole('menuitem', { name: 'Codex' }).click();
     await app.page.getByRole('button', { name: 'New Chat', exact: true }).click();
+    await app.page.getByRole('button', { name: /^Agent: / }).click();
+    await app.page.getByRole('menuitemradio', { name: 'Codex' }).click();
     const panel = activeAgentPanel(app.page);
     const scope = panel.getByRole('button', { name: /Session folder: project-alpha/ });
     await expect(scope).toBeVisible();
@@ -166,9 +167,9 @@ test('removing a chat folder preserves started work and opens a fresh Library ch
     await openLibraryFolder(app.page, 'project-alpha');
     await dismissEmbeddingKeyPrompt(app.page);
 
-    await app.page.getByRole('button', { name: 'Choose agent for new chat' }).click();
-    await app.page.getByRole('menuitem', { name: 'Codex' }).click();
     await app.page.getByRole('button', { name: 'New Chat', exact: true }).click();
+    await app.page.getByRole('button', { name: /^Agent: / }).click();
+    await app.page.getByRole('menuitemradio', { name: 'Codex' }).click();
     let panel = activeAgentPanel(app.page);
     let composer = panel.locator('[aria-label="Message agent"]');
     await expect(composer).toHaveAttribute('contenteditable', 'true');
@@ -243,9 +244,9 @@ test('Codex chat keeps its folder-bound transcript through approval and interrup
     await openLibraryFolder(app.page, 'project-alpha');
     await dismissEmbeddingKeyPrompt(app.page);
 
-    await app.page.getByRole('button', { name: 'Choose agent for new chat' }).click();
-    await app.page.getByRole('menuitem', { name: 'Codex' }).click();
     await app.page.getByRole('button', { name: 'New Chat', exact: true }).click();
+    await app.page.getByRole('button', { name: /^Agent: / }).click();
+    await app.page.getByRole('menuitemradio', { name: 'Codex' }).click();
     let panel = activeAgentPanel(app.page);
     let composer = panel.locator('[aria-label="Message agent"]');
     await expect(composer).toHaveAttribute('contenteditable', 'true');
@@ -338,10 +339,10 @@ test('Agent chooser reuses only blank chats, drafts freeze scope, and history re
 
     const chatTabs = app.page.getByRole('tablist', { name: 'Chat sessions' });
     const initialCount = await chatTabs.getByRole('tab').count();
-    await app.page.getByRole('button', { name: 'Choose agent for new chat' }).click();
-    await expect(app.page.getByRole('menuitem', { name: 'Codex' })).toBeVisible();
-    await app.page.getByRole('menuitem', { name: 'Codex' }).click();
     await app.page.getByRole('button', { name: 'New Chat', exact: true }).click();
+    await app.page.getByRole('button', { name: /^Agent: / }).click();
+    await expect(app.page.getByRole('menuitemradio', { name: 'Codex' })).toBeVisible();
+    await app.page.getByRole('menuitemradio', { name: 'Codex' }).click();
     await expect(chatTabs.getByRole('tab')).toHaveCount(initialCount);
 
     let panel = activeAgentPanel(app.page);
@@ -391,14 +392,22 @@ test('Agent chooser reuses only blank chats, drafts freeze scope, and history re
     await panel.getByRole('button', { name: 'Stop agent' }).click();
     await expect(panel.getByRole('button', { name: 'Send message' })).toBeVisible();
 
-    // Folder-scope chat history lives on the ACTIVE folder header, so
-    // switch the window back to project-alpha before resuming its session.
+    // Chat history has ONE standing entry now — the clock in the chat
+    // pane's header, listing every session across the library; each row
+    // resumes in its own home scope, so the resumed project-alpha session
+    // is reachable without leaving project-beta. Switch back anyway so
+    // the resumed session's window matches its folder scope below.
     await openLibraryFolder(app.page, 'project-alpha');
     await expect(app.page).toHaveTitle('project-alpha — StashBase');
-    await app.page.getByRole('button', { name: 'Chat history in project-alpha' }).click();
-    const history = app.page.getByRole('dialog', { name: 'Chat history in project-alpha' });
-    await expect(history.getByRole('button', { name: 'Resume Fixture history session' })).toBeVisible();
-    await history.getByRole('button', { name: 'Resume Fixture history session' }).click();
+    await app.page.getByRole('button', { name: 'Chat history', exact: true }).click();
+    const history = app.page.getByRole('dialog', { name: 'Chat history' });
+    // The all-scope listing names each row's home; the same fixture
+    // session exists in every scope, so pick project-alpha's by its label.
+    const alphaRow = history
+      .getByRole('button', { name: 'Resume Fixture history session' })
+      .filter({ hasText: 'project-alpha' });
+    await expect(alphaRow).toBeVisible();
+    await alphaRow.click();
     panel = activeAgentPanel(app.page);
     await expect(panel.getByText('History fixture question')).toBeVisible();
     await expect(panel.getByText('Restored formula from history:')).toBeVisible();

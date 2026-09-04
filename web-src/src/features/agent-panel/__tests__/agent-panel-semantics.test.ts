@@ -107,7 +107,7 @@ test('chat sessions are a named tab list whose tabs and panels reference each ot
   });
 });
 
-test('Library-wide chats do not expose a working-directory Instructions editor', async () => {
+test('Library-wide chats edit the Library-scope Instructions, not a folder', async () => {
   const libraryTab = {
     ...makeChatTab('codex', []),
     title: 'Library Chat',
@@ -122,10 +122,14 @@ test('Library-wide chats do not expose a working-directory Instructions editor',
       }),
     });
 
+    // A library-bound tab edits the Library scope even while a window
+    // folder is open — the tooltip must name Library, not the folder.
+    const instructions = dom.query('button[title^="Agent Instructions for Library"]');
+    assert.ok(instructions, 'a Library chat exposes the Library-wide Instructions editor');
     assert.equal(
-      dom.query('button[title^="Agent Instructions for "]'),
+      dom.query('button[title^="Agent Instructions for Research"]'),
       null,
-      'Library retrieval scope must not masquerade as a working directory',
+      'the window folder must not capture a Library chat’s editor',
     );
   });
 });

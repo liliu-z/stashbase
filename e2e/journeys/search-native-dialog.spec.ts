@@ -56,7 +56,7 @@ test('native folder dialog success, cancellation, and failure preserve their bou
     await stubOpenFolderDialog(app.electron, { kind: 'cancel' });
     await openFolderPickerMenu(app.page);
     await expect(app.page).toHaveTitle('StashBase');
-    await expect(app.page.getByRole('heading', { name: 'Start faster with a template.' })).toBeVisible();
+    await expect(app.page.getByRole('heading', { name: 'Explore Gallery' })).toBeVisible();
 
     await stubOpenFolderDialog(app.electron, { kind: 'error', message: 'fixture picker failed' });
     await openFolderPickerMenu(app.page);
