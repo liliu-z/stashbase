@@ -5,6 +5,7 @@ import { useAppActions } from '@/store/contexts/AppContext';
 import type { HistoryScope } from '@/common/lib/libraryScope';
 import { lazyWithRetry } from '@/common/components/ErrorBoundary';
 import { Button } from '@/common/components/ui/button';
+import { cn } from '@/common/lib/utils';
 import { PopupLoadingStatus } from '@/common/components/ui/status';
 
 /* The popover and its session list load at the interaction boundary
@@ -24,11 +25,15 @@ const SessionHistoryMenu = lazyWithRetry(() =>
 export function ScopeHistoryButton({
   scope,
   label,
+  className,
   onOpenChange,
 }: {
   scope: HistoryScope;
   /** Accessible name + tooltip, e.g. "Chat history in Notes". */
   label: string;
+  /** Placement adjustments from the hosting row (e.g. the chat header's
+   *  titlebar-band centring). */
+  className?: string;
   /** Lets the owning header hold its hover-revealed cluster visible
    *  while the menu is open. */
   onOpenChange?: (open: boolean) => void;
@@ -60,15 +65,17 @@ export function ScopeHistoryButton({
       <Button
         ref={buttonRef}
         variant="ghost"
-        size="icon-xs"
-        className="text-muted-foreground aria-expanded:bg-active aria-expanded:text-foreground"
+        /* icon-sm with a 3.5 glyph: the chat header's control size —
+         * the same pair AgentInstructionsControl and the floating
+         * chat-panel toggle use, so the three sit as one family. */
+        size="icon-sm"
+        className={cn('text-muted-foreground aria-expanded:bg-active aria-expanded:text-foreground', className)}
         title={label}
         aria-label={label}
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpenReported(!open)}
-      >{/* Explicit size: icon-xs would otherwise render its own 12px
-          default, and every sidebar glyph is 14px. */}
+      >
         <HistoryIcon className="size-3.5" /></Button>
       {open && (
         <Suspense

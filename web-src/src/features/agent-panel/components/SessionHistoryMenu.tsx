@@ -57,7 +57,7 @@ export function SessionHistoryMenu({
   onClose: () => void;
   onResume: (agent: AgentKind, sessionId: string, folder: string | null) => void;
 }) {
-  const { rows, failedAgents, loading, rename, remove } = useSessionHistory(scope);
+  const { rows, failedAgents, pendingAgents, rename, remove } = useSessionHistory(scope);
   const [q, setQ] = useState('');
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
@@ -72,6 +72,11 @@ export function SessionHistoryMenu({
     return needle ? rows.filter((row) => row.title.toLowerCase().includes(needle)) : rows;
   }, [rows, q]);
 
+  /* "Loading…" only while NOTHING has answered: the first settled agent's
+   * rows render immediately and stragglers get the quiet note below, so
+   * one slow runtime (Codex lists through a spawned app-server) never
+   * holds the menu blank. */
+  const loading = pendingAgents.length === AGENTS.length;
   const allFailed = failedAgents.length === AGENTS.length;
 
   async function commitRename(row: MergedSessionRow) {
@@ -118,7 +123,14 @@ export function SessionHistoryMenu({
               {failedAgents.map((agent) => AGENT_META[agent].shortName).join(' and ')} history could not be loaded.
             </div>
           )}
-          {!loading && !allFailed && shown.length === 0 && (
+          {!loading && pendingAgents.length > 0 && (
+            // A straggler follows the same quiet idiom while its rows are
+            // still on the way.
+            <div className="px-2.5 pt-0.5 pb-1 text-xs text-muted-foreground" role="status">
+              {pendingAgents.map((agent) => AGENT_META[agent].shortName).join(' and ')} history is still loading…
+            </div>
+          )}
+          {!loading && !allFailed && pendingAgents.length === 0 && shown.length === 0 && (
             <EmptyState>{q ? 'No matches.' : 'No sessions yet.'}</EmptyState>
           )}
           {/* Sessions are a list. The empty/partial-failure notices above

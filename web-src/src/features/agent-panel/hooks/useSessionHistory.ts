@@ -15,7 +15,10 @@ export interface SessionHistory {
   rows: MergedSessionRow[];
   /** Agents whose listing failed; each surfaces as a quiet inline note. */
   failedAgents: AgentKind[];
-  loading: boolean;
+  /** Agents whose listing has not answered yet. The menu renders settled
+   *  rows immediately and names the stragglers, so one slow runtime
+   *  never blanks the whole list behind a spinner. */
+  pendingAgents: AgentKind[];
   rename: (row: MergedSessionRow, title: string) => Promise<void>;
   /** False when the delete failed and the row is still listed. */
   remove: (row: MergedSessionRow) => Promise<boolean>;
@@ -26,9 +29,11 @@ export interface SessionHistory {
  * rename and delete commands for a row.
  *
  * Each Agent stores its own history, so listings are independent
- * requests merged into one ordering. They are fetched together and a
- * failure is per agent: one agent being unreachable must leave the other's
- * sessions listed rather than blank the menu.
+ * requests merged into one ordering. They are fetched together but land
+ * INDEPENDENTLY: each answer re-merges into the list as it arrives.
+ * Codex's listing spawns a short-lived app-server and can take seconds
+ * against a large store, and a failure is per agent — neither may hold
+ * the already-answered Agents' rows hostage.
  *
  * Rename and delete route through the row's own agent and scope, not the
  * menu's — the library-wide listing mixes rows from every folder, and each
@@ -37,23 +42,28 @@ export interface SessionHistory {
 export function useSessionHistory(scope: HistoryScope): SessionHistory {
   const [rows, setRows] = useState<MergedSessionRow[]>([]);
   const [failedAgents, setFailedAgents] = useState<AgentKind[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [pendingAgents, setPendingAgents] = useState<AgentKind[]>(AGENTS.map((agent) => agent.id));
 
   useEffect(() => {
     let cancelled = false;
-    void (async () => {
-      // Agents fetch in parallel; one failing must not blank the others'
-      // history — the failed Agent surfaces as a quiet inline note.
-      const lists = await Promise.all(AGENTS.map(async (agent) => ({
-        agent: agent.id,
-        sessions: await api.listSessions(agent.id, historyRequestParams(scope)).catch(() => null),
-      })));
-      if (cancelled) return;
-      const merged = mergeAgentSessions(lists);
-      setRows(merged.rows);
-      setFailedAgents(merged.failed);
-      setLoading(false);
-    })();
+    // Answers accumulate here; every arrival re-merges the settled set so
+    // ordering stays one newest-first list however the requests land.
+    const settled: { agent: AgentKind; sessions: Awaited<ReturnType<typeof api.listSessions>> | null }[] = [];
+    setRows([]);
+    setFailedAgents([]);
+    setPendingAgents(AGENTS.map((agent) => agent.id));
+    for (const agent of AGENTS) {
+      void api.listSessions(agent.id, historyRequestParams(scope))
+        .catch(() => null)
+        .then((sessions) => {
+          if (cancelled) return;
+          settled.push({ agent: agent.id, sessions });
+          const merged = mergeAgentSessions(settled);
+          setRows(merged.rows);
+          setFailedAgents(merged.failed);
+          setPendingAgents((pending) => pending.filter((id) => id !== agent.id));
+        });
+    }
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch only when the scope identity changes
   }, [scope.kind, scope.kind === 'folder' ? scope.path : '']);
@@ -72,5 +82,5 @@ export function useSessionHistory(scope: HistoryScope): SessionHistory {
     return true;
   }, [scope]);
 
-  return { rows, failedAgents, loading, rename, remove };
+  return { rows, failedAgents, pendingAgents, rename, remove };
 }
