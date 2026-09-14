@@ -29,6 +29,9 @@ user-managed results.
   meaning. It is off until then, and nothing outside Settings names it before
   it is on. Product copy keeps the phrase lowercase; engineering terms such as
   semantic indexing and embeddings appear only where technically necessary.
+- A failed meaning-based search reports its error instead of returning an
+  empty match list. Slow indexing or meaning-based searches leave capacity
+  for status requests; keyword search remains independent.
 - Agent retrieval combines meaning-based similarity with text matching for
   every Chat whose folder has a key on, and uses text matching alone
   otherwise, including current prepared PDF, DOCX, image, and media

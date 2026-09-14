@@ -119,6 +119,23 @@ daemon's binding-loss result is a recoverable lifecycle fingerprint: retry the
 authoritative operation once from bind instead of persisting a per-file index
 failure.
 
+The daemon input reader only parses and admits requests. Execution is bounded
+to one ordered mutation lane, two search slots, one scan slot, two status/list
+slots, and one embedder-probe slot, with at most 64 queued requests. A full
+queue returns an explicit busy error. Bind/unbind, admission-rule changes, and
+store close are ordered exclusive barriers: they wait for earlier calls to
+actually exit and block later calls from crossing the changed store state.
+Shutdown rejects queued requests and drains active calls before closing Milvus;
+the existing Node termination deadline remains the fallback for stuck native
+calls. Replies retain request IDs and serialize complete stdout JSON records.
+
+Focused runtime evidence uses the real daemon and local Milvus Lite with a
+local HTTP embedding fixture: one indexing call and two searches were held
+inside the endpoint while status and scan completed; releasing them preserved
+delete, close, and rebind order without restoring the deleted rows. The built
+Electron boundary smoke also passes. This verifies process/store mechanics,
+not cloud retrieval quality or the migration to the new MFS library.
+
 Large semantic workloads use the same authoritative content-hash diff. Known
 stale rows become unavailable before a durable awaiting/paused decision is
 published. A pause never delays browsing, preparation, editing, or keyword
@@ -168,7 +185,7 @@ search; only explicit Start clears it.
   rejects concurrent reopen/register attempts, and durable membership is
   removed last so an interrupted cleanup remains recoverable by reconcile. It
   invalidates queued folder-sync generations before cleanup and interrupts an
-  active single-threaded daemon scan; concurrent status polls treat that short
+  active daemon scan; concurrent status polls treat that short
   retirement window as transitional instead of surfacing a daemon-close error.
   Because the daemon is process-wide, the same retirement may interrupt a
   concurrent reconcile for another live member; that authoritative operation

@@ -95,6 +95,7 @@ import json
 import os
 import re
 import sys
+import threading
 import time
 import traceback
 from collections import defaultdict
@@ -169,7 +170,7 @@ class _OnnxEmbedder:
 
     # mfs's get_provider("onnx", ...) does real network I/O (a first-use
     # model download, ~570MB) and model loading synchronously. The daemon
-    # processes requests one at a time on a single thread, so an unbounded
+    # treats binding as an exclusive store barrier, so an unbounded
     # call here would freeze every other request -- search, status, delete,
     # other binds -- for as long as it takes. A dead network already fails
     # fast on its own (huggingface_hub's etag_timeout=10s), but a reachable-
@@ -1544,12 +1545,9 @@ def op_search(svc: StashbaseStore, args: dict) -> dict:
         hits = store.hybrid_search(qvec, query, path_filter=path_filter, top_k=fetch_k)
     except Exception as exc:
         sys.stderr.write(f"[stashbase] search store failed: {exc}\n")
-        # Hosted quota exhaustion is a product state, not an empty result.
-        # Let Node surface it so the renderer can keep Exact Search available
-        # while explaining why meaning-based search stopped.
-        if "quota_exhausted" in str(exc):
-            raise
-        return {"hits": []}
+        # A failed search has no valid empty-result answer. Preserve the error
+        # across the protocol so callers can explain the unavailable capability.
+        raise
 
     out = []
     for h in hits:
@@ -1870,9 +1868,115 @@ OPS = {
 }
 
 
+_OUTPUT_LOCK = threading.Lock()
+
+
 def _emit(obj: dict) -> None:
-    sys.stdout.write(json.dumps(obj) + "\n")
-    sys.stdout.flush()
+    with _OUTPUT_LOCK:
+        sys.stdout.write(json.dumps(obj) + "\n")
+        sys.stdout.flush()
+
+
+class _RequestDispatcher:
+    """Bounded request execution with serial writes and exclusive reconfiguration.
+
+    Slow embedding and disk scans do not occupy the input reader or status slots.
+    Binding/rule/close operations are ordered barriers: no request crosses them,
+    and the store remains open until every preceding call has actually exited.
+    """
+
+    _BARRIERS = frozenset({"bind_folder", "unbind_folder", "set_rules", "close_store"})
+    _CAPACITY = {"write": 1, "search": 2, "scan": 1, "status": 2, "probe": 1, "barrier": 1}
+
+    def __init__(self, svc, *, emit=None, handlers=None, max_pending=64):
+        self._svc = svc
+        self._emit = emit or _emit
+        self._handlers = OPS if handlers is None else handlers
+        self._max_pending = max_pending
+        self._condition = threading.Condition()
+        self._pending = []
+        self._active = {lane: 0 for lane in self._CAPACITY}
+        self._closed = False
+        self._executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=7, thread_name_prefix="stashbase-request",
+        )
+
+    @classmethod
+    def _lane(cls, op):
+        if op in cls._BARRIERS:
+            return "barrier"
+        return {"search": "search", "scan_diff": "scan", "status": "status",
+                "list": "status", "probe_embedder": "probe"}.get(op, "write")
+
+    def submit(self, req):
+        if not isinstance(req, dict) or not isinstance(req.get("op"), str):
+            self._emit({"id": None, "ok": False, "error": "bad request: expected an operation object"})
+            return
+        req_id, op = req.get("id"), req["op"]
+        args = req.get("args", {})
+        if args is None:
+            args = {}
+        if not isinstance(args, dict):
+            self._emit({"id": req_id, "ok": False, "error": "bad request: args must be an object"})
+            return
+        if op not in self._handlers:
+            self._emit({"id": req_id, "ok": False, "error": f"unknown op: {op}", "op": op})
+            return
+        with self._condition:
+            if self._closed or len(self._pending) >= self._max_pending:
+                self._emit({"id": req_id, "ok": False,
+                            "error": "daemon closing" if self._closed else "daemon request queue full",
+                            "code": "MFS_DAEMON_RETIRING" if self._closed else "MFS_DAEMON_BUSY",
+                            "op": op})
+                return
+            self._pending.append((req_id, op, args))
+            self._drain()
+
+    def _drain(self):
+        if self._closed or self._active["barrier"]:
+            return
+        index = 0
+        while index < len(self._pending):
+            request = self._pending[index]
+            lane = self._lane(request[1])
+            if lane == "barrier":
+                if index or any(self._active.values()):
+                    return
+            elif self._active[lane] >= self._CAPACITY[lane]:
+                index += 1
+                continue
+            self._pending.pop(index)
+            self._active[lane] += 1
+            self._executor.submit(self._run, lane, request)
+            if lane == "barrier":
+                return
+
+    def _run(self, lane, request):
+        req_id, op, args = request
+        try:
+            result = self._handlers[op](self._svc, args)
+            self._emit({"id": req_id, "ok": True, "result": result})
+        except (KeyError, ValueError) as exc:
+            self._emit({"id": req_id, "ok": False, "error": f"bad args for {op}: {exc}", "op": op})
+        except Exception as exc:
+            sys.stderr.write(traceback.format_exc())
+            sys.stderr.flush()
+            self._emit({"id": req_id, "ok": False, "error": str(exc), "op": op})
+        finally:
+            with self._condition:
+                self._active[lane] -= 1
+                self._drain()
+                self._condition.notify_all()
+
+    def close(self):
+        with self._condition:
+            self._closed = True
+            pending, self._pending = self._pending, []
+        for req_id, op, _args in pending:
+            self._emit({"id": req_id, "ok": False, "error": "daemon closing", "op": op})
+        # Never close Milvus while a worker still holds a store/model reference.
+        # The Node owner retains its existing terminate/kill deadline for stuck calls.
+        self._executor.shutdown(wait=True)
 
 
 def _termination_signals(signal_module) -> tuple[Any, ...]:
@@ -1941,39 +2045,27 @@ def main() -> int:
     atexit.register(_cleanup_store)
     for sig in _termination_signals(signal):
         try:
-            signal.signal(sig, lambda *_: (_cleanup_store(), sys.exit(0)))
+            signal.signal(sig, lambda *_: sys.exit(0))
         except (ValueError, OSError):
             pass
 
     _emit({"event": "ready", "db": str(svc._db_path)})
 
-    for line in sys.stdin:
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            req = json.loads(line)
-            req_id = req.get("id")
-            op = req["op"]
-            args = req.get("args", {}) or {}
-        except (ValueError, KeyError) as exc:
-            _emit({"id": None, "ok": False, "error": f"bad request: {exc}"})
-            continue
-
-        try:
-            handler = OPS.get(op)
-            if handler is None:
-                _emit({"id": req_id, "ok": False, "error": f"unknown op: {op}", "op": op})
+    dispatcher = _RequestDispatcher(svc)
+    try:
+        for line in sys.stdin:
+            line = line.strip()
+            if not line:
                 continue
-            result = handler(svc, args)
-            _emit({"id": req_id, "ok": True, "result": result})
-        except (KeyError, ValueError) as exc:
-            sys.stderr.write(f"[stashbase] bad args for {op}: {exc}\n")
-            _emit({"id": req_id, "ok": False, "error": f"bad args for {op}: {exc}", "op": op})
-        except Exception as exc:
-            sys.stderr.write(traceback.format_exc())
-            sys.stderr.flush()
-            _emit({"id": req_id, "ok": False, "error": str(exc), "op": op})
+            try:
+                req = json.loads(line)
+            except ValueError as exc:
+                _emit({"id": None, "ok": False, "error": f"bad request: {exc}"})
+                continue
+            dispatcher.submit(req)
+    finally:
+        dispatcher.close()
+        _cleanup_store()
 
     return 0
 

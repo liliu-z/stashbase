@@ -106,6 +106,10 @@ surface.
 - The server serializes daemon generations: concurrent reset callers share one
   retirement barrier, and callbacks from an older child cannot mutate the
   current generation's process or request state.
+- Within one daemon generation, slow calls use bounded execution lanes while
+  stdin continues accepting requests. Mutations retain their order, and
+  reconfiguration/close wait for actual execution retirement as specified by
+  [Data Lifecycle](data-lifecycle.md#reconcile).
 - Application quit is an authenticated owner-to-server shutdown handshake.
   Signals are timeout fallbacks, not the normal cleanup path.
 - The shutdown ladder closes hosted-broker listening, active, and idle sockets

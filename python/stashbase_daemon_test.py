@@ -4,6 +4,7 @@ import io
 import json
 import sys
 import tempfile
+import threading
 import time
 import types
 import unittest
@@ -17,6 +18,113 @@ with contextlib.redirect_stdout(io.StringIO()):
 
 
 class StashbaseDaemonTests(unittest.TestCase):
+    def test_slow_indexing_and_search_leave_status_and_scan_slots_available(self):
+        release = threading.Event()
+        condition = threading.Condition()
+        entered, replies = set(), {}
+
+        def slow(_svc, args):
+            with condition:
+                entered.add(args["name"])
+                condition.notify_all()
+            self.assertTrue(release.wait(5))
+            return {}
+
+        def emit(reply):
+            with condition:
+                replies[reply["id"]] = reply
+                condition.notify_all()
+
+        handlers = {"upsert": slow, "search": slow, "status": lambda *_: {"indexed": 2},
+                    "scan_diff": lambda *_: {"added": []}}
+        dispatcher = stashbase_daemon._RequestDispatcher(None, emit=emit, handlers=handlers)
+        try:
+            for name, op in [("index", "upsert"), ("query1", "search"), ("query2", "search")]:
+                dispatcher.submit({"id": name, "op": op, "args": {"name": name}})
+            with condition:
+                self.assertTrue(condition.wait_for(lambda: len(entered) == 3, 2))
+            dispatcher.submit({"id": "status", "op": "status"})
+            dispatcher.submit({"id": "scan", "op": "scan_diff"})
+            with condition:
+                self.assertTrue(condition.wait_for(lambda: "status" in replies and "scan" in replies, 2))
+                self.assertTrue(replies["status"]["ok"])
+                self.assertNotIn("index", replies)
+        finally:
+            release.set()
+            dispatcher.close()
+
+    def test_dispatch_preserves_write_order_and_exclusive_close_barrier(self):
+        release, entered, closed = threading.Event(), threading.Event(), threading.Event()
+        events = []
+
+        def upsert(*_args):
+            entered.set()
+            self.assertTrue(release.wait(5))
+            events.append("upsert")
+            return {}
+
+        def operation(name):
+            def run(*_args):
+                events.append(name)
+                if name == "after-close":
+                    closed.set()
+                return {}
+            return run
+
+        dispatcher = stashbase_daemon._RequestDispatcher(None, emit=lambda _: None, handlers={
+            "upsert": upsert, "delete": operation("delete"),
+            "close_store": operation("close"), "status": operation("after-close"),
+        })
+        try:
+            dispatcher.submit({"op": "upsert"})
+            self.assertTrue(entered.wait(2))
+            for op in ("delete", "close_store", "status"):
+                dispatcher.submit({"op": op})
+            self.assertEqual(events, [])
+            release.set()
+            self.assertTrue(closed.wait(3))
+            self.assertEqual(events, ["upsert", "delete", "close", "after-close"])
+        finally:
+            release.set()
+            dispatcher.close()
+
+    def test_dispatch_bounds_pending_work_and_shutdown_retires_active_calls(self):
+        release, entered, closing = threading.Event(), threading.Event(), threading.Event()
+        replies = []
+
+        def slow(*_args):
+            entered.set()
+            self.assertTrue(release.wait(5))
+            return {}
+
+        dispatcher = stashbase_daemon._RequestDispatcher(
+            None, emit=replies.append, handlers={"upsert": slow}, max_pending=1,
+        )
+        try:
+            dispatcher.submit({"id": 1, "op": "upsert"})
+            self.assertTrue(entered.wait(2))
+            dispatcher.submit({"id": 2, "op": "upsert"})
+            dispatcher.submit({"id": 3, "op": "upsert"})
+            self.assertEqual(replies[-1]["code"], "MFS_DAEMON_BUSY")
+            thread = threading.Thread(target=lambda: (dispatcher.close(), closing.set()))
+            thread.start()
+            self.assertFalse(closing.wait(0.05))
+            release.set()
+            thread.join(3)
+            self.assertTrue(closing.is_set())
+            self.assertEqual({r["id"] for r in replies}, {1, 2, 3})
+        finally:
+            release.set()
+            dispatcher.close()
+
+    def test_search_backend_failure_is_not_reported_as_no_matches(self):
+        store = types.SimpleNamespace(is_empty=lambda: False,
+                                      hybrid_search=mock.Mock(side_effect=RuntimeError("index unavailable")))
+        embedder = types.SimpleNamespace(embed=lambda _: [[1.0, 0.0]])
+        svc = types.SimpleNamespace(stores=lambda: [("pk", embedder, store)])
+        with self.assertRaisesRegex(RuntimeError, "index unavailable"):
+            stashbase_daemon.op_search(svc, {"query": "needle"})
+
     def test_json_scanner_rules_keep_note_bundles_note_only(self) -> None:
         previous = {key: value.copy() if hasattr(value, "copy") else value for key, value in stashbase_daemon._RULES.items()}
         try:
