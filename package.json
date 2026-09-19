@@ -1,6 +1,6 @@
 {
   "name": "stashbase",
-  "version": "2.9.7",
+  "version": "2.9.9",
   "packageManager": "pnpm@11.5.1",
   "description": "StashBase is an IDE for writing: brainstorm, draft, and revise in local projects.",
   "author": {
