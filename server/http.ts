@@ -144,6 +144,11 @@ export type EmbedderKeyCheck = { ok: true } | { ok: false; status: number; error
 const EMBEDDER_KEY_CHECK_TIMEOUT_MS = 15_000;
 const OPENAI_EMBEDDINGS_URL = 'https://api.openai.com/v1/embeddings';
 const OPENAI_EMBEDDING_MODEL = 'text-embedding-3-small';
+const EMBEDDER_KEY_CHECK_ENDPOINTS = {
+  openai: { providerName: 'OpenAI', modelsUrl: 'https://api.openai.com/v1/models' },
+  openrouter: { providerName: 'OpenRouter', modelsUrl: 'https://openrouter.ai/api/v1/models' },
+  requesty: { providerName: 'Requesty', modelsUrl: 'https://router.requesty.ai/v1/models' },
+} as const;
 
 function failedEmbedderKeyCheck(
   providerName: string,
@@ -169,14 +174,11 @@ function failedEmbedderKeyCheck(
  *  check could not prove the key invalid (network / transient upstream
  *  failure). */
 export async function validateEmbedderKey(
-  provider: 'openai' | 'openrouter',
+  provider: 'openai' | 'openrouter' | 'requesty',
   key: string,
   opts: { timeoutMs?: number } = {},
 ): Promise<EmbedderKeyCheck> {
-  const providerName = provider === 'openrouter' ? 'OpenRouter' : 'OpenAI';
-  const modelsUrl = provider === 'openrouter'
-    ? 'https://openrouter.ai/api/v1/models'
-    : 'https://api.openai.com/v1/models';
+  const { providerName, modelsUrl } = EMBEDDER_KEY_CHECK_ENDPOINTS[provider];
   try {
     const r = await fetch(modelsUrl, {
       headers: { Authorization: `Bearer ${key}` },

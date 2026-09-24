@@ -15,8 +15,8 @@ import type { EmbedderProvider } from '../shared/embedding.ts';
 export type { SearchHit } from '../shared/search-results.ts';
 
 export interface EmbedderRuntimeConfig {
-  /** Supported embedding endpoints. OpenRouter is used only as an
-   *  OpenAI-compatible embeddings endpoint for the fixed 1536d model. */
+  /** Supported embedding endpoints. OpenRouter and Requesty are used only as
+   *  OpenAI-compatible embeddings endpoints for the fixed 1536d model. */
   provider: EmbedderProvider;
   /** Provider API key. */
   apiKey?: string;
@@ -24,7 +24,7 @@ export interface EmbedderRuntimeConfig {
   model?: string;
   /** Optional dimension override (default 1536). */
   dimension?: number;
-  /** Optional OpenAI-compatible base URL. Used by OpenRouter. */
+  /** Optional OpenAI-compatible base URL. Used by OpenRouter and Requesty. */
   baseUrl?: string;
 }
 

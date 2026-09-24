@@ -1,6 +1,6 @@
 /** The user-owned provider authorized to produce embeddings. */
 
-export type EmbedderProvider = 'openai' | 'openrouter';
+export type EmbedderProvider = 'openai' | 'openrouter' | 'requesty';
 
 /** What saving a provider key reports back. `hasKey` is literal `true`:
  *  the endpoint only answers on success, so a caller never has to check it. */

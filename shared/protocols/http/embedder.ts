@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const embedderProviderSchema = z.enum(['openai', 'openrouter']);
+export const embedderProviderSchema = z.enum(['openai', 'openrouter', 'requesty']);
 
 /** `GET /api/account`. Account identity is independent from embeddings. */
 export const hostedAccountStateSchema = z

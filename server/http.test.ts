@@ -47,6 +47,12 @@ test('embedder key validation uses the provider models endpoint', async () => {
       url: 'https://openrouter.ai/api/v1/models',
       authorization: 'Bearer sk-or-v1-test',
     }]);
+    calls.length = 0;
+    assert.deepEqual(await validateEmbedderKey('requesty', 'rqsty-test', { timeoutMs: 1000 }), { ok: true });
+    assert.deepEqual(calls, [{
+      url: 'https://router.requesty.ai/v1/models',
+      authorization: 'Bearer rqsty-test',
+    }]);
   } finally {
     globalThis.fetch = originalFetch;
   }
