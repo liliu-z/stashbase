@@ -30,6 +30,7 @@ function useTabsSnapshot<Value>(
 
 const readHasDocuments = (runtime: DocumentTabsRuntime) => runtime.hasDocuments();
 const readOpenSources = (runtime: DocumentTabsRuntime) => runtime.openSources();
+const readActiveSource = (runtime: DocumentTabsRuntime) => runtime.activeSource();
 
 /** Whether any document is open. */
 export function useHasOpenDocuments(runtime: DocumentTabsRuntime | null): boolean {
@@ -42,4 +43,11 @@ export function useOpenDocumentSources(
   runtime: DocumentTabsRuntime | null,
 ): readonly SourceReference[] {
   return useTabsSnapshot(runtime, readOpenSources, NO_SOURCES);
+}
+
+/** The source behind the tab in front of the reader, or null with none. */
+export function useActiveDocumentSource(
+  runtime: DocumentTabsRuntime | null,
+): SourceReference | null {
+  return useTabsSnapshot(runtime, readActiveSource, null);
 }

@@ -232,7 +232,7 @@ export function AgentActivityGroup({
    *  step in hand. A tool between calls leaves nothing running; the turn is
    *  what makes the group live, not a single call's status. */
   live?: boolean;
-  onOpenSource?: ((source: SourceReference) => void) | undefined;
+  onOpenSource?: ((source: SourceReference, phrase: string | null) => void) | undefined;
   sourceFor?: ((path: string) => SourceReference | null) | undefined;
   steps: AgentActivityStep[];
 }) {

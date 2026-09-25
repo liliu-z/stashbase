@@ -39,6 +39,15 @@ once setup succeeds; changed work or cancelled consent rejects late completion.
   may advance the queue. Stop, failure, or connection loss pauses it.
 - Validate context before sending. Opening a document does not attach it; missing
   or changed context needs replacement, refresh, or explicit removal.
+- The Agent pane beside Documents suggests the document in front of the reader
+  as a quiet chip. One click attaches it like a mention; dismissing it hides the
+  suggestion until another document comes to the front. Chat mode shows no
+  suggestion, since no document is on screen there.
+- A **passage** is selected text bound as context, from **Ask Agent** on a
+  Markdown selection. Its words travel with the request, so later edits to the
+  file do not change what was asked about; it is refused only when its file
+  leaves the project or it exceeds 6,000 characters. Reloaded history shows it
+  as the same passage chip.
 - A runtime that advertises attachments accepts ordinary local files through the
   picker, drop, or paste. Images and PDFs may have visual previews; other files
   remain named file cards. Attachment acceptance does not promise that every
@@ -63,6 +72,11 @@ once setup succeeds; changed work or cancelled consent rejects late completion.
 - Approval applies to its pending action only. Stop cancels unanswered approvals,
   retires model/tool work, and preserves transcripts and completed file edits.
   Cancellation is confirmed before reporting Stopped; it does not roll back edits.
+- A reply may cite a passage in a project file with a link carrying a short
+  quoted phrase. Opening it shows the file in Documents and locates that
+  phrase; when the file no longer holds it, the file stays open and says so.
+  A link without a phrase opens its file at the top. Citing is standing
+  guidance to the Agent, not a guarantee that every reply cites.
 - A clarifying question is answered in place on its own pending request. Answers
   return keyed by question text; Skip or Stop leaves it unanswered rather than
   guessing on the reader's behalf.

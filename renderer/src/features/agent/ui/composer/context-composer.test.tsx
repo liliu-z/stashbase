@@ -6,7 +6,8 @@ import {
   createAgentSessionRuntime,
   type AgentSessionRuntime,
 } from '@/features/agent/application/session-runtime';
-import type { AgentScopeEnvironment } from '@/features/agent/domain/context';
+import { passageContextItem, type AgentScopeEnvironment } from '@/features/agent/domain/context';
+import type { SourceReference } from '@/shared/domain/source-reference';
 import { typeInto } from '@/test/dom';
 import { agentContextPort, agentSessionPort, type FakeAgentSession } from '@/test/fakes/agent';
 
@@ -20,6 +21,8 @@ const environment: AgentScopeEnvironment = {
     files: [
       { format: 'md', path: 'notes.md' },
       { format: 'image', path: 'chart.png' },
+      { format: 'md', path: 'drafts/essay.md' },
+      { format: 'generic', path: 'data.bin' },
     ],
     folders: ['drafts'],
   },
@@ -34,7 +37,9 @@ afterEach(() => {
   for (const runtime of runtimes.splice(0)) runtime.dispose();
 });
 
-function renderComposer(overrides: { skills?: boolean } = {}) {
+function renderComposer(
+  overrides: { skills?: boolean; activeSource?: SourceReference | null } = {},
+) {
   const port: FakeAgentSession = agentSessionPort();
   const session = createAgentSessionRuntime({
     agent: 'codex',
@@ -51,20 +56,23 @@ function renderComposer(overrides: { skills?: boolean } = {}) {
     onSkillChange: vi.fn(),
     onStop: vi.fn(),
   };
-  const view = render(
+  const composer = (activeSource: SourceReference | null) => (
     <AgentContextComposer
       attachments
-      environment={environment}
+      environment={{ ...environment, activeSource }}
       queue={[]}
       placeholder="Ask about Research…"
       session={session}
       skills={overrides.skills ?? true}
       status="idle"
       {...spies}
-    />,
+    />
   );
+  const view = render(composer(overrides.activeSource ?? null));
+  const showDocument = (activeSource: SourceReference | null) =>
+    view.rerender(composer(activeSource));
   const field = screen.getByRole('textbox', { name: 'Message' });
-  return { field, port, session, view, ...spies };
+  return { field, port, session, showDocument, view, ...spies };
 }
 
 /** Puts the runtime in the live state a skill catalog arrives in. */
@@ -156,6 +164,66 @@ describe('Agent context composer', () => {
     const tiles = await screen.findByRole('list', { name: 'Attached context' });
     expect(tiles).not.toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Remove chart.png' }));
+    expect(session.store.getState().context).toEqual([]);
+  });
+
+  it('offers the document in front of the reader and binds it only on a click', async () => {
+    const notes = { folderPath: SCOPE.path, path: 'notes.md' };
+    const { session } = renderComposer({ activeSource: notes });
+
+    expect(session.store.getState().context).toEqual([]);
+    await userEvent.click(screen.getByRole('button', { name: 'Attach notes.md' }));
+
+    expect(session.store.getState()).toMatchObject({
+      context: [expect.objectContaining({ kind: 'source', source: notes })],
+      draft: '@notes.md ',
+    });
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Attach notes.md' })).toBeNull(),
+    );
+  });
+
+  it('keeps a dismissed suggestion hidden until another document comes forward', async () => {
+    const notes = { folderPath: SCOPE.path, path: 'notes.md' };
+    const essay = { folderPath: SCOPE.path, path: 'drafts/essay.md' };
+    const { showDocument } = renderComposer({ activeSource: notes });
+
+    await userEvent.click(screen.getByRole('button', { name: "Don't suggest notes.md" }));
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Attach notes.md' })).toBeNull(),
+    );
+
+    showDocument(essay);
+    expect(screen.getByRole('button', { name: 'Attach essay.md' })).not.toBeNull();
+    showDocument(notes);
+    expect(screen.getByRole('button', { name: 'Attach notes.md' })).not.toBeNull();
+  });
+
+  it('suggests nothing without a listed, readable document from this folder', () => {
+    const { showDocument } = renderComposer({ activeSource: null });
+    showDocument({ folderPath: SCOPE.path, path: 'data.bin' });
+    showDocument({ folderPath: SCOPE.path, path: 'unlisted.md' });
+    showDocument({ folderPath: '/project/Plans', path: 'notes.md' });
+
+    for (const name of ['data.bin', 'unlisted.md', 'notes.md'])
+      expect(screen.queryByRole('button', { name: `Attach ${name}` })).toBeNull();
+  });
+
+  it('shows a passage as a removable chip and takes focus when asked', async () => {
+    const { field, session } = renderComposer();
+    const passage = passageContextItem(
+      { folderPath: SCOPE.path, path: 'drafts/essay.md' },
+      'The opening line of the essay runs longer than six words.',
+    );
+    act(() => {
+      if (passage) session.addContext(passage);
+      session.requestComposerFocus();
+    });
+
+    await waitFor(() => expect(field.contains(document.activeElement)).toBe(true));
+    expect(session.store.getState().composerFocusRequested).toBe(false);
+    expect(screen.getByText('The opening line of the essay…')).not.toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Remove essay.md' }));
     expect(session.store.getState().context).toEqual([]);
   });
 

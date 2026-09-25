@@ -111,6 +111,12 @@ cut it short, or when it changes nothing, and a busy or unavailable service
 leaves the document as it was. Humanize needs no account today and is free for
 a limited time; the service meters by network address, not by account.
 
+**Ask Agent** on the same toolbar binds the exact selection, as Markdown, to
+the chat beside the document and brings that chat into view. It writes
+nothing and needs no service; the selection is saved first so the Agent reads
+what the reader selected. [Agent Sessions](agent-sessions.md) owns how the
+passage is sent.
+
 Markdown frontmatter is outside the prose editor. A proposal that changes it is
 refused with a visible reason; its metadata is never silently omitted from a review.
 

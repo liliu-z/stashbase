@@ -175,7 +175,10 @@ describe('Agent activity', () => {
     expect(list.textContent).not.toContain('denied.md');
     expect(screen.queryByRole('button', { name: 'Open notes.md' })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Open plan.md' }));
-    expect(onOpenSource).toHaveBeenCalledWith({ folderPath: '/project/Research', path: 'plan.md' });
+    expect(onOpenSource).toHaveBeenCalledWith(
+      { folderPath: '/project/Research', path: 'plan.md' },
+      null,
+    );
     await userEvent.click(screen.getByRole('button', { name: 'Edited files', expanded: false }));
     expect(screen.getByRole('button', { name: /Changed.*notes\.md.*Done/u })).not.toBeNull();
   });

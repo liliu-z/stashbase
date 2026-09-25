@@ -31,16 +31,31 @@ function pendingStatus(): FolderIndexStatus {
 function mount(
   status: FolderIndexStatus | null = null,
   documents: DocumentTabsRuntime | null = null,
+  documentsShown = true,
 ) {
-  return renderHook(() =>
-    useAgentEnvironment(folderListing, status, documents, folderPath, folderPath),
+  return renderHook(
+    ({ shown }) =>
+      useAgentEnvironment(folderListing, status, documents, folderPath, folderPath, shown),
+    { initialProps: { shown: documentsShown } },
+  );
+}
+
+function openNotes(): DocumentTabsRuntime {
+  return createDocumentTabsRuntime(
+    documentTabsRuntimeOptions({
+      folderPath,
+      restored: {
+        activeTabId: 'tab-1',
+        tabs: [{ id: 'tab-1', source: { folderPath, path: 'notes.md' } }],
+      },
+    }),
   );
 }
 
 describe('useAgentEnvironment', () => {
   it("publishes nothing until the folder's listing has arrived", () => {
     const { result } = renderHook(() =>
-      useAgentEnvironment(undefined, null, null, folderPath, folderPath),
+      useAgentEnvironment(undefined, null, null, folderPath, folderPath, true),
     );
 
     expect(result.current).toEqual({
@@ -50,7 +65,9 @@ describe('useAgentEnvironment', () => {
   });
 
   it('has no environment while no folder is open', () => {
-    const { result } = renderHook(() => useAgentEnvironment(folderListing, null, null, null, null));
+    const { result } = renderHook(() =>
+      useAgentEnvironment(folderListing, null, null, null, null, true),
+    );
 
     expect(result.current.environment).toBeNull();
     // Welcome has no conversation scope.
@@ -75,15 +92,7 @@ describe('useAgentEnvironment', () => {
   });
 
   it('leads with the documents open beside the chat', async () => {
-    const documents = createDocumentTabsRuntime(
-      documentTabsRuntimeOptions({
-        folderPath,
-        restored: {
-          activeTabId: 'tab-1',
-          tabs: [{ id: 'tab-1', source: { folderPath, path: 'notes.md' } }],
-        },
-      }),
-    );
+    const documents = openNotes();
     const { result } = mount(null, documents);
     expect(result.current.environment?.openPaths).toEqual(['notes.md']);
 
@@ -93,11 +102,25 @@ describe('useAgentEnvironment', () => {
     documents.dispose();
   });
 
+  it('offers the document in front only while Documents is on screen', async () => {
+    const documents = openNotes();
+    const { rerender, result } = mount(null, documents);
+    expect(result.current.environment?.activeSource).toEqual({ folderPath, path: 'notes.md' });
+
+    rerender({ shown: false });
+    expect(result.current.environment?.activeSource).toBeNull();
+
+    rerender({ shown: true });
+    await act(() => documents.close('tab-1'));
+    expect(result.current.environment?.activeSource).toBeNull();
+    documents.dispose();
+  });
+
   it('hands back the same environment while nothing it reads has changed', () => {
     const { rerender, result } = mount();
     const first = result.current.environment;
 
-    rerender();
+    rerender({ shown: true });
 
     expect(result.current.environment).toBe(first);
   });

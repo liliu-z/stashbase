@@ -173,6 +173,8 @@ export function transitionAgentSession(
       return { ...state, context: action.context, contextIssue: null };
     case 'set-context-issue':
       return { ...state, contextIssue: action.message };
+    case 'request-composer-focus':
+      return { ...state, composerFocusRequested: action.requested };
     case 'set-queue':
       return { ...state, queuedPrompts: action.queue.slice(0, MAX_QUEUED_PROMPTS) };
     case 'submit-prompt':

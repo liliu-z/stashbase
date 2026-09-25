@@ -285,6 +285,7 @@ export function createAgentSessionRuntime({
       if (disposed) return;
       transition({ context: removeContextItem(state().context, key), kind: 'set-context' });
     },
+    requestComposerFocus: controls.requestComposerFocus,
     fileForTransient(path) {
       return transientFiles.get(path);
     },

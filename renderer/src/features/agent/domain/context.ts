@@ -33,6 +33,13 @@ export type AgentContextItem =
       boundVersion: number | null;
     }
   | {
+      kind: 'passage';
+      source: SourceReference;
+      /** The selected Markdown, sent verbatim: a later edit to the file
+       *  cannot change what the reader asked about. */
+      quote: string;
+    }
+  | {
       kind: 'transient';
       path: string;
       name: string;
@@ -40,16 +47,43 @@ export type AgentContextItem =
       previewUrl?: string | undefined;
     };
 
+/** The most selected text one passage carries, near Humanize's own limit. */
+export const PASSAGE_QUOTE_LIMIT = 6_000;
+
+/** FNV-1a, enough to tell two passages of one file apart in a key. */
+function quoteDigest(quote: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < quote.length; index += 1) {
+    hash ^= quote.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16);
+}
+
 export function contextItemKey(item: AgentContextItem): string {
-  return item.kind === 'source'
-    ? `source:${item.source.folderPath}/${item.source.path}`
-    : `transient:${item.path}`;
+  switch (item.kind) {
+    case 'source':
+      return `source:${item.source.folderPath}/${item.source.path}`;
+    case 'passage':
+      return `passage:${item.source.folderPath}/${item.source.path}#${quoteDigest(item.quote)}`;
+    case 'transient':
+      return `transient:${item.path}`;
+  }
 }
 
 export function contextItemName(item: AgentContextItem): string {
-  return item.kind === 'source'
-    ? basePathName(item.source.path)
-    : item.name || basePathName(item.path);
+  return item.kind === 'transient'
+    ? item.name || basePathName(item.path)
+    : basePathName(item.source.path);
+}
+
+/** A passage of `source`, or null when the selection holds no text. */
+export function passageContextItem(
+  source: SourceReference,
+  quote: string,
+): Extract<AgentContextItem, { kind: 'passage' }> | null {
+  const trimmed = quote.trim();
+  return trimmed ? { kind: 'passage', quote: trimmed, source } : null;
 }
 
 export function addContextItem(
@@ -215,6 +249,17 @@ function validateItem(item: AgentContextItem, environment: ContextEnvironment): 
   ) {
     return { item, key, reason: 'This file is no longer in the folder.', status: 'stale' };
   }
+  // The quote travels in the prompt, so neither a later edit nor preparation
+  // changes what a passage says; only its length can refuse it.
+  if (item.kind === 'passage')
+    return item.quote.length > PASSAGE_QUOTE_LIMIT
+      ? {
+          item,
+          key,
+          reason: `This passage is longer than ${PASSAGE_QUOTE_LIMIT.toLocaleString('en-US')} characters. Select less and ask again.`,
+          status: 'stale',
+        }
+      : { item, key, reason: null, status: 'ready' };
   const version = environment.versions?.[item.source.path];
   if (version !== undefined && item.boundVersion !== null && version !== item.boundVersion)
     return {
@@ -251,47 +296,6 @@ export function validateContext(
 /** Only a stale item blocks a send; the rest are explained and sent. */
 export function staleContext(validations: readonly ContextValidation[]): ContextValidation[] {
   return validations.filter((validation) => validation.status === 'stale');
-}
-
-// Prompt rendering
-
-export interface ResolvedContextFile {
-  path: string;
-  sourcePath: string;
-  readPath: string;
-  kind: 'direct' | 'derived';
-  sourceFormat: string;
-  available: boolean;
-  reason: string;
-}
-
-export interface ResolvedContextLine {
-  item: AgentContextItem;
-  resolved: ResolvedContextFile | null;
-}
-
-const PREPARED_FORMATS = new Set(['pdf', 'docx', 'audio']);
-
-function absolutePath(item: AgentContextItem): string {
-  return item.kind === 'source' ? `${item.source.folderPath}/${item.source.path}` : item.path;
-}
-
-function contextLine({ item, resolved }: ResolvedContextLine): string {
-  if (resolved?.kind === 'derived') {
-    return `- ${resolved.sourcePath} (for text context, use mcp__stashbase__read_file with path ${resolved.path}; it returns the derived text representation for this ${resolved.sourceFormat})`;
-  }
-  if (resolved && !resolved.available && PREPARED_FORMATS.has(resolved.sourceFormat)) {
-    return `- ${resolved.sourcePath} (derived text is not available yet; ${resolved.reason})`;
-  }
-  return `- ${absolutePath(item)}`;
-}
-
-/** The wire prompt: the typed text plus the legacy `Attached files:` suffix
- *  every runtime and history replay already understand. */
-export function renderPromptContext(text: string, lines: readonly ResolvedContextLine[]): string {
-  if (lines.length === 0) return text;
-  const block = `Attached files:\n${lines.map(contextLine).join('\n')}`;
-  return `${text}${text ? '\n\n' : ''}${block}`;
 }
 
 // Transcript segmentation
@@ -362,6 +366,10 @@ export interface AgentScopeEnvironment {
   /** Folder-relative paths of the documents open beside the chat, so an `@`
    *  list can lead with what the user is looking at. */
   openPaths?: readonly string[];
+  /** The document in front of the reader while the Agent docks beside it,
+   *  which the composer offers to attach. Null in Chats, where no document
+   *  is on screen. */
+  activeSource?: SourceReference | null;
   readiness: Readonly<Record<string, AgentContextReadiness>>;
   versions: Readonly<Record<string, number>>;
 }

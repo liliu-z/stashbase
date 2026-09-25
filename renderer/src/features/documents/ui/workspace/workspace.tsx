@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useStore } from 'zustand';
 
 import { Button } from '@/components/ui/button';
+import { SEARCH_NOTICES } from '@/features/documents/application/navigation-runtime';
 import type {
   DocumentAssetPort,
   DocumentHumanizePort,
@@ -17,6 +18,7 @@ import {
   documentViewerFormat,
 } from '@/features/documents/domain/document-format';
 import { retainMarkdownTabIds } from '@/features/documents/domain/markdown';
+import type { DocumentSelection } from '@/features/documents/domain/selection';
 import { useDocumentTabs } from '@/features/documents/hooks/use-document-tabs';
 import { DocumentSource } from '@/features/documents/ui/source/document';
 import { documentViewerEntry } from '@/features/documents/ui/source/registry';
@@ -40,6 +42,8 @@ export interface DocumentWorkspaceProps {
   docxPreviewApi: DocxPreviewPort;
   genericPreviewApi: GenericFilePreviewPort;
   humanizeApi?: DocumentHumanizePort | undefined;
+  /** Binds a selected Markdown passage to the Agent beside the document. */
+  onAskAgent?: ((selection: DocumentSelection) => void) | undefined;
   onNavigate?: ((target: DocumentNavigationTarget) => void) | undefined;
   onOpenExternal?: ((href: string) => Promise<boolean>) | undefined;
   /** Fired once when a DOCX or media document mounts so preparation can be
@@ -62,6 +66,7 @@ export function DocumentWorkspace({
   docxPreviewApi,
   genericPreviewApi,
   humanizeApi,
+  onAskAgent,
   onNavigate = ignoreNavigation,
   onOpenExternal = rejectExternalNavigation,
   onOpenPrepared,
@@ -73,6 +78,7 @@ export function DocumentWorkspace({
   viewers,
 }: DocumentWorkspaceProps) {
   const searchNotice = useStore(runtime.navigation.store, (state) => state.searchNotice);
+  const searchPurpose = useStore(runtime.navigation.store, (state) => state.searchPurpose);
   const openFailure = useStore(runtime.store, (state) => state.openFailure);
   const closeDecision = useStore(runtime.store, (state) => state.closeDecision);
   const { activeTab, activeTabId, tabs } = useDocumentTabs(runtime);
@@ -131,6 +137,7 @@ export function DocumentWorkspace({
             genericPreviewApi={genericPreviewApi}
             humanizeApi={humanizeApi}
             navigation={runtime.navigation}
+            onAskAgent={onAskAgent}
             onNavigate={onNavigate}
             onOpenExternal={onOpenExternal}
             onOpenPrepared={onOpenPrepared}
@@ -169,7 +176,7 @@ export function DocumentWorkspace({
       {searchNotice && (
         <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2 text-caption">
           <span role="status">
-            {activeFindable ? searchNotice : 'This preview cannot locate search matches.'}
+            {activeFindable ? searchNotice : SEARCH_NOTICES[searchPurpose].unavailable}
           </span>
           <Button
             size="compact"

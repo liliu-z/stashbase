@@ -62,6 +62,8 @@ export interface AgentSessionRuntime {
   editPrompt(blockId: string): boolean;
   addContext(item: AgentContextItem): void;
   removeContext(key: string): void;
+  /** Asks the composer to take focus, or with false records that it did. */
+  requestComposerFocus(requested?: boolean): void;
   /** Uploads transient files and binds each successful one to the draft. */
   attachFiles(files: File[]): Promise<void>;
   /** The File behind an upload bound in this session, for thumbnails. */

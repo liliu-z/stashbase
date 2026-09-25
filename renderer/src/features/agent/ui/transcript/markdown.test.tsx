@@ -83,8 +83,32 @@ $$\href{javascript:alert(1)}{unsafe}$$`}
       />,
     );
     await userEvent.click(screen.getByRole('link', { name: 'Draft' }));
-    expect(onOpenSource).toHaveBeenCalledWith(source);
+    expect(onOpenSource).toHaveBeenCalledWith(source, null);
     expect(screen.queryByRole('link', { name: 'Outside' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Protocol' })).toBeNull();
+  });
+
+  it('opens a cited passage with its phrase, and a malformed fragment without one', async () => {
+    const source = { folderPath: '/project', path: 'notes/draft.md' };
+    const onOpenSource = vi.fn();
+    render(
+      <AgentMarkdown
+        markdown={
+          '[the claim](notes/draft.md#:~:text=rising%20tides%2C%20slowly) ' +
+          '[broken](notes/draft.md#:~:text=%E0%A4%A)'
+        }
+        sourceFor={(path) => (path === 'notes/draft.md' ? source : null)}
+        onOpenSource={onOpenSource}
+      />,
+    );
+
+    const cited = screen.getByRole('link', { name: 'the claim' });
+    expect(cited.getAttribute('href')).toBe('notes/draft.md#:~:text=rising%20tides%2C%20slowly');
+    expect(cited.getAttribute('title')).toContain('rising tides, slowly');
+    await userEvent.click(cited);
+    expect(onOpenSource).toHaveBeenLastCalledWith(source, 'rising tides, slowly');
+
+    await userEvent.click(screen.getByRole('link', { name: 'broken' }));
+    expect(onOpenSource).toHaveBeenLastCalledWith(source, null);
   });
 });

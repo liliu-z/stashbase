@@ -454,10 +454,12 @@ function userInput(value: unknown): { text: string; attachments: CodexAttachment
     .join('\n');
   // The `Attached files:` suffix restore is already validated (images to
   // transient thumbnails, other known documents to name-only cards); keep its
-  // results as-is rather than re-filtering to images, deduping by path.
+  // results as-is rather than re-filtering to images, deduping by path and quote
+  // so a passage and the whole file it came from both survive.
   const restored = restoreHistoryAttachments(text);
   for (const attachment of restored.attachments) {
-    if (!attachments.some((existing) => existing.path === attachment.path)) attachments.push(attachment);
+    if (!attachments.some((existing) => existing.path === attachment.path && existing.quote === attachment.quote))
+      attachments.push(attachment);
   }
   return { text: restored.text, attachments };
 }

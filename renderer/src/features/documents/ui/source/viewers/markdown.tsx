@@ -8,13 +8,14 @@ export default function MarkdownViewer({
   humanizeApi,
   name,
   navigation,
+  onAskAgent,
   onNavigate,
   onOpenExternal,
   runtime,
   sourceApi,
   status,
 }: DocumentViewerProps<
-  'humanizeApi' | 'navigation' | 'onNavigate' | 'onOpenExternal' | 'sourceApi'
+  'humanizeApi' | 'navigation' | 'onAskAgent' | 'onNavigate' | 'onOpenExternal' | 'sourceApi'
 >) {
   // Read live, not captured: the request outlives any one render and must
   // see the buffer as it is when the rewrite lands.
@@ -47,6 +48,7 @@ export default function MarkdownViewer({
           mode={markdownMode}
           name={name}
           navigation={navigation}
+          onAskAgent={onAskAgent}
           onChange={onChange}
           onModeChange={(mode) => runtime.setMarkdownMode(mode)}
           onNavigate={onNavigate}

@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vite-plus/test';
 
-import { createDocumentNavigationRuntime } from './navigation-runtime';
+import { passageSearchTarget } from '@/features/documents/domain/location';
+
+import { createDocumentNavigationRuntime, SEARCH_NOTICES } from './navigation-runtime';
 
 describe('document navigation runtime', () => {
   it('keeps Find registration active-tab-owned and restores a retained query', async () => {
@@ -84,5 +86,32 @@ describe('document navigation runtime', () => {
       query: 'evidence',
       total: 3,
     });
+  });
+
+  it('words a cited passage as a passage while locating, missing, and failing', async () => {
+    const runtime = createDocumentNavigationRuntime('one');
+    const notice = () => runtime.store.getState().searchNotice;
+    const controller = {
+      close: vi.fn(),
+      next: vi.fn(() => ({ current: 0, total: 0 })),
+      previous: vi.fn(() => ({ current: 0, total: 0 })),
+      setQuery: vi
+        .fn()
+        .mockReturnValueOnce({ current: 0, total: 0 })
+        .mockImplementationOnce(() => Promise.reject(new Error('preview gone'))),
+    };
+
+    runtime.requestSearch('one', passageSearchTarget('rising tides'));
+    expect(notice()).toBe(SEARCH_NOTICES.passage.locating);
+    expect(runtime.store.getState().searchPurpose).toBe('passage');
+    runtime.claimFind('one', Symbol('viewer'), controller);
+    await vi.waitFor(() => expect(notice()).toBe(SEARCH_NOTICES.passage.missing));
+    expect(controller.setQuery).toHaveBeenCalledWith('rising tides', {
+      caseSensitive: false,
+      wholeWord: false,
+    });
+
+    runtime.requestSearch('one', passageSearchTarget('rising tides'));
+    await vi.waitFor(() => expect(notice()).toBe(SEARCH_NOTICES.passage.failed));
   });
 });

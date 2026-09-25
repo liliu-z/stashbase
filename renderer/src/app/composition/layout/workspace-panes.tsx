@@ -17,6 +17,7 @@ import { AgentWorkspace, type AgentWorkspaceRuntime } from '@/features/agent/pub
 import {
   DocumentWorkspace,
   NewTabPage,
+  type DocumentSelection,
   type DocumentTabsRuntime,
   type NewTab,
   type OpenRevision,
@@ -38,6 +39,8 @@ export interface WorkspacePanesProps {
   /** The strip's New tab; its page covers the document slot while it is
    *  selected. */
   newTab: NewTab;
+  /** Binds a document selection to the chat beside it. */
+  onAskAgent(selection: DocumentSelection): void;
   /** What the New tab's page starts: a draft beside the tree's selection. */
   onCreateDraft(): void;
   onPrepare(source: SourceReference): void;
@@ -59,6 +62,7 @@ export function WorkspacePanes({
   documents,
   mode,
   newTab,
+  onAskAgent,
   onCreateDraft,
   onPrepare,
   onReprocess,
@@ -93,8 +97,9 @@ export function WorkspacePanes({
           persona={dependencies.agent.persona}
           onOpenAgentSettings={() => settings.openSettings('agents')}
           onOpenExternal={(href) => void dependencies.documents.openExternal(href)}
-          onOpenSource={(source) => {
-            sources.open(source);
+          onOpenSource={(source, phrase) => {
+            if (phrase) void sources.locatePassage(source, phrase);
+            else sources.open(source);
             onShowDocuments();
           }}
           onReprocess={onReprocess}
@@ -118,6 +123,7 @@ export function WorkspacePanes({
                 assetApi={dependencies.documents.adapters.asset}
                 docxPreviewApi={dependencies.documents.adapters.docxPreview}
                 genericPreviewApi={dependencies.documents.adapters.genericPreview}
+                onAskAgent={onAskAgent}
                 onNavigate={sources.navigate}
                 onOpenExternal={dependencies.documents.openExternal}
                 onOpenPrepared={onPrepare}

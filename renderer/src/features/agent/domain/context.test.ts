@@ -6,16 +6,18 @@ import {
   contextItemKey,
   contextItemName,
   mentionQueryAt,
+  PASSAGE_QUOTE_LIMIT,
+  passageContextItem,
   rankMentionSuggestions,
   removeContextItem,
   removeMentionText,
-  renderPromptContext,
   segmentFileMentions,
   staleContext,
   validateContext,
   type AgentContextItem,
   type AgentScopeListing,
 } from './context';
+import { renderPromptContext } from './prompt-context';
 
 const listing: AgentScopeListing = {
   files: [
@@ -35,6 +37,12 @@ const source = (path: string, format: 'md' | 'pdf' = 'md'): AgentContextItem => 
   kind: 'source',
   source: { folderPath: '/Library/Research', path },
 });
+
+const passage = (path: string, quote: string): AgentContextItem => {
+  const item = passageContextItem({ folderPath: '/Library/Research', path }, quote);
+  if (!item) throw new Error('empty passage');
+  return item;
+};
 
 const transient: AgentContextItem = {
   kind: 'transient',
@@ -56,6 +64,21 @@ describe('context items', () => {
     expect(twice).toEqual([a]);
     expect(addContextItem(twice, transient)).toEqual([a, transient]);
     expect(removeContextItem([a, transient], contextItemKey(a))).toEqual([transient]);
+  });
+
+  it('keeps two passages of one file, and the file itself, apart', () => {
+    const first = passage('docs/agent.md', 'First paragraph.');
+    const keys = [
+      contextItemKey(first),
+      contextItemKey(passage('docs/agent.md', 'Second paragraph.')),
+      contextItemKey(source('docs/agent.md')),
+    ];
+    expect(new Set(keys).size).toBe(3);
+    expect(contextItemKey(passage('docs/agent.md', '  First paragraph.\n'))).toBe(keys[0]);
+    expect(addContextItem([first], passage('docs/agent.md', 'First paragraph.'))).toEqual([first]);
+    expect(passageContextItem({ folderPath: '/Library/Research', path: 'a.md' }, ' \n ')).toBe(
+      null,
+    );
   });
 });
 
@@ -208,6 +231,26 @@ describe('context validation', () => {
         ?.status,
     ).toBe('ready');
   });
+
+  it('refuses a passage only when its file left the folder or it is too long', () => {
+    const validations = validateContext(
+      [
+        passage('docs/agent.md', 'Short.'),
+        passage('docs/agent.md', 'x'.repeat(PASSAGE_QUOTE_LIMIT + 1)),
+        passage('gone.md', 'Short.'),
+      ],
+      {
+        listing,
+        // A pending or changed file does not matter: the quote travels itself.
+        readiness: { 'docs/agent.md': 'pending' },
+        scope,
+        versions: { 'docs/agent.md': 7 },
+      },
+    );
+    expect(validations.map((v) => v.status)).toEqual(['ready', 'stale', 'stale']);
+    expect(validations[1]?.reason).toContain('longer than');
+    expect(validations[2]?.reason).toBe('This file is no longer in the folder.');
+  });
 });
 
 describe('prompt rendering', () => {
@@ -254,6 +297,33 @@ describe('prompt rendering', () => {
     );
     expect(renderPromptContext('', [{ item: transient, resolved: null }])).toBe(
       'Attached files:\n- /tmp/stashbase-attachments/batch/screen shot.png',
+    );
+  });
+
+  it('renders passages as quoted blocks ahead of the attached files', () => {
+    const rendered = renderPromptContext('Tighten these.', [
+      { item: source('notes.md'), resolved: null },
+      { item: passage('docs/agent.md', 'First line.\n\nThird line.'), resolved: null },
+      { item: passage('notes.md', 'Only line.'), resolved: null },
+    ]);
+    expect(rendered).toBe(
+      [
+        'Tighten these.',
+        '',
+        'Selected passages:',
+        '- /Library/Research/docs/agent.md',
+        '  > First line.',
+        '  >',
+        '  > Third line.',
+        '- /Library/Research/notes.md',
+        '  > Only line.',
+        '',
+        'Attached files:',
+        '- /Library/Research/notes.md',
+      ].join('\n'),
+    );
+    expect(renderPromptContext('', [{ item: passage('a.md', 'Quote.'), resolved: null }])).toBe(
+      'Selected passages:\n- /Library/Research/a.md\n  > Quote.',
     );
   });
 });

@@ -24,12 +24,18 @@ export const agentSessionInfoSchema = z
   })
   .strict();
 
+/** The longest replayed passage quote; above the composer's own limit so
+ *  every passage it sends replays, and a longer one stays in the prose. */
+export const AGENT_SESSION_QUOTE_MAX = 16_384;
+
 export const agentSessionAttachmentSchema = z
   .object({
     path: boundedText(16_384),
     name: boundedText(2_000),
     dims: boundedText(128).optional(),
     previewUrl: boundedText(32_768).optional(),
+    /** The selected passage a `Selected passages:` entry carried. */
+    quote: boundedText(AGENT_SESSION_QUOTE_MAX).optional(),
   })
   .strict();
 

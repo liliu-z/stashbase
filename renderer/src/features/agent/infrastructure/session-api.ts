@@ -10,10 +10,12 @@ import {
   type AgentSessionPort,
 } from '@/features/agent/application/ports';
 import type { AgentAccessMode } from '@/features/agent/domain/access';
+import { passageContextItem, type AgentContextItem } from '@/features/agent/domain/context';
 import type { AgentHistoryEntry } from '@/features/agent/domain/conversation-history';
 import type { AgentSkill } from '@/features/agent/domain/runtime-catalog';
 import type { AgentId, AgentScope, AgentSessionEvent } from '@/features/agent/domain/session';
 import type { AgentSessionCommand } from '@/features/agent/domain/session-command';
+import type { AgentTranscriptBlock } from '@/features/agent/domain/session-transcript';
 import { toModel } from '@/features/agent/infrastructure/model-wire';
 import { request as httpRequest, type TransportRequest } from '@/platform/http/classify';
 import type { HttpClient } from '@/platform/http/client';
@@ -25,6 +27,7 @@ import {
   agentSessionRenameRequestSchema,
   agentSessionReplaySchema,
   type AgentSessionInfoWire,
+  type AgentSessionBlockWire,
 } from '@/protocols/http/agent-sessions';
 import {
   agentClientEventSchema,
@@ -207,6 +210,47 @@ function sessionEvent(event: AgentServerEvent): AgentSessionEvent | null {
 
 /** One session-history call. The service names its own refusal, so that
  *  sentence is what the reader sees. */
+/** One replayed block in the feature's terms. Image previews are server
+ *  routes, absolutized here where the origin is known. A turn that carried a
+ *  selected passage replays as bound context, so its passage reads as the
+ *  chip it was sent as; a quote outside the chat's folder stays an upload. */
+function replayedBlock(
+  block: AgentSessionBlockWire,
+  scope: AgentScope,
+  serverOrigin: string,
+): AgentTranscriptBlock {
+  if (block.kind !== 'user' || !block.attachments) return block;
+  const attachments = block.attachments.map(({ quote, ...attachment }) => ({
+    attachment: attachment.previewUrl
+      ? { ...attachment, previewUrl: new URL(attachment.previewUrl, serverOrigin).href }
+      : attachment,
+    quote,
+  }));
+  if (!attachments.some(({ quote }) => quote !== undefined))
+    return { ...block, attachments: attachments.map(({ attachment }) => attachment) };
+  const folder = `${scope.path}/`;
+  const context = attachments.map(({ attachment, quote }): AgentContextItem => {
+    const passage =
+      quote !== undefined && attachment.path.startsWith(folder)
+        ? passageContextItem(
+            { folderPath: scope.path, path: attachment.path.slice(folder.length) },
+            quote,
+          )
+        : null;
+    return (
+      passage ?? {
+        dims: attachment.dims,
+        kind: 'transient',
+        name: attachment.name,
+        path: attachment.path,
+        previewUrl: attachment.previewUrl,
+      }
+    );
+  });
+  const { attachments: _replayed, ...rest } = block;
+  return { ...rest, context };
+}
+
 function history(path: string, signal: AbortSignal, invalid: string): TransportRequest {
   return {
     error: AgentSessionError,
@@ -304,19 +348,8 @@ export function createAgentSessionAdapter(
         ),
         schema: agentSessionReplaySchema,
       });
-      // Replayed image previews are server routes; the renderer runs on its
-      // own origin, so they are absolutized here where the origin is known.
       const transcript = replay.messages.map((block) =>
-        block.kind === 'user' && block.attachments
-          ? {
-              ...block,
-              attachments: block.attachments.map((attachment) =>
-                attachment.previewUrl
-                  ? { ...attachment, previewUrl: new URL(attachment.previewUrl, serverOrigin).href }
-                  : attachment,
-              ),
-            }
-          : block,
+        replayedBlock(block, entry.scope, serverOrigin),
       );
       return { effort: replay.effort, transcript };
     },

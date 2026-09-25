@@ -18,6 +18,7 @@ import type {
   GenericFilePreviewPort,
 } from '@/features/documents/application/ports';
 import type { DocumentViewerFormat } from '@/features/documents/domain/document-format';
+import type { DocumentSelection } from '@/features/documents/domain/selection';
 import type { SourceReference } from '@/shared/domain/source-reference';
 
 /** Formats that can show a preparation status row above their content. */
@@ -43,6 +44,9 @@ export interface DocumentViewerServices {
    *  offers no Humanize control rather than one that cannot answer. */
   humanizeApi?: DocumentHumanizePort | undefined;
   navigation: DocumentNavigationRuntime;
+  /** Absent where no Agent sits beside the document; the Markdown surface
+   *  then offers no Ask Agent control. */
+  onAskAgent?: ((selection: DocumentSelection) => void) | undefined;
   onNavigate(target: DocumentNavigationTarget): void;
   onOpenExternal(href: string): Promise<boolean>;
   onOpenPrepared?: ((source: SourceReference, format: PreparedOnOpenFormat) => void) | undefined;

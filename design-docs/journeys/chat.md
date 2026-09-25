@@ -29,7 +29,8 @@ Chat, Documents assistance, and runtimes.
    file appears in Documents. New output preserves reading position.
 4. Continue, queue a follow-up, stop, or reuse a message for another turn. Open a
    file result or a local file link to switch to Documents and show that file,
-   retaining the conversation and unsent input. Agent writes do not take focus.
+   retaining the conversation and unsent input. A link that cites a passage
+   also locates the quoted phrase, or says the file no longer holds it. Agent writes do not take focus.
 5. Return through history or change modes without losing the conversation or unsent
    work. Rename is deliberate; deleting a chat does not delete project files.
    New Chat reuses the last explicitly selected thinking effort for that project's

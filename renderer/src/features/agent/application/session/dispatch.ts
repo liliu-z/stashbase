@@ -12,14 +12,16 @@ import type {
 } from '@/features/agent/application/session/prompts';
 import {
   addContextItem,
-  renderPromptContext,
   staleContext,
   validateContext,
   type AgentContextItem,
   type AgentContextReadiness,
   type AgentScopeListing,
-  type ResolvedContextLine,
 } from '@/features/agent/domain/context';
+import {
+  renderPromptContext,
+  type ResolvedContextLine,
+} from '@/features/agent/domain/prompt-context';
 import {
   agentCanSend,
   agentSessionIsBusy,

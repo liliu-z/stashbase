@@ -3,7 +3,7 @@
  *  way a source can go stale before or during the send. */
 import { describe, expect, it, vi } from 'vite-plus/test';
 
-import type { AgentContextItem } from '@/features/agent/domain/context';
+import { passageContextItem, type AgentContextItem } from '@/features/agent/domain/context';
 import { agentContextPort, agentSessionPort } from '@/test/fakes/agent';
 
 import { AgentContextError, type AgentReconnectScheduler, type AgentSessionPort } from './ports';
@@ -114,6 +114,49 @@ describe('AgentSessionRuntime context', () => {
       skill: null,
       text: initial?.kind === 'prompt' ? initial.text : '',
     });
+  });
+
+  it('sends a selected passage as a quoted block without resolving its file', async () => {
+    const test = harness();
+    const context = agentContextPort();
+    const runtime = createAgentSessionRuntime({
+      agent: 'codex',
+      context,
+      environment: () => ({
+        listing: { files: [{ format: 'md', path: 'drafts/essay.md' }], folders: [] },
+        readiness: {},
+      }),
+      id: 'chat-1',
+      port: test.port,
+      scheduler: test.scheduler,
+      scope: { kind: 'folder', path: '/project/Research' },
+    });
+    test.listeners[0]?.onEvent({ kind: 'ready' });
+    const passage = passageContextItem(
+      { folderPath: '/project/Research', path: 'drafts/essay.md' },
+      'The opening line.\n\nThe closing line.',
+    );
+    if (passage) runtime.addContext(passage);
+    runtime.setDraft('Is this clear?');
+
+    await expect(runtime.sendPrompt()).resolves.toEqual({ ok: true });
+
+    expect(context.resolve).not.toHaveBeenCalled();
+    expect(test.sent.at(-1)).toMatchObject({
+      kind: 'prompt',
+      text: [
+        'Is this clear?',
+        '',
+        'Selected passages:',
+        '- /project/Research/drafts/essay.md',
+        '  > The opening line.',
+        '  >',
+        '  > The closing line.',
+      ].join('\n'),
+    });
+    expect(runtime.store.getState().transcript).toEqual([
+      expect.objectContaining({ context: [passage], text: 'Is this clear?' }),
+    ]);
   });
 
   it('refuses a send whose source left the folder and keeps the draft', async () => {

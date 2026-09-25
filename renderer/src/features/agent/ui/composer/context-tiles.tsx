@@ -1,12 +1,13 @@
 /**
  * Bound context outside the text. A visual source (an image or a PDF) is a
  * square tile like the composer's own thumbnails; a non-visual source sent
- * without a mention is a compact chip with its type glyph and name. Both
- * share one box surface and one spring. State reads as a dot and a word,
- * and only a missing or failed source turns red.
+ * without a mention is a compact chip with its type glyph and name, and a
+ * selected passage is the same chip with a quote glyph and its first words.
+ * All share one box surface and one spring. State reads as a dot and a
+ * word, and only a missing or failed source turns red.
  */
 import { AnimatePresence, motion } from 'framer-motion';
-import { X } from 'lucide-react';
+import { TextQuote, X } from 'lucide-react';
 
 import { FileThumbnail } from '@/components/ui/file-thumbnail';
 import { FileTypeIcon } from '@/components/ui/file-type-icon';
@@ -27,7 +28,17 @@ import type { SourceReference } from '@/shared/domain/source-reference';
 import { STATUS_WORD } from './mention-widgets';
 
 type SourceItem = Extract<AgentContextItem, { kind: 'source' }>;
+type PassageItem = Extract<AgentContextItem, { kind: 'passage' }>;
 type TransientItem = Extract<AgentContextItem, { kind: 'transient' }>;
+
+const PASSAGE_EXCERPT_WORDS = 6;
+
+/** The passage's opening words, enough to tell two passages of one file apart. */
+function passageExcerpt(quote: string): string {
+  const words = quote.split(/\s+/u).filter(Boolean);
+  const head = words.slice(0, PASSAGE_EXCERPT_WORDS).join(' ');
+  return words.length > PASSAGE_EXCERPT_WORDS ? `${head}…` : head;
+}
 
 /** Only a source with something to look at earns a square tile. */
 export function isVisualSource(item: SourceItem): boolean {
@@ -222,6 +233,36 @@ function SourceChip({
   );
 }
 
+/** A selected passage: the source chip's frame with a quote glyph, the file
+ *  name, and the passage's first words; the whole quote is its tooltip. */
+function PassageChip({
+  item,
+  reason,
+  status = 'ready',
+}: {
+  item: PassageItem;
+  reason?: string | null;
+  status?: ContextStatus;
+}) {
+  const shape = useShape();
+  return (
+    <div
+      className={cn(
+        'inline-flex h-7 max-w-72 items-center gap-1.5 border border-border bg-accent pr-2.5 pl-2 text-[12px]',
+        shape.bg,
+      )}
+      title={reason ?? `${item.source.path}\n\n${item.quote}`}
+    >
+      <TextQuote aria-hidden="true" className="shrink-0 text-muted-foreground" size={14} />
+      <span className="max-w-32 shrink-0 truncate font-medium text-foreground">
+        {contextItemName(item)}
+      </span>
+      <span className="min-w-0 truncate text-muted-foreground">{passageExcerpt(item.quote)}</span>
+      {status !== 'ready' && <StatusLine status={status} />}
+    </div>
+  );
+}
+
 /** A sent upload whose File is gone, which is every replayed history record:
  *  the same box over a server preview or a type glyph. */
 function RemoteTile({ item, size }: { item: TransientItem; size: number }) {
@@ -246,7 +287,7 @@ function RemoteTile({ item, size }: { item: TransientItem; size: number }) {
   );
 }
 
-/** The draft's visual sources, rendered inside the composer's preview row
+/** The draft's tiles and passage chips, rendered inside the composer's preview row
  *  ahead of its file thumbnails with the thumbnails' own enter and exit. */
 export function DraftSourceTiles({
   onRemove,
@@ -282,6 +323,8 @@ export function DraftSourceTiles({
                 size={size}
                 status={validation.status}
               />
+            ) : item.kind === 'passage' ? (
+              <PassageChip item={item} reason={validation.reason} status={validation.status} />
             ) : (
               <div
                 className="flex flex-col items-center gap-1"
@@ -330,6 +373,7 @@ export function SentContextTiles({
             <SourceChip item={item} key={contextItemKey(item)} />
           );
         }
+        if (item.kind === 'passage') return <PassageChip item={item} key={contextItemKey(item)} />;
         const file = fileFor?.(item.path);
         return file ? (
           <FileThumbnail file={file} key={item.path} size={size} />

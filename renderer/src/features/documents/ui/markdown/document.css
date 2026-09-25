@@ -282,16 +282,16 @@
   background: var(--border);
 }
 
-/* Humanize is a word among glyphs: the item widens to the word, and the word
-   takes the glyphs' foreground ladder so it reads as one of them. */
-.markdown-crepe .milkdown-toolbar .toolbar-item:has(.markdown-humanize-label) {
+/* The product actions are words among glyphs: the item widens to the word,
+   and the word takes the glyphs' foreground ladder so it reads as one of them. */
+.markdown-crepe .milkdown-toolbar .toolbar-item:has(.markdown-toolbar-label) {
   display: inline-flex;
   align-items: center;
   width: auto;
   padding-inline: 10px;
 }
 
-.markdown-humanize-label {
+.markdown-toolbar-label {
   color: color-mix(in oklab, var(--foreground) 76%, var(--background));
   font-size: var(--fs-caption, 12px);
   font-weight: 500;
@@ -299,7 +299,7 @@
   white-space: nowrap;
 }
 
-.markdown-crepe .milkdown-toolbar .toolbar-item:hover .markdown-humanize-label {
+.markdown-crepe .milkdown-toolbar .toolbar-item:hover .markdown-toolbar-label {
   color: var(--foreground);
 }
 

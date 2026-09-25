@@ -29,6 +29,7 @@ import {
   type AgentScopeEnvironment,
   type ContextStatus,
 } from '@/features/agent/domain/context';
+import { isDraftTile } from '@/features/agent/domain/draft-context';
 import { agentSkills } from '@/features/agent/domain/session';
 import { useShape } from '@/lib/shape-context';
 import { cn } from '@/lib/utils';
@@ -38,8 +39,11 @@ import { dragCarriesSource, readSourceDrag } from '@/shared/utils/source-drag';
 
 import { useMentionRows } from './context-rows';
 import { DraftSourceTiles, isVisualSource } from './context-tiles';
+import { useComposerFocusRequest } from './focus';
 import { MentionEditor, type MentionEditorHandle, type MentionEditorProps } from './mention-editor';
 import { MentionListbox } from './mention-listbox';
+import { SuggestedSourceChip } from './suggested-source-chip';
+import { useSuggestedSource } from './use-suggested-source';
 
 /** Native picker hint for an Agent that accepts transient local files. The
  * selected runtime decides what it can interpret after the file is attached;
@@ -137,6 +141,8 @@ export function AgentContextComposer({
   const editorRef = useRef<MentionEditorHandle>(null);
   const listboxId = useId();
 
+  useComposerFocusRequest(session, editorRef);
+
   const scoped =
     environment && scope.kind === 'folder' && environment.folderPath === scope.path
       ? environment
@@ -166,8 +172,6 @@ export function AgentContextComposer({
     }
     return next;
   }, [validations]);
-  // A visual source earns a tile only while the text does not mention it;
-  // a non-visual source is always inline, so it never takes a tile.
   const mentioned = useMemo(
     () =>
       new Set(
@@ -177,11 +181,9 @@ export function AgentContextComposer({
       ),
     [draft],
   );
-  const tileValidations = validations.filter((validation) =>
-    validation.item.kind === 'transient'
-      ? validation.status === 'stale'
-      : !mentioned.has(validation.item.source.path),
-  );
+  const tileValidations = validations.filter((validation) => isDraftTile(validation, mentioned));
+
+  const suggestion = useSuggestedSource(scoped, context);
 
   // Uploads render as the shared composer's own tiles, so the File behind
   // each bound upload is handed back to it.
@@ -252,12 +254,7 @@ export function AgentContextComposer({
     if (item.kind === 'source') session.setDraft(removeMentionText(draft, item.source.path));
   };
 
-  const onDropCapture = (event: DragEvent<HTMLDivElement>) => {
-    if (!dragCarriesSource(event.dataTransfer)) return;
-    event.preventDefault();
-    event.stopPropagation();
-    const source = readSourceDrag(event.dataTransfer);
-    if (!source) return;
+  const attachSource = (source: SourceReference) => {
     const listed = scoped?.listing.files.find((file) => file.path === source.path);
     const visual =
       listed !== undefined &&
@@ -270,6 +267,14 @@ export function AgentContextComposer({
     // a source outside the listing is still bound explicitly.
     editorRef.current?.insertMention(source.path);
     bindSource(source);
+  };
+
+  const onDropCapture = (event: DragEvent<HTMLDivElement>) => {
+    if (!dragCarriesSource(event.dataTransfer)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const source = readSourceDrag(event.dataTransfer);
+    if (source) attachSource(source);
   };
 
   const onPasteCapture = (event: ClipboardEvent<HTMLDivElement>) => {
@@ -347,15 +352,26 @@ export function AgentContextComposer({
         placeholder={placeholder}
         placeholderIsPrompt={placeholderIsPrompt}
         previewSlot={
-          tileValidations.length > 0 ? (
-            <div aria-label="Attached context" className="contents" role="list">
-              <DraftSourceTiles
-                onRemove={removeTile}
-                onReprocess={onReprocess}
-                size={80}
-                validations={tileValidations}
-              />
-            </div>
+          tileValidations.length > 0 || suggestion.source ? (
+            <>
+              {tileValidations.length > 0 && (
+                <div aria-label="Attached context" className="contents" role="list">
+                  <DraftSourceTiles
+                    onRemove={removeTile}
+                    onReprocess={onReprocess}
+                    size={80}
+                    validations={tileValidations}
+                  />
+                </div>
+              )}
+              {suggestion.source && (
+                <SuggestedSourceChip
+                  onAttach={() => suggestion.source && attachSource(suggestion.source)}
+                  onDismiss={suggestion.dismiss}
+                  source={suggestion.source}
+                />
+              )}
+            </>
           ) : undefined
         }
         queue={queue}

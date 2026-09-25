@@ -5,6 +5,7 @@ import test from 'node:test';
 import type { Event } from '@opencode-ai/sdk';
 import type { WebSocket } from 'ws';
 import {
+  blocksForMessage,
   OpenCodeEventTranslator,
   OpenCodePanelSession,
   openCodeSessionHasContent,
@@ -269,6 +270,39 @@ test('OpenCode events normalize into the Shared Agent Contract without duplicate
   assert.deepEqual(translator.translate({ type: 'session.idle', properties: { sessionID: 'session-1' } }), [
     { t: 'turn-end', isError: false },
   ]);
+});
+
+test('OpenCode translator never replays the reader\'s own prompt as Agent text', () => {
+  const translator = new OpenCodeEventTranslator();
+  translator.bindSession('session-1');
+  translator.beginTurn();
+  const message = (id: string, role: 'user' | 'assistant') => translator.translate({
+    type: 'message.updated',
+    properties: { info: { id, sessionID: 'session-1', role } },
+  } as unknown as Event);
+  const part = (messageID: string, text: string) => translator.translate({
+    type: 'message.part.updated',
+    properties: { part: { id: `${messageID}-part`, sessionID: 'session-1', messageID, type: 'text', text } },
+  });
+
+  assert.deepEqual(message('prompt-1', 'user'), []);
+  assert.deepEqual(part('prompt-1', 'what do you understand?\n\nSelected passages:\n- /a.md\n  > quote'), []);
+  assert.deepEqual(message('reply-1', 'assistant'), []);
+  assert.deepEqual(part('reply-1', 'The passage says…'), [{ t: 'text', delta: 'The passage says…' }]);
+});
+
+test('OpenCode history returns a prompt\'s passage to its chip instead of raw text', () => {
+  const quoted = 'what do you understand?\n\nSelected passages:\n- /home/me/notes/essay.md\n  > The tide rises.';
+  const blocks = blocksForMessage(
+    { id: 'prompt-1', sessionID: 'session-1', role: 'user' } as unknown as Parameters<typeof blocksForMessage>[0],
+    [{ id: 'part-1', sessionID: 'session-1', messageID: 'prompt-1', type: 'text', text: quoted }] as unknown as Parameters<typeof blocksForMessage>[1],
+  );
+  assert.deepEqual(blocks, [{
+    kind: 'user',
+    id: 'prompt-1',
+    text: 'what do you understand?',
+    attachments: [{ path: '/home/me/notes/essay.md', name: 'essay.md', quote: 'The tide rises.' }],
+  }]);
 });
 
 test('OpenCode translator isolates sessions and classifies hosted allowance failures', () => {

@@ -2,7 +2,8 @@
  * What Humanize hands the service and what it makes of the answer, proven
  * against the real Milkdown build: the selection widens to whole blocks,
  * refuses blocks that are not prose, and the rewrite lands in exactly the
- * selection's place in a whole-document proposal.
+ * selection's place in a whole-document proposal. Ask Agent, by contrast,
+ * takes exactly what is selected, code included.
  */
 import { CrepeBuilder } from '@milkdown/crepe/builder';
 import { diffComponent, diffComponentConfig } from '@milkdown/kit/component/diff';
@@ -19,6 +20,7 @@ import { TextSelection } from '@milkdown/kit/prose/state';
 import { afterEach, describe, expect, it } from 'vite-plus/test';
 
 import { humanizeProposal, humanizeTarget } from './humanize-selection';
+import { selectedMarkdown } from './selection-markdown';
 
 const SOURCE =
   '# Title\n\nThe first line.\n\nThe second line, comprehensively.\n\n```js\nconst code = 1;\n```\n\n- one\n- two\n';
@@ -180,5 +182,40 @@ describe('humanize proposal', () => {
       'unchanged',
     );
     expect(probe.action((ctx) => humanizeProposal(ctx, target, '   \n'))).toBe('unusable');
+  });
+});
+
+describe('selected markdown', () => {
+  it('takes exactly the selected words, not the paragraph around them', async () => {
+    const probe = await openProbe();
+    probe.select('second line');
+
+    expect(probe.action(selectedMarkdown)).toBe('second line');
+  });
+
+  it('keeps the blocks a selection crosses, code included', async () => {
+    const probe = await openProbe();
+    probe.select('Title', 'first');
+    expect(probe.action(selectedMarkdown)).toBe('# Title\n\nThe first');
+
+    probe.select('comprehensively', 'code');
+    expect(probe.action(selectedMarkdown)).toBe('comprehensively.\n\n```js\nconst code\n```');
+  });
+
+  it('answers nothing for an empty or whitespace-only selection', async () => {
+    const probe = await openProbe();
+    const selectRange = (from: number, to: number) =>
+      probe.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, from, to)));
+      });
+    selectRange(1, 1);
+    expect(probe.action(selectedMarkdown)).toBeNull();
+
+    probe.select('The first line.');
+    const end = probe.action((ctx) => ctx.get(editorViewCtx).state.selection.to);
+    // The gap between two paragraphs holds no text at all.
+    selectRange(end, end + 2);
+    expect(probe.action(selectedMarkdown)).toBeNull();
   });
 });

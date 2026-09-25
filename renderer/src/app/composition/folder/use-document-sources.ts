@@ -2,7 +2,11 @@ import { useCallback } from 'react';
 
 import { mutateDocuments } from '@/app/workflows/mutate-documents';
 import { openDocument } from '@/app/workflows/open-document';
-import type { DocumentNavigationTarget, DocumentTabsRuntime } from '@/features/documents/public';
+import {
+  passageSearchTarget,
+  type DocumentNavigationTarget,
+  type DocumentTabsRuntime,
+} from '@/features/documents/public';
 import type { SearchNavigationIntent } from '@/features/retrieval/public';
 import {
   useProjectLifecycle,
@@ -23,6 +27,9 @@ export interface DocumentSources {
   /** Opens the document behind a search hit and lands on the match. Answers
    *  whether the document opened. */
   navigateToMatch(intent: SearchNavigationIntent): Promise<boolean>;
+  /** Opens the document a reply cited and lands on the quoted phrase. Answers
+   *  whether the document opened; a phrase it no longer holds is said there. */
+  locatePassage(source: SourceReference, phrase: string): Promise<boolean>;
   /** Opens a source. Browsing is the default and opens a preview, the one
    *  tab the next browse reuses; `keep` asks for a tab that stays. */
   open(source: SourceReference, options?: { keep?: boolean }): void;
@@ -98,6 +105,18 @@ export function useDocumentSources(
     [documents, workspace],
   );
 
+  const locatePassage = useCallback(
+    async (source: SourceReference, phrase: string) => {
+      if (!workspace || !documents) return false;
+      const opened = await openDocument(workspace, documents, source, {
+        preview: true,
+        search: passageSearchTarget(phrase),
+      });
+      return opened !== null;
+    },
+    [documents, workspace],
+  );
+
   const mutate = useCallback(
     (entry: WorkspaceEntry, operation: () => Promise<string | null>) =>
       workspace && documents
@@ -113,6 +132,7 @@ export function useDocumentSources(
 
   return {
     hostFailure: projectLifecycle.failure,
+    locatePassage,
     navigate,
     navigateToMatch,
     open,

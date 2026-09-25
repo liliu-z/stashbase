@@ -58,7 +58,14 @@ const markdown = viewerEntry({
   find: true,
   icon: constantIcon(FileText),
   outline: true,
-  services: ['humanizeApi', 'navigation', 'onNavigate', 'onOpenExternal', 'sourceApi'],
+  services: [
+    'humanizeApi',
+    'navigation',
+    'onAskAgent',
+    'onNavigate',
+    'onOpenExternal',
+    'sourceApi',
+  ],
   status: sourceStatus,
 });
 

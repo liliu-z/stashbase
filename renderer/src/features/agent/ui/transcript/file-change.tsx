@@ -286,7 +286,7 @@ export function AgentChangedFiles({
   sourceFor,
 }: {
   changes: readonly AgentFileChange[];
-  onOpenSource?: ((source: SourceReference) => void) | undefined;
+  onOpenSource?: ((source: SourceReference, phrase: string | null) => void) | undefined;
   sourceFor?: ((path: string) => SourceReference | null) | undefined;
 }) {
   const shape = useShape();
@@ -325,7 +325,7 @@ export function AgentChangedFiles({
               <Button
                 aria-label={`Open ${name}`}
                 className="-my-1"
-                onClick={() => onOpenSource?.(source)}
+                onClick={() => onOpenSource?.(source, null)}
                 size="compact"
                 variant="ghost"
               >

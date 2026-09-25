@@ -25,6 +25,7 @@ import {
 import { getCurrentFolder, runWithWindowId } from './folder.ts';
 import { filesystemPath } from './filesystem-path.ts';
 import { agentTurnErrorEvent } from './agent-turn-failure.ts';
+import { restoreHistoryAttachments } from './agent-history-attachments.ts';
 import {
   createOpenCodeSessionRuntime,
   openCodeClient,
@@ -81,6 +82,9 @@ export class OpenCodeEventTranslator {
   private readonly diffs = new Set<string>();
   private diffCounter = 0;
   private readonly errors = new Set<string>();
+  /** OpenCode streams the reader's own prompt as parts too; only its role,
+   * announced on the message before its parts, tells them from the reply. */
+  private readonly userMessages = new Set<string>();
 
   bindSession(id: string): void { this.sessionId = id; }
   beginTurn(): AgentServerEvent[] {
@@ -124,6 +128,7 @@ export class OpenCodeEventTranslator {
         return event.properties.diff.flatMap((diff) => this.fileDiff(diff));
       case 'message.updated': {
         const info = event.properties.info;
+        if (this.matches(info.sessionID) && info.role === 'user') this.userMessages.add(info.id);
         if (!this.matches(info.sessionID) || info.role !== 'assistant' || !info.error) return [];
         const message = 'data' in info.error && typeof info.error.data?.message === 'string'
           ? info.error.data.message
@@ -166,7 +171,7 @@ export class OpenCodeEventTranslator {
   }
 
   private part(part: Part, delta?: string): AgentServerEvent[] {
-    if (!this.matches(part.sessionID)) return [];
+    if (!this.matches(part.sessionID) || this.userMessages.has(part.messageID)) return [];
     if (part.type === 'text' || part.type === 'reasoning') {
       const previous = this.content.get(part.id) ?? '';
       const next = part.text;
@@ -431,11 +436,20 @@ function textOf(parts: Part[], type: 'text' | 'reasoning'): string {
     .join('');
 }
 
-function blocksForMessage(info: Message, parts: Part[]): SessionBlock[] {
+/** One stored message as transcript blocks. A prompt's generated context
+ * suffixes return to chips, as they do for the other runtimes' history. */
+export function blocksForMessage(info: Message, parts: Part[]): SessionBlock[] {
   const blocks: SessionBlock[] = [];
   if (info.role === 'user') {
-    const text = textOf(parts, 'text');
-    if (text) blocks.push({ kind: 'user', id: info.id, text });
+    const restored = restoreHistoryAttachments(textOf(parts, 'text'));
+    if (restored.text || restored.attachments.length) {
+      blocks.push({
+        kind: 'user',
+        id: info.id,
+        text: restored.text,
+        ...(restored.attachments.length ? { attachments: restored.attachments } : {}),
+      });
+    }
     return blocks;
   }
   const reasoning = textOf(parts, 'reasoning');

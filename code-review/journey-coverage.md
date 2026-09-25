@@ -270,9 +270,12 @@ Inline review: `renderer/src/features/documents/domain/revision.ts`,
 `renderer/src/features/documents/ui/markdown/revision-adapter.ts` over a patched
 `@milkdown/plugin-diff` (`patches/`).
 Humanize on a selection: `renderer/src/features/documents/ui/markdown/humanize-selection.ts`,
-`use-humanize.ts`, `humanize-toolbar.ts`, `renderer/src/features/documents/infrastructure/humanize-api.ts`;
+`use-humanize.ts`, `selection-toolbar.ts`, `renderer/src/features/documents/infrastructure/humanize-api.ts`;
 host `server/humanize.ts` and `server/routes/humanize.ts`; wire
 `shared/protocols/http/humanize.ts`.
+Ask Agent on a selection: `renderer/src/features/documents/ui/markdown/selection-markdown.ts`
+and `selection-toolbar.ts`, bound in `renderer/src/app/shell.tsx`, which saves the
+documents, shows the chat pane, and hands the passage to the Agent workspace.
 A save refused against a version a deleted file no longer has, whose reload confirms
 the source is gone, enters the document's `detached` state and stops autosave.
 `application/draft-settlement.ts` turns a close or a release of such a tab into the
@@ -781,6 +784,35 @@ Project choice and first Send: `renderer/src/features/agent/application/project-
   official installer downloads, and packaged cross-platform shutdown remain
   release checks, not established by these local fixtures.
 
+**Document context (2026-09-25):** a passage is a context kind in
+`renderer/src/features/agent/domain/context.ts`, rendered into the prompt as a
+`Selected passages:` block by `domain/prompt-context.ts` and validated only
+against scope, listing, and its 6,000-character limit. `application/ask-about.ts`
+binds it to the chat in the passage's folder and leaves a composer focus request that survives the pane
+mounting. `server/agent-history-attachments.ts` lifts the block back out of
+Claude, Codex, and Default (OpenCode) history, and `infrastructure/session-api.ts` turns a replayed
+quote under the chat's folder into the same passage chip. The composer's
+suggestion of the document in front comes from `activeSource`, which
+`use-agent-environment.ts` publishes only in Documents; `domain/draft-context.ts`
+decides what is offered and `use-suggested-source.ts` holds the dismissal.
+`context.test.ts`, `session-runtime.context.test.ts`, `ask-about.test.ts`,
+`session-api.test.ts`, `codex-history.test.ts`, `context-composer.test.tsx`,
+`humanize-selection.test.ts`, and `use-agent-environment.test.tsx` own these rules.
+A driven built-app pass (2026-09-25, Linux, isolated home, folder dialog stubbed
+in the main process) opened a Markdown file beside the Agent pane: the pane
+offered it as a dashed suggestion; a selection showed Humanize and Ask Agent on
+the toolbar; Ask Agent bound "tide rises twice" as a passage chip and moved the
+caret into the composer; clicking the suggestion turned it into an inline
+mention and removed it. The formatting toolbar stays drawn after Ask Agent
+moves focus, until the next selection change. Not proven at runtime: a real
+turn receiving the passage, and a reloaded chat restoring its chip.
+A real Default turn (2026-09-25) received the passage and replied with a
+`#:~:text=` citation, but showed the reader's own prompt, context block
+included, again as Agent text: OpenCode streams the prompt's text part like a
+reply's, and `OpenCodeEventTranslator` forwarded every text part. It now drops
+parts of messages OpenCode announced as the user's; `opencode-agent.test.ts`
+owns that rule and the history restore.
+
 ## J07: Converge
 
 **Intent:** [J07](../design-docs/journeys/README.md#j07-converge-chat-into-a-document).
@@ -820,6 +852,15 @@ Host/services: `server/project-file-mutations.ts`, `server/text-file-transaction
   held only its name without it. Not proven: that a real runtime follows the
   guidance turn after turn. It is a standing instruction, not a gate, and no
   conversation was driven after the change.
+- **Citations (2026-09-25):** `renderer/src/features/agent/domain/citation.ts`
+  reads a `#:~:text=` phrase from a reply's local link; the transcript hands it
+  to `locatePassage` in `use-document-sources.ts`, which opens the file with a
+  passage-purpose Find target whose notices `navigation-runtime.ts` words for a
+  passage. `server/agent-runtime-instructions.ts` asks every runtime to cite
+  that way. `citation.test.ts`, `markdown.test.tsx`, `navigation-runtime.test.ts`,
+  and `agent-convergence.test.tsx` (a cited link selects Documents and Find lands
+  on the phrase) cover it. Not proven: that a real runtime cites as instructed,
+  and a phrase spanning a line break in the rendered text is not found.
 - **AI Eval:** requested writing quality belongs to J10. Existing deterministic
   orchestration evidence is not document-specific diff evidence.
 - **Release Check:** real-runtime requested draft/revision followed by editor save.

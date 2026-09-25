@@ -24,8 +24,9 @@ export interface AgentWorkspaceProps {
   /** Explicit account choice; a caller signal waits for completion without
    *  carrying account tokens or authorizing a send after cancellation. */
   onSignIn(signal?: AbortSignal): void | Promise<boolean>;
-  /** Opens a file the Agent changed beside the chat; the user chose it. */
-  onOpenSource?: ((source: SourceReference) => void) | undefined;
+  /** Opens a file the Agent changed or cited beside the chat; the user chose
+   *  it. A cited phrase is the passage to locate, null for the whole file. */
+  onOpenSource?: ((source: SourceReference, phrase: string | null) => void) | undefined;
   /** Restarts preparation for a bound source whose prepared text failed. */
   onReprocess?: ((source: SourceReference) => void) | undefined;
   /** The review open on a document an agent proposed a revision to, by

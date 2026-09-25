@@ -7,7 +7,7 @@
  */
 import { useEffect, useState } from 'react';
 
-import { useAgentWorkspaceRuntime } from '@/features/agent/public';
+import { askAbout, useAgentWorkspaceRuntime } from '@/features/agent/public';
 import {
   RevisionPreview,
   useDocumentCommands,
@@ -15,6 +15,7 @@ import {
   useNewTab,
   useOpenRevisions,
   useRevisionPreview,
+  type DocumentSelection,
 } from '@/features/documents/public';
 import { useFolderStatus } from '@/features/preparation/public';
 import { AccountProvider, useSearchKeyConfigured } from '@/features/settings/public';
@@ -127,7 +128,6 @@ function WorkspaceWindow() {
     treeVersion: status?.treeVersion,
   });
 
-  const agent = useAgentEnvironment(listing, status, documents, folderPath, selectedPath);
   const runtime = useAgentWorkspaceRuntime({
     context: dependencies.agent.context,
     recordUsage: dependencies.recordUsage,
@@ -138,7 +138,6 @@ function WorkspaceWindow() {
     ...(dependencies.agent.preferences ? { preferences: dependencies.agent.preferences } : {}),
     subscribeFolderRemoved: workspaceDeps.adapters.lifecycle.onFolderRemoved,
   });
-  useEffect(() => runtime.setScopeEnvironment(agent.environment), [agent.environment, runtime]);
 
   // A proposal an agent parked is drained by the window that has its folder
   // open, and the drain deletes what it returns, so whatever cannot be shown
@@ -159,6 +158,24 @@ function WorkspaceWindow() {
     session,
     workspace,
   });
+
+  const agent = useAgentEnvironment(
+    listing,
+    status,
+    documents,
+    folderPath,
+    selectedPath,
+    chrome.navigator.mode === 'documents',
+  );
+  useEffect(() => runtime.setScopeEnvironment(agent.environment), [agent.environment, runtime]);
+  // Asking about a selection brings the chat beside the document into view
+  // and binds the passage there; the save is started so what the Agent reads
+  // from disk is what the reader selected.
+  const askAgent = (selection: DocumentSelection) => {
+    void documents?.flush();
+    setChatPaneOpen(true);
+    askAbout(runtime, selection.source, selection.markdown);
+  };
 
   useDocumentCommands(documents?.navigation ?? null, documents, {
     enabled: chrome.navigator.mode === 'documents',
@@ -252,6 +269,7 @@ function WorkspaceWindow() {
             agent={{ runtime }}
             documents={documents}
             mode={chrome.navigator.mode}
+            onAskAgent={askAgent}
             newTab={newTab}
             onCreateDraft={newDraft}
             onPrepare={preparation.prepare}

@@ -1,5 +1,5 @@
 import { EditorView } from '@codemirror/view';
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
 
@@ -97,6 +97,15 @@ vi.mock('@milkdown/crepe/builder', () => ({
     }
 
     async create() {
+      // The rendered prose Find reads; the real editor draws it from the Markdown.
+      const prose = document.createElement('div');
+      prose.className = 'ProseMirror';
+      for (const line of this.instance.markdown.split('\n').filter(Boolean)) {
+        const paragraph = document.createElement('p');
+        paragraph.textContent = line.replace(/^#+\s*/u, '');
+        prose.append(paragraph);
+      }
+      this.instance.root.append(prose);
       this.instance.status = 'Created';
     }
 
@@ -349,6 +358,46 @@ describe('J07 converge chat into a document', () => {
       settleWrite(listener, 'write-2', 'Canvas.md', '# Canvas v2');
 
       await waitFor(() => expect(markdownEditorFor('Canvas.md').markdown).toBe('# Canvas v2'));
+    },
+    COMPOSITION_TEST_MS,
+  );
+
+  it(
+    'opens a cited passage from a reply in Documents and locates its phrase',
+    async () => {
+      const test = harness();
+      const listener = await converge(test);
+      await userEvent.click(screen.getByRole('tab', { name: 'Chats' }));
+
+      test.setFiles(['Welcome.md', 'Canvas.md']);
+      test.setSource('Canvas.md', '# Canvas\n\nThe tide rises slowly.', 'c1');
+      settleWrite(listener, 'write-1', 'Canvas.md', '# Canvas\n\nThe tide rises slowly.');
+      act(() =>
+        listener.onEvent({
+          kind: 'text',
+          delta: 'See [the claim](Canvas.md#:~:text=tide%20rises).',
+        }),
+      );
+
+      const cited = await screen.findByRole('link', { name: 'the claim' });
+      expect(cited.getAttribute('title')).toContain('tide rises');
+      await userEvent.click(cited);
+
+      expect(screen.getByRole('tab', { name: 'Documents' }).getAttribute('aria-selected')).toBe(
+        'true',
+      );
+      expect(await screen.findByRole('tab', { name: 'Canvas.md, preview' })).not.toBeNull();
+      await waitFor(() =>
+        expect(screen.queryByText('The file is open. Locating the passage…')).toBeNull(),
+      );
+      expect(screen.queryByText(/passage could not be/u)).toBeNull();
+      await userEvent.keyboard('{Control>}f{/Control}');
+      const find = await screen.findByRole('search', { name: 'Find in document' });
+      expect(within(find).getByRole('textbox', { name: 'Find in document' })).toHaveProperty(
+        'value',
+        'tide rises',
+      );
+      expect(within(find).getByRole('status').textContent).toBe('1/1');
     },
     COMPOSITION_TEST_MS,
   );

@@ -7,7 +7,11 @@
  */
 import { createStore, type StoreApi } from 'zustand/vanilla';
 
-import type { DocumentSearchTarget, FindOptions } from '@/features/documents/domain/location';
+import type {
+  DocumentSearchPurpose,
+  DocumentSearchTarget,
+  FindOptions,
+} from '@/features/documents/domain/location';
 import type { DocumentHeading } from '@/features/documents/domain/outline';
 
 export type { FindOptions };
@@ -45,6 +49,8 @@ interface PendingDocumentAnchor {
 
 interface DocumentNavigationState {
   searchNotice: string | null;
+  /** The purpose of the last requested search, for notices the viewer adds. */
+  searchPurpose: DocumentSearchPurpose;
   outlineFailed: boolean;
   find: DocumentFindState;
   outline: DocumentOutlineState;
@@ -81,6 +87,29 @@ export interface DocumentNavigationRuntime {
   setFindWholeWord(value: boolean): void;
 }
 
+interface SearchNotices {
+  locating: string;
+  missing: string;
+  failed: string;
+  /** Shown instead of any notice when the open preview has no Find. */
+  unavailable: string;
+}
+
+export const SEARCH_NOTICES: Readonly<Record<DocumentSearchPurpose, SearchNotices>> = {
+  match: {
+    locating: 'The file is open. Locating the search result in this preview…',
+    missing: 'This search match could not be located. The source may have changed.',
+    failed: 'The search match could not be located in this preview.',
+    unavailable: 'This preview cannot locate search matches.',
+  },
+  passage: {
+    locating: 'The file is open. Locating the passage…',
+    missing: 'This passage could not be found. The file may have changed.',
+    failed: 'The passage could not be located in this preview.',
+    unavailable: 'This preview cannot locate passages.',
+  },
+};
+
 const emptyOutline = (): DocumentOutlineState => ({
   activeId: null,
   available: false,
@@ -92,6 +121,7 @@ export function createDocumentNavigationRuntime(
 ): DocumentNavigationRuntime {
   const store = createStore<DocumentNavigationState>(() => ({
     searchNotice: null,
+    searchPurpose: 'match',
     outlineFailed: false,
     find: {
       available: false,
@@ -157,6 +187,7 @@ export function createDocumentNavigationRuntime(
     pendingSearch = null;
     const sequence = ++requestSequence;
     const { caseSensitive, occurrenceIndex, query, wholeWord } = pending.target;
+    const notices = SEARCH_NOTICES[pending.target.purpose ?? 'match'];
     updateFind({
       caseSensitive,
       current: 0,
@@ -170,9 +201,7 @@ export function createDocumentNavigationRuntime(
         if (disposed || sequence !== requestSequence || findController !== controller) return;
         if (initial.total === 0 || occurrenceIndex >= initial.total) {
           updateFind(initial);
-          store.setState({
-            searchNotice: 'This search match could not be located. The source may have changed.',
-          });
+          store.setState({ searchNotice: notices.missing });
           return;
         }
         store.setState({ searchNotice: null });
@@ -188,7 +217,7 @@ export function createDocumentNavigationRuntime(
       .catch(() => {
         if (disposed || sequence !== requestSequence || findController !== controller) return;
         updateFind({ current: 0, total: 0 });
-        store.setState({ searchNotice: 'The search match could not be located in this preview.' });
+        store.setState({ searchNotice: notices.failed });
       });
   };
 
@@ -314,9 +343,8 @@ export function createDocumentNavigationRuntime(
       ) {
         return;
       }
-      store.setState({
-        searchNotice: 'The file is open. Locating the search result in this preview…',
-      });
+      const purpose = target.purpose ?? 'match';
+      store.setState({ searchNotice: SEARCH_NOTICES[purpose].locating, searchPurpose: purpose });
       pendingSearch = { tabId, target: { ...target } };
       deliverSearch();
     },

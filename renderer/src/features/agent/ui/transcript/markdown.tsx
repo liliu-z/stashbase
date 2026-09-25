@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 
 import 'katex/dist/katex.min.css';
+import { parseCitationHref } from '@/features/agent/domain/citation';
 import type { SourceReference } from '@/shared/domain/source-reference';
 
 function isHttpUrl(href: string): boolean {
@@ -18,7 +19,7 @@ function isHttpUrl(href: string): boolean {
 
 interface MarkdownLinks {
   onOpenExternal?: ((href: string) => void) | undefined;
-  onOpenSource?: ((source: SourceReference) => void) | undefined;
+  onOpenSource?: ((source: SourceReference, phrase: string | null) => void) | undefined;
   sourceFor?: ((path: string) => SourceReference | null) | undefined;
 }
 
@@ -55,24 +56,23 @@ function markdownComponents({
           </a>
         );
       }
-      let source: SourceReference | null = null;
-      try {
-        const path = decodeURIComponent(href.split(/[?#]/u)[0] ?? '');
-        if (path && !/^[a-z][a-z0-9+.-]*:/iu.test(path) && !path.startsWith('//'))
-          source = sourceFor?.(path) ?? null;
-      } catch {
-        /* Malformed links stay inert. */
-      }
+      const citation = parseCitationHref(href);
+      const path = citation?.path ?? '';
+      const source =
+        path && !/^[a-z][a-z0-9+.-]*:/iu.test(path) && !path.startsWith('//')
+          ? (sourceFor?.(path) ?? null)
+          : null;
       if (!source || !onOpenSource) return <span>{children}</span>;
-      const target = source;
+      const phrase = citation?.phrase ?? null;
       return (
         <a
           {...props}
           href={href}
           onClick={(event) => {
             event.preventDefault();
-            onOpenSource(target);
+            onOpenSource(source, phrase);
           }}
+          title={phrase ? `${path}: \u201c${phrase}\u201d` : props.title}
         >
           {children}
         </a>

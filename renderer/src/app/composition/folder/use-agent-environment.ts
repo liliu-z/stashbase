@@ -1,7 +1,11 @@
 import { useMemo } from 'react';
 
 import type { AgentScope, AgentScopeEnvironment } from '@/features/agent/public';
-import { useOpenDocumentSources, type DocumentTabsRuntime } from '@/features/documents/public';
+import {
+  useActiveDocumentSource,
+  useOpenDocumentSources,
+  type DocumentTabsRuntime,
+} from '@/features/documents/public';
 import { sourceReadiness } from '@/features/preparation/public';
 import type { FolderIndexStatus } from '@/features/preparation/public';
 import type { WorkspaceListing } from '@/features/workspace/public';
@@ -20,8 +24,9 @@ export interface AgentEnvironment {
  * The Agent validates bound context against the folder in front of the user,
  * and it has to do that without importing workspace or preparation state. So
  * the shell publishes a projection instead: the listing, per-source readiness
- * for anything not already current, the conversion versions, and the paths of
- * the documents open beside the chat. Everything here is derived — the Agent
+ * for anything not already current, the conversion versions, the paths of
+ * the documents open beside the chat, and the one in front of the reader while
+ * the Agent docks beside it. Everything here is derived — the Agent
  * never gets a handle it could use to change what it is looking at.
  *
  * Both halves are memoised because the runtime is told about a new environment
@@ -34,8 +39,12 @@ export function useAgentEnvironment(
   documents: DocumentTabsRuntime | null,
   folderPath: string | null,
   selectedFolderPath: string | null,
+  documentsShown: boolean,
 ): AgentEnvironment {
   const openSources = useOpenDocumentSources(documents);
+  const activeSource = useActiveDocumentSource(documents);
+  const shownSource =
+    documentsShown && activeSource?.folderPath === folderPath ? activeSource : null;
 
   // The selected folder, not the mounted workspace: a chat is scoped the
   // moment the reader picks a folder, before its workspace has settled.
@@ -54,6 +63,7 @@ export function useAgentEnvironment(
       }
     }
     return {
+      activeSource: shownSource,
       folderPath,
       listing: {
         files: listing.files.map((file) => ({ format: file.format, path: file.path })),
@@ -67,7 +77,7 @@ export function useAgentEnvironment(
       readiness,
       versions: status?.conversionVersions ?? {},
     };
-  }, [folderPath, listing, openSources, status]);
+  }, [folderPath, listing, openSources, shownSource, status]);
 
   return useMemo(() => ({ environment, scope }), [environment, scope]);
 }

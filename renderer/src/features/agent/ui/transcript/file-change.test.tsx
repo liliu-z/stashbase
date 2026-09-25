@@ -92,9 +92,12 @@ describe('Agent file change evidence', () => {
     expect(list.textContent).toContain('config.json');
     expect(screen.queryByRole('button', { name: 'Open config.json' })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Open plan.md' }));
-    expect(onOpenSource).toHaveBeenCalledWith({
-      folderPath: '/project/Research',
-      path: 'notes/plan.md',
-    });
+    expect(onOpenSource).toHaveBeenCalledWith(
+      {
+        folderPath: '/project/Research',
+        path: 'notes/plan.md',
+      },
+      null,
+    );
   });
 });

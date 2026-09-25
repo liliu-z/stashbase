@@ -15,11 +15,10 @@ import { placeholder } from '@milkdown/crepe/feature/placeholder';
 import { table } from '@milkdown/crepe/feature/table';
 import { toolbar } from '@milkdown/crepe/feature/toolbar';
 import { replaceAll } from '@milkdown/kit/utils';
-import { BookOpen, PenLine, RefreshCw } from 'lucide-react';
+import { BookOpen, PenLine } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useStore } from 'zustand';
 
-import { Button } from '@/components/ui/button';
 import { TabsSubtle, TabsSubtleItem } from '@/components/ui/tabs-subtle';
 import { startMarkdownEditorCreation } from '@/features/documents/application/markdown-editor-lifecycle';
 import type { DocumentNavigationRuntime } from '@/features/documents/application/navigation-runtime';
@@ -27,6 +26,7 @@ import type { MarkdownViewMode } from '@/features/documents/domain/document';
 import { resolveDocumentLink } from '@/features/documents/domain/link-target';
 import { splitLeadingYamlFrontmatter } from '@/features/documents/domain/markdown';
 import type { DocumentHeading } from '@/features/documents/domain/outline';
+import type { DocumentSelection } from '@/features/documents/domain/selection';
 import { cn } from '@/lib/utils';
 import type { SourceReference } from '@/shared/domain/source-reference';
 import { writeToClipboard } from '@/shared/ui/clipboard';
@@ -34,7 +34,7 @@ import { writeToClipboard } from '@/shared/ui/clipboard';
 import { watchMarkdownChanges } from './changes';
 import { createMarkdownFindController } from './find-controller';
 import { HumanizeNotice } from './humanize-notice';
-import { humanizeToolbar } from './humanize-toolbar';
+import { MarkdownOpenFailure } from './open-failure';
 
 import '@milkdown/crepe/theme/common/style.css';
 import '@milkdown/crepe/theme/frame.css';
@@ -50,6 +50,8 @@ import {
   scrollOutlineToHeading,
   type ProseMirrorDocument,
 } from './outline-adapter';
+import { useAskAgent } from './selection-markdown';
+import { selectionToolbar } from './selection-toolbar';
 import { useHumanize, type HumanizeBinding } from './use-humanize';
 import { useRevisionReview, type RevisionBinding } from './use-revision-review';
 
@@ -64,6 +66,9 @@ export interface MarkdownDocumentProps {
   humanize?: HumanizeBinding | undefined;
   mode: MarkdownViewMode;
   name: string;
+  /** Ask Agent on the selection toolbar, with the exact selection. Absent
+   *  where no Agent sits beside the document. */
+  onAskAgent?: ((selection: DocumentSelection) => void) | undefined;
   onChange(value: string): void;
   onNavigate(target: { anchor?: string | undefined; source: SourceReference }): void;
   onModeChange(mode: MarkdownViewMode): void;
@@ -86,6 +91,7 @@ export function MarkdownDocument({
   humanize,
   mode,
   name,
+  onAskAgent,
   onChange,
   onNavigate,
   onModeChange,
@@ -128,6 +134,7 @@ export function MarkdownDocument({
   const humanizeControls = useHumanize(humanize, editorRef);
   // `run` is stable, so the toolbar built with the editor keeps it without a ref.
   const humanizeRun = humanize === undefined ? null : humanizeControls.run;
+  const askAgentRun = useAskAgent(onAskAgent, source);
   const pendingAnchor = useStore(navigation.store, (state) =>
     state.pendingAnchor?.tabId === tabId ? state.pendingAnchor.id : null,
   );
@@ -164,7 +171,13 @@ export function MarkdownDocument({
           }),
       })
       .addFeature(blockEdit)
-      .addFeature(toolbar, humanizeRun ? humanizeToolbar(() => humanizeRun(editor)) : undefined)
+      .addFeature(
+        toolbar,
+        selectionToolbar({
+          askAgent: askAgentRun,
+          humanize: humanizeRun ? () => humanizeRun(editor) : undefined,
+        }),
+      )
       .addFeature(table)
       .addFeature(codeMirror, { copyText: 'Copy code', languages })
       .addFeature(latex);
@@ -213,7 +226,7 @@ export function MarkdownDocument({
       }
       stopCreation();
     };
-  }, [attachReview, attempt, humanizeRun, navigation, tabId]);
+  }, [askAgentRun, attachReview, attempt, humanizeRun, navigation, tabId]);
 
   useEffect(() => {
     editorRef.current?.setReadonly(readOnly);
@@ -365,22 +378,7 @@ export function MarkdownDocument({
         </div>
       )}
       {creationState === 'failed' && (
-        <div className="markdown-status flex-col gap-3" role="alert">
-          <div>
-            <p className="text-body font-medium">Could not open this Markdown document</p>
-            <p className="mt-1 text-caption text-muted-foreground">
-              The source is unchanged. Try opening the editor again.
-            </p>
-          </div>
-          <Button
-            leadingIcon={RefreshCw}
-            onClick={() => setAttempt((current) => current + 1)}
-            size="compact"
-            variant="tertiary"
-          >
-            Try again
-          </Button>
-        </div>
+        <MarkdownOpenFailure onRetry={() => setAttempt((current) => current + 1)} />
       )}
       {reviewBar}
       <HumanizeNotice controls={humanizeControls} />

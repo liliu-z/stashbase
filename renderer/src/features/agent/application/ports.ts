@@ -1,8 +1,8 @@
 import type { AgentContextExtra } from '@/features/agent/application/failure-messages';
 import type { AgentAccessMode } from '@/features/agent/domain/access';
 import type { AgentCatalog } from '@/features/agent/domain/agent-catalog';
-import type { ResolvedContextFile as ResolvedContextText } from '@/features/agent/domain/context';
 import type { AgentHistoryEntry } from '@/features/agent/domain/conversation-history';
+import type { ResolvedContextFile as ResolvedContextText } from '@/features/agent/domain/prompt-context';
 import type {
   AgentId,
   AgentScope,

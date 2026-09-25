@@ -141,7 +141,7 @@ const TranscriptBlock = memo(function TranscriptBlock({
   now: number;
   onEditPrompt?: ((blockId: string) => void) | undefined;
   onOpenExternal(href: string): void;
-  onOpenSource?: ((source: SourceReference) => void) | undefined;
+  onOpenSource?: ((source: SourceReference, phrase: string | null) => void) | undefined;
   sourceFor?: ((path: string) => SourceReference | null) | undefined;
   onPermission(
     toolUseId: string,
@@ -280,7 +280,7 @@ export const AgentTranscript = memo(function AgentTranscript({
   onOpenExternal(href: string): void;
   /** Opens a file the Agent changed beside the chat, without selecting it
    *  on the Agent's behalf. */
-  onOpenSource?: ((source: SourceReference) => void) | undefined;
+  onOpenSource?: ((source: SourceReference, phrase: string | null) => void) | undefined;
   onPermission(
     toolUseId: string,
     permissionId: string,

@@ -20,7 +20,11 @@ export type { DocumentRevisionProposal, DrainedRevisions } from './application/p
 export { createDocumentAdapters, type DocumentAdapters } from './infrastructure/adapters';
 export { useDocumentCommands } from './hooks/use-document-commands';
 export { useDocumentSaveBarrier } from './hooks/use-document-save-barrier';
-export { useHasOpenDocuments, useOpenDocumentSources } from './hooks/use-open-documents';
+export {
+  useActiveDocumentSource,
+  useHasOpenDocuments,
+  useOpenDocumentSources,
+} from './hooks/use-open-documents';
 export { useOpenRevisions, type OpenRevision } from './hooks/use-open-revisions';
 export { useNewTab, type NewTab } from './hooks/use-new-tab';
 export { useRevisionPreview } from './hooks/use-revision-preview';
@@ -32,5 +36,7 @@ export { DocumentHistoryButtons } from './ui/workspace/history-buttons';
 export { DocumentOutline, DocumentOutlineEmpty } from './ui/workspace/outline';
 export { DocumentWorkspace } from './ui/workspace/workspace';
 export type { DocumentNavigationTarget } from './ui/source/viewer';
+export { passageSearchTarget } from './domain/location';
+export type { DocumentSelection } from './domain/selection';
 
 export { prepareDocument } from './application/prepare-document';

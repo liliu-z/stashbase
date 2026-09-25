@@ -19,6 +19,9 @@ source mutations, saving, and release guarantees.
    change or the remaining set. The Chat card reflects the same review.
    Select prose and choose Humanize to receive Hemmingway-1's rewrite as such a
    proposal; a refusal names its reason and leaves the document as it was.
+   Select any Markdown and choose Ask Agent to bind that passage to the chat
+   beside the document; the chat pane opens if it was hidden. The pane also
+   suggests the document in front, which attaches only on a click.
 4. Return to live work with edits, undo, selection, and reading position intact.
    Relaunch restores kept tabs from saved files and reports missing files individually.
 

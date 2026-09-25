@@ -4,6 +4,7 @@ export { createAgentSessionAdapter } from './infrastructure/session-api';
 export { AgentChats, AgentWorkspace } from './ui/workspace-lazy';
 export { ChatNavButtons } from './ui/chat-nav-buttons';
 export { ChatTitle } from './ui/chat-title';
+export { askAbout } from './application/ask-about';
 export { useAgentWorkspaceRuntime } from './hooks/use-agent-workspace-runtime';
 export { agentSurfaceProps } from './ui/composer/focus';
 export type { AgentCatalogPort, AgentContextPort, AgentSessionPort } from './application/ports';

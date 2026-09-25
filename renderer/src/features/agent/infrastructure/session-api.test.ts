@@ -42,6 +42,65 @@ describe('Agent session API', () => {
     expect(url.searchParams.has('windowId')).toBe(false);
   });
 
+  it('replays a quoted attachment in the chat folder as a passage and the rest as uploads', async () => {
+    const api = createAgentSessionAdapter(
+      httpClient({
+        effort: null,
+        messages: [
+          {
+            attachments: [
+              {
+                name: 'essay.md',
+                path: '/project/Research/drafts/essay.md',
+                quote: 'The opening line.',
+              },
+              { name: 'other.md', path: '/project/Plans/other.md', quote: 'Elsewhere.' },
+              { name: 'chart.png', path: '/tmp/chart.png', previewUrl: '/api/preview?p=chart' },
+            ],
+            id: 'user-1',
+            kind: 'user',
+            text: 'Is this clear?',
+          },
+        ],
+        protocol: 2,
+      }),
+      'http://127.0.0.1:1',
+    );
+    const replay = await api.replay(
+      {
+        agent: 'codex',
+        hasContent: true,
+        id: 'session-1',
+        lastModified: 42,
+        scope: { kind: 'folder', path: '/project/Research' },
+        title: 'Research',
+      },
+      new AbortController().signal,
+    );
+
+    expect(replay.transcript).toEqual([
+      {
+        context: [
+          {
+            kind: 'passage',
+            quote: 'The opening line.',
+            source: { folderPath: '/project/Research', path: 'drafts/essay.md' },
+          },
+          { kind: 'transient', name: 'other.md', path: '/project/Plans/other.md' },
+          {
+            kind: 'transient',
+            name: 'chart.png',
+            path: '/tmp/chart.png',
+            previewUrl: 'http://127.0.0.1:1/api/preview?p=chart',
+          },
+        ],
+        id: 'user-1',
+        kind: 'user',
+        text: 'Is this clear?',
+      },
+    ]);
+  });
+
   it('validates history, replay, and websocket events at the adapter seam', async () => {
     const historyClient = httpClient([
       {

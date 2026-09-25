@@ -83,6 +83,10 @@ export function createSessionControls({
       transition({ effort, kind: 'set-effort' });
       if (isStarted()) transport.open({ resume: current.nativeSessionId ?? undefined });
     },
+    requestComposerFocus(requested = true) {
+      if (disposed() || state().composerFocusRequested === requested) return;
+      transition({ kind: 'request-composer-focus', requested });
+    },
     applyPersona() {
       const current = state();
       if (disposed() || agentSessionIsBusy(current) || !isStarted()) return;

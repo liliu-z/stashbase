@@ -187,6 +187,75 @@ test('restores the same attachment thumbnail for a Claude SDK transcript', () =>
   }]);
 });
 
+test('lifts selected passages into quoted cards beside the file attached from the same document', () => {
+  const blocks = codexThreadToBlocks({
+    turns: [{
+      items: [{
+        type: 'userMessage',
+        content: [{
+          type: 'text',
+          text: [
+            'tighten these',
+            '',
+            'Selected passages:',
+            '- /Users/me/notes/draft.md',
+            '  > First paragraph.',
+            '  >',
+            '  > Second paragraph.',
+            '- /Users/me/notes/draft.md',
+            '  > A later line.',
+            '',
+            'Attached files:',
+            '- /Users/me/notes/draft.md',
+          ].join('\n'),
+        }],
+      }],
+    }],
+  });
+
+  assert.deepEqual(blocks, [{
+    kind: 'user',
+    id: 'c0',
+    text: 'tighten these',
+    attachments: [
+      { path: '/Users/me/notes/draft.md', name: 'draft.md', quote: 'First paragraph.\n\nSecond paragraph.' },
+      { path: '/Users/me/notes/draft.md', name: 'draft.md', quote: 'A later line.' },
+      { path: '/Users/me/notes/draft.md', name: 'draft.md' },
+    ],
+  }]);
+});
+
+test('keeps a passage from an unknown path in the prose while lifting a known one', () => {
+  const blocks = transcriptToBlocks([{
+    type: 'user',
+    message: {
+      content: [
+        'Selected passages:',
+        '- /etc/passwd',
+        '  > root:x:0:0',
+        '- /Users/me/notes/draft.md',
+        '  > Kept as a card.',
+      ].join('\n'),
+    },
+  }]);
+
+  assert.deepEqual(blocks, [{
+    kind: 'user',
+    id: 'h0',
+    text: 'Selected passages:\n- /etc/passwd\n  > root:x:0:0',
+    attachments: [{ path: '/Users/me/notes/draft.md', name: 'draft.md', quote: 'Kept as a card.' }],
+  }]);
+});
+
+test('leaves typed prose that only resembles a passage block untouched', () => {
+  const text = 'notes\n\nSelected passages:\n- /Users/me/notes/draft.md\nnot a quote line';
+  const blocks = codexThreadToBlocks({
+    turns: [{ items: [{ type: 'userMessage', content: [{ type: 'text', text }] }] }],
+  });
+
+  assert.deepEqual(blocks, [{ kind: 'user', id: 'c0', text }]);
+});
+
 test('restores a non-image document attachment as a name-only card', () => {
   const blocks = codexThreadToBlocks({
     turns: [{

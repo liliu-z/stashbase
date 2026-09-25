@@ -90,6 +90,10 @@ export interface AgentSessionState {
   context: AgentContextItem[];
   /** Why the last send or attach was refused; cleared by any draft change. */
   contextIssue: string | null;
+  /** Set when something outside the composer bound context for the reader to
+   *  write about; the composer takes focus and clears it, even when it mounts
+   *  after the request. */
+  composerFocusRequested: boolean;
   queuedPrompts: AgentQueuedPrompt[];
   nativeSessionId: string | null;
   transcript: AgentTranscriptBlock[];
@@ -127,6 +131,7 @@ export function createAgentSessionState(options: {
     draft: '',
     context: [],
     contextIssue: null,
+    composerFocusRequested: false,
     queuedPrompts: [],
     nativeSessionId: null,
     transcript: [],
@@ -222,6 +227,7 @@ type AgentSessionLocalAction =
   | { kind: 'pause-queue'; paused: boolean }
   | { kind: 'set-context'; context: AgentContextItem[] }
   | { kind: 'set-context-issue'; message: string | null }
+  | { kind: 'request-composer-focus'; requested: boolean }
   | { kind: 'set-queue'; queue: AgentQueuedPrompt[] }
   | {
       kind: 'submit-prompt';
