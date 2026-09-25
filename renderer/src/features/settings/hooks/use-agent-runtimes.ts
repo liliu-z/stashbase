@@ -30,6 +30,7 @@ import { pollWhileBusy, useSettingsCommand } from '@/features/settings/hooks/use
 import type { AgentId } from '@/shared/domain/agent-id';
 import type { FailureView } from '@/shared/domain/feature-error';
 import { useRequestSignals } from '@/shared/runtime/use-request-signals';
+import { useWindowFocus } from '@/shared/runtime/use-window-focus';
 
 /** The commands a reader can aim at one runtime. Each opens a lane of its own
  *  per agent id, so two rows never share an abort. */
@@ -105,6 +106,8 @@ export function useAgentRuntimes(port: AgentRuntimePort): AgentRuntimesViewModel
     enabled: stashbaseReady,
     refetchInterval: 30_000,
   });
+  const { refetch: refreshAllowance } = allowance;
+  useWindowFocus(refreshAllowance, stashbaseReady);
 
   /** A command's response is the freshest truth about the catalog, so the poll
    *  that was already in flight is dropped before it is written: otherwise a

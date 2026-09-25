@@ -35,6 +35,7 @@ export interface AccountViewModel {
   readonly loading: boolean;
   readonly loadFailed: boolean;
   retryAccount(): void;
+  openBilling(): void;
   /** The browser round trip is open: started, and not yet reported finished. */
   readonly signInPending: boolean;
   /** A browser flow is open and its local wait can be stopped. */
@@ -159,6 +160,7 @@ export function useAccount(
   const signInPending = startSignIn.busy || signInFlow !== null;
 
   return {
+    openBilling: () => openExternal('https://stashbase.ai/pricing/'),
     account: account.data ?? null,
     busy: signInPending || anyBusy(signOut),
     failure:

@@ -2,7 +2,7 @@
  * The signed-in StashBase account as the renderer reasons about it: who is
  * signed in, and how a browser sign-in ends.
  *
- * Signing in exists for the bundled Agent's free credits and for nothing else. Search
+ * Signing in identifies the bundled Agent's free or subscribed credits. Search
  * by meaning runs on a key the reader brings, so no fact here says anything
  * about search, and no search surface reads the account.
  */

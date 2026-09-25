@@ -8,7 +8,7 @@ no account.
 
 | Capability | Access source |
 |---|---|
-| Default Agent | StashBase account and free Agent credits |
+| Default Agent | StashBase account with free or subscribed Agent credits |
 | Humanize | StashBase-run rewrite service; no account today |
 | Codex / Claude | The native runtime's installation and authentication |
 | Search by meaning | User-supplied embedding key in Settings, billed independently |
@@ -24,7 +24,7 @@ Settings owns lasting preferences and connection configuration:
 
 - **General:** appearance, usage statistics, and updates.
 - **Agents:** group account, credit balance/refill, and connection state under
-  Default; manage Codex and Claude individually. An installed runtime shows its
+  Default, with a Plans and billing entry that opens the website; manage Codex and Claude individually. An installed runtime shows its
   version; a runtime whose own updater StashBase can run offers Update, which
   runs that updater in place and never replaces a provider-owned installation
   with a second copy. A runtime that reports a model its
@@ -89,3 +89,21 @@ simulators use a separate development-only entry. Neither belongs in normal Sett
 [credentials](../../code-review/architecture.md#credentials-and-external-access),
 [updates](../../code-review/architecture.md#native-lifecycle-and-updates), and
 [reporting](../../code-review/architecture.md#bug-report).
+
+
+## Default Agent Subscriptions
+
+Plus and Pro add hosted Default Agent capacity; local files, writing tools,
+Claude/Codex access, and BYOK search remain independent. The website shows the
+signed-in billing account. A desktop user uses that same account in the browser;
+no desktop session token travels in a link. Returning to Settings refreshes the
+existing allowance query; opening billing never sends a draft.
+
+Stripe owns prices, promotion codes, and payment management. The hosted API owns
+subscription rights and usage. A discounted subscription receives its full tier
+allowance. Seven-day usage windows remain independent of monthly billing: renewal
+or a tier change preserves consumption and the refresh date. A paid upgrade raises
+the current ceiling; a paid downgrade lowers it. Paid-tier changes use Stripe
+prorations. Cancellation retains access until paid-through, then returns to Free.
+A browser success redirect is not evidence of payment; pending confirmation stays
+visible until the API confirms rights. Failed billing does not discard local work.

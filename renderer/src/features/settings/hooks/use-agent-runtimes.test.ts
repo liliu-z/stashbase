@@ -50,6 +50,25 @@ async function mount(port: AgentRuntimePort) {
 afterEach(cleanup);
 
 describe('useAgentRuntimes', () => {
+  it('refreshes credits when returning from billing and stops after leaving Settings', async () => {
+    let current = IDLE_ALLOWANCE;
+    const getAllowance = vi.fn(async () => current);
+    const { view } = await mount(
+      agentRuntimePort({
+        listAgents: async () => catalog([agentRuntime({ preparation: { kind: 'ready' } })]),
+        getAllowance,
+      }),
+    );
+    await waitFor(() => expect(view.result.current.allowance.allowance).toEqual(IDLE_ALLOWANCE));
+    current = { ...IDLE_ALLOWANCE, remainingPercent: 90 };
+    act(() => window.dispatchEvent(new Event('focus')));
+    await waitFor(() => expect(view.result.current.allowance.allowance).toEqual(current));
+    view.unmount();
+    const calls = getAllowance.mock.calls.length;
+    act(() => window.dispatchEvent(new Event('focus')));
+    expect(getAllowance).toHaveBeenCalledTimes(calls);
+  });
+
   it('polls every 500ms while a runtime is actively preparing, and stops once none are', async () => {
     const installing = catalog([
       codex({ preparation: { kind: 'running', note: null, stage: 'install' } }),

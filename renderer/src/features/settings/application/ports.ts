@@ -45,7 +45,7 @@ export interface AppearancePort {
   update(change: AppearanceChange, signal: AbortSignal): Promise<AppearancePreferences>;
 }
 
-/** The StashBase account, which exists for the bundled Agent's free credits. A
+/** The StashBase account, which identifies the bundled Agent's free or subscribed credits. A
  *  sign-in is a browser round trip the server owns: the renderer starts it,
  *  hands the URL to the browser, and polls until the server says the flow
  *  finished. Sign-out answers with the signed-out account. */

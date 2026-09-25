@@ -521,6 +521,30 @@ Host/services: `server/retrieval/index.ts`, `server/indexer.mfs.ts`, `python/sta
 
 ## J06: Agent
 
+**Default Agent billing:** Settings -> Agents exposes Plans and billing through
+`settings/hooks/use-account.ts` and `settings/ui/agents/agents-panel.tsx`. The
+website and hosted API own Checkout, subscription state, and paid allowance
+ceilings; the existing allowance query refreshes the desktop. The panel test
+checks the fixed external destination. Hosted API integration tests cover
+account isolation, idempotent Checkout recovery, paid-through expiry, tier changes
+without usage resets, and settlement after cancellation. The built Settings Story
+was visually inspected with a signed-in fixture; built website browser checks
+covered sign-in return, Checkout/Portal navigation, and mobile layout with mocked
+auth and API responses. Real Stripe test-mode validation covered the half-price
+first invoice, full allowance, upgrade/downgrade, configured-only Portal offers,
+minimum-expiry rejection recovery, and cancellation. Regression checks cover
+invoice pagination, customer reconciliation locks/backoff, independent Stripe
+maintenance/deletion jobs, audited catalog changes, and pricing-page restoration
+after cached browser navigation, re-authentication after payment, token refresh
+while opening Checkout, and disabled purchase during unavailable status. Checkout
+switching retires the previous payable session before opening another; regressions
+cover ambiguous creation, expiration failure, and early expiration. The allowance
+hook refreshes on desktop window focus and removes its listener on unmount.
+Real live-mode payment,
+renewal collection, and packaged cross-browser account handoff remain release
+checks; local and Stripe test-mode checks do not establish those behaviors.
+
+
 **Agent switching:** `application/session/controls.ts` resets runtime-specific
 choices without adding a composer notice. The session recovery test switches a
 Codex draft with model, effort, and skill selections to Default, verifying the

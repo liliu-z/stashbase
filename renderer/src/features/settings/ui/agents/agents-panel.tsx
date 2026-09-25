@@ -102,6 +102,18 @@ export function AgentRuntimesPanel({ agentRuntimeApi }: AgentRuntimesPanelProps)
       <SettingsGroup title="Default">
         <SettingsList as="ul">
           <AccountRow account={account} />
+          {account.account?.signedIn && (
+            <SettingsRow
+              as="li"
+              detail="Choose more Default Agent credits or manage your subscription with the same account on the website."
+              title="Subscription"
+              trail={
+                <Button onClick={account.openBilling} size="compact" variant="tertiary">
+                  Plans and billing
+                </Button>
+              }
+            />
+          )}
           {account.account?.signedIn && (allowance.allowance || allowance.failed) && (
             <>
               {allowance.allowance ? (

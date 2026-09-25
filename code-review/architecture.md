@@ -355,7 +355,10 @@ data migration is not required by [maintenance policy](../MAINTENANCE.md#previou
   across the one auth-refresh retry, and cannot expose account tokens in history.
   Turn/channel retirement cancels body reads and pending upstream work; awaited
   credential acquisition cannot forward a request after retirement.
-  Hosted quota/accounting stays external; the desktop exposes only bounded usage.
+  Hosted quota/accounting and Stripe billing stay external; the desktop exposes
+  bounded usage and a fixed website Plans and billing link. Browser billing uses
+  its own authenticated session, explicitly displaying the account; desktop
+  account tokens never appear in links or Stripe configuration.
   Child environment and AppData HOME/config isolate ambient secrets and user config.
 - Humanize calls the website Worker at `stashbase.ai/api/rewrite` from Node with
   the client version header and no credential; the renderer never reaches it.

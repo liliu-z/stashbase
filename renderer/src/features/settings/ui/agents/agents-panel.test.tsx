@@ -87,12 +87,14 @@ describe('AgentRuntimesPanel', () => {
 
   it('names the signed-in person under Account and signs out from there', async () => {
     const account = accountPort(SIGNED_IN_ACCOUNT);
-    renderPanel(agentRuntimePort(), account);
+    const rendered = renderPanel(agentRuntimePort(), account);
     const user = userEvent.setup();
 
     expect(await screen.findByText('Ada Lovelace · ada@example.com')).not.toBeNull();
     expect(screen.queryByRole('button', { name: 'Sign in' })).toBeNull();
-    expect(await screen.findByText('Free credits')).not.toBeNull();
+    expect(await screen.findByText('Agent credits')).not.toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Plans and billing' }));
+    expect(rendered.onOpenExternal).toHaveBeenCalledWith('https://stashbase.ai/pricing/');
 
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
     await waitFor(() => expect(account.signOut).toHaveBeenCalledOnce());
