@@ -281,6 +281,8 @@ host `server/humanize.ts` and `server/routes/humanize.ts`; wire
 Ask Agent on a selection: `renderer/src/features/documents/ui/markdown/selection-markdown.ts`
 and `selection-toolbar.ts`, bound in `renderer/src/app/shell.tsx`, which saves the
 documents, shows the chat pane, and hands the passage to the Agent workspace.
+The same `selection-toolbar.ts` owns the leading Text/Heading 1–3 block menu;
+Milkdown's block command remains the document mutation owner.
 A save refused against a version a deleted file no longer has, whose reload confirms
 the source is gone, enters the document's `detached` state and stops autosave.
 `application/draft-settlement.ts` turns a close or a release of such a tab into the
@@ -324,6 +326,9 @@ Host/services: `server/file-save.ts`, `server/text-file-transaction.ts`,
   request through `server/humanize.ts` reached the live service on 2026-09-22
   and returned a whole rewrite in about two seconds. Unproven: the shared
   per-address rate limit under real use, and rewrite quality.
+  `selection-toolbar.test.ts` runs the Heading menu against a real Milkdown
+  editor, covering toolbar order, the checked block kind, paragraph/heading
+  conversion, and menu dismissal while retaining Humanize and Ask Agent.
 - **Driven Runtime Pass (Humanize, 2026-09-22):** the built application, with
   its own user data and port, opened a seeded folder from Recent, opened its
   Markdown draft in Edit mode, and took real mouse input. A drag from a
@@ -343,6 +348,14 @@ Host/services: `server/file-save.ts`, `server/text-file-transaction.ts`,
   A full-window screenshot was reviewed by eye for the reading bar, open menu,
   selected presets, and enlarged document composition. This pass did not use a
   packaged, signed application or exercise a failed preference write.
+- **Heading menu runtime pass (2026-09-26):** the built macOS source app, with
+  isolated configuration and telemetry disabled, opened a fixture Markdown file
+  in the normal Documents and Chat split. Selecting its blocks and choosing
+  Heading 2 converted them to H2, and reopening the menu marked Heading 2 as the
+  current choice. A full-window screenshot was reviewed by eye to confirm the
+  Heading menu, Humanize, and Ask Agent remain visible ahead of the generic
+  formatting actions at that width. This pass did not use a packaged, signed
+  application or exercise undo and save-conflict recovery.
 - **Driven Runtime Pass:** isolated built-app passes cover preview reuse/keep,
   history, draft creation/rename, and kept-only tab restoration. Earlier journal
   restoration passes apply to the removed snapshot feature, not current durability. A separate window-origin

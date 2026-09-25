@@ -100,6 +100,11 @@ preference wins either way, and a refused proposal is reported rather than
 written directly. This is standing guidance to the Agent, not a gate: the
 runtime's permissions still decide what a write needs.
 
+The selection toolbar leads with a **Heading** menu: Text, Heading 1, Heading 2
+and Heading 3, with the selection's current kind checked. A choice turns every
+selected block into that kind. Deeper levels and other block types stay in the
+slash menu.
+
 The reader can also ask for a rewrite from the document itself. **Humanize** on
 the selection toolbar sends the selected prose to Hemmingway-1 through a
 StashBase-run service and opens the rewrite as the same review; nothing is

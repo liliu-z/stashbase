@@ -381,7 +381,7 @@
   background: var(--border);
 }
 
-/* The product actions are words among glyphs: the item widens to the word,
+/* The words among the glyphs (Heading, Ask Agent): the item widens to the word,
    and the word takes the glyphs' foreground ladder so it reads as one of them. */
 .markdown-crepe .milkdown-toolbar .toolbar-item:has(.markdown-toolbar-label) {
   display: inline-flex;
@@ -400,6 +400,72 @@
 
 .markdown-crepe .milkdown-toolbar .toolbar-item:hover .markdown-toolbar-label {
   color: var(--foreground);
+}
+
+/* The Heading item is a menu trigger: its word, then a small stroked chevron
+   rather than one of Crepe's filled glyphs. */
+.markdown-crepe .milkdown-toolbar .toolbar-item .milkdown-icon:has([data-heading-menu]) {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.markdown-crepe .milkdown .milkdown-toolbar .toolbar-item svg.markdown-toolbar-chevron {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The Heading menu sits under its trigger, on the toolbar's own surface. */
+.markdown-crepe .markdown-heading-menu {
+  position: absolute;
+  z-index: 11;
+  display: flex;
+  flex-direction: column;
+  min-width: 148px;
+  padding: 4px;
+  color: var(--foreground);
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: var(--shape-input-radius, 8px);
+  box-shadow: var(--shadow-5);
+}
+
+.markdown-crepe .markdown-heading-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 30px;
+  padding-inline: 8px;
+  color: color-mix(in oklab, var(--foreground) 76%, var(--background));
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.markdown-crepe .markdown-heading-menu-item:hover {
+  color: var(--foreground);
+  background: var(--hover);
+}
+
+.markdown-crepe
+  .markdown-heading-menu-item:is(:hover, [aria-checked='true'])
+  .markdown-toolbar-label {
+  color: var(--foreground);
+}
+
+.markdown-crepe .markdown-heading-menu-check {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .markdown-crepe .milkdown-link-edit > .link-edit,
