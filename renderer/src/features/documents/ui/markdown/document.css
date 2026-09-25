@@ -1,6 +1,8 @@
 /* Milkdown is the migration's sole component-specific CSS exception. Every
    value below maps third-party anatomy onto the app's semantic design system. */
 .markdown-surface {
+  --reading-bar-height: 40px;
+
   position: relative;
   display: grid;
   grid-template: minmax(0, 1fr) / minmax(0, 1fr);
@@ -12,6 +14,32 @@
 
 .markdown-surface > * {
   grid-area: 1 / 1;
+}
+
+/* The reading bar: a paper-coloured band across the top that holds the
+   surface's controls, like an e-reader's toolbar. The editor scrolls below it
+   rather than under it, so no line ever runs beneath a control, and prose
+   fades out along its lower edge instead of being cut at it. */
+.markdown-surface::before,
+.markdown-surface::after {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  right: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+.markdown-surface::before {
+  top: 0;
+  height: var(--reading-bar-height);
+  background: var(--surface-2);
+}
+
+.markdown-surface::after {
+  top: var(--reading-bar-height);
+  height: 16px;
+  background: linear-gradient(var(--surface-2), transparent);
 }
 
 .markdown-mode-control {
@@ -31,6 +59,19 @@
      invisible until it is hovered. */
   top: 6px;
   right: 5px;
+}
+
+/* The review bar's corner of the reading bar: an open review replaces this
+   control, and it sits on the mode control's line across the pane. */
+.markdown-reading-control {
+  position: absolute;
+  z-index: 2;
+  top: 6px;
+  left: 8px;
+}
+
+.markdown-surface:not([data-markdown-state='ready']) .markdown-reading-control {
+  display: none;
 }
 
 .markdown-review-bar {
@@ -126,6 +167,7 @@
 .markdown-crepe {
   min-width: 0;
   min-height: 0;
+  margin-top: var(--reading-bar-height);
   container-type: inline-size;
 }
 
@@ -167,20 +209,77 @@
 .markdown-crepe .milkdown .ProseMirror {
   box-sizing: border-box;
   width: 100%;
-  max-width: 820px;
+  /* The measure is in em so a line holds the same text at every size. */
+  max-width: calc(var(--reading-measure, 44em) + 2 * clamp(28px, 6cqi, 52px));
   min-height: 100%;
   margin: 0 auto;
   padding: 32px clamp(28px, 6cqi, 52px) 96px;
   color: var(--foreground);
-  font-family: var(--font-sans);
-  font-size: var(--reading-font-size, 15px);
-  line-height: 1.68;
+  font-family: var(--font-reading);
+  font-size: var(--reading-font-size, 16px);
+  line-height: var(--reading-line-height, 1.65);
   outline: none;
 }
 
-.markdown-crepe .ProseMirror :is(h1, h2, h3, h4, h5, h6) {
+/* Crepe fixes paragraphs at 16px/24px; prose follows the reading size instead. */
+.markdown-crepe .milkdown .ProseMirror p {
+  font-size: inherit;
+  line-height: inherit;
+}
+
+/* One family for headings and prose, so hierarchy comes from size alone; the
+   serif's optical-size axis also gives large headings a tighter display cut. */
+.markdown-crepe .milkdown .ProseMirror :is(h1, h2, h3, h4, h5, h6) {
+  margin-bottom: 0;
   color: var(--foreground);
-  letter-spacing: -0.015em;
+  font-family: var(--font-reading);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
+.markdown-crepe .milkdown .ProseMirror h1 {
+  margin-top: 1em;
+  font-size: 2em;
+  letter-spacing: -0.02em;
+}
+
+.markdown-crepe .milkdown .ProseMirror h2 {
+  margin-top: 1.4em;
+  font-size: 1.45em;
+  letter-spacing: -0.01em;
+}
+
+.markdown-crepe .milkdown .ProseMirror h3 {
+  margin-top: 1.3em;
+  font-size: 1.2em;
+}
+
+.markdown-crepe .milkdown .ProseMirror :is(h4, h5, h6) {
+  margin-top: 1.2em;
+  font-size: 1em;
+}
+
+/* Monospace follows the reading size, scaled so it sits beside the serif's
+   smaller x-height without looking a size larger than the prose. */
+.markdown-crepe .milkdown .ProseMirror code {
+  font-size: calc(var(--reading-code-scale, 0.875) * 1em);
+}
+
+.markdown-crepe .milkdown .milkdown-code-block .cm-editor {
+  font-size: calc(var(--reading-code-scale, 0.875) * var(--reading-font-size, 16px));
+}
+
+/* Tabular data keeps the interface sans, whose figures align. */
+.markdown-crepe .ProseMirror table {
+  font-family: var(--font-sans);
+  font-size: 0.9em;
+}
+
+/* Keep list markers centred on the first line: the prose line box plus the
+   4px block padding Crepe puts above and below each paragraph. */
+.markdown-crepe .milkdown .milkdown-list-item-block li :is(.label-wrapper, .label-wrapper .label) {
+  height: calc(var(--reading-line-height, 1.65) * 1em + 8px);
 }
 
 .markdown-crepe .ProseMirror a {
@@ -322,16 +421,10 @@
   display: none !important;
 }
 
-@container (max-width: 1120px) {
-  .markdown-crepe .milkdown .ProseMirror {
-    padding-top: 72px;
-  }
-}
-
 @container (max-width: 520px) {
   .markdown-crepe .milkdown .ProseMirror {
-    padding: 72px 20px;
-    font-size: calc(var(--reading-font-size, 15px) - 1px);
+    padding: 32px 20px 72px;
+    font-size: calc(var(--reading-font-size, 16px) - 1px);
   }
 }
 

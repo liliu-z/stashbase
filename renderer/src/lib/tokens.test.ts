@@ -216,7 +216,9 @@ describe('appearance preferences', () => {
     // picked up `--ui-scale` would enlarge prose along with the furniture,
     // and the two preferences would stop being separable at all.
     const declared = [...stylesheet.matchAll(/^[ \t]*--reading-font-size:[^;]*;/gm)];
-    expect(declared, 'globals.css declares a default and both steps').toHaveLength(3);
+    expect(declared, 'globals.css declares a default and both steps per reading font').toHaveLength(
+      6,
+    );
     for (const [declaration] of declared) {
       expect(declaration).not.toContain('--ui-scale');
       expect(declaration.trim()).toMatch(/^--reading-font-size: \d+px;$/);
@@ -232,6 +234,7 @@ describe('appearance preferences', () => {
     expect(stylesheet).toContain("html[data-ui-scale='large']");
     expect(stylesheet).toContain("html[data-reading-text-size='small']");
     expect(stylesheet).toContain("html[data-reading-text-size='large']");
+    expect(stylesheet).toContain("html[data-reading-font='serif']");
     const applier = fs.readFileSync(
       path.resolve(
         path.dirname(fileURLToPath(import.meta.url)),
@@ -241,5 +244,6 @@ describe('appearance preferences', () => {
     );
     expect(applier).toContain('root.dataset.uiScale = surface.uiScale');
     expect(applier).toContain('root.dataset.readingTextSize = surface.readingTextSize');
+    expect(applier).toContain('root.dataset.readingFont = surface.readingFont');
   });
 });

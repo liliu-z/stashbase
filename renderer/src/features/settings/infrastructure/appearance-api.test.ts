@@ -6,12 +6,18 @@ import { createAppearanceAdapter } from './appearance-api';
 
 const signal = new AbortController().signal;
 
-const TRIPLE = { readingTextSize: 'default', theme: 'dark', uiScale: 'default' } as const;
+const PRESETS = {
+  readingFont: 'serif',
+  readingTextSize: 'default',
+  theme: 'dark',
+  uiScale: 'default',
+} as const;
 
 describe('appearance API', () => {
-  it('reads the triple through the appearance route', async () => {
-    const request = vi.fn(async () => ({ body: TRIPLE, status: 200 }));
+  it('reads every preset through the appearance route', async () => {
+    const request = vi.fn(async () => ({ body: PRESETS, status: 200 }));
     await expect(createAppearanceAdapter({ request }).load(signal)).resolves.toEqual({
+      readingFont: 'serif',
       readingTextSize: 'default',
       theme: 'dark',
       uiScale: 'default',
@@ -19,10 +25,11 @@ describe('appearance API', () => {
     expect(request).toHaveBeenCalledWith(expect.objectContaining({ path: '/api/appearance' }));
   });
 
-  it('writes one row at a time and answers with the whole triple', async () => {
-    const request = vi.fn(async () => ({ body: TRIPLE, status: 200 }));
+  it('writes one row at a time and answers with every preset', async () => {
+    const request = vi.fn(async () => ({ body: PRESETS, status: 200 }));
     const api = createAppearanceAdapter({ request });
     await expect(api.update({ theme: 'dark' }, signal)).resolves.toEqual({
+      readingFont: 'serif',
       readingTextSize: 'default',
       theme: 'dark',
       uiScale: 'default',

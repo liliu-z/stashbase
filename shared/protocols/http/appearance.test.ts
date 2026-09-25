@@ -6,26 +6,28 @@ import {
   appearancePreferencesSchema,
 } from './appearance.ts';
 
-test('the response carries the triple the server applied', () => {
+test('the response carries every preset the server applied', () => {
   assert.deepEqual(
     appearancePreferencesSchema.parse({
+      readingFont: 'serif',
       readingTextSize: 'large',
       theme: 'dark',
       uiScale: 'small',
     }),
-    { readingTextSize: 'large', theme: 'dark', uiScale: 'small' },
+    { readingFont: 'serif', readingTextSize: 'large', theme: 'dark', uiScale: 'small' },
   );
 });
 
 test('a response drops a preference this renderer has no reader for', () => {
   assert.deepEqual(
     appearancePreferencesSchema.parse({
+      readingFont: 'sans',
       readingTextSize: 'default',
       theme: 'system',
       uiScale: 'default',
       accentColour: 'teal',
     }),
-    { readingTextSize: 'default', theme: 'system', uiScale: 'default' },
+    { readingFont: 'sans', readingTextSize: 'default', theme: 'system', uiScale: 'default' },
   );
 });
 

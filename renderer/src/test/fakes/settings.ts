@@ -151,11 +151,12 @@ export function mcpAccessPort(overrides: Partial<McpAccessPort> = {}): McpAccess
   };
 }
 
-/** The server's own defaults, and a write that answers with the whole triple
+/** The server's own defaults, and a write that answers with every preset
  *  the way the route does. */
 export function appearancePort(overrides: Partial<AppearancePort> = {}): AppearancePort {
   const saved: AppearancePreferences = {
     readingTextSize: 'default',
+    readingFont: 'serif',
     theme: 'system',
     uiScale: 'default',
   };

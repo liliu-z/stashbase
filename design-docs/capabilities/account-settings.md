@@ -22,7 +22,8 @@ Agent history; supplied environment variables do not configure BYOK access.
 
 Settings owns lasting preferences and connection configuration:
 
-- **General:** appearance, usage statistics, and updates.
+- **General:** appearance (theme, interface size, reading text size and font),
+  usage statistics, and updates.
 - **Agents:** group account, credit balance/refill, and connection state under
   Default; manage Codex and Claude individually. An installed runtime shows its
   version; a runtime whose own updater StashBase can run offers Update, which

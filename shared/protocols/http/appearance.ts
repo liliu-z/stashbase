@@ -4,12 +4,15 @@ export const appearanceThemeSchema = z.enum(['system', 'light', 'dark']);
 
 export const appearanceScaleSchema = z.enum(['small', 'default', 'large']);
 
+export const readingFontSchema = z.enum(['serif', 'sans']);
+
 /** `GET /api/appearance` and the `PUT` echo. The response strips: the renderer
- *  has exactly three readers for this triple and it becomes state stamped on
+ *  has exactly one reader per preset and each becomes state stamped on
  *  the document root, so an unknown key has no reader and carrying it forward
  *  is dead weight. */
 export const appearancePreferencesSchema = z
   .object({
+    readingFont: readingFontSchema,
     readingTextSize: appearanceScaleSchema,
     theme: appearanceThemeSchema,
     uiScale: appearanceScaleSchema,

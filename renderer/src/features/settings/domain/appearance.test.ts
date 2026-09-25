@@ -7,7 +7,7 @@ import {
   type AppearanceField,
 } from './appearance';
 
-const FIELDS: readonly AppearanceField[] = ['theme', 'uiScale', 'readingTextSize'];
+const FIELDS: readonly AppearanceField[] = ['theme', 'uiScale', 'readingTextSize', 'readingFont'];
 
 describe('appearanceChange', () => {
   it('accepts every value its own field names', () => {
@@ -24,6 +24,7 @@ describe('appearanceChange', () => {
     expect(appearanceChange('theme', 'small')).toBeNull();
     expect(appearanceChange('uiScale', 'dark')).toBeNull();
     expect(appearanceChange('readingTextSize', 'system')).toBeNull();
+    expect(appearanceChange('readingFont', 'default')).toBeNull();
   });
 
   it('refuses a value no field names', () => {
@@ -37,16 +38,26 @@ describe('appearanceChange', () => {
 
 describe('appearanceSurface', () => {
   it('drops the theme class only when the system decides', () => {
-    const scales = { uiScale: 'small', readingTextSize: 'large' } as const;
+    const scales = { uiScale: 'small', readingTextSize: 'large', readingFont: 'serif' } as const;
 
     expect(appearanceSurface({ theme: 'system', ...scales }).themeClass).toBeNull();
     expect(appearanceSurface({ theme: 'light', ...scales }).themeClass).toBe('light');
     expect(appearanceSurface({ theme: 'dark', ...scales }).themeClass).toBe('dark');
   });
 
-  it('carries both scales through untouched', () => {
+  it('carries both scales and the reading font through untouched', () => {
     expect(
-      appearanceSurface({ theme: 'dark', uiScale: 'large', readingTextSize: 'small' }),
-    ).toEqual({ themeClass: 'dark', uiScale: 'large', readingTextSize: 'small' });
+      appearanceSurface({
+        theme: 'dark',
+        uiScale: 'large',
+        readingTextSize: 'small',
+        readingFont: 'sans',
+      }),
+    ).toEqual({
+      themeClass: 'dark',
+      uiScale: 'large',
+      readingTextSize: 'small',
+      readingFont: 'sans',
+    });
   });
 });

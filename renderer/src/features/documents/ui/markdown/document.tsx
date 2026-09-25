@@ -16,7 +16,7 @@ import { table } from '@milkdown/crepe/feature/table';
 import { toolbar } from '@milkdown/crepe/feature/toolbar';
 import { replaceAll } from '@milkdown/kit/utils';
 import { BookOpen, PenLine } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useStore } from 'zustand';
 
 import { TabsSubtle, TabsSubtleItem } from '@/components/ui/tabs-subtle';
@@ -74,6 +74,7 @@ export interface MarkdownDocumentProps {
   onModeChange(mode: MarkdownViewMode): void;
   onOpenExternal(href: string): Promise<boolean>;
   navigation: DocumentNavigationRuntime;
+  readingControl?: ReactNode;
   readOnly: boolean;
   /** The review the document runtime holds, and what this surface reports
    *  back to it. */
@@ -97,6 +98,7 @@ export function MarkdownDocument({
   onModeChange,
   onOpenExternal,
   navigation,
+  readingControl,
   readOnly,
   revision,
   source,
@@ -380,7 +382,7 @@ export function MarkdownDocument({
       {creationState === 'failed' && (
         <MarkdownOpenFailure onRetry={() => setAttempt((current) => current + 1)} />
       )}
-      {reviewBar}
+      {reviewBar ?? <div className="markdown-reading-control">{readingControl}</div>}
       <HumanizeNotice controls={humanizeControls} />
       {linkFailure && (
         <div className="markdown-link-failure" role="alert">

@@ -64,6 +64,7 @@ const markdown = viewerEntry({
     'onAskAgent',
     'onNavigate',
     'onOpenExternal',
+    'renderReadingControl',
     'sourceApi',
   ],
   status: sourceStatus,

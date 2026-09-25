@@ -29,6 +29,7 @@ export function createAppearanceAdapter(client: HttpClient): AppearancePort {
         theme: parsed.theme,
         uiScale: parsed.uiScale,
         readingTextSize: parsed.readingTextSize,
+        readingFont: parsed.readingFont,
       };
     },
     async update(change, signal) {
@@ -42,6 +43,7 @@ export function createAppearanceAdapter(client: HttpClient): AppearancePort {
         theme: parsed.theme,
         uiScale: parsed.uiScale,
         readingTextSize: parsed.readingTextSize,
+        readingFont: parsed.readingFont,
       };
     },
   };

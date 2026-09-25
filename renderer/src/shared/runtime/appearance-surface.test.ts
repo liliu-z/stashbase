@@ -26,7 +26,13 @@ function post(published: AppearanceSurface): void {
 }
 
 function surface(overrides: Partial<AppearanceSurface> = {}): AppearanceSurface {
-  return { themeClass: null, uiScale: 'default', readingTextSize: 'default', ...overrides };
+  return {
+    themeClass: null,
+    uiScale: 'default',
+    readingTextSize: 'default',
+    readingFont: 'serif',
+    ...overrides,
+  };
 }
 
 afterEach(() => {
@@ -35,14 +41,18 @@ afterEach(() => {
   root.classList.remove('light', 'dark');
   delete root.dataset.uiScale;
   delete root.dataset.readingTextSize;
+  delete root.dataset.readingFont;
 });
 
 describe('applyAppearanceSurface', () => {
-  it('stamps both scales on the document root', () => {
-    applyAppearanceSurface(surface({ uiScale: 'large', readingTextSize: 'small' }));
+  it('stamps both scales and the reading font on the document root', () => {
+    applyAppearanceSurface(
+      surface({ uiScale: 'large', readingTextSize: 'small', readingFont: 'sans' }),
+    );
 
     expect(document.documentElement.dataset.uiScale).toBe('large');
     expect(document.documentElement.dataset.readingTextSize).toBe('small');
+    expect(document.documentElement.dataset.readingFont).toBe('sans');
   });
 
   it('carries the pinned theme as its class', () => {

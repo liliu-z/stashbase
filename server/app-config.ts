@@ -15,6 +15,7 @@ import type {
   AppearancePreferences,
   AppearanceScale,
   AppearanceTheme,
+  ReadingFont,
   UpdatePreferences,
   WorkspacePreferences,
 } from '../shared/preferences.ts';
@@ -47,6 +48,7 @@ export const DEFAULT_APPEARANCE_PREFERENCES: AppearancePreferences = {
   theme: 'system',
   uiScale: 'default',
   readingTextSize: 'default',
+  readingFont: 'serif',
 };
 
 export const DEFAULT_UPDATE_PREFERENCES: UpdatePreferences = {
@@ -353,6 +355,10 @@ function isAppearanceScale(value: unknown): value is AppearanceScale {
   return value === 'small' || value === 'default' || value === 'large';
 }
 
+function isReadingFont(value: unknown): value is ReadingFont {
+  return value === 'serif' || value === 'sans';
+}
+
 /** Resolve persisted presentation values defensively so a hand-edited or
  * legacy config cannot prevent Settings from loading. */
 export function normalizeAppearancePreferences(value: unknown): AppearancePreferences {
@@ -365,6 +371,9 @@ export function normalizeAppearancePreferences(value: unknown): AppearancePrefer
     readingTextSize: isAppearanceScale(raw.readingTextSize)
       ? raw.readingTextSize
       : DEFAULT_APPEARANCE_PREFERENCES.readingTextSize,
+    readingFont: isReadingFont(raw.readingFont)
+      ? raw.readingFont
+      : DEFAULT_APPEARANCE_PREFERENCES.readingFont,
   };
 }
 

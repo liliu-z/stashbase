@@ -23,7 +23,11 @@ import {
   type OpenRevision,
 } from '@/features/documents/public';
 import { SourcePreparationStatus, type FolderIndexStatus } from '@/features/preparation/public';
-import { LocalComponentRecovery, useAccountView } from '@/features/settings/public';
+import {
+  LocalComponentRecovery,
+  ReadingTextMenu,
+  useAccountView,
+} from '@/features/settings/public';
 import type { WorkspaceSessionController } from '@/features/workspace/public';
 import type { SourceReference } from '@/shared/domain/source-reference';
 
@@ -148,6 +152,9 @@ export function WorkspacePanes({
                       status={status}
                     />
                   </>
+                )}
+                renderReadingControl={() => (
+                  <ReadingTextMenu appearanceApi={dependencies.settings.appearanceApi} />
                 )}
                 revealLabel={dependencies.workspace.revealLabel}
                 runtime={documents}

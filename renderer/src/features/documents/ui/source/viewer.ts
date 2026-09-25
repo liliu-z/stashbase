@@ -54,6 +54,9 @@ export interface DocumentViewerServices {
   renderPreparation?:
     | ((source: SourceReference, format: PreparationSlotFormat) => ReactNode)
     | undefined;
+  /** The reading-font control the Markdown surface places in its top-left
+   *  corner. Composed by the app, so the preference stays Settings'. */
+  renderReadingControl?: (() => ReactNode) | undefined;
   revealLabel: string;
   sourceApi: DocumentSourcePort;
 }

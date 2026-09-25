@@ -12,10 +12,15 @@ export type AppearanceTheme = 'system' | 'light' | 'dark';
 
 export type AppearanceScale = 'small' | 'default' | 'large';
 
+/** The face of Markdown prose: a serif for writing, or the interface sans
+ *  for documents that are mostly code. */
+export type ReadingFont = 'serif' | 'sans';
+
 export interface AppearancePreferences {
   theme: AppearanceTheme;
   uiScale: AppearanceScale;
   readingTextSize: AppearanceScale;
+  readingFont: ReadingFont;
 }
 
 export interface WorkspacePreferences {

@@ -8,6 +8,8 @@ import { useSurface } from '@/lib/surface-context';
 import { cn } from '@/lib/utils';
 
 interface PresetOption {
+  /** A face to set the label in, so a font preset can show itself. */
+  readonly fontFamily?: string;
   readonly label: string;
   readonly value: string;
 }
@@ -16,6 +18,9 @@ export interface PresetChoiceProps {
   readonly choices: readonly PresetOption[];
   /** The read has not answered yet, so there is no preset to move. */
   readonly disabled?: boolean;
+  /** Stretch to the container with equal segments, so stacked pickers with
+   *  different preset counts line up as one column. */
+  readonly fill?: boolean;
   readonly label: string;
   readonly value: string | null;
   onChoose(value: string): void;
@@ -38,6 +43,7 @@ export interface PresetChoiceProps {
 export function PresetChoice({
   choices,
   disabled = false,
+  fill = false,
   label,
   onChoose,
   value,
@@ -51,7 +57,8 @@ export function PresetChoice({
     <fieldset
       aria-label={label}
       className={cn(
-        'm-0 inline-flex items-center border-0 bg-muted p-0 select-none',
+        'm-0 items-center border-0 bg-muted p-0 select-none',
+        fill ? 'flex w-full' : 'inline-flex',
         shape.container,
         size.segmentPad,
         disabled && 'opacity-60',
@@ -65,6 +72,7 @@ export function PresetChoice({
           <label
             className={cn(
               'relative flex items-center px-3 transition-colors duration-fast',
+              fill && 'flex-1 justify-center',
               disabled ? 'cursor-default' : 'cursor-pointer',
               shape.bg,
               size.segmentItem,
@@ -75,6 +83,7 @@ export function PresetChoice({
               'has-[:focus-visible]:ring-1',
             )}
             key={choice.value}
+            style={choice.fontFamily ? { fontFamily: choice.fontFamily } : undefined}
           >
             <input
               checked={selected}

@@ -8,7 +8,7 @@
  *  light-dark() pair); only the frame gray is fixed. The strokes are weighed
  *  for the mark's one in-app size, 40px on the welcome lockup: the ink edges
  *  land at 2.5px there, the same stroke a Lucide glyph draws at that size, so
- *  the mark carries the weight of the icon system beside a semibold wordmark
+ *  the mark carries the weight of the icon system beside the medium wordmark
  *  rather than a hairline. The frame stays a step lighter, and sits inset
  *  from the cube's true edges: with the ink's corners rounded, a frame on the
  *  edge itself would poke past the S's silhouette, so it is drawn a step

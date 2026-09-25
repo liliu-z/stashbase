@@ -2,11 +2,13 @@ import type { AppearanceSurface } from '@/shared/domain/appearance';
 
 type AppearanceTheme = 'system' | 'light' | 'dark';
 type AppearanceScale = 'small' | 'default' | 'large';
+type ReadingFont = 'serif' | 'sans';
 
 export interface AppearancePreferences {
   readonly theme: AppearanceTheme;
   readonly uiScale: AppearanceScale;
   readonly readingTextSize: AppearanceScale;
+  readonly readingFont: ReadingFont;
 }
 
 export type AppearanceField = keyof AppearancePreferences;
@@ -15,14 +17,27 @@ export type AppearanceField = keyof AppearancePreferences;
 export type AppearanceChange =
   | { readonly theme: AppearanceTheme }
   | { readonly uiScale: AppearanceScale }
-  | { readonly readingTextSize: AppearanceScale };
+  | { readonly readingTextSize: AppearanceScale }
+  | { readonly readingFont: ReadingFont };
 
-/** Both scale rows offer the same three steps, so the steps are one
- *  vocabulary rather than a choice each row makes for itself. */
-const SCALE_CHOICES: readonly { readonly label: string; readonly value: AppearanceScale }[] = [
-  { label: 'Small', value: 'small' },
-  { label: 'Default', value: 'default' },
-  { label: 'Large', value: 'large' },
+/** Both scale rows, and the document's reading menu, offer the same three
+ *  steps, so the steps are one vocabulary rather than a choice each row makes
+ *  for itself. */
+export const SCALE_CHOICES: readonly { readonly label: string; readonly value: AppearanceScale }[] =
+  [
+    { label: 'Small', value: 'small' },
+    { label: 'Default', value: 'default' },
+    { label: 'Large', value: 'large' },
+  ];
+
+/** Shared by the Appearance row and the document's own reading-font menu, so
+ *  both offer the same presets under the same names. */
+export const READING_FONT_CHOICES: readonly {
+  readonly label: string;
+  readonly value: ReadingFont;
+}[] = [
+  { label: 'Serif', value: 'serif' },
+  { label: 'Sans', value: 'sans' },
 ];
 
 /** Parameterised by field so a row's choices cannot carry a value the field
@@ -40,9 +55,10 @@ interface AppearanceRowFor<Field extends AppearanceField> {
 export type AppearanceRow =
   | AppearanceRowFor<'theme'>
   | AppearanceRowFor<'uiScale'>
-  | AppearanceRowFor<'readingTextSize'>;
+  | AppearanceRowFor<'readingTextSize'>
+  | AppearanceRowFor<'readingFont'>;
 
-/** This one table drives all three rows and is the only list of labels, so a
+/** This one table drives every row and is the only list of labels, so a
  *  panel holds no per-preference branch. */
 export const APPEARANCE_ROWS: readonly AppearanceRow[] = [
   {
@@ -67,6 +83,12 @@ export const APPEARANCE_ROWS: readonly AppearanceRow[] = [
     field: 'readingTextSize',
     title: 'Reading text size',
   },
+  {
+    choices: READING_FONT_CHOICES,
+    detail: 'Serif suits prose; Sans suits documents full of code.',
+    field: 'readingFont',
+    title: 'Reading font',
+  },
 ];
 
 function chosen<Field extends AppearanceField>(
@@ -90,6 +112,8 @@ export function appearanceChange(field: AppearanceField, value: string): Appeara
       return chosen(row, value, (uiScale) => ({ uiScale }));
     case 'readingTextSize':
       return chosen(row, value, (readingTextSize) => ({ readingTextSize }));
+    case 'readingFont':
+      return chosen(row, value, (readingFont) => ({ readingFont }));
   }
 }
 
@@ -98,5 +122,6 @@ export function appearanceSurface(preferences: AppearancePreferences): Appearanc
     themeClass: preferences.theme === 'system' ? null : preferences.theme,
     uiScale: preferences.uiScale,
     readingTextSize: preferences.readingTextSize,
+    readingFont: preferences.readingFont,
   };
 }

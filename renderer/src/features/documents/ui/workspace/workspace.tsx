@@ -54,6 +54,7 @@ export interface DocumentWorkspaceProps {
   renderPreparation?:
     | ((source: SourceReference, format: PreparationSlotFormat) => ReactNode)
     | undefined;
+  renderReadingControl?: (() => ReactNode) | undefined;
   revealLabel: string;
   runtime: DocumentTabsRuntime;
   sourceApi: DocumentSourcePort;
@@ -72,6 +73,7 @@ export function DocumentWorkspace({
   onOpenPrepared,
   onReveal,
   renderPreparation,
+  renderReadingControl,
   revealLabel,
   runtime,
   sourceApi,
@@ -143,6 +145,7 @@ export function DocumentWorkspace({
             onOpenPrepared={onOpenPrepared}
             onReveal={onReveal}
             renderPreparation={renderPreparation}
+            renderReadingControl={renderReadingControl}
             revealLabel={revealLabel}
             runtime={document}
             sourceApi={sourceApi}

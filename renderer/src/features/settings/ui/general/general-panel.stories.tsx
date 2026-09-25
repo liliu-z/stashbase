@@ -21,11 +21,17 @@ function GeneralHarness({ updates = null }: { updates?: SoftwareUpdateRow | null
   return (
     <GeneralPanel
       appearanceApi={{
-        load: async () => ({ theme: 'system', uiScale: 'default', readingTextSize: 'default' }),
+        load: async () => ({
+          theme: 'system',
+          uiScale: 'default',
+          readingTextSize: 'default',
+          readingFont: 'serif',
+        }),
         update: async (change) => ({
           theme: 'system',
           uiScale: 'default',
           readingTextSize: 'default',
+          readingFont: 'serif',
           ...change,
         }),
       }}

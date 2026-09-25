@@ -1,6 +1,9 @@
 @import 'tailwindcss';
 @import '@fontsource-variable/geist-mono';
 @import '@fontsource-variable/inter';
+@import '@fontsource-variable/newsreader/opsz.css';
+@import '@fontsource-variable/newsreader/opsz-italic.css';
+@import '@fontsource-variable/space-grotesk';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -330,6 +333,7 @@
 
   --font-mono:
     'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-brand: 'Space Grotesk Variable', ui-sans-serif, system-ui, sans-serif;
   --font-sans: 'Inter Variable', system-ui, sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -450,11 +454,25 @@ body {
   --fs-body: calc(13px * var(--ui-scale));
   --fs-caption: calc(12px * var(--ui-scale));
 
-  /* The markdown reading surface's base, deliberately outside `--ui-scale`:
+  /* The markdown reading surface, deliberately outside `--ui-scale`:
      interface size moves chrome type only, so a reader who enlarged the page
-     furniture keeps the prose size they chose. 15px is what the reading
-     surface already computed from `--fs-body` + 2px. */
-  --reading-font-size: 15px;
+     furniture keeps the prose size they chose. Each reading font carries its
+     own size steps, line height, and measure because a serif's smaller
+     x-height needs a larger base than the interface sans. CJK falls through
+     to each platform's sans under either font. */
+  --font-reading-sans:
+    'Inter Variable', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC',
+    system-ui, sans-serif;
+  --font-reading-serif:
+    'Newsreader Variable', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC',
+    serif;
+  --font-reading: var(--font-reading-sans);
+  --reading-font-size: 16px;
+  --reading-line-height: 1.65;
+  --reading-measure: 44em;
+  /* Code relative to the prose around it, chosen per font so monospace lands
+     near 14px at the default step under either. */
+  --reading-code-scale: 0.875;
 }
 
 @media (min-width: 640px) {
@@ -486,15 +504,36 @@ html[data-ui-scale='large'] {
 }
 
 html[data-reading-text-size='small'] {
-  --reading-font-size: 14px;
+  --reading-font-size: 15px;
 }
 
 html[data-reading-text-size='large'] {
   --reading-font-size: 18px;
 }
 
+html[data-reading-font='serif'] {
+  --font-reading: var(--font-reading-serif);
+  --reading-font-size: 18px;
+  --reading-line-height: 1.7;
+  --reading-measure: 36em;
+  --reading-code-scale: 0.8;
+}
+
+html[data-reading-font='serif'][data-reading-text-size='small'] {
+  --reading-font-size: 17px;
+}
+
+html[data-reading-font='serif'][data-reading-text-size='large'] {
+  --reading-font-size: 20px;
+}
+
 @utility text-display {
   font-size: var(--fs-display, 28px);
+}
+@utility brand-wordmark {
+  font-family: var(--font-brand);
+  font-weight: 500;
+  letter-spacing: -0.05em;
 }
 @utility text-title {
   font-size: var(--fs-title, 16px);

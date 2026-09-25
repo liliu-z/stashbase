@@ -29,6 +29,8 @@
     "@codemirror/view": "^6.42.1",
     "@fontsource-variable/geist-mono": "5.3.0",
     "@fontsource-variable/inter": "5.3.0",
+    "@fontsource-variable/newsreader": "5.3.0",
+    "@fontsource-variable/space-grotesk": "5.3.0",
     "@lezer/highlight": "^1.2.3",
     "@lobehub/icons-static-svg": "1.95.0",
     "@milkdown/crepe": "^7.21.3",

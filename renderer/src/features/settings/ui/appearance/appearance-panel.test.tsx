@@ -14,6 +14,7 @@ afterEach(() => {
   root.classList.remove('light', 'dark');
   delete root.dataset.uiScale;
   delete root.dataset.readingTextSize;
+  delete root.dataset.readingFont;
 });
 
 const group = (name: string) => screen.getByRole('radiogroup', { name });
@@ -37,18 +38,24 @@ async function loaded(checked: string) {
 describe('AppearancePanel', () => {
   it('offers one group per preference, each with its presets in order', async () => {
     withQueryClient(<AppearancePanel appearanceApi={appearancePort()} />);
-    await waitFor(() => expect(screen.getAllByRole('radiogroup')).toHaveLength(3));
+    await waitFor(() => expect(screen.getAllByRole('radiogroup')).toHaveLength(4));
 
     expectOptions('Theme', ['Match system', 'Light', 'Dark']);
     expectOptions('Interface size', ['Small', 'Default', 'Large']);
     expectOptions('Reading text size', ['Small', 'Default', 'Large']);
+    expectOptions('Reading font', ['Serif', 'Sans']);
   });
 
   it('checks the preset the read answered with', async () => {
     withQueryClient(
       <AppearancePanel
         appearanceApi={appearancePort({
-          load: async () => ({ readingTextSize: 'small', theme: 'dark', uiScale: 'large' }),
+          load: async () => ({
+            readingFont: 'sans',
+            readingTextSize: 'small',
+            theme: 'dark',
+            uiScale: 'large',
+          }),
         })}
       />,
     );
@@ -64,6 +71,10 @@ describe('AppearancePanel', () => {
       true,
     );
     expect(within(group('Reading text size')).getByRole('radio', { name: 'Small' })).toHaveProperty(
+      'checked',
+      true,
+    );
+    expect(within(group('Reading font')).getByRole('radio', { name: 'Sans' })).toHaveProperty(
       'checked',
       true,
     );

@@ -12,6 +12,7 @@ const DEFAULTS: AppearancePreferences = {
   theme: 'system',
   uiScale: 'default',
   readingTextSize: 'default',
+  readingFont: 'serif',
 };
 
 interface OpenWrite {

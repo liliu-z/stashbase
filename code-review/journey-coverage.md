@@ -264,6 +264,11 @@ The [Documents design](../design-docs/journeys/documents.md) owns navigation, co
 and recovery behavior; the evidence below establishes its exercised paths.
 
 **Implementation:** Renderer: `renderer/src/features/documents/ui/source/registry.tsx`, `renderer/src/features/documents/application/document-runtime.ts`, `renderer/src/features/documents/ui/markdown/document.tsx`.
+The Markdown reading bar composes the Settings-owned
+`renderer/src/features/settings/ui/appearance/reading-text-menu.tsx`; durable
+font and size presets cross `shared/protocols/http/appearance.ts` to
+`server/app-config.ts` and are stamped on the document root by
+`renderer/src/shared/runtime/appearance-surface.ts`.
 Inline review: `renderer/src/features/documents/domain/revision.ts`,
 `renderer/src/features/documents/ui/markdown/use-revision-review.tsx`,
 `renderer/src/features/documents/hooks/use-revision-proposals.ts`, and
@@ -292,6 +297,11 @@ Host/services: `server/file-save.ts`, `server/text-file-transaction.ts`,
   hidden-file policy, tab/history behavior, save barriers, shared version
   authority, conflicts, and failure handling.
   `pnpm test:config` covers strict durable preferences.
+  `reading-text-menu.test.tsx`, the Appearance domain/infrastructure/surface
+  suites, `shared/protocols/http/appearance.test.ts`, and
+  `server/routes/appearance.test.ts` cover the reading menu's font/size writes,
+  immediate surface application, rollback, strict wire values, and preservation
+  of unrelated preferences.
   Transaction/Python regressions cover concurrent saves, staging-time external
   edits, failed empty-source removal with same-content retry, and consecutive
   projection acceptance while a local embedder blocks. They do not establish
@@ -324,6 +334,15 @@ Host/services: `server/file-save.ts`, `server/text-file-transaction.ts`,
   rewrite opened as a review of three changes, all inside that paragraph,
   with the code block and the list after it unmarked. Screenshots were
   reviewed by eye; the pass records no timing beyond "seconds".
+- **Reading typography runtime pass (2026-09-26):** the built macOS source app,
+  with isolated configuration and telemetry disabled, opened this repository's
+  README in Documents. The document reading menu changed Serif to Sans and the
+  default size to Large without closing; the document root reported both new
+  values, the computed prose face changed to Inter, and the isolated durable
+  configuration retained `readingFont: sans` and `readingTextSize: large`.
+  A full-window screenshot was reviewed by eye for the reading bar, open menu,
+  selected presets, and enlarged document composition. This pass did not use a
+  packaged, signed application or exercise a failed preference write.
 - **Driven Runtime Pass:** isolated built-app passes cover preview reuse/keep,
   history, draft creation/rename, and kept-only tab restoration. Earlier journal
   restoration passes apply to the removed snapshot feature, not current durability. A separate window-origin

@@ -165,7 +165,7 @@ export function ProjectWelcome({
         <div className="flex w-full max-w-2xl flex-col items-center text-center">
           <div className="flex items-center gap-3">
             <Logo aria-hidden="true" className="size-10" />
-            <h1 className="text-display font-semibold tracking-tight">StashBase</h1>
+            <h1 className="brand-wordmark text-display">StashBase</h1>
           </div>
           <p className="mt-3 text-body leading-relaxed text-muted-foreground">
             Turn your local files into a wiki, then write with Claude and Codex using your own

@@ -14,6 +14,7 @@ function Queries({ children }: { children: ReactNode }) {
 
 const saved: AppearancePreferences = {
   readingTextSize: 'default',
+  readingFont: 'serif',
   theme: 'system',
   uiScale: 'default',
 };

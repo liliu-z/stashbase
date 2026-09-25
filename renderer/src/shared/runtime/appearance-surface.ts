@@ -10,6 +10,7 @@ export function applyAppearanceSurface(surface: AppearanceSurface): void {
   root.classList.toggle('dark', surface.themeClass === 'dark');
   root.dataset.uiScale = surface.uiScale;
   root.dataset.readingTextSize = surface.readingTextSize;
+  root.dataset.readingFont = surface.readingFont;
 }
 
 let channel: BroadcastChannel | undefined;

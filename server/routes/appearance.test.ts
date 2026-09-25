@@ -9,8 +9,10 @@ import { readAppConfigStrict, writeAppConfigStrict, normalizeAppearancePreferenc
 
 const THEMES: readonly unknown[] = ['system', 'light', 'dark'];
 const SCALES: readonly unknown[] = ['small', 'default', 'large'];
+const READING_FONTS: readonly unknown[] = ['serif', 'sans'];
 
 interface AppearanceBody {
+  readingFont: unknown;
   readingTextSize: unknown;
   theme: unknown;
   uiScale: unknown;
@@ -55,11 +57,13 @@ function presetsOf(value: unknown): AppearanceBody {
     value === null ||
     !('theme' in value) ||
     !('uiScale' in value) ||
-    !('readingTextSize' in value)
+    !('readingTextSize' in value) ||
+    !('readingFont' in value)
   ) {
-    return assert.fail('the read answers with all three appearance presets');
+    return assert.fail('the read answers with every appearance preset');
   }
   return {
+    readingFont: value.readingFont,
     readingTextSize: value.readingTextSize,
     theme: value.theme,
     uiScale: value.uiScale,
@@ -69,7 +73,9 @@ function presetsOf(value: unknown): AppearanceBody {
 test('partial appearance writes persist through the real route and preserve other configuration', async () => {
   writeAppConfigStrict({ appearance: { uiScale: 'large' }, updates: { autoCheck: false } });
   assert.equal(await put({ theme: 'dark', readingTextSize: 'small' }), 200);
-  assert.deepEqual((await get()).body, { theme: 'dark', uiScale: 'large', readingTextSize: 'small' });
+  assert.deepEqual((await get()).body, {
+    theme: 'dark', uiScale: 'large', readingTextSize: 'small', readingFont: 'serif',
+  });
   const saved = readAppConfigStrict();
   assert.deepEqual(saved.updates, { autoCheck: false });
   for (const value of [[], { unknown: true }, { theme: 'light', unknown: true }]) {
@@ -77,7 +83,7 @@ test('partial appearance writes persist through the real route and preserve othe
     assert.deepEqual(readAppConfigStrict(), saved);
   }
   assert.deepEqual(normalizeAppearancePreferences({ theme: 'neon', uiScale: 'huge' }), {
-    theme: 'system', uiScale: 'default', readingTextSize: 'default',
+    theme: 'system', uiScale: 'default', readingTextSize: 'default', readingFont: 'serif',
   });
 });
 test('a theme outside the three presets is refused rather than written', async () => {
@@ -92,6 +98,10 @@ test('a reading text size outside the three presets is refused', async () => {
   assert.equal(await put({ readingTextSize: 'tiny' }), 400);
 });
 
+test('a reading font outside its two presets is refused', async () => {
+  assert.equal(await put({ readingFont: 'mono' }), 400);
+});
+
 test('a read answers with every preset inside its own allowed values', async () => {
   const read = await get();
   assert.equal(read.status, 200);
@@ -102,4 +112,5 @@ test('a read answers with every preset inside its own allowed values', async () 
     SCALES.includes(presets.readingTextSize),
     `readingTextSize ${String(presets.readingTextSize)}`,
   );
+  assert.ok(READING_FONTS.includes(presets.readingFont), `readingFont ${String(presets.readingFont)}`);
 });
