@@ -2,7 +2,7 @@
  * Embedder routes: manage the global embedding provider key and validate
  * a key without persisting it.
  *
- * Search by meaning uses an OpenAI or OpenRouter key supplied by the user.
+ * Search by meaning uses an OpenAI, OpenRouter, or Requesty key supplied by the user.
  * Each Folder is configured as one MFS Internal namespace.
  */
 import express from 'express';
@@ -26,8 +26,14 @@ function parseProvider(raw: unknown, fallback: EmbedderProvider): EmbedderProvid
   return isEmbedderProvider(raw) ? raw : null;
 }
 
+const PROVIDER_LABELS: Record<EmbedderProvider, string> = {
+  openai: 'OpenAI',
+  openrouter: 'OpenRouter',
+  requesty: 'Requesty',
+};
+
 function providerLabel(provider: EmbedderProvider): string {
-  return provider === 'openrouter' ? 'OpenRouter' : 'OpenAI';
+  return PROVIDER_LABELS[provider];
 }
 
 export function mount(app: express.Express): void {

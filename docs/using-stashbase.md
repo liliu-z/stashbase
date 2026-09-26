@@ -69,7 +69,7 @@ retrieval text, and Agent file access vary by format; see the canonical
 
 Keyword search needs no account or API key and is on from the start. Search
 by meaning, which finds files even when the wording differs, is off until you
-add an OpenAI or OpenRouter key under **Settings → Advanced → Search by Meaning**. The
+add an OpenAI, OpenRouter, or Requesty key under **Settings → Advanced → Search by Meaning**. The
 key is billed to you and is used only for search by meaning; signing in to
 StashBase does not turn it on.
 

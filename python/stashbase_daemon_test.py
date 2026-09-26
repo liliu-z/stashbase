@@ -387,6 +387,26 @@ class StashbaseMfsTests(unittest.TestCase):
             )
             self.assertEqual(calls, [{"model": "openai/text-embedding-3-small", "input": ["query"]}])
 
+    def test_requesty_embedder_uses_openai_compatible_endpoint(self) -> None:
+        calls = []
+
+        class Embeddings:
+            def create(self, **kwargs):
+                calls.append(kwargs)
+                return types.SimpleNamespace(
+                    data=[types.SimpleNamespace(embedding=[0.1, 0.2, 0.3]) for _ in kwargs["input"]]
+                )
+
+        with mock.patch("openai.OpenAI") as client:
+            client.return_value.embeddings = Embeddings()
+            embedder = stashbase_daemon.make_embedder("requesty", api_key="secret")
+            self.assertEqual(embedder.embedding_space, "stashbase/requesty/openai/text-embedding-3-small")
+            self.assertEqual(embedder.embed_query("query"), [0.1, 0.2, 0.3])
+            client.assert_called_once_with(
+                api_key="secret", base_url="https://router.requesty.ai/v1", timeout=60.0
+            )
+            self.assertEqual(calls, [{"model": "openai/text-embedding-3-small", "input": ["query"]}])
+
     def test_removing_key_supersedes_pending_semantic_activation(self) -> None:
         entered, release = threading.Event(), threading.Event()
 

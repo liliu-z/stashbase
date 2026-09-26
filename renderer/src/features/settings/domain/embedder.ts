@@ -3,14 +3,15 @@
  * The infrastructure adapter translates the wire without carrying legacy
  * source-selection or authorization aliases into this domain. */
 
-export type EmbedderProvider = 'openai' | 'openrouter';
+export type EmbedderProvider = 'openai' | 'openrouter' | 'requesty';
 
 /** The providers a reader may choose between, in offer order. */
-export const EMBEDDER_PROVIDERS: readonly EmbedderProvider[] = ['openai', 'openrouter'];
+export const EMBEDDER_PROVIDERS: readonly EmbedderProvider[] = ['openai', 'openrouter', 'requesty'];
 
 export const EMBEDDER_PROVIDER_LABELS: Record<EmbedderProvider, string> = {
   openai: 'OpenAI',
   openrouter: 'OpenRouter',
+  requesty: 'Requesty',
 };
 
 export interface EmbedderState {
