@@ -540,8 +540,32 @@ while opening Checkout, and disabled purchase during unavailable status. Checkou
 switching retires the previous payable session before opening another; regressions
 cover ambiguous creation, expiration failure, and early expiration. The allowance
 hook refreshes on desktop window focus and removes its listener on unmount.
+The hosted API repository's `dev:billing` command starts a test-only local stack;
+the website repository's Astro billing integration reuses the production
+handlers with a loopback transport. Local runtime checks covered the actual pricing page,
+Stripe CLI webhook forwarding, scheduler processing of a paid half-price test
+invoice, full fixture allowance, and child-process shutdown. These checks used
+an SDK-created test subscription. A subsequent user-driven local sign-in and
+Checkout completed a $5 half-price Plus test purchase; provider and local records
+agreed on the active subscription and paid-through date, with all three payment
+events processed and the full fixture allowance available. This establishes the
+local initial-purchase flow, not live collection or packaged desktop handoff.
+The API's repeatable `billing:verify` command passed real Stripe test-clock
+renewal, failed collection, payment recovery after store restart, cancellation at
+period end, and paid prorated tier changes against an isolated PostgreSQL ledger.
+Allowance expiry uses the simulated timestamp explicitly. Read-only readiness
+checks and protected billing queue/failure/staleness metrics support release
+operations. A PostgreSQL regression covers queued and late webhook acknowledgement
+when account deletion retires the billing identity.
+An isolated real Stripe Portal browser pass completed Plus -> Pro -> Plus with
+prorated invoices and period-end cancellation. The payment-method page did not
+render a card form in the automated browser after retries, so card replacement
+remains unverified; SDK payment recovery does not establish that browser action.
+That Portal pass exposed timestamp-based cancellation missing from the local
+indicator; the provider now handles an explicit cancellation at the current
+period end, with regression and real-provider projection checks.
 Real live-mode payment,
-renewal collection, and packaged cross-browser account handoff remain release
+production renewal collection, browser card replacement, and packaged cross-browser account handoff remain release
 checks; local and Stripe test-mode checks do not establish those behaviors.
 
 
