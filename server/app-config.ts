@@ -89,10 +89,15 @@ const EMBEDDER_DEFAULTS: Record<EmbedderProvider, Omit<EmbedderConfig, 'provider
     dimension: 1536,
     baseUrl: 'https://openrouter.ai/api/v1',
   },
+  requesty: {
+    model: 'openai/text-embedding-3-small',
+    dimension: 1536,
+    baseUrl: 'https://router.requesty.ai/v1',
+  },
 };
 
 export function isEmbedderProvider(value: unknown): value is EmbedderProvider {
-  return value === 'openai' || value === 'openrouter';
+  return value === 'openai' || value === 'openrouter' || value === 'requesty';
 }
 
 export interface AppConfigFile {

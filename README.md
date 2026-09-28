@@ -101,7 +101,7 @@ Agent conversations send your prompts and relevant context to model services.
 Claude and Codex use your provider accounts; the Default Agent connects
 through StashBase's hosted model gateway.
 
-**Search by meaning** requires your own OpenAI or OpenRouter key in
+**Search by meaning** requires your own OpenAI, OpenRouter, or Requesty key in
 **Settings → Advanced → Search by Meaning**. It sends source text and search
 queries to your chosen embedding provider. Default Agent credits don't cover
 this service.

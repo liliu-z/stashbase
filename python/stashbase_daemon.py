@@ -190,13 +190,16 @@ def make_embedder(
     dimension: int | None = None,
     base_url: str | None = None,
 ) -> OpenAIEmbedder:
-    if provider not in ("openai", "openrouter"):
+    if provider not in ("openai", "openrouter", "requesty"):
         raise ValueError(f"unsupported embedding provider {provider!r}")
     if not api_key:
         raise ValueError(f"{provider} embedder requires api_key")
     if provider == "openrouter":
         model = model or "openai/text-embedding-3-small"
         base_url = base_url or "https://openrouter.ai/api/v1"
+    elif provider == "requesty":
+        model = model or "openai/text-embedding-3-small"
+        base_url = base_url or "https://router.requesty.ai/v1"
     else:
         model = model or "text-embedding-3-small"
     return OpenAIEmbedder(
@@ -329,7 +332,7 @@ class StashbaseMFS:
                 dimension=int(args["dimension"]) if args.get("dimension") else None,
                 base_url=args.get("base_url"),
             )
-        elif provider not in ("openai", "openrouter"):
+        elif provider not in ("openai", "openrouter", "requesty"):
             raise ValueError(f"unsupported embedding provider {provider!r}")
 
         namespace = "folder-" + blake3(identity.encode("utf-8")).hexdigest()[:32]

@@ -161,7 +161,7 @@ export async function bindIndexerForFolder(folderAbs: string): Promise<void> {
   const cfg = resolveEmbedderRuntime();
   const runtime = cfg ?? { provider: getEmbedderConfig().provider };
   if (!cfg) {
-    log.warn(`embedder: no provider key configured — ${folderAbs} bound for keyword search; add an OpenAI or OpenRouter key for search by meaning`);
+    log.warn(`embedder: no provider key configured — ${folderAbs} bound for keyword search; add an OpenAI, OpenRouter, or Requesty key for search by meaning`);
   }
   await indexer.bindFolder(filesystemPath.absolute(folderAbs), runtime);
 }
