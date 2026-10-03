@@ -254,7 +254,7 @@ const DialogTitle = forwardRef<HTMLHeadingElement, HTMLAttributes<HTMLHeadingEle
       <DialogPrimitive.Title
         ref={ref}
         className={cn(
-          compact ? 'text-[15px]' : 'text-[16px]',
+          compact ? 'text-ui-15' : 'text-ui-16',
           'leading-tight text-foreground',
           className,
         )}

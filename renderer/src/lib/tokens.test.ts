@@ -92,10 +92,10 @@ function customProperty(block: string, name: string): number {
   return Number(scaled);
 }
 
-/** The pixel size a `text-[13px]` ladder class stands for. */
+/** The pixel size a `text-ui-13` ladder class stands for. */
 function ladderPx(className: string): number {
-  const match = /^text-\[(\d+)px\]$/.exec(className);
-  expect(match, `${className} is an arbitrary px type step`).not.toBeNull();
+  const match = /^text-ui-(\d+)$/.exec(className);
+  expect(match, `${className} is an interface-scaled px type step`).not.toBeNull();
   return Number(match?.[1]);
 }
 
@@ -147,7 +147,11 @@ describe('shape', () => {
 
 describe('focus ring', () => {
   it('gives the copied-primitive fallback the same colour as the token', () => {
-    const declared = /--focus-ring:\s*(#[0-9a-fA-F]{3,8})\s*;/.exec(stylesheet)?.[1];
+    // The StashBase value is the fallback inside the light side's var().
+    const declared =
+      /--focus-ring:\s*light-dark\(var\(--light-focus-ring,\s*(#[0-9a-fA-F]{3,8})\)/.exec(
+        stylesheet,
+      )?.[1];
     const fallback = /#[0-9a-fA-F]{3,8}/.exec(FOCUS_RING_FALLBACK)?.[0];
     expect(declared, 'globals.css declares --focus-ring as a hex colour').toBeDefined();
     expect(fallback, 'lib/focus-ring.ts writes the fallback as a hex colour').toBeDefined();

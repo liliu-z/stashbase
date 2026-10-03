@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import type { AppearancePort } from '@/features/settings/application/ports';
+import type { AppearancePort, SystemTextPort } from '@/features/settings/application/ports';
 import type { TelemetryPort } from '@/features/settings/application/telemetry-port';
 import { AppearancePanel } from '@/features/settings/ui/appearance/appearance-panel';
 import {
@@ -17,6 +17,7 @@ import { TelemetryGroup } from './telemetry-group';
 
 export interface GeneralPanelProps {
   appearanceApi?: AppearancePort | undefined;
+  systemTextApi?: SystemTextPort | undefined;
   revisionPreview?: ReactNode;
   telemetryApi?: TelemetryPort | undefined;
   onOpenExternal?: ((href: string) => void) | undefined;
@@ -28,12 +29,15 @@ export function GeneralPanel({
   appearanceApi,
   revisionPreview,
   softwareUpdate,
+  systemTextApi,
   telemetryApi,
   onOpenExternal,
 }: GeneralPanelProps) {
   return (
     <SettingsPane title="General">
-      {appearanceApi && <AppearancePanel appearanceApi={appearanceApi} />}
+      {appearanceApi && (
+        <AppearancePanel appearanceApi={appearanceApi} systemTextApi={systemTextApi} />
+      )}
       {telemetryApi && onOpenExternal && (
         <TelemetryGroup port={telemetryApi} onOpenExternal={onOpenExternal} />
       )}

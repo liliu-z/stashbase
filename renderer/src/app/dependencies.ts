@@ -42,6 +42,7 @@ import {
   createAccountAdapter,
   createAgentRuntimeAdapter,
   createAppearanceAdapter,
+  createSystemTextAdapter,
   createEmbedderAdapter,
   createMcpAccessAdapter,
   createLocalComponentAdapter,
@@ -49,6 +50,7 @@ import {
   type AccountPort,
   type AgentRuntimePort,
   type AppearancePort,
+  type SystemTextPort,
   type EmbedderPort,
   type McpAccessPort,
 } from '@/features/settings/public';
@@ -64,8 +66,10 @@ import { readBridge } from '@/platform/electron/bridge';
 import { createExternalNavigation } from '@/platform/electron/external-navigation';
 import { fileManagerLabel } from '@/platform/electron/file-manager';
 import { createFolderPicker } from '@/platform/electron/folder-picker';
+import type { WindowLifecycleBridge } from '@/platform/electron/window-lifecycle';
 import { createHttpClient } from '@/platform/http/client';
 import { createUsageRecorder } from '@/platform/telemetry';
+import type { AppearanceSurface } from '@/shared/domain/appearance';
 
 /** The folder chrome's dependencies, as the welcome screen declares them;
  *  the folder window's sidebar takes only the project port from the set. */
@@ -74,6 +78,9 @@ type ProjectChrome = Pick<ComponentProps<typeof ProjectWelcome>, 'api' | 'lifecy
 };
 
 export interface AppDependencies {
+  /** The appearance the desktop remembered for this window's first paint;
+   *  null on a first launch. */
+  initialAppearance: AppearanceSurface | null;
   recordUsage: ReturnType<typeof createUsageRecorder>;
   agent: {
     /** Which runtimes a conversation can open on. Settings reads the same
@@ -106,6 +113,10 @@ export interface AppDependencies {
     accountApi: AccountPort;
     agentRuntimeApi: AgentRuntimePort;
     appearanceApi: AppearancePort;
+    /** Hands the applied appearance to the desktop's native chrome and
+     *  spellchecker. */
+    setAppearance: WindowLifecycleBridge['setAppearance'];
+    systemTextApi: SystemTextPort;
     telemetryApi: TelemetryPort;
     embedderApi: EmbedderPort;
     mcpAccessApi: McpAccessPort;
@@ -131,6 +142,7 @@ export function createDependencies(): AppDependencies {
     workspaceSession: bridge.workspaceSession,
   });
   return {
+    initialAppearance: bridge.runtime.appearance ?? null,
     recordUsage: createUsageRecorder(http),
     agent: {
       catalog: createAgentCatalogAdapter(http),
@@ -167,6 +179,8 @@ export function createDependencies(): AppDependencies {
       accountApi: createAccountAdapter(http, bridge.runtime.serverOrigin),
       agentRuntimeApi: createAgentRuntimeAdapter(http),
       appearanceApi: createAppearanceAdapter(http),
+      setAppearance: (appearance) => bridge.windowLifecycle.setAppearance(appearance),
+      systemTextApi: createSystemTextAdapter(bridge.textServices),
       telemetryApi: createTelemetryAdapter(http),
       embedderApi: createEmbedderAdapter(http),
       mcpAccessApi: createMcpAccessAdapter(http),

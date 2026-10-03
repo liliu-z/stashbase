@@ -1,6 +1,6 @@
 'use client';
 
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotionConfig } from 'framer-motion';
 import { forwardRef, useState, useEffect, type HTMLAttributes } from 'react';
 
 import { fontWeights } from '@/lib/font-weight';
@@ -34,7 +34,7 @@ const ThinkingIndicator = forwardRef<HTMLDivElement, ThinkingIndicatorProps>(
     const [index, setIndex] = useState(0);
     // Reduced motion drops the infinite glyph morph and the word cycling — a
     // static glyph and label carry the same meaning without the movement.
-    const reduceMotion = useReducedMotion() ?? false;
+    const reduceMotion = useReducedMotionConfig() ?? false;
 
     useEffect(() => {
       if (reduceMotion) return;

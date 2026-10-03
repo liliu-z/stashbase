@@ -2,9 +2,11 @@ import { waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vite-plus/test';
 
 import type { AppearanceSurface } from '@/shared/domain/appearance';
+import { appearanceSurface as fixture } from '@/test/fakes/settings';
 
 import {
   applyAppearanceSurface,
+  connectNativeAppearance,
   publishAppearanceSurface,
   subscribeToAppearanceSurface,
 } from './appearance-surface';
@@ -26,51 +28,71 @@ function post(published: AppearanceSurface): void {
 }
 
 function surface(overrides: Partial<AppearanceSurface> = {}): AppearanceSurface {
-  return {
-    themeClass: null,
-    uiScale: 'default',
-    readingTextSize: 'default',
-    readingFont: 'serif',
-    ...overrides,
-  };
+  return { ...fixture(), ...overrides };
 }
 
 afterEach(() => {
   for (const channel of opened.splice(0)) channel.close();
   const root = document.documentElement;
+  applyAppearanceSurface(fixture());
   root.classList.remove('light', 'dark');
-  delete root.dataset.uiScale;
-  delete root.dataset.readingTextSize;
-  delete root.dataset.readingFont;
 });
 
 describe('applyAppearanceSurface', () => {
-  it('stamps both scales and the reading font on the document root', () => {
-    applyAppearanceSurface(
-      surface({ uiScale: 'large', readingTextSize: 'small', readingFont: 'sans' }),
-    );
+  it('stamps both scales on the document root', () => {
+    applyAppearanceSurface(surface({ uiScale: 'large', readingTextSize: 'small' }));
 
     expect(document.documentElement.dataset.uiScale).toBe('large');
     expect(document.documentElement.dataset.readingTextSize).toBe('small');
-    expect(document.documentElement.dataset.readingFont).toBe('sans');
   });
 
   it('carries the pinned theme as its class', () => {
-    applyAppearanceSurface(surface({ themeClass: 'light' }));
+    applyAppearanceSurface(surface({ theme: 'light' }));
     expect(document.documentElement.classList.contains('light')).toBe(true);
     expect(document.documentElement.classList.contains('dark')).toBe(false);
 
-    applyAppearanceSurface(surface({ themeClass: 'dark' }));
+    applyAppearanceSurface(surface({ theme: 'dark' }));
     expect(document.documentElement.classList.contains('light')).toBe(false);
     expect(document.documentElement.classList.contains('dark')).toBe(true);
   });
 
   it('leaves neither class on when the theme follows the system', () => {
-    applyAppearanceSurface(surface({ themeClass: 'dark' }));
-    applyAppearanceSurface(surface({ themeClass: null }));
+    applyAppearanceSurface(surface({ theme: 'dark' }));
+    applyAppearanceSurface(surface({ theme: 'system' }));
 
     expect(document.documentElement.classList.contains('light')).toBe(false);
     expect(document.documentElement.classList.contains('dark')).toBe(false);
+  });
+});
+
+const root = () => document.documentElement;
+
+describe('theme and font overrides', () => {
+  it('stamps a named theme on its own side and clears it for StashBase', () => {
+    applyAppearanceSurface(surface({ darkTheme: 'catppuccin-mocha' }));
+    expect(root().style.getPropertyValue('--dark-surface-1')).toBe('#1e1e2e');
+    expect(root().style.getPropertyValue('--light-surface-1')).toBe('');
+
+    applyAppearanceSurface(surface());
+    expect(root().style.getPropertyValue('--dark-surface-1')).toBe('');
+  });
+
+  it('carries a chosen font with the bundled stack behind it', () => {
+    applyAppearanceSurface(surface({ codeFont: 'JetBrains Mono', writingFont: 'Literata' }));
+    expect(root().style.getPropertyValue('--writing-font')).toBe('"Literata", var(--font-sans)');
+    expect(root().style.getPropertyValue('--code-font')).toBe('"JetBrains Mono", var(--font-mono)');
+
+    applyAppearanceSurface(surface());
+    expect(root().style.getPropertyValue('--writing-font')).toBe('');
+  });
+
+  it('hands every applied surface to the desktop until disconnected', () => {
+    const reported: AppearanceSurface[] = [];
+    const disconnect = connectNativeAppearance((next) => reported.push(next));
+    applyAppearanceSurface(surface({ spellcheck: false }));
+    disconnect();
+    applyAppearanceSurface(surface());
+    expect(reported).toEqual([surface({ spellcheck: false })]);
   });
 });
 
@@ -81,12 +103,12 @@ describe('publishAppearanceSurface', () => {
       received.push(event.data),
     );
 
-    publishAppearanceSurface(surface({ themeClass: 'dark', uiScale: 'small' }));
+    publishAppearanceSurface(surface({ theme: 'dark', uiScale: 'small' }));
 
     expect(document.documentElement.classList.contains('dark')).toBe(true);
     expect(document.documentElement.dataset.uiScale).toBe('small');
     await waitFor(() => expect(received).toHaveLength(1));
-    expect(received[0]).toEqual(surface({ themeClass: 'dark', uiScale: 'small' }));
+    expect(received[0]).toEqual(surface({ theme: 'dark', uiScale: 'small' }));
   });
 });
 

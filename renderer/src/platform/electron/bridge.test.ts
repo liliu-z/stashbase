@@ -26,6 +26,11 @@ const workspaceSession = {
 };
 const windowLifecycle = {
   onPrepareContextRelease: () => () => undefined,
+  setAppearance: async () => undefined,
+};
+const textServices = {
+  listFonts: async () => ({ ok: true as const, families: [] }),
+  spellcheckLanguages: async () => ({ ok: true as const, languages: [] }),
 };
 const runtime = { serverOrigin: 'http://127.0.0.1:8090' };
 
@@ -39,6 +44,7 @@ describe('Electron bridge', () => {
       externalNavigation,
       project,
       runtime,
+      textServices,
       workspaceSession,
       windowLifecycle,
     };
@@ -46,9 +52,13 @@ describe('Electron bridge', () => {
       externalNavigation,
       project,
       runtime,
+      textServices,
       workspaceSession,
       windowLifecycle,
     });
+
+    window.stashbase = { externalNavigation, project, runtime, workspaceSession, windowLifecycle };
+    expect(() => readBridge()).toThrow('Text services are unavailable.');
   });
 
   it('rejects missing capabilities and renderer-supplied window identity', () => {
@@ -81,6 +91,7 @@ describe('Electron bridge', () => {
       externalNavigation,
       project,
       runtime,
+      textServices,
       updates,
       workspaceSession,
       windowLifecycle,
@@ -93,6 +104,7 @@ describe('Electron bridge', () => {
       externalNavigation,
       project,
       runtime,
+      textServices,
       updates: { read: async () => undefined },
       workspaceSession,
       windowLifecycle,

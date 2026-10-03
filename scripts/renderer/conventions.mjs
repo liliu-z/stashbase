@@ -72,6 +72,13 @@ const checks = [
     pattern: /\bduration-\d+\b|duration:\s*0\.\d+/g,
   },
   {
+    // Interface size multiplies chrome type through --ui-scale; a literal px
+    // size is the one spelling that cannot follow it.
+    rule: 'Chrome type sizes follow the interface size: text-body/caption roles or text-ui-<px>, not text-[Npx]',
+    applies: (file) => isSource(file),
+    pattern: /\btext-\[\d+(?:\.\d+)?px\]/g,
+  },
+  {
     rule: 'A request signal comes from useRequestSignals or a caller, never an inline controller',
     applies: (file) => isSource(file),
     pattern: /new AbortController\(\)\.signal/g,

@@ -174,6 +174,7 @@ test('each convention reports the file, the count, and the rule it keeps', (cont
   write(root, 'lib/color.ts', "export const brand = '#ff0000';\n");
   write(root, 'lib/theme.tsx', "export const chip = 'dark:bg-slate-900';\n");
   write(root, 'lib/motion.ts', "export const fade = 'duration-200';\n");
+  write(root, 'lib/type.tsx', "export const label = 'text-[11px] text-ui-11';\n");
   write(root, 'lib/signal.ts', 'export const signal = new AbortController().signal;\n');
   write(root, 'lib/view-model.ts', 'export type Panel = ReturnType<typeof useWorkspace>;\n');
   write(root, 'lib/failure.ts', 'export class LoadFailure extends Error {}\n');
@@ -200,6 +201,7 @@ test('each convention reports the file, the count, and the rule it keeps', (cont
     'lib/motion.ts: 1× — Motion durations are tokens (duration-fast/base/slow, tween.*), not literals',
     'lib/signal.ts: 1× — A request signal comes from useRequestSignals or a caller, never an inline controller',
     'lib/theme.tsx: 1× — Themes use light-dark() tokens, never dark: classes',
+    'lib/type.tsx: 1× — Chrome type sizes follow the interface size: text-body/caption roles or text-ui-<px>, not text-[Npx]',
     'lib/view-model.ts: 1× — Panels take a typed view model, not ReturnType<typeof useX>',
   ]);
 });

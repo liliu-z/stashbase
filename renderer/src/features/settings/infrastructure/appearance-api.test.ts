@@ -1,39 +1,25 @@
 import { describe, expect, it, vi } from 'vite-plus/test';
 
 import type { HttpClient } from '@/platform/http/client';
+import { appearanceSurface } from '@/test/fakes/settings';
 
 import { createAppearanceAdapter } from './appearance-api';
 
 const signal = new AbortController().signal;
 
-const PRESETS = {
-  readingFont: 'serif',
-  readingTextSize: 'default',
-  theme: 'dark',
-  uiScale: 'default',
-} as const;
+const SAVED = { ...appearanceSurface(), theme: 'dark' } as const;
 
 describe('appearance API', () => {
-  it('reads every preset through the appearance route', async () => {
-    const request = vi.fn(async () => ({ body: PRESETS, status: 200 }));
-    await expect(createAppearanceAdapter({ request }).load(signal)).resolves.toEqual({
-      readingFont: 'serif',
-      readingTextSize: 'default',
-      theme: 'dark',
-      uiScale: 'default',
-    });
+  it('reads the record through the appearance route', async () => {
+    const request = vi.fn(async () => ({ body: SAVED, status: 200 }));
+    await expect(createAppearanceAdapter({ request }).load(signal)).resolves.toEqual(SAVED);
     expect(request).toHaveBeenCalledWith(expect.objectContaining({ path: '/api/appearance' }));
   });
 
-  it('writes one row at a time and answers with every preset', async () => {
-    const request = vi.fn(async () => ({ body: PRESETS, status: 200 }));
+  it('writes one row at a time and answers with the whole record', async () => {
+    const request = vi.fn(async () => ({ body: SAVED, status: 200 }));
     const api = createAppearanceAdapter({ request });
-    await expect(api.update({ theme: 'dark' }, signal)).resolves.toEqual({
-      readingFont: 'serif',
-      readingTextSize: 'default',
-      theme: 'dark',
-      uiScale: 'default',
-    });
+    await expect(api.update({ theme: 'dark' }, signal)).resolves.toEqual(SAVED);
     expect(request).toHaveBeenCalledWith(
       expect.objectContaining({
         body: { theme: 'dark' },

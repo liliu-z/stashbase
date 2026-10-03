@@ -55,7 +55,7 @@ export function FileTreeNameRow({
         className={cn(
           // The tree's own row: 28px, a 14px glyph, and the 13px label,
           // with the label on the rows' 38px text line.
-          'relative flex h-7 items-center gap-2 bg-hover pr-3 text-[13px] text-foreground',
+          'relative flex h-7 items-center gap-2 bg-hover pr-3 text-ui-13 text-foreground',
           // The row it stands in for is a compact Button, so it takes the
           // same ladder corner rather than a shape role of its own.
           sizeClasses.radius,

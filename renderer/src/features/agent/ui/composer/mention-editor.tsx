@@ -298,9 +298,9 @@ export const MentionEditor = forwardRef<MentionEditorHandle, MentionEditorProps>
           EditorView.theme({
             '&': {
               font: 'inherit',
-              fontSize: `${fontSize}px`,
-              lineHeight: `${lineHeight}px`,
-              minHeight: `${lineHeight * ctx.minRows + paddingY * 2}px`,
+              fontSize: `calc(${fontSize}px * var(--ui-scale, 1))`,
+              lineHeight: `calc(${lineHeight}px * var(--ui-scale, 1))`,
+              minHeight: `calc(${lineHeight * ctx.minRows}px * var(--ui-scale, 1) + ${paddingY * 2}px)`,
             },
             '&.cm-focused': { outline: 'none' },
             '.cm-content': {
@@ -320,7 +320,7 @@ export const MentionEditor = forwardRef<MentionEditorHandle, MentionEditorProps>
             '.cm-scroller': {
               fontFamily: 'inherit',
               lineHeight: 'inherit',
-              maxHeight: `${lineHeight * ctx.maxRows + paddingY * 2}px`,
+              maxHeight: `calc(${lineHeight * ctx.maxRows}px * var(--ui-scale, 1) + ${paddingY * 2}px)`,
               overflow: 'auto',
             },
             '.cm-selectionBackground, ::selection': {

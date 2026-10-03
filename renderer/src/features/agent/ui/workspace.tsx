@@ -193,7 +193,7 @@ function ChatWorkspace({
           )}
         >
           {empty && !notice && state.connection.kind !== 'restoring' ? (
-            <h2 className="text-center text-[28px] leading-none font-semibold tracking-[-0.03em] text-foreground max-sm:text-[24px]">
+            <h2 className="text-center text-ui-28 leading-none font-semibold tracking-[-0.03em] text-foreground max-sm:text-ui-24">
               What’s on your mind?
             </h2>
           ) : (

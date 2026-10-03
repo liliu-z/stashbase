@@ -25,7 +25,7 @@ export function SuggestedSourceChip({
   return (
     <div
       className={cn(
-        'inline-flex h-7 max-w-64 shrink-0 items-center border border-dashed border-border text-[12px] text-muted-foreground',
+        'inline-flex h-7 max-w-64 shrink-0 items-center border border-dashed border-border text-ui-12 text-muted-foreground',
         shape.bg,
       )}
     >

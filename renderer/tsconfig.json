@@ -13,6 +13,7 @@
       "@/contracts/agent-runtime": ["../shared/agent-runtime.ts"],
       "@/contracts/agent-protocol": ["../shared/agent-protocol.ts"],
       "@/contracts/account": ["../shared/account.ts"],
+      "@/contracts/appearance-themes": ["../shared/appearance-themes.ts"],
       "@/*": ["./src/*"]
     },
     "lib": ["ES2023", "DOM", "DOM.Iterable"],

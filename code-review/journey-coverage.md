@@ -168,7 +168,23 @@ Host/services: `electron/main.cjs`, `server/folder.ts`.
   entering an empty project, useful brainstorming, and returning without
   unnecessary onboarding. Real update download, replacement, and relaunch remain
   unproven by controlled handoff; unpackaged builds report unsupported.
-- **Known issues:** saved appearance applies after first paint.
+- **Appearance at launch (2026-09-27):** Electron main keeps the last applied
+  appearance beside the workspace session, sets `nativeTheme` and the
+  spellchecker before the first window opens, and hands the record to each new
+  window, which applies it before its first render. The window background,
+  native chrome, theme tokens, fonts, and sizes therefore match on first paint.
+  `electron/window/appearance.test.cjs` covers restore, refusal, spellcheck, and
+  repaint; `electron/renderer/runtime.test.cjs` covers the first-paint argument;
+  `use-appearance-surface.test.ts` covers handing each applied record to the desktop.
+- **Appearance customization (2026-09-27):** themes, fonts, reading layout,
+  reduce motion, and editor aids. `shared/protocols/http/appearance.test.ts`
+  holds every theme to WCAG AA text contrast; `server/routes/appearance.test.ts`
+  covers persistence, per-field fallback, and refusal of font names that could
+  escape CSS; `electron/text-services/text-services.test.cjs` covers font listing,
+  capability refusal, and the spelling menu; `appearance-panel.test.tsx` and
+  `writing-aids.test.ts` cover the Settings rows, font picker, word count, and
+  focus-mode marking. **Gap:** font enumeration on macOS and Windows and native
+  spellcheck suggestions are unproven by a driven pass on those platforms.
 - **Sign-in recovery (2026-09-15):** `settings/hooks/account-context.tsx` owns
   one browser wait shared by sidebar, composer, and Agents Settings.
   `use-account.test.ts`, `agents-panel.test.tsx`, and

@@ -196,14 +196,14 @@ module.exports = {
       },
       to: {
         path: '^shared/',
-        pathNot: ['^shared/protocols/', '^shared/file-formats[.]ts$'],
+        pathNot: ['^shared/protocols/', '^shared/(?:file-formats|appearance-themes)[.]ts$'],
       },
     },
     {
-      name: 'file-format-vocabulary-scope',
+      name: 'contract-vocabulary-scope',
       severity: 'error',
       comment:
-        'shared/file-formats is the one registered contract vocabulary the shared kernel may restate; every other layer reaches it through the boundary.',
+        'shared/file-formats and shared/appearance-themes are the registered contract vocabularies the shared kernel and feature domains may restate; every other layer reaches them through the boundary.',
       from: {
         path: '^renderer/src/',
         pathNot: [
@@ -214,7 +214,7 @@ module.exports = {
           '^renderer/src/features/[^/]+/domain/',
         ],
       },
-      to: { path: '^shared/file-formats[.]ts$' },
+      to: { path: '^shared/(?:file-formats|appearance-themes)[.]ts$' },
     },
     {
       name: 'renderer-does-not-import-implementation-trees',

@@ -6,17 +6,7 @@ import express from 'express';
 
 import { mount } from './appearance.ts';
 import { readAppConfigStrict, writeAppConfigStrict, normalizeAppearancePreferences } from '../app-config.ts';
-
-const THEMES: readonly unknown[] = ['system', 'light', 'dark'];
-const SCALES: readonly unknown[] = ['small', 'default', 'large'];
-const READING_FONTS: readonly unknown[] = ['serif', 'sans'];
-
-interface AppearanceBody {
-  readingFont: unknown;
-  readingTextSize: unknown;
-  theme: unknown;
-  uiScale: unknown;
-}
+import { DEFAULT_APPEARANCE_PREFERENCES } from '../../shared/protocols/http/appearance.ts';
 
 async function withRoute<T>(read: (url: string) => Promise<T>): Promise<T> {
   const app = express();
@@ -51,30 +41,18 @@ function get(): Promise<{ body: unknown; status: number }> {
   });
 }
 
-function presetsOf(value: unknown): AppearanceBody {
-  if (
-    typeof value !== 'object' ||
-    value === null ||
-    !('theme' in value) ||
-    !('uiScale' in value) ||
-    !('readingTextSize' in value) ||
-    !('readingFont' in value)
-  ) {
-    return assert.fail('the read answers with every appearance preset');
-  }
-  return {
-    readingFont: value.readingFont,
-    readingTextSize: value.readingTextSize,
-    theme: value.theme,
-    uiScale: value.uiScale,
-  };
-}
-
 test('partial appearance writes persist through the real route and preserve other configuration', async () => {
   writeAppConfigStrict({ appearance: { uiScale: 'large' }, updates: { autoCheck: false } });
-  assert.equal(await put({ theme: 'dark', readingTextSize: 'small' }), 200);
+  assert.equal(
+    await put({ theme: 'dark', darkTheme: 'catppuccin-mocha', writingFont: 'Iosevka Aile' }),
+    200,
+  );
   assert.deepEqual((await get()).body, {
-    theme: 'dark', uiScale: 'large', readingTextSize: 'small', readingFont: 'serif',
+    ...DEFAULT_APPEARANCE_PREFERENCES,
+    darkTheme: 'catppuccin-mocha',
+    theme: 'dark',
+    uiScale: 'large',
+    writingFont: 'Iosevka Aile',
   });
   const saved = readAppConfigStrict();
   assert.deepEqual(saved.updates, { autoCheck: false });
@@ -82,35 +60,37 @@ test('partial appearance writes persist through the real route and preserve othe
     assert.equal(await put(value), 400);
     assert.deepEqual(readAppConfigStrict(), saved);
   }
-  assert.deepEqual(normalizeAppearancePreferences({ theme: 'neon', uiScale: 'huge' }), {
-    theme: 'system', uiScale: 'default', readingTextSize: 'default', readingFont: 'serif',
-  });
-});
-test('a theme outside the three presets is refused rather than written', async () => {
-  assert.equal(await put({ theme: 'midnight' }), 400);
 });
 
-test('an interface size outside the three presets is refused', async () => {
-  assert.equal(await put({ uiScale: 'huge' }), 400);
+test('values outside a preference are refused rather than written', async () => {
+  const invalid = [
+    { theme: 'midnight' },
+    { uiScale: 'huge' },
+    { lightTheme: 'catppuccin-mocha' },
+    { darkTheme: 'dracula' },
+    { lineWidth: 'enormous' },
+    { spellcheck: 'yes' },
+    { spellcheckLanguage: 'english please' },
+  ];
+  for (const body of invalid) assert.equal(await put(body), 400, JSON.stringify(body));
 });
 
-test('a reading text size outside the three presets is refused', async () => {
-  assert.equal(await put({ readingTextSize: 'tiny' }), 400);
+test('a font name that could escape its CSS declaration is refused', async () => {
+  for (const writingFont of ['Inter"; color: red', 'a;b', 'x}', 'url(x)', '', 'a\u0000b']) {
+    assert.equal(await put({ writingFont }), 400, writingFont);
+  }
+  assert.equal(await put({ codeFont: 'JetBrains Mono NL' }), 200);
+  assert.equal(await put({ codeFont: null }), 200);
 });
 
-test('a reading font outside its two presets is refused', async () => {
-  assert.equal(await put({ readingFont: 'mono' }), 400);
-});
-
-test('a read answers with every preset inside its own allowed values', async () => {
-  const read = await get();
-  assert.equal(read.status, 200);
-  const presets = presetsOf(read.body);
-  assert.ok(THEMES.includes(presets.theme), `theme ${String(presets.theme)}`);
-  assert.ok(SCALES.includes(presets.uiScale), `uiScale ${String(presets.uiScale)}`);
-  assert.ok(
-    SCALES.includes(presets.readingTextSize),
-    `readingTextSize ${String(presets.readingTextSize)}`,
+test('a stored value this build cannot read falls back alone', () => {
+  assert.deepEqual(
+    normalizeAppearancePreferences({
+      darkTheme: 'tokyo-night',
+      theme: 'neon',
+      uiScale: 'huge',
+      writingFont: 'Inter"}',
+    }),
+    { ...DEFAULT_APPEARANCE_PREFERENCES, darkTheme: 'tokyo-night' },
   );
-  assert.ok(READING_FONTS.includes(presets.readingFont), `readingFont ${String(presets.readingFont)}`);
 });

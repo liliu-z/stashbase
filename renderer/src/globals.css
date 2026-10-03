@@ -10,7 +10,10 @@
 /* ============================================================================
    1. DESIGN TOKENS
    ----------------------------------------------------------------------------
-   Every color token is written ONCE, as light-dark(light, dark). Which side
+   Every color token is written ONCE, as light-dark(light, dark). A named
+   theme (shared/appearance-themes.ts) overrides a token by setting
+   --light-<token> or --dark-<token> on the root; the literal after each
+   var() is the StashBase theme, which sets nothing. Which side
    renders is driven by `color-scheme`: the root follows the OS, and a `.light`
    or `.dark` class (on <html> via ThemeProvider, or on any subtree for a
    forced-theme preview) pins it.
@@ -40,31 +43,37 @@
      Light: 2 color steps (floor, sunken) then flat #FFFFFF; shadow does the
      work. Dark: additive white-opacity ladder over #171717. Each surface
      pairs 1:1 with a shadow recipe (--shadow-1 .. --shadow-8). */
-  --surface-1: light-dark(#fafafa, #171717);
-  --surface-2: light-dark(#fcfcfc, #1e1e1e);
-  --surface-3: light-dark(#ffffff, #252525);
-  --surface-4: light-dark(#ffffff, #2c2c2c);
-  --surface-5: light-dark(#ffffff, #333333);
-  --surface-6: light-dark(#ffffff, #3a3a3a);
-  --surface-7: light-dark(#ffffff, #414141);
-  --surface-8: light-dark(#ffffff, #484848);
+  --surface-1: light-dark(var(--light-surface-1, #fafafa), var(--dark-surface-1, #171717));
+  --surface-2: light-dark(var(--light-surface-2, #fcfcfc), var(--dark-surface-2, #1e1e1e));
+  --surface-3: light-dark(var(--light-surface-3, #ffffff), var(--dark-surface-3, #252525));
+  --surface-4: light-dark(var(--light-surface-4, #ffffff), var(--dark-surface-4, #2c2c2c));
+  --surface-5: light-dark(var(--light-surface-5, #ffffff), var(--dark-surface-5, #333333));
+  --surface-6: light-dark(var(--light-surface-6, #ffffff), var(--dark-surface-6, #3a3a3a));
+  --surface-7: light-dark(var(--light-surface-7, #ffffff), var(--dark-surface-7, #414141));
+  --surface-8: light-dark(var(--light-surface-8, #ffffff), var(--dark-surface-8, #484848));
 
   /* ── Semantic tokens ── */
   --background: var(--surface-1);
-  --foreground: light-dark(#171717, #f5f5f5);
+  --foreground: light-dark(var(--light-foreground, #171717), var(--dark-foreground, #f5f5f5));
   --card: var(--surface-3);
   /* Light `muted` decouples from surface-2: the light surface ladder is so
      compressed (#FAFAFA → #FCFCFC → #FFFFFF) that bg-muted would read as
      near-white, making anything sitting on it (Tabs track, etc.) blend
      together. A slightly more grey value gives muted real semantic presence.
      Dark keeps the ladder value (#1E1E1E = surface-2). */
-  --muted: light-dark(#f4f4f5, #1e1e1e);
-  --muted-foreground: light-dark(#737373, #a3a3a3);
+  --muted: light-dark(var(--light-muted, #f4f4f5), var(--dark-muted, #1e1e1e));
+  --muted-foreground: light-dark(
+    var(--light-muted-foreground, #737373),
+    var(--dark-muted-foreground, #a3a3a3)
+  );
 
   /* ── Interactive states ── */
-  --accent: light-dark(#ececec, #525252);
-  --accent-foreground: light-dark(#171717, #f5f5f5);
-  --selected: light-dark(#dedede, #525252);
+  --accent: light-dark(var(--light-accent, #ececec), var(--dark-accent, #525252));
+  --accent-foreground: light-dark(
+    var(--light-accent-foreground, #171717),
+    var(--dark-accent-foreground, #f5f5f5)
+  );
+  --selected: light-dark(var(--light-selected, #dedede), var(--dark-selected, #525252));
 
   /* ── Borders ──
      --border mixes from --foreground, so it tracks the theme automatically —
@@ -73,15 +82,18 @@
   --border: color-mix(in oklab, var(--foreground) 12%, transparent);
 
   /* ── Error / Destructive ── */
-  --destructive: light-dark(#ef4444, #f87171);
-  --destructive-light: light-dark(#fef2f2, #450a0a);
+  --destructive: light-dark(var(--light-destructive, #ef4444), var(--dark-destructive, #f87171));
+  --destructive-light: light-dark(
+    var(--light-destructive-light, #fef2f2),
+    var(--dark-destructive-light, #450a0a)
+  );
 
   /* Agent work provenance and decisions. Provenance speaks in plain ink —
      the monochrome theme keeps no cyan voice — while a decision keeps the
      amber voice as a single mark: the icon on the card that asks, never a
      wash behind a card the transcript repeats. */
   --working: var(--foreground);
-  --decision: light-dark(#b45309, #fbbf24);
+  --decision: light-dark(var(--light-decision, #b45309), var(--dark-decision, #fbbf24));
 
   /* Diff evidence: added lines read green, removed lines read red.
      The wash behind a whole line and the stronger tint behind the changed
@@ -91,8 +103,8 @@
      different strengths. A Tailwind arbitrary value takes the property
      directly (`bg-[var(--diff-add-line)]`), which a spelled-out color-mix
      cannot do without retyping it with underscores. */
-  --diff-add: light-dark(#15803d, #4ade80);
-  --diff-remove: light-dark(#dc2626, #f87171);
+  --diff-add: light-dark(var(--light-diff-add, #15803d), var(--dark-diff-add, #4ade80));
+  --diff-remove: light-dark(var(--light-diff-remove, #dc2626), var(--dark-diff-remove, #f87171));
   --diff-add-line: color-mix(in oklab, var(--diff-add) 12%, transparent);
   --diff-remove-line: color-mix(in oklab, var(--diff-remove) 10%, transparent);
   --diff-add-token: color-mix(in oklab, var(--diff-add) 28%, transparent);
@@ -103,12 +115,29 @@
      the single theming point. The literal fallback is written only inside
      lib/focus-ring.ts, which keeps registry components self-contained when
      installed into projects without the variable. */
-  --focus-ring: #6b97ff;
+  --focus-ring: light-dark(var(--light-focus-ring, #6b97ff), var(--dark-focus-ring, #6b97ff));
 
   /* Filled interactive control — the switch track while on. The same blue as
      the focus ring, with a darker hover step. */
-  --control-on: var(--focus-ring);
-  --control-on-hover: #5c89f2;
+  --control-on: light-dark(
+    var(--light-control-on, var(--focus-ring)),
+    var(--dark-control-on, var(--focus-ring))
+  );
+  --control-on-hover: light-dark(
+    var(--light-control-on-hover, #5c89f2),
+    var(--dark-control-on-hover, #5c89f2)
+  );
+
+  /* ── Prose ──
+     The ground behind inline code, and the ink a theme lends links and the
+     blockquote rule. StashBase keeps prose monochrome; a named theme's
+     accent shows here, which is where most of its identity reads in a
+     writing surface. */
+  --code-chip: light-dark(var(--light-code-chip, #ebebed), var(--dark-code-chip, #2c2c2c));
+  --prose-accent: light-dark(
+    var(--light-prose-accent, var(--foreground)),
+    var(--dark-prose-accent, var(--foreground))
+  );
 
   /* ── Scrim ──
      The wash behind a modal surface (dialog, mobile drawer, mobile sidebar).
@@ -333,8 +362,8 @@
 
   --font-mono:
     'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  --font-brand: 'Space Grotesk Variable', ui-sans-serif, system-ui, sans-serif;
   --font-sans: 'Inter Variable', system-ui, sans-serif;
+  --font-brand: 'Space Grotesk Variable', ui-sans-serif, system-ui, sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -424,7 +453,7 @@ body {
      <pre> — shiki blocks style themselves. Base layer, so a page can still
      override with utilities. */
   code:not(pre code) {
-    background: light-dark(#ebebed, #2c2c2c);
+    background: var(--code-chip);
     border-radius: 4px;
     padding: 1px 4px;
     font-size: var(--fs-caption, 12px);
@@ -459,7 +488,8 @@ body {
      furniture keeps the prose size they chose. Each reading font carries its
      own size steps, line height, and measure because a serif's smaller
      x-height needs a larger base than the interface sans. CJK falls through
-     to each platform's sans under either font. */
+     to each platform's sans under either font. An installed writing font
+     (--writing-font) keeps the metrics of the preset it replaces. */
   --font-reading-sans:
     'Inter Variable', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC',
     system-ui, sans-serif;
@@ -468,11 +498,17 @@ body {
     serif;
   --font-reading: var(--font-reading-sans);
   --reading-font-size: 16px;
-  --reading-line-height: 1.65;
-  --reading-measure: 44em;
+  --reading-line-height-base: 1.65;
+  --reading-measure-base: 44em;
   /* Code relative to the prose around it, chosen per font so monospace lands
      near 14px at the default step under either. */
   --reading-code-scale: 0.875;
+  /* Line spacing and line width are the reader's adjustments to the font's
+     own leading and measure, so each font keeps its proportions. */
+  --reading-leading: 0;
+  --reading-measure-scale: 1;
+  --reading-line-height: calc(var(--reading-line-height-base) + var(--reading-leading));
+  --reading-measure: calc(var(--reading-measure-base) * var(--reading-measure-scale));
 }
 
 @media (min-width: 640px) {
@@ -514,8 +550,8 @@ html[data-reading-text-size='large'] {
 html[data-reading-font='serif'] {
   --font-reading: var(--font-reading-serif);
   --reading-font-size: 18px;
-  --reading-line-height: 1.7;
-  --reading-measure: 36em;
+  --reading-line-height-base: 1.7;
+  --reading-measure-base: 36em;
   --reading-code-scale: 0.8;
 }
 
@@ -525,6 +561,27 @@ html[data-reading-font='serif'][data-reading-text-size='small'] {
 
 html[data-reading-font='serif'][data-reading-text-size='large'] {
   --reading-font-size: 20px;
+}
+
+html[data-line-spacing='compact'] {
+  --reading-leading: -0.15;
+}
+
+html[data-line-spacing='relaxed'] {
+  --reading-leading: 0.25;
+}
+
+html[data-line-width='narrow'] {
+  --reading-measure-scale: 0.82;
+}
+
+html[data-line-width='wide'] {
+  --reading-measure-scale: 1.35;
+}
+
+/* Full runs the text to the editor's own edges. */
+html[data-line-width='full'] {
+  --reading-measure: 100vw;
 }
 
 @utility text-display {
@@ -546,6 +603,13 @@ html[data-reading-font='serif'][data-reading-text-size='large'] {
 }
 @utility text-caption {
   font-size: var(--fs-caption, 12px);
+}
+
+/* A chrome type size the named roles above do not cover, still multiplied by
+   the interface-size preference: `text-ui-11` is 11px at the default step.
+   A literal `text-[11px]` would silently opt out of that preference. */
+@utility text-ui-* {
+  font-size: calc(--value(integer) * 1px * var(--ui-scale, 1));
 }
 
 /* Motion steps as duration utilities — the class-side spelling of the
@@ -607,6 +671,26 @@ html[data-reading-font='serif'][data-reading-text-size='large'] {
     transition-duration: 1ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* The same settling when the reader turns reduced motion on in Settings
+   rather than in the operating system. A media query cannot be forced from a
+   page, so the attribute repeats the block. */
+html[data-reduce-motion='on'],
+html[data-reduce-motion='on'] .light,
+html[data-reduce-motion='on'] .dark {
+  --motion-fast: 1ms;
+  --motion-base: 1ms;
+  --motion-slow: 1ms;
+}
+
+html[data-reduce-motion='on'] *,
+html[data-reduce-motion='on'] *::before,
+html[data-reduce-motion='on'] *::after {
+  animation-duration: 1ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 1ms !important;
+  scroll-behavior: auto !important;
 }
 
 /* Continuous corners. `border-radius` alone draws a circular arc, and a big

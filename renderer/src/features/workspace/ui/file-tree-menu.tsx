@@ -160,7 +160,7 @@ export function FileTreeMenu({
                     ? {}
                     : { 'aria-checked': row.checked, role: 'menuitemcheckbox' })}
                   className={cn(
-                    'flex h-7 cursor-pointer items-center gap-2 px-2 text-[12px] outline-none',
+                    'flex h-7 cursor-pointer items-center gap-2 px-2 text-ui-12 outline-none',
                     focusRing('data-[highlighted]:bg-hover'),
                     row.destructive && 'text-destructive',
                     row.disabled && 'pointer-events-none opacity-50',

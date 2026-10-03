@@ -9,6 +9,7 @@ function createBugReportReviewWindow({
   preloadPath,
   appUrl,
   appOrigin = APP_ORIGIN,
+  backgroundColor = '#fafafa',
   sourceWindow = null,
 }) {
   if (
@@ -27,7 +28,7 @@ function createBugReportReviewWindow({
     minHeight: 520,
     show: false,
     title: 'Report a Bug',
-    backgroundColor: '#fafafa',
+    backgroundColor,
     autoHideMenuBar: true,
     fullscreenable: false,
     webPreferences: { ...applicationWindowWebPreferences({ preloadPath }), spellcheck: true },

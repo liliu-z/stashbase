@@ -489,7 +489,16 @@ One token/geometry/motion system serves app and catalog through shared providers
 Server-rendered pages opened outside the renderer restate those token values
 locally and track the token layer when it moves. Bundled kit code never loads
 registry/CDN assets at runtime. Overrideable CSS belongs in its layer; scoped
-themes resolve their own tokens. Reduced motion must
+themes resolve their own tokens. Node's Settings own saved appearance through
+one wire schema that is also its normalizer. Theme palettes and their token
+mapping live in `shared/appearance-themes.ts`; a theme overrides tokens as
+`--light-*`/`--dark-*` root properties, and the stylesheet's literals are the
+StashBase theme. Electron main keeps only a disposable copy of the applied
+appearance for native chrome, the spellchecker, and the next window's first
+paint, refreshed by every window on each apply. Main lists installed fonts and
+spellcheck languages from the operating system under its own window
+capability; windows are never granted Chromium's font-access permission.
+Chrome type follows the interface size. Reduced motion (system or Settings) must
 settle both JS and CSS lifetimes, including transition-end waiters. Structural
 shape, DOM-test, swallowed-error, and third-party token exceptions remain locally
 justified and bounded. Stories/axe do not prove painted contrast or composition.

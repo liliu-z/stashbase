@@ -29,6 +29,7 @@ import type { DocumentHeading } from '@/features/documents/domain/outline';
 import type { DocumentSelection } from '@/features/documents/domain/selection';
 import { cn } from '@/lib/utils';
 import type { SourceReference } from '@/shared/domain/source-reference';
+import { prefersReducedMotion } from '@/shared/runtime/appearance-surface';
 import { writeToClipboard } from '@/shared/ui/clipboard';
 
 import { watchMarkdownChanges } from './changes';
@@ -52,6 +53,7 @@ import {
 import { useAskAgent } from './selection-markdown';
 import { selectionToolbar } from './selection-toolbar';
 import { useRevisionReview, type RevisionBinding } from './use-revision-review';
+import { attachWritingAids, WordCount } from './writing-aids';
 
 type CreationState = 'creating' | 'failed' | 'ready';
 
@@ -122,6 +124,7 @@ export function MarkdownDocument({
   const [creationState, setCreationState] = useState<CreationState>('creating');
   const [headings, setHeadings] = useState<DocumentHeading[]>([]);
   const [linkFailure, setLinkFailure] = useState(false);
+  const [wordCount, setWordCount] = useState(0);
   const {
     active: reviewActive,
     attach: attachReview,
@@ -186,6 +189,7 @@ export function MarkdownDocument({
     };
     refreshHeadingsRef.current = updateHeadings;
     editor.setReadonly(readOnlyRef.current);
+    attachWritingAids(editor, setWordCount);
     watchMarkdownChanges(editor, (markdown) => {
       if (readOnlyRef.current || suppressChangeRef.current) return;
       onChangeRef.current(frontmatterRef.current + markdown);
@@ -286,8 +290,7 @@ export function MarkdownDocument({
           hostRef.current,
           heading,
           currentEditorView(editorRef.current),
-          hostRef.current?.ownerDocument.defaultView?.matchMedia('(prefers-reduced-motion: reduce)')
-            .matches ?? true,
+          prefersReducedMotion(hostRef.current?.ownerDocument.defaultView),
         ),
     );
   }, [active, activeHeading, creationState, headings, navigation, tabId]);
@@ -374,6 +377,7 @@ export function MarkdownDocument({
         </div>
       )}
       <div className={cn('markdown-crepe', readOnly && 'markdown-crepe-readonly')} ref={hostRef} />
+      {creationState === 'ready' && <WordCount count={wordCount} />}
     </div>
   );
 }

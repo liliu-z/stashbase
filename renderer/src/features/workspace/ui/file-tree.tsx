@@ -5,7 +5,7 @@
  * (`file-tree-keyboard`), and the roving tab stop lives in a hook
  * (`file-tree-focus`).
  */
-import { AnimatePresence, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, useReducedMotionConfig } from 'framer-motion';
 import {
   Fragment,
   useCallback,
@@ -113,7 +113,7 @@ export function FileTree({
   const treeElement = useRef<HTMLDivElement>(null);
   const sectionElement = useRef<HTMLElement>(null);
   const shape = useShape();
-  const reduceMotion = useReducedMotion() ?? false;
+  const reduceMotion = useReducedMotionConfig() ?? false;
   const touchPrimary = useTouchPrimary();
   const {
     activeIndex,

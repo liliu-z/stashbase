@@ -40,6 +40,10 @@ export default defineConfig({
         find: '@/contracts/account',
         replacement: fileURLToPath(new URL('../shared/account.ts', import.meta.url)),
       },
+      {
+        find: '@/contracts/appearance-themes',
+        replacement: fileURLToPath(new URL('../shared/appearance-themes.ts', import.meta.url)),
+      },
       { find: '@', replacement: fileURLToPath(new URL('./src', import.meta.url)) },
     ],
   },

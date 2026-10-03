@@ -100,7 +100,7 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(
               // hands the width back to the message, letting the code block's
               // own `overflow-auto` scroll the line instead of the panel.
               'max-w-full break-words whitespace-pre-wrap',
-              compact ? 'text-[13px]' : 'text-[14px]',
+              compact ? 'text-ui-13' : 'text-ui-14',
               // Only the bubble carries vertical padding; the flush assistant
               // reply lets the transcript gap set its rhythm.
               isUser && (compact ? 'py-1.5' : 'py-2'),
@@ -133,7 +133,7 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(
           <div
             className={cn(
               'flex items-center gap-1.5 leading-none text-muted-foreground select-none',
-              compact ? 'text-[11px]' : 'text-[12px]',
+              compact ? 'text-ui-11' : 'text-ui-12',
               !isTouch && [
                 'pointer-events-none opacity-0 transition-opacity duration-base',
                 'group-hover:pointer-events-auto group-hover:opacity-100',

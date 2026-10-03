@@ -301,6 +301,7 @@ app
         'externalNavigation',
         'runtime',
         'project',
+        'textServices',
         'workspaceSession',
         'windowLifecycle',
         'updates',
@@ -333,7 +334,7 @@ app
       workspaceSession: { ok: true, session: null },
       workspaceSessionFrozen: true,
       windowLifecycleFrozen: true,
-      windowLifecycleKeys: ['onPrepareContextRelease'],
+      windowLifecycleKeys: ['onPrepareContextRelease', 'setAppearance'],
       updatesFrozen: true,
       updatesKeys: [
         'check',

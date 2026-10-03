@@ -38,7 +38,7 @@ export function FooterNote({ children, tone }: { children: string; tone: 'error'
     );
   }
   return (
-    <p className={`${FOOTER_EDGE} text-[10px] text-muted-foreground`} role="status">
+    <p className={`${FOOTER_EDGE} text-ui-10 text-muted-foreground`} role="status">
       {children}
     </p>
   );

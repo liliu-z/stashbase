@@ -39,7 +39,7 @@ function Harness({ initial = 'general' }: { initial?: SettingsTarget }) {
 it('keeps preferences in General and reaches both optional configurations through Advanced', async () => {
   withQueryClient(<Harness />);
   const user = userEvent.setup();
-  await screen.findByRole('radiogroup', { name: 'Theme' });
+  await screen.findByRole('radiogroup', { name: 'Mode' });
   const nav = screen.getByLabelText('Settings sections');
   expect(within(nav).getAllByRole('button')).toHaveLength(3);
   for (const name of ['General', 'Agents', 'Advanced']) {

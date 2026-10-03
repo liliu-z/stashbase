@@ -20,6 +20,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { IconProvider } from '@/lib/icon-context';
 import { SizeProvider, type SizeVariant } from '@/lib/size-context';
 import { SurfaceProvider } from '@/lib/surface-context';
+import { useAppliedAppearance } from '@/shared/runtime/appearance-surface';
 
 interface FluidProvidersProps {
   /** The step every control inside starts on. Defaults to `default`. */
@@ -28,8 +29,10 @@ interface FluidProvidersProps {
 }
 
 function FluidProviders({ size = 'default', children }: FluidProvidersProps) {
+  // "user" follows the operating system; the Settings override forces it on.
+  const reduceMotion = useAppliedAppearance()?.reduceMotion === 'on' ? 'always' : 'user';
   return (
-    <MotionConfig reducedMotion="user">
+    <MotionConfig reducedMotion={reduceMotion}>
       <SizeProvider size={size}>
         <SurfaceProvider value={1}>
           <IconProvider>

@@ -11,7 +11,7 @@
  *  overlay, a panel opening at mount) and needs to name the same landing. */
 'use client';
 
-import { useReducedMotion } from 'framer-motion';
+import { useReducedMotionConfig } from 'framer-motion';
 
 /** Land on the target with no travel. */
 export const instant = { duration: 0 } as const;
@@ -26,5 +26,5 @@ type Instant = typeof instant;
  * times rather than threading a boolean through its own render.
  */
 export function useMotionTier<T extends object>(tier: T): T | Instant {
-  return (useReducedMotion() ?? false) ? instant : tier;
+  return (useReducedMotionConfig() ?? false) ? instant : tier;
 }

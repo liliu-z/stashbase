@@ -20,7 +20,7 @@ import { useShape } from '@/lib/shape-context';
 import { cn } from '@/lib/utils';
 import { SINGLE_CLICK_DELAY_MS } from '@/shared/utils/click-intent';
 
-const VALUE_TYPOGRAPHY_CLASS = 'font-sans text-[12px] leading-none tabular-nums';
+const VALUE_TYPOGRAPHY_CLASS = 'font-sans text-ui-12 leading-none tabular-nums';
 
 export function ViewerToolbar({
   children,

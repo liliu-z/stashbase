@@ -32,7 +32,10 @@ describe('ReadingTextMenu', () => {
     await user.click(await preset('Font', 'Sans'));
 
     await waitFor(() =>
-      expect(port.update).toHaveBeenCalledWith({ readingFont: 'sans' }, expect.any(AbortSignal)),
+      expect(port.update).toHaveBeenCalledWith(
+        { readingFont: 'sans', writingFont: null },
+        expect.any(AbortSignal),
+      ),
     );
     expect(document.documentElement.dataset.readingFont).toBe('sans');
     expect(await screen.findByRole('button', { name: 'Reading text: Sans' })).toBeTruthy();

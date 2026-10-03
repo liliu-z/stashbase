@@ -55,7 +55,7 @@ test('window preload flushes registered barriers and refuses release after unsub
     { ready: false, reason: 'window-close', requestId: 'close-2' },
   ]);
 
-  assert.deepEqual(Object.keys(preload), ['onPrepareContextRelease']);
+  assert.deepEqual(Object.keys(preload), ['onPrepareContextRelease', 'setAppearance']);
 });
 
 test('window preload carries an update install release across the boundary', async () => {
@@ -78,4 +78,21 @@ test('window preload carries an update install release across the boundary', asy
     'window:context-release-ready',
     { ready: true, reason: 'update-install', requestId: 'install-7' },
   ]);
+});
+
+test('window preload sends only a valid appearance record to the desktop', async () => {
+  const ipc = ipcFixture();
+  const preload = createWindowLifecyclePreload(ipc);
+  const appearance = {
+    theme: 'dark', lightTheme: 'stashbase-light', darkTheme: 'nord', uiScale: 'default',
+    readingTextSize: 'default', readingFont: 'serif', writingFont: 'Literata', codeFont: null, lineSpacing: 'default',
+    lineWidth: 'wide', reduceMotion: 'system', spellcheck: true, spellcheckLanguage: null,
+    focusMode: false, typewriterScrolling: false, wordCount: true,
+  };
+
+  await preload.setAppearance(appearance);
+  assert.deepEqual(ipc.invocations.at(-1), ['window:appearance', appearance]);
+
+  await assert.rejects(preload.setAppearance({ ...appearance, darkTheme: 'sepia' }));
+  assert.equal(ipc.invocations.length, 1);
 });

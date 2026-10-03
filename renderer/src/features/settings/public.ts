@@ -4,6 +4,7 @@ export {
   type AgentRuntimePort,
   type AppearancePort,
   type McpAccessPort,
+  type SystemTextPort,
 } from './application/ports';
 export { type EmbedderPort } from './application/embedder-port';
 export { createAccountAdapter } from './infrastructure/account-api';
@@ -11,7 +12,7 @@ export { createAgentRuntimeAdapter } from './infrastructure/agent-runtime-api';
 export { createMcpAccessAdapter } from './infrastructure/mcp-access-api';
 export { createEmbedderAdapter } from './infrastructure/embedder-api';
 export { createAppearanceAdapter } from './infrastructure/appearance-api';
-export { appearanceSurface } from './domain/appearance';
+export { createSystemTextAdapter } from './infrastructure/system-text';
 export { useSearchKeyConfigured } from './hooks/use-embedder';
 export { AccountProvider, useAccountView } from './hooks/account-context';
 export { SidebarAccountRow } from './ui/account/sidebar-account-row';

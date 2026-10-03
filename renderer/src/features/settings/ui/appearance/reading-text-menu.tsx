@@ -12,7 +12,14 @@ import { Button } from '@/components/ui/button';
 import { Elevated } from '@/components/ui/elevated';
 import { Tooltip } from '@/components/ui/tooltip';
 import type { AppearancePort } from '@/features/settings/application/ports';
-import { READING_FONT_CHOICES, SCALE_CHOICES } from '@/features/settings/domain/appearance';
+import {
+  isReadingFont,
+  PRESET_ROWS,
+  presetChange,
+  READING_FONT_CHOICES,
+  readingFontChange,
+  SCALE_CHOICES,
+} from '@/features/settings/domain/appearance';
 import { useAppearance } from '@/features/settings/hooks/use-appearance';
 import { PresetChoice } from '@/features/settings/ui/appearance/preset-choice';
 import { useShape } from '@/lib/shape-context';
@@ -20,30 +27,29 @@ import { SizeProvider } from '@/lib/size-context';
 import { cn } from '@/lib/utils';
 import { FailureNotice } from '@/shared/ui/failure-notice';
 
-const FONT_SAMPLES = READING_FONT_CHOICES.map((choice) => ({
-  ...choice,
-  fontFamily: `var(--font-reading-${choice.value})`,
-}));
-
 export function ReadingTextMenu({ appearanceApi }: { appearanceApi: AppearancePort }) {
   const appearance = useAppearance(appearanceApi);
   const shape = useShape();
   const preferences = appearance.preferences;
-  const font = READING_FONT_CHOICES.find((choice) => choice.value === preferences?.readingFont);
+  // An installed writing font, chosen in Settings, stands in for either preset.
+  const installed = preferences?.writingFont ?? null;
+  const font =
+    installed ??
+    READING_FONT_CHOICES.find((choice) => choice.value === preferences?.readingFont)?.label;
   return (
     <Popover.Root>
       <Tooltip content="Reading text" side="bottom">
         <Popover.Trigger
           render={
             <Button
-              aria-label={font ? `Reading text: ${font.label}` : 'Reading text'}
+              aria-label={font ? `Reading text: ${font}` : 'Reading text'}
               disabled={preferences === null}
               leadingIcon={ALargeSmall}
               size="compact"
               trailingIcon={ChevronDown}
               variant="ghost"
             >
-              {font?.label}
+              {font}
             </Button>
           }
         />
@@ -65,17 +71,22 @@ export function ReadingTextMenu({ appearanceApi }: { appearanceApi: AppearancePo
                 <span className="text-caption text-muted-foreground">Font</span>
                 <PresetChoice
                   fill
-                  choices={FONT_SAMPLES}
+                  choices={READING_FONT_CHOICES}
                   label="Font"
-                  onChoose={(value) => appearance.choose('readingFont', value)}
-                  value={preferences?.readingFont ?? null}
+                  onChoose={(value) => {
+                    if (isReadingFont(value)) appearance.change(readingFontChange(value));
+                  }}
+                  value={installed ? null : (preferences?.readingFont ?? null)}
                 />
                 <span className="text-caption text-muted-foreground">Size</span>
                 <PresetChoice
                   fill
                   choices={SCALE_CHOICES}
                   label="Size"
-                  onChoose={(value) => appearance.choose('readingTextSize', value)}
+                  onChoose={(value) => {
+                    const change = presetChange(PRESET_ROWS.readingTextSize, value);
+                    if (change) appearance.change(change);
+                  }}
                   value={preferences?.readingTextSize ?? null}
                 />
               </div>

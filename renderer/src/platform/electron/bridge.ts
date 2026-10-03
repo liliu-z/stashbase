@@ -6,6 +6,7 @@ import {
 import type { ExternalNavigationBridge } from './external-navigation';
 import type { ProjectBridge } from './folder-picker';
 import type { ProjectLifecycleBridge } from './project-lifecycle';
+import type { TextServicesBridge } from './text-services';
 import { isUpdatesBridge, type UpdatesBridge } from './updates';
 import type { WindowLifecycleBridge } from './window-lifecycle';
 
@@ -21,6 +22,7 @@ interface DesktopBridge {
   externalNavigation: ExternalNavigationBridge;
   project: DesktopProjectBridge;
   runtime: RendererRuntimeConfig;
+  textServices: TextServicesBridge;
   /** Optional: keeping this build current exists only in the desktop shell. */
   updates?: UpdatesBridge;
   workspaceSession: DesktopWorkspaceSessionBridge;
@@ -34,6 +36,7 @@ declare global {
       externalNavigation?: ExternalNavigationBridge;
       project?: DesktopProjectBridge;
       runtime?: unknown;
+      textServices?: TextServicesBridge;
       updates?: unknown;
       workspaceSession?: DesktopWorkspaceSessionBridge;
       windowLifecycle?: WindowLifecycleBridge;
@@ -71,8 +74,20 @@ export function readBridge(globalWindow: Window = window): DesktopBridge {
   ) {
     throw new Error('Workspace session persistence is unavailable.');
   }
-  if (!windowLifecycle || typeof windowLifecycle.onPrepareContextRelease !== 'function') {
+  if (
+    !windowLifecycle ||
+    typeof windowLifecycle.onPrepareContextRelease !== 'function' ||
+    typeof windowLifecycle.setAppearance !== 'function'
+  ) {
     throw new Error('The window lifecycle is unavailable.');
+  }
+  const textServices = globalWindow.stashbase?.textServices;
+  if (
+    !textServices ||
+    typeof textServices.listFonts !== 'function' ||
+    typeof textServices.spellcheckLanguages !== 'function'
+  ) {
+    throw new Error('Text services are unavailable.');
   }
   const updates = globalWindow.stashbase?.updates;
   return {
@@ -80,6 +95,7 @@ export function readBridge(globalWindow: Window = window): DesktopBridge {
     externalNavigation,
     project,
     runtime,
+    textServices,
     windowLifecycle,
     workspaceSession,
   };

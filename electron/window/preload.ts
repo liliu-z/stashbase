@@ -1,9 +1,12 @@
 import {
   WINDOW_CONTEXT_RELEASE_READY_CHANNEL,
+  WINDOW_APPEARANCE_CHANNEL,
   WINDOW_PREPARE_CONTEXT_RELEASE_CHANNEL,
   type WindowContextReleaseReason,
+  type WindowAppearance,
   windowContextReleaseReadySchema,
   windowContextReleaseRequestSchema,
+  windowAppearanceSchema,
 } from '../../shared/protocols/electron/window-lifecycle.ts';
 
 export interface IpcRenderer {
@@ -15,6 +18,7 @@ export interface WindowLifecyclePreload {
   onPrepareContextRelease(
     handler: (reason: WindowContextReleaseReason) => boolean | Promise<boolean>,
   ): () => void;
+  setAppearance(appearance: WindowAppearance): Promise<void>;
 }
 
 export function createWindowLifecyclePreload(ipcRenderer: IpcRenderer): WindowLifecyclePreload {
@@ -47,6 +51,9 @@ export function createWindowLifecyclePreload(ipcRenderer: IpcRenderer): WindowLi
     onPrepareContextRelease(handler) {
       handlers.add(handler);
       return () => handlers.delete(handler);
+    },
+    async setAppearance(appearance) {
+      await ipcRenderer.invoke(WINDOW_APPEARANCE_CHANNEL, windowAppearanceSchema.parse(appearance));
     },
   };
   return Object.freeze(preload);

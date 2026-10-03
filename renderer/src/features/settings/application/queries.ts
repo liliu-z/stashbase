@@ -4,6 +4,7 @@ import type {
   AgentRuntimePort,
   AppearancePort,
   McpAccessPort,
+  SystemTextPort,
 } from '@/features/settings/application/ports';
 
 export const settingsQueryKeys = {
@@ -14,7 +15,29 @@ export const settingsQueryKeys = {
   appearance: ['settings', 'appearance'] as const,
   embedder: ['settings', 'embedder'] as const,
   mcpAccess: ['settings', 'mcp-access'] as const,
+  systemFonts: ['settings', 'system-fonts'] as const,
+  spellcheckLanguages: ['settings', 'spellcheck-languages'] as const,
 };
+
+/** The installed fonts change only when fonts are installed, so one read
+ *  serves the whole session. */
+export function systemFontsQuery(port: SystemTextPort) {
+  return {
+    queryFn: () => port.listFonts(),
+    queryKey: settingsQueryKeys.systemFonts,
+    retry: false,
+    staleTime: Infinity,
+  } as const;
+}
+
+export function spellcheckLanguagesQuery(port: SystemTextPort) {
+  return {
+    queryFn: () => port.spellcheckLanguages(),
+    queryKey: settingsQueryKeys.spellcheckLanguages,
+    retry: false,
+    staleTime: Infinity,
+  } as const;
+}
 
 export function accountQuery(port: AccountPort) {
   return {

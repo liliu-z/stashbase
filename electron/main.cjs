@@ -9,7 +9,7 @@
  * bundled, typed preload bridge.
  */
 
-const { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, session, shell } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, net, protocol, session, shell } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const { spawn } = require('node:child_process');
 const crypto = require('node:crypto');
@@ -158,7 +158,10 @@ let workspaceSessionCapability = null;
 let windowLifecycleCapability = null;
 let externalNavigationCapability = null;
 let updatesCapability = null;
+let textServicesCapability = null;
 let replacementWindowLifecycle = null;
+let replacementAppearance = null;
+let replacementEditableContextMenu = null;
 let replacementUpdates = null;
 let workspaceSessionRestoreWindow = null;
 let replacementBoundaryInstalled = false;
@@ -225,6 +228,34 @@ function installReplacementBoundary() {
     'bug-report',
     'review-ipc.cjs',
   ));
+  const windowAppearance = require(path.join(
+    PROJECT_ROOT,
+    'dist',
+    'electron',
+    'window',
+    'appearance.cjs',
+  ));
+  const textServices = require(path.join(
+    PROJECT_ROOT,
+    'dist',
+    'electron',
+    'text-services',
+    'ipc.cjs',
+  ));
+  const { listSystemFonts } = require(path.join(
+    PROJECT_ROOT,
+    'dist',
+    'electron',
+    'text-services',
+    'system-fonts.cjs',
+  ));
+  replacementEditableContextMenu = require(path.join(
+    PROJECT_ROOT,
+    'dist',
+    'electron',
+    'text-services',
+    'context-menu.cjs',
+  )).editableContextMenu;
   const updates = require(path.join(
     PROJECT_ROOT,
     'dist',
@@ -238,6 +269,7 @@ function installReplacementBoundary() {
   windowLifecycleCapability = windowLifecycle.WINDOW_LIFECYCLE_CAPABILITY;
   externalNavigationCapability = externalNavigation.EXTERNAL_NAVIGATION_CAPABILITY;
   updatesCapability = updates.UPDATES_CAPABILITY;
+  textServicesCapability = textServices.TEXT_SERVICES_CAPABILITY;
   bugReportReview.registerBugReportReviewIpc({
     ipcMain,
     bugReports,
@@ -310,6 +342,31 @@ function installReplacementBoundary() {
     store: workspaceSession.createWorkspaceSessionStore({
       filePath: path.join(app.getPath('userData'), 'workspace-session.json'),
     }),
+  });
+  replacementAppearance = windowAppearance.registerAppearance({
+    allWindows: () => BrowserWindow.getAllWindows(),
+    BrowserWindow,
+    ipcMain,
+    nativeTheme,
+    platform: process.platform,
+    spellchecker: session.defaultSession,
+    expectedOrigins: new Set([RENDERER_ORIGIN]),
+    isLiveWindow: (win) => isLiveMainWindow(win),
+    hasCapability: (win, capability) => (
+      replacementWindowCapabilities.get(win)?.has(capability) === true
+    ),
+    filePath: path.join(app.getPath('userData'), 'appearance.json'),
+  });
+  textServices.registerTextServices({
+    BrowserWindow,
+    ipcMain,
+    expectedOrigins: new Set([RENDERER_ORIGIN]),
+    isLiveWindow: (win) => isLiveMainWindow(win),
+    hasCapability: (win, capability) => (
+      replacementWindowCapabilities.get(win)?.has(capability) === true
+    ),
+    listFonts: () => listSystemFonts(process.platform),
+    spellcheckLanguages: () => session.defaultSession.availableSpellCheckerLanguages,
   });
   replacementWindowLifecycle = windowLifecycle.registerWindowLifecycle({
     onCloseBlocked: () => { quitRequested = false; },
@@ -738,6 +795,12 @@ async function showUpdateInstallBlocked() {
   });
 }
 
+// The boundary is installed before any window opens; the fallback covers
+// only a window created without it, which then follows the light default.
+function windowBackgroundColor() {
+  return replacementAppearance?.backgroundColor() ?? '#fafafa';
+}
+
 async function openBugReportReview(win) {
   const source = bugReportSourceForWindow(win);
   if (!source) {
@@ -754,6 +817,7 @@ async function openBugReportReview(win) {
   try {
     review = createBugReportReviewWindow({
       BrowserWindow,
+      backgroundColor: windowBackgroundColor(),
       sourceWindow: isLiveMainWindow(win) ? win : null,
       preloadPath: path.join(
         PROJECT_ROOT,
@@ -830,11 +894,14 @@ async function createWindow() {
     // There is no in-window titlebar strip — document.title is the only
     // place the folder identity is spelled out.
     title: 'StashBase',
-    backgroundColor: '#fafafa',
+    backgroundColor: windowBackgroundColor(),
     ...applicationWindowChromeOptions(process.platform),
     webPreferences: applicationWindowWebPreferences({
       preloadPath: path.join(PROJECT_ROOT, 'dist', 'electron', 'renderer', 'preload.cjs'),
-      additionalArguments: [`--stashbase-server-origin=${SERVER_URL}`],
+      additionalArguments: [
+        `--stashbase-server-origin=${SERVER_URL}`,
+        ...(replacementAppearance?.windowArguments() ?? []),
+      ],
     }),
   });
   const webContentsId = win.webContents.id;
@@ -847,7 +914,8 @@ async function createWindow() {
     workspaceSessionCapability &&
     windowLifecycleCapability &&
     externalNavigationCapability &&
-    updatesCapability
+    updatesCapability &&
+    textServicesCapability
   ) {
     replacementWindowCapabilities.set(
       win,
@@ -858,11 +926,20 @@ async function createWindow() {
         windowLifecycleCapability,
         externalNavigationCapability,
         updatesCapability,
+        textServicesCapability,
       ]),
     );
   }
   lastMainWindow = win;
   replacementWindowLifecycle?.attach(win);
+  win.webContents.on('context-menu', (_event, params) => {
+    const template = replacementEditableContextMenu?.(
+      params,
+      win.webContents,
+      win.webContents.session,
+    );
+    if (template) Menu.buildFromTemplate(template).popup({ window: win });
+  });
   win.on('focus', () => {
     lastMainWindow = win;
   });

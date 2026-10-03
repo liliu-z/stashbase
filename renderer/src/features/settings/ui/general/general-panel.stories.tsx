@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import type { SoftwareUpdateRow } from '@/shared/domain/software-update';
+import { appearanceSurface } from '@/test/fakes/settings';
 
 import { GeneralPanel } from './general-panel';
 import { LocalComponentRecovery } from './local-component-recovery';
@@ -21,19 +22,8 @@ function GeneralHarness({ updates = null }: { updates?: SoftwareUpdateRow | null
   return (
     <GeneralPanel
       appearanceApi={{
-        load: async () => ({
-          theme: 'system',
-          uiScale: 'default',
-          readingTextSize: 'default',
-          readingFont: 'serif',
-        }),
-        update: async (change) => ({
-          theme: 'system',
-          uiScale: 'default',
-          readingTextSize: 'default',
-          readingFont: 'serif',
-          ...change,
-        }),
+        load: async () => appearanceSurface(),
+        update: async (change) => ({ ...appearanceSurface(), ...change }),
       }}
       softwareUpdate={updates}
     />

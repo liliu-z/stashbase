@@ -41,7 +41,7 @@ export function AgentDecisionCard({
         <div className="flex items-start gap-2">
           <Icon aria-hidden className="mt-0.5 size-4 shrink-0 text-decision" strokeWidth={1.5} />
           <h3
-            className="text-[13px] font-medium text-foreground outline-none"
+            className="text-ui-13 font-medium text-foreground outline-none"
             id={headingId}
             ref={headingRef}
             tabIndex={-1}
@@ -58,7 +58,7 @@ export function AgentDecisionCard({
 /** What the card says once the decision is made and the controls are gone. */
 export function AgentDecisionStatus({ status }: { status: AgentToolBlock['status'] }) {
   return (
-    <p className="mt-1 text-right text-[12px] text-muted-foreground" role="status">
+    <p className="mt-1 text-right text-ui-12 text-muted-foreground" role="status">
       {STATUS_LABELS[status]}
     </p>
   );

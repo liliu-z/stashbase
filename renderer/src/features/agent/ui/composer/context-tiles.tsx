@@ -79,7 +79,7 @@ function StatusLine({ status }: { status: Exclude<ContextStatus, 'ready'> }) {
   return (
     <span
       className={cn(
-        'inline-flex items-center justify-center gap-1 text-[10px] leading-tight font-medium',
+        'inline-flex items-center justify-center gap-1 text-ui-10 leading-tight font-medium',
         alarming ? 'text-destructive' : 'text-muted-foreground',
       )}
     >
@@ -167,7 +167,7 @@ function SourceTile({
         <div
           className={cn(
             'line-clamp-2 max-w-full text-center leading-tight font-medium break-words text-foreground',
-            size >= 72 ? 'text-[11px]' : 'text-[10px]',
+            size >= 72 ? 'text-ui-11' : 'text-ui-10',
           )}
         >
           {name}
@@ -177,7 +177,7 @@ function SourceTile({
       {reprocessable && (
         <ReprocessButton
           className={cn(
-            'absolute inset-x-1 bottom-1 cursor-pointer bg-neutral-900 py-0.5 text-[10px] font-medium text-white opacity-0 transition-opacity duration-fast outline-none group-hover/tile:opacity-100 focus-visible:opacity-100',
+            'absolute inset-x-1 bottom-1 cursor-pointer bg-neutral-900 py-0.5 text-ui-10 font-medium text-white opacity-0 transition-opacity duration-fast outline-none group-hover/tile:opacity-100 focus-visible:opacity-100',
             shape.chip,
           )}
           onReprocess={onReprocess}
@@ -206,7 +206,7 @@ function SourceChip({
   return (
     <div
       className={cn(
-        'inline-flex h-7 max-w-64 items-center gap-1.5 border border-border bg-accent pr-2.5 pl-2 text-[12px] font-medium text-foreground',
+        'inline-flex h-7 max-w-64 items-center gap-1.5 border border-border bg-accent pr-2.5 pl-2 text-ui-12 font-medium text-foreground',
         shape.bg,
       )}
       title={reason ?? item.source.path}
@@ -222,7 +222,7 @@ function SourceChip({
       {status === 'failed' && onReprocess && (
         <ReprocessButton
           className={cn(
-            '-mr-1 shrink-0 cursor-pointer px-1 text-[11px] font-medium text-foreground transition-colors duration-fast outline-none hover:bg-hover',
+            '-mr-1 shrink-0 cursor-pointer px-1 text-ui-11 font-medium text-foreground transition-colors duration-fast outline-none hover:bg-hover',
             shape.chip,
           )}
           onReprocess={onReprocess}
@@ -248,7 +248,7 @@ function PassageChip({
   return (
     <div
       className={cn(
-        'inline-flex h-7 max-w-72 items-center gap-1.5 border border-border bg-accent pr-2.5 pl-2 text-[12px]',
+        'inline-flex h-7 max-w-72 items-center gap-1.5 border border-border bg-accent pr-2.5 pl-2 text-ui-12',
         shape.bg,
       )}
       title={reason ?? `${item.source.path}\n\n${item.quote}`}

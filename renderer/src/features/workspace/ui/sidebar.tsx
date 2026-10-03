@@ -103,7 +103,7 @@ export function ProjectSidebar({
       </span>
     </>
   );
-  const rowClass = 'h-8 gap-2 text-[13px] text-foreground';
+  const rowClass = 'h-8 gap-2 text-ui-13 text-foreground';
   const actionsCount = (onNewFile ? 1 : 0) + (onNewFolder ? 1 : 0) + (onCollapseAll ? 1 : 0);
 
   if (!foldable) {

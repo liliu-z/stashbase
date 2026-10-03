@@ -27,7 +27,7 @@ const codeSurfaceTheme = EditorView.theme({
   },
   '.cm-content': {
     caretColor: 'var(--foreground)',
-    fontFamily: 'var(--font-mono)',
+    fontFamily: 'var(--code-font, var(--font-mono))',
     lineHeight: '1.55',
     padding: '12px 0 64px',
   },

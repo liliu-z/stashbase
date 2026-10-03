@@ -1,6 +1,11 @@
 import { z } from 'zod';
 
+import { appearancePreferencesSchema } from '../http/appearance';
+
 export const RENDERER_SERVER_ORIGIN_ARGUMENT = '--stashbase-server-origin=';
+/** The appearance main last saw, handed to a new window so its first paint
+ *  already wears it. Absent on a first launch. */
+export const RENDERER_APPEARANCE_ARGUMENT = '--stashbase-appearance=';
 
 export const rendererServerOriginSchema = z.string().url().superRefine((value, context) => {
   const url = new URL(value);
@@ -23,6 +28,7 @@ export const rendererServerOriginSchema = z.string().url().superRefine((value, c
 export const rendererRuntimeConfigSchema = z
   .object({
     serverOrigin: rendererServerOriginSchema,
+    appearance: appearancePreferencesSchema.strict().optional(),
   })
   .strict();
 

@@ -20,6 +20,8 @@ import type { AgentAllowance, AgentRuntime } from '@/features/settings/domain/ag
 import type { AppearancePreferences } from '@/features/settings/domain/appearance';
 import type { EmbedderState } from '@/features/settings/domain/embedder';
 import type { McpAccess, McpHttpAccess } from '@/features/settings/domain/mcp-access';
+import { DEFAULT_APPEARANCE_PREFERENCES } from '@/protocols/http/appearance';
+import type { AppearanceSurface } from '@/shared/domain/appearance';
 
 export const SIGNED_OUT_ACCOUNT: HostedAccount = {
   avatarUrl: null,
@@ -151,18 +153,18 @@ export function mcpAccessPort(overrides: Partial<McpAccessPort> = {}): McpAccess
   };
 }
 
-/** The server's own defaults, and a write that answers with every preset
+/** The server's own defaults, with what a test changes laid over them. */
+export function appearanceSurface(overrides: Partial<AppearanceSurface> = {}): AppearanceSurface {
+  return { ...DEFAULT_APPEARANCE_PREFERENCES, ...overrides };
+}
+
+/** The server's own defaults, and a write that answers with the whole record
  *  the way the route does. */
 export function appearancePort(overrides: Partial<AppearancePort> = {}): AppearancePort {
-  const saved: AppearancePreferences = {
-    readingTextSize: 'default',
-    readingFont: 'serif',
-    theme: 'system',
-    uiScale: 'default',
-  };
+  let saved: AppearancePreferences = appearanceSurface();
   return {
     load: vi.fn(async () => saved),
-    update: vi.fn(async (change) => ({ ...saved, ...change })),
+    update: vi.fn(async (change) => (saved = { ...saved, ...change })),
     ...overrides,
   };
 }

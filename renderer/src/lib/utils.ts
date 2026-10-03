@@ -18,10 +18,15 @@ import { extendTailwindMerge } from 'tailwind-merge';
 // when the suffix is a number or an arbitrary value, so without this it treats
 // the named steps as unknown classes and `cn('duration-fast', 'duration-<n>')`
 // would emit both.
+// `text-ui-<px>` (the interface-scaled sizes) joins the same font-size group.
+const isInteger = (value: string) => /^\d+$/u.test(value);
+
 const twMerge = extendTailwindMerge({
   extend: {
     classGroups: {
-      'font-size': [{ text: ['display', 'title', 'subtitle', 'body', 'caption'] }],
+      'font-size': [
+        { text: ['display', 'title', 'subtitle', 'body', 'caption', { ui: [isInteger] }] },
+      ],
       duration: [{ duration: ['fast', 'base', 'slow'] }],
       delay: [{ delay: ['fast', 'base', 'slow'] }],
     },

@@ -80,7 +80,7 @@ function WorkspaceWindow() {
   const dependencies = useDependencies();
   // Two adapter records this function hands on more than once.
   const { documents: docs, workspace: workspaceDeps } = dependencies;
-  useAppearanceSurface(dependencies.settings.appearanceApi);
+  useAppearanceSurface(dependencies.settings.appearanceApi, dependencies.settings.setAppearance);
   useEffect(() => dependencies.recordUsage({ event: 'app_opened' }), [dependencies]);
   const session = useWorkspaceSession(
     workspaceDeps.adapters.project,

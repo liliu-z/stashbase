@@ -21,8 +21,31 @@ Agent history; supplied environment variables do not configure BYOK access.
 
 Settings owns lasting preferences and connection configuration:
 
-- **General:** appearance (theme, interface size, reading text size and font),
-  usage statistics, and updates.
+- **General:** appearance, usage statistics, and updates. Appearance is user-wide
+  and grouped as:
+  - **Theme:** a mode (match system, light, dark) plus a light theme and a dark
+    theme chosen separately from published palettes (StashBase, Catppuccin,
+    Tokyo Night, Rosé Pine, Gruvbox, Nord). Every theme keeps body and
+    secondary text at WCAG AA on its surfaces. The theme also governs native
+    menus, dialogs, and the window background from launch.
+  - **Interface:** interface size, which reaches all chrome text, and reduce
+    motion (match system or on).
+  - **Writing:** the writing font, chosen from the two included reading fonts
+    (Serif, the default, and Sans) or any font installed on the computer; the
+    code font, from the bundled monospace or installed monospaced fonts; and
+    reading text size, line spacing, and line width. The document's reading
+    menu edits the same reading font and size.
+  - **Editor:** spellcheck and its language (where the system offers a
+    choice), focus mode, typewriter scrolling, and word count.
+
+  Every appearance value is a preset except the two font names, which are
+  validated as names before they are stored. An installed writing font
+  overrides the Serif/Sans preset and keeps that preset's size steps and
+  measure; choosing Serif or Sans again clears it. A chosen font that is later
+  uninstalled stays selected, is marked as not installed, and falls back to
+  the included default. The installed-font list never leaves the device.
+  Custom colors, custom CSS, imported editor themes, and per-project
+  appearance are out of scope.
 - **Agents:** group account, credit balance/refill, and connection state under
   Default, with a Plans and billing entry that opens the website; manage Codex and Claude individually. An installed runtime shows its
   version; a runtime whose own updater StashBase can run offers Update, which

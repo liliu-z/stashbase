@@ -89,7 +89,7 @@ function AgentToolPayload({ indent = true, tool }: { indent?: boolean; tool: Age
   return (
     <div
       className={cn(
-        'space-y-2 pr-2 pb-2 text-[12px] text-muted-foreground',
+        'space-y-2 pr-2 pb-2 text-ui-12 text-muted-foreground',
         indent ? 'pl-7' : 'pt-2',
       )}
     >
@@ -144,7 +144,7 @@ function AgentToolRow({ tool }: { tool: AgentToolBlock }) {
         aria-controls={hasDetails ? panelId : undefined}
         aria-expanded={hasDetails ? open : undefined}
         className={cn(
-          'group flex min-h-8 w-full items-center gap-2 px-2 text-left text-[12px] outline-none',
+          'group flex min-h-8 w-full items-center gap-2 px-2 text-left text-ui-12 outline-none',
           shape.item,
           focusRing('hover:bg-hover'),
           !hasDetails && 'cursor-default',
@@ -255,7 +255,7 @@ export function AgentActivityGroup({
   return (
     <div className="-ml-2 flex w-[calc(100%+0.5rem)] flex-col gap-1">
       <ThinkingSteps className="w-full" defaultOpen={false}>
-        <ThinkingStepsHeader className="px-2 py-1.5 text-[13px]" ref={headerRef}>
+        <ThinkingStepsHeader className="px-2 py-1.5 text-ui-13" ref={headerRef}>
           {tools.length ? agentActivitySummary(tools, active) : thinkingHeader}
         </ThinkingStepsHeader>
         <ThinkingStepsContent className="gap-0.5 pl-2">

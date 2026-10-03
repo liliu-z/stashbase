@@ -38,6 +38,9 @@ const contractBoundaries = [
 // domain re-export.
 const contractVocabularies = new Map([
   ['shared/file-formats.ts', /^renderer\/src\/(?:shared|features\/[^/]+\/domain)\//],
+  // The theme catalog names and colours every theme; the shared runtime
+  // stamps its tokens and the Settings domain lists its labels.
+  ['shared/appearance-themes.ts', /^renderer\/src\/(?:shared|features\/[^/]+\/domain)\//],
 ]);
 
 function slash(relativePath) {

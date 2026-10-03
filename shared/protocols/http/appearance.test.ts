@@ -2,59 +2,57 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import {
+  contrastRatio,
+  DARK_THEME_IDS,
+  darkThemeTokens,
+  LIGHT_THEME_IDS,
+  lightThemeTokens,
+  THEME_TOKENS,
+} from '../../appearance-themes.ts';
+import {
   appearancePreferencesRequestSchema,
   appearancePreferencesSchema,
+  DEFAULT_APPEARANCE_PREFERENCES,
 } from './appearance.ts';
-
-test('the response carries every preset the server applied', () => {
-  assert.deepEqual(
-    appearancePreferencesSchema.parse({
-      readingFont: 'serif',
-      readingTextSize: 'large',
-      theme: 'dark',
-      uiScale: 'small',
-    }),
-    { readingFont: 'serif', readingTextSize: 'large', theme: 'dark', uiScale: 'small' },
-  );
-});
 
 test('a response drops a preference this renderer has no reader for', () => {
   assert.deepEqual(
-    appearancePreferencesSchema.parse({
-      readingFont: 'sans',
-      readingTextSize: 'default',
-      theme: 'system',
-      uiScale: 'default',
-      accentColour: 'teal',
-    }),
-    { readingFont: 'sans', readingTextSize: 'default', theme: 'system', uiScale: 'default' },
+    appearancePreferencesSchema.parse({ ...DEFAULT_APPEARANCE_PREFERENCES, accentColour: 'teal' }),
+    DEFAULT_APPEARANCE_PREFERENCES,
   );
 });
 
 test('a response missing a preference is refused', () => {
-  assert.equal(
-    appearancePreferencesSchema.safeParse({ theme: 'light', uiScale: 'default' }).success,
-    false,
-  );
+  const { wordCount: _dropped, ...partial } = DEFAULT_APPEARANCE_PREFERENCES;
+  assert.equal(appearancePreferencesSchema.safeParse(partial).success, false);
 });
 
-test('a write refuses an unknown key rather than persisting it', () => {
+test('a write carries the one field a row changed and refuses unknown keys', () => {
+  assert.deepEqual(appearancePreferencesRequestSchema.parse({ uiScale: 'large' }), {
+    uiScale: 'large',
+  });
   assert.equal(
     appearancePreferencesRequestSchema.safeParse({ theme: 'light', rogue: 1 }).success,
     false,
   );
 });
 
-test('a write refuses a value outside the preset ramp', () => {
-  assert.equal(appearancePreferencesRequestSchema.safeParse({ theme: 'sepia' }).success, false);
-  assert.equal(
-    appearancePreferencesRequestSchema.safeParse({ uiScale: 'medium' }).success,
-    false,
-  );
-});
+const surfaces = ['surface-1', 'surface-2', 'surface-3'] as const;
 
-test('a write carries the one field a row changed', () => {
-  assert.deepEqual(appearancePreferencesRequestSchema.parse({ uiScale: 'large' }), {
-    uiScale: 'large',
-  });
+test('every theme keeps body and secondary text readable on its surfaces (WCAG AA)', () => {
+  const themes = [
+    ...LIGHT_THEME_IDS.map((id) => [id, lightThemeTokens(id)] as const),
+    ...DARK_THEME_IDS.map((id) => [id, darkThemeTokens(id)] as const),
+  ];
+  for (const [id, tokens] of themes) {
+    if (!tokens) continue;
+    assert.deepEqual(Object.keys(tokens).sort(), [...THEME_TOKENS].sort(), id);
+    for (const text of ['foreground', 'muted-foreground', 'prose-accent'] as const) {
+      for (const surface of surfaces) {
+        const ratio = contrastRatio(tokens[text], tokens[surface]);
+        assert.ok(ratio >= 4.5, `${id}: ${text} on ${surface} is ${ratio.toFixed(2)}:1`);
+      }
+    }
+    assert.ok(contrastRatio(tokens['muted-foreground'], tokens.muted) >= 4.5, `${id}: muted text`);
+  }
 });

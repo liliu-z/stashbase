@@ -5,6 +5,7 @@ import type {
   AgentRuntimePort,
   AppearancePort,
   McpAccessPort,
+  SystemTextPort,
 } from '@/features/settings/application/ports';
 import type { TelemetryPort } from '@/features/settings/application/telemetry-port';
 import type { SoftwareUpdateRow } from '@/shared/domain/software-update';
@@ -24,6 +25,7 @@ export interface SettingsProps {
   telemetryApi?: TelemetryPort;
   agentRuntimeApi: AgentRuntimePort;
   appearanceApi?: AppearancePort;
+  systemTextApi?: SystemTextPort;
   embedderApi?: EmbedderPort;
   mcpAccessApi?: McpAccessPort;
   onClose: () => void;

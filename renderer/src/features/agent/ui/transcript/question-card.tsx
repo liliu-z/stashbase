@@ -70,9 +70,9 @@ function ChoiceRow({
           ))}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[13px] leading-5 text-foreground">{option.label}</span>
+        <span className="block text-ui-13 leading-5 text-foreground">{option.label}</span>
         {option.description && (
-          <span className="block text-[12px] leading-4 text-muted-foreground">
+          <span className="block text-ui-12 leading-4 text-muted-foreground">
             {option.description}
           </span>
         )}
@@ -128,12 +128,12 @@ function QuestionField({
       {(!single || question.header) && (
         <legend className="mb-1.5 flex flex-wrap items-baseline gap-x-2 px-2">
           {question.header && (
-            <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+            <span className="text-ui-11 font-medium tracking-wide text-muted-foreground uppercase">
               {question.header}
             </span>
           )}
           {!single && (
-            <span className="text-[13px] font-medium text-foreground">{question.question}</span>
+            <span className="text-ui-13 font-medium text-foreground">{question.question}</span>
           )}
         </legend>
       )}
@@ -159,7 +159,7 @@ function QuestionField({
           <input
             aria-label="Your answer"
             className={cn(
-              'mx-2 mt-0.5 border border-border bg-background px-2 py-1 text-[13px] text-foreground outline-none placeholder:text-muted-foreground',
+              'mx-2 mt-0.5 border border-border bg-background px-2 py-1 text-ui-13 text-foreground outline-none placeholder:text-muted-foreground',
               shape.input,
               focusRing(),
             )}

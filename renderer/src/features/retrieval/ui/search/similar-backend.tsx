@@ -60,7 +60,7 @@ function similarRows(result: SemanticSearchResult, folderPath: string): SearchRo
                 <span className="flex min-w-0 items-center gap-2 text-caption">
                   <SourceName path={hit.source.path} />
                   {location && (
-                    <span className="max-w-[45%] shrink-0 truncate text-[10px] text-muted-foreground">
+                    <span className="max-w-[45%] shrink-0 truncate text-ui-10 text-muted-foreground">
                       {location}
                     </span>
                   )}

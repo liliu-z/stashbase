@@ -299,7 +299,7 @@ test('dependency-cruiser confines repository contracts to the host boundary', (c
   );
   assert.notEqual(result.status, 0, result.output);
   assert.match(result.output, /contracts-are-mapped-at-the-boundary/);
-  assert.match(result.output, /file-format-vocabulary-scope/);
+  assert.match(result.output, /contract-vocabulary-scope/);
   assert.doesNotMatch(result.output, /shared\/domain\/formats\.ts/);
   assert.doesNotMatch(result.output, /infrastructure\/api\.ts/);
 });

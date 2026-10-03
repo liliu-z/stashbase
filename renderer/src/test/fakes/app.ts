@@ -32,6 +32,7 @@ export function galleryPort(overrides: Partial<GalleryPort> = {}): GalleryPort {
 export function appDependencies(overrides: Partial<AppDependencies> = {}): AppDependencies {
   const adapters = overrides.workspace?.adapters ?? workspaceAdapters();
   return {
+    initialAppearance: null,
     recordUsage: vi.fn(),
     agent: {
       catalog: agentCatalogPort(),
@@ -52,6 +53,8 @@ export function appDependencies(overrides: Partial<AppDependencies> = {}): AppDe
       accountApi: accountPort(),
       agentRuntimeApi: agentRuntimePort(),
       appearanceApi: appearancePort(),
+      setAppearance: async () => undefined,
+      systemTextApi: { listFonts: async () => [], spellcheckLanguages: async () => [] },
       telemetryApi: {
         load: async () => ({ enabled: true, available: false }),
         update: async (change) => ({

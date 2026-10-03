@@ -1,4 +1,4 @@
-import { useReducedMotion } from 'framer-motion';
+import { useReducedMotionConfig } from 'framer-motion';
 import { useEffect, useState } from 'react';
 
 import { ambient } from '@/lib/springs';
@@ -11,7 +11,7 @@ import { ambient } from '@/lib/springs';
  * show.
  */
 export function useRotatingPrompt(prompts: readonly string[], paused: boolean): string | null {
-  const reduceMotion = useReducedMotion() ?? false;
+  const reduceMotion = useReducedMotionConfig() ?? false;
   const [index, setIndex] = useState(0);
   const count = prompts.length;
 

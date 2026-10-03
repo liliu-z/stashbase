@@ -103,12 +103,12 @@ function exactRows(
               id={groupId}
             >
               <SourceName path={first.file.source.path} />
-              <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">
+              <span className="shrink-0 text-ui-10 text-muted-foreground tabular-nums">
                 {group.totalMatches}
               </span>
             </div>
             {group.directory && (
-              <p className="truncate px-9 pb-1 text-[10px] text-muted-foreground">
+              <p className="truncate px-9 pb-1 text-ui-10 text-muted-foreground">
                 {group.directory}
               </p>
             )}
@@ -127,7 +127,7 @@ function exactRows(
                   key={occurrence.id}
                   onClick={() => view.onOpen(index)}
                 >
-                  <span className="mt-0.5 w-9 shrink-0 text-[10px] text-muted-foreground tabular-nums">
+                  <span className="mt-0.5 w-9 shrink-0 text-ui-10 text-muted-foreground tabular-nums">
                     {location}
                   </span>
                   <span className="min-w-0 flex-1">

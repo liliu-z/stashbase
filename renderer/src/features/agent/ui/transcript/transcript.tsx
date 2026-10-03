@@ -77,7 +77,7 @@ function DayDivider({ at, now }: { at: number; now: number }) {
   return (
     <div
       aria-label={label}
-      className="flex items-center gap-3 text-[11px] text-muted-foreground select-none not-first:mt-2"
+      className="flex items-center gap-3 text-ui-11 text-muted-foreground select-none not-first:mt-2"
       role="separator"
     >
       <span aria-hidden className="h-px flex-1 bg-border" />
@@ -239,7 +239,7 @@ const TranscriptBlock = memo(function TranscriptBlock({
     );
   }
   if (block.kind === 'thinking') {
-    return <p className="text-[13px] leading-5 text-muted-foreground">{block.text}</p>;
+    return <p className="text-ui-13 leading-5 text-muted-foreground">{block.text}</p>;
   }
   if (block.kind === 'notice') {
     return (

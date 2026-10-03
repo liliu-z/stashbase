@@ -7,6 +7,7 @@ import { EditorView, WidgetType, type DecorationSet, Decoration } from '@codemir
 
 import type { ContextStatus } from '@/features/agent/domain/context';
 import { shapeTokens } from '@/lib/shape-context';
+import { prefersReducedMotion } from '@/shared/runtime/appearance-surface';
 import { basePathName } from '@/shared/utils/file-path';
 
 import { mentionField, statusField } from './mention-markers';
@@ -22,18 +23,10 @@ export const STATUS_WORD: Record<ContextStatus, string> = {
   stale: 'Stale',
 };
 
-function reducedMotion(root: Document): boolean {
-  const view = root.defaultView;
-  return (
-    typeof view?.matchMedia === 'function' &&
-    view.matchMedia('(prefers-reduced-motion: reduce)').matches
-  );
-}
-
 const CHIP_CLASS = `mx-px inline-flex max-w-full items-center gap-1 ${shapeTokens.chip} bg-foreground/8 px-1.5 align-baseline font-medium whitespace-nowrap text-foreground`;
 
 function popIn(chip: HTMLElement, root: Document) {
-  if (typeof chip.animate !== 'function' || reducedMotion(root)) return;
+  if (typeof chip.animate !== 'function' || prefersReducedMotion(root.defaultView)) return;
   chip.animate(
     [
       { opacity: 0, transform: 'scale(0.92)' },

@@ -93,12 +93,12 @@ export const AgentMarkdown = memo(function AgentMarkdown({
   return (
     <div
       className={[
-        'min-w-0 text-[14px] leading-[1.6] whitespace-normal text-foreground',
+        'min-w-0 text-ui-14 leading-[1.6] whitespace-normal text-foreground',
         '[&>*:first-child]:mt-0 [&>*:last-child]:mb-0',
         '[&_p]:my-3 [&_p]:whitespace-normal',
-        '[&_h1]:mt-6 [&_h1]:mb-2 [&_h1]:text-[18px] [&_h1]:leading-tight [&_h1]:font-semibold',
-        '[&_h2]:mt-5 [&_h2]:mb-2 [&_h2]:text-[16px] [&_h2]:leading-tight [&_h2]:font-semibold',
-        '[&_h3]:mt-4 [&_h3]:mb-1.5 [&_h3]:text-[14px] [&_h3]:font-semibold',
+        '[&_h1]:mt-6 [&_h1]:mb-2 [&_h1]:text-ui-18 [&_h1]:leading-tight [&_h1]:font-semibold',
+        '[&_h2]:mt-5 [&_h2]:mb-2 [&_h2]:text-ui-16 [&_h2]:leading-tight [&_h2]:font-semibold',
+        '[&_h3]:mt-4 [&_h3]:mb-1.5 [&_h3]:text-ui-14 [&_h3]:font-semibold',
         '[&_ul]:my-3 [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-5',
         '[&_ol]:my-3 [&_ol]:list-decimal [&_ol]:space-y-1 [&_ol]:pl-5',
         '[&_li]:pl-0.5 [&_li>p]:my-0',
@@ -110,7 +110,7 @@ export const AgentMarkdown = memo(function AgentMarkdown({
         '[&_pre_code]:bg-transparent [&_pre_code]:p-0',
         '[&_hr]:my-5 [&_hr]:border-border',
         '[&_table]:my-4 [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto [&_table]:border-collapse',
-        '[&_th]:border-b [&_th]:border-border [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:text-[12px] [&_th]:font-medium',
+        '[&_th]:border-b [&_th]:border-border [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:text-ui-12 [&_th]:font-medium',
         '[&_td]:border-b [&_td]:border-border [&_td]:px-3 [&_td]:py-2 [&_td]:align-top',
       ].join(' ')}
     >

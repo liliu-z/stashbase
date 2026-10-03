@@ -21,30 +21,18 @@ function preferences(signal: AbortSignal, unavailable: string) {
 export function createAppearanceAdapter(client: HttpClient): AppearancePort {
   return {
     async load(signal) {
-      const parsed = await request(client, {
+      return request(client, {
         ...preferences(signal, 'Appearance settings are unavailable.'),
         schema: appearancePreferencesSchema,
       });
-      return {
-        theme: parsed.theme,
-        uiScale: parsed.uiScale,
-        readingTextSize: parsed.readingTextSize,
-        readingFont: parsed.readingFont,
-      };
     },
     async update(change, signal) {
-      const parsed = await request(client, {
+      return request(client, {
         ...preferences(signal, 'Appearance settings could not be saved.'),
         body: appearancePreferencesRequestSchema.parse(change),
         method: 'PUT',
         schema: appearancePreferencesSchema,
       });
-      return {
-        theme: parsed.theme,
-        uiScale: parsed.uiScale,
-        readingTextSize: parsed.readingTextSize,
-        readingFont: parsed.readingFont,
-      };
     },
   };
 }

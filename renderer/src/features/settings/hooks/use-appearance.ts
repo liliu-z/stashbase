@@ -4,12 +4,9 @@ import { useRef } from 'react';
 import { settingsFailure } from '@/features/settings/application/failure-messages';
 import type { AppearancePort } from '@/features/settings/application/ports';
 import { appearanceQuery, settingsQueryKeys } from '@/features/settings/application/queries';
-import {
-  appearanceChange,
-  appearanceSurface,
-  type AppearanceChange,
-  type AppearanceField,
-  type AppearancePreferences,
+import type {
+  AppearanceChange,
+  AppearancePreferences,
 } from '@/features/settings/domain/appearance';
 import { useSettingsCommand } from '@/features/settings/hooks/use-settings-command';
 import type { FailureView } from '@/shared/domain/feature-error';
@@ -21,7 +18,7 @@ export interface AppearanceViewModel {
   readonly preferences: AppearancePreferences | null;
   readonly loading: boolean;
   readonly failure: FailureView | null;
-  choose(field: AppearanceField, value: string): void;
+  change(change: AppearanceChange): void;
 }
 
 interface AppearanceWrite {
@@ -34,13 +31,13 @@ export function useAppearance(port: AppearancePort): AppearanceViewModel {
   const queryClient = useQueryClient();
   const preferences = useQuery(appearanceQuery(port));
   const revision = useRef(0);
-  /** The newest triple the server stood behind, and so the only honest thing a
+  /** The newest record the server stood behind, and so the only honest thing a
    *  rollback can go back to. Never an optimistic value. */
   const confirmed = useRef<AppearancePreferences | null>(null);
 
   const settle = (next: AppearancePreferences) => {
     queryClient.setQueryData(settingsQueryKeys.appearance, next);
-    publishAppearanceSurface(appearanceSurface(next));
+    publishAppearanceSurface(next);
   };
 
   const update = useSettingsCommand(
@@ -73,13 +70,12 @@ export function useAppearance(port: AppearancePort): AppearanceViewModel {
     preferences: preferences.data ?? null,
     loading: preferences.isPending,
     failure: preferences.isError ? settingsFailure(preferences.error) : update.failure,
-    choose: (field, value) => {
-      const change = appearanceChange(field, value);
+    change: (change) => {
       const current = queryClient.getQueryData<AppearancePreferences>(settingsQueryKeys.appearance);
-      if (!change || !current) return;
+      if (!current) return;
       const optimistic = { ...current, ...change };
       revision.current += 1;
-      publishAppearanceSurface(appearanceSurface(optimistic));
+      publishAppearanceSurface(optimistic);
       update.run({ change, optimistic, revision: revision.current });
     },
   };

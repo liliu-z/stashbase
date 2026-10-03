@@ -46,7 +46,7 @@ export function AgentRevisionCard({
     >
       {open ? (
         <>
-          <p className="mt-1 pl-6 text-[12px] text-muted-foreground">
+          <p className="mt-1 pl-6 text-ui-12 text-muted-foreground">
             {review.pending === 1 ? '1 suggested change' : `${review.pending} suggested changes`}
           </p>
           <div className="mt-2 flex justify-end gap-2">
@@ -59,7 +59,7 @@ export function AgentRevisionCard({
           </div>
         </>
       ) : (
-        <p className="mt-1 text-right text-[12px] text-muted-foreground" role="status">
+        <p className="mt-1 text-right text-ui-12 text-muted-foreground" role="status">
           This review is no longer open here.
         </p>
       )}

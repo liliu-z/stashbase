@@ -68,6 +68,7 @@ export function WorkspaceDialogs({
       <Settings
         agentRuntimeApi={dependencies.settings.agentRuntimeApi}
         appearanceApi={dependencies.settings.appearanceApi}
+        systemTextApi={dependencies.settings.systemTextApi}
         telemetryApi={dependencies.settings.telemetryApi}
         embedderApi={dependencies.settings.embedderApi}
         mcpAccessApi={dependencies.settings.mcpAccessApi}

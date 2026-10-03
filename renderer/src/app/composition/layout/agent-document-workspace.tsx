@@ -7,7 +7,7 @@
  * document keeps a floor of its own and the Agent yields, which is what makes
  * a narrow window collapse the chat rather than crush the page being read.
  */
-import { motion, useReducedMotion } from 'framer-motion';
+import { motion, useReducedMotionConfig } from 'framer-motion';
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 
 import { SplitHandle } from '@/components/ui/split-handle';
@@ -102,7 +102,7 @@ export function AgentDocumentWorkspace({
   const chatShown = chatPaneOpen || !documentsShown;
   const rowRef = useRef<HTMLDivElement>(null);
   const rowWidth = useRowWidth(rowRef);
-  const reduceMotion = useReducedMotion() ?? false;
+  const reduceMotion = useReducedMotionConfig() ?? false;
 
   // The seam animates on two flips and nothing else: a document opening or
   // the last one closing (including the documents leaving and returning with

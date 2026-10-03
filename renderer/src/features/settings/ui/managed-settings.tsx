@@ -18,6 +18,7 @@ export default function ManagedSettings({
   revisionPreview,
   section,
   softwareUpdate = null,
+  systemTextApi,
   telemetryApi,
 }: SettingsProps) {
   const sections: SettingsSectionDef[] = [
@@ -29,6 +30,7 @@ export default function ManagedSettings({
       render: () => (
         <GeneralPanel
           appearanceApi={appearanceApi}
+          systemTextApi={systemTextApi}
           telemetryApi={telemetryApi}
           onOpenExternal={onOpenExternal}
           revisionPreview={revisionPreview}

@@ -13,19 +13,15 @@ import path from 'node:path';
 import { logger, errorMessage } from './log.ts';
 import type {
   AppearancePreferences,
-  AppearanceScale,
-  AppearanceTheme,
-  ReadingFont,
   UpdatePreferences,
   WorkspacePreferences,
 } from '../shared/preferences.ts';
+import { normalizeAppearancePreferences } from '../shared/protocols/http/appearance.ts';
 import type { EmbedderProvider } from '../shared/embedding.ts';
 import { normalizeHostedDisplayName, parseGoogleAvatarUrl } from './hosted-account-profile.ts';
 
 export type {
   AppearancePreferences,
-  AppearanceScale,
-  AppearanceTheme,
   UpdatePreferences,
   WorkspacePreferences,
 } from '../shared/preferences.ts';
@@ -43,13 +39,6 @@ export interface RecentFolder {
   /** User-starred in the Welcome project list. Absent = not a favorite. */
   favorite?: boolean;
 }
-
-export const DEFAULT_APPEARANCE_PREFERENCES: AppearancePreferences = {
-  theme: 'system',
-  uiScale: 'default',
-  readingTextSize: 'default',
-  readingFont: 'serif',
-};
 
 export const DEFAULT_UPDATE_PREFERENCES: UpdatePreferences = {
   autoCheck: true,
@@ -121,8 +110,9 @@ export interface AppConfigFile {
     dockerAccess?: boolean;
     dockerPort?: number;
   };
-  /** Bounded, user-wide presentation preferences. These deliberately avoid
-   * arbitrary theme, font, spacing, and layout customization. */
+  /** User-wide presentation and editor preferences. Every value is a preset
+   * except the two font families, which name fonts installed on the system
+   * and are validated as names before they are stored. */
   appearance?: Partial<AppearancePreferences>;
   /** Application-level Workbench visibility preferences. Absent and invalid
    * values fail closed to the default safe view. */
@@ -347,35 +337,7 @@ export function getEmbedderProvider(): EmbedderProvider {
 
 
 
-function isAppearanceTheme(value: unknown): value is AppearanceTheme {
-  return value === 'system' || value === 'light' || value === 'dark';
-}
-
-function isAppearanceScale(value: unknown): value is AppearanceScale {
-  return value === 'small' || value === 'default' || value === 'large';
-}
-
-function isReadingFont(value: unknown): value is ReadingFont {
-  return value === 'serif' || value === 'sans';
-}
-
-/** Resolve persisted presentation values defensively so a hand-edited or
- * legacy config cannot prevent Settings from loading. */
-export function normalizeAppearancePreferences(value: unknown): AppearancePreferences {
-  const raw = value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Partial<AppearancePreferences>
-    : {};
-  return {
-    theme: isAppearanceTheme(raw.theme) ? raw.theme : DEFAULT_APPEARANCE_PREFERENCES.theme,
-    uiScale: isAppearanceScale(raw.uiScale) ? raw.uiScale : DEFAULT_APPEARANCE_PREFERENCES.uiScale,
-    readingTextSize: isAppearanceScale(raw.readingTextSize)
-      ? raw.readingTextSize
-      : DEFAULT_APPEARANCE_PREFERENCES.readingTextSize,
-    readingFont: isReadingFont(raw.readingFont)
-      ? raw.readingFont
-      : DEFAULT_APPEARANCE_PREFERENCES.readingFont,
-  };
-}
+export { normalizeAppearancePreferences };
 
 export function getAppearancePreferences(): AppearancePreferences {
   return normalizeAppearancePreferences(readAppConfig().appearance);

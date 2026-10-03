@@ -125,6 +125,32 @@
   visibility: hidden;
 }
 
+/* Word count: a quiet caption in the corner, where the link failure is not. */
+.markdown-word-count {
+  position: absolute;
+  z-index: 2;
+  right: 16px;
+  bottom: 12px;
+  padding: 2px 8px;
+  color: var(--muted-foreground);
+  font-size: var(--fs-caption, 12px);
+  font-variant-numeric: tabular-nums;
+  background: color-mix(in oklab, var(--surface-2) 88%, transparent);
+  border-radius: var(--shape-input-radius, 8px);
+  pointer-events: none;
+}
+
+/* Focus mode dims every top-level block but the one being written. The editor
+   marks that block whether or not the mode is on, so turning it on needs no
+   editor round trip. */
+html[data-focus-mode='on'] .markdown-crepe .ProseMirror > * {
+  transition: opacity var(--motion-base) ease;
+}
+
+html[data-focus-mode='on'] .markdown-crepe:focus-within .ProseMirror > :not(.is-current-block) {
+  opacity: 0.32;
+}
+
 .markdown-status {
   z-index: 1;
   display: flex;
@@ -153,7 +179,7 @@
   --crepe-color-on-surface: var(--foreground);
   --crepe-color-on-surface-variant: var(--muted-foreground);
   --crepe-color-outline: var(--border);
-  --crepe-color-primary: var(--foreground);
+  --crepe-color-primary: var(--prose-accent);
   --crepe-color-secondary: var(--accent);
   --crepe-color-on-secondary: var(--accent-foreground);
   --crepe-color-inverse: var(--foreground);
@@ -165,7 +191,7 @@
   --crepe-color-inline-area: var(--border);
   --crepe-font-title: var(--font-sans);
   --crepe-font-default: var(--font-sans);
-  --crepe-font-code: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --crepe-font-code: var(--code-font, var(--font-mono));
   --crepe-shadow-1: var(--shadow-4);
   --crepe-shadow-2: var(--shadow-6);
 
@@ -187,7 +213,7 @@
   margin: 0 auto;
   padding: 32px clamp(28px, 6cqi, 52px) 96px;
   color: var(--foreground);
-  font-family: var(--font-reading);
+  font-family: var(--writing-font, var(--font-reading));
   font-size: var(--reading-font-size, 16px);
   line-height: var(--reading-line-height, 1.65);
   outline: none;
@@ -204,7 +230,7 @@
 .markdown-crepe .milkdown .ProseMirror :is(h1, h2, h3, h4, h5, h6) {
   margin-bottom: 0;
   color: var(--foreground);
-  font-family: var(--font-reading);
+  font-family: var(--writing-font, var(--font-reading));
   font-weight: 600;
   line-height: 1.25;
   letter-spacing: 0;
@@ -255,8 +281,8 @@
 }
 
 .markdown-crepe .ProseMirror a {
-  color: var(--foreground);
-  text-decoration-color: color-mix(in oklab, var(--foreground) 38%, transparent);
+  color: var(--prose-accent);
+  text-decoration-color: color-mix(in oklab, var(--prose-accent) 38%, transparent);
   text-underline-offset: 3px;
   cursor: pointer;
 }

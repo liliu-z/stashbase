@@ -2,8 +2,9 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 
-import type { AppearancePort } from '@/features/settings/application/ports';
+import type { AppearancePort, SystemTextPort } from '@/features/settings/application/ports';
 import type { AppearancePreferences } from '@/features/settings/domain/appearance';
+import { appearanceSurface } from '@/test/fakes/settings';
 
 import { AppearancePanel } from './appearance-panel';
 
@@ -12,11 +13,14 @@ function Queries({ children }: { children: ReactNode }) {
   return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 }
 
-const saved: AppearancePreferences = {
-  readingTextSize: 'default',
-  readingFont: 'serif',
-  theme: 'system',
-  uiScale: 'default',
+const saved: AppearancePreferences = appearanceSurface();
+
+const systemText: SystemTextPort = {
+  listFonts: async () => [
+    { family: 'Georgia', monospace: false },
+    { family: 'Courier New', monospace: true },
+  ],
+  spellcheckLanguages: async () => ['en-US', 'fr'],
 };
 
 const appearancePort: AppearancePort = {
@@ -25,7 +29,7 @@ const appearancePort: AppearancePort = {
 };
 
 function AppearanceHarness() {
-  return <AppearancePanel appearanceApi={appearancePort} />;
+  return <AppearancePanel appearanceApi={appearancePort} systemTextApi={systemText} />;
 }
 
 const meta = {

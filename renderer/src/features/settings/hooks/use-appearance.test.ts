@@ -4,16 +4,12 @@ import { afterEach, describe, expect, it } from 'vite-plus/test';
 import { failureMessage } from '@/features/settings/application/failure-messages';
 import { SettingsError, type AppearancePort } from '@/features/settings/application/ports';
 import type { AppearancePreferences } from '@/features/settings/domain/appearance';
+import { appearanceSurface } from '@/test/fakes/settings';
 import { createTestQueryClient, queryWrapper } from '@/test/query';
 
 import { useAppearance } from './use-appearance';
 
-const DEFAULTS: AppearancePreferences = {
-  theme: 'system',
-  uiScale: 'default',
-  readingTextSize: 'default',
-  readingFont: 'serif',
-};
+const DEFAULTS: AppearancePreferences = appearanceSurface();
 
 interface OpenWrite {
   resolve(saved: AppearancePreferences): void;
@@ -64,7 +60,7 @@ describe('useAppearance', () => {
     const { result } = mount(port);
     await waitFor(() => expect(result.current.preferences).not.toBeNull());
 
-    act(() => result.current.choose('theme', 'dark'));
+    act(() => result.current.change({ theme: 'dark' }));
     expect(root().classList.contains('dark')).toBe(true);
 
     await waitFor(() => expect(result.current.preferences?.uiScale).toBe('large'));
@@ -73,23 +69,12 @@ describe('useAppearance', () => {
     expect(result.current.failure).toBeNull();
   });
 
-  it('ignores a value the chosen field does not name', async () => {
-    const { port, writes } = controlledPort();
-    const { result } = mount(port);
-    await waitFor(() => expect(result.current.preferences).not.toBeNull());
-
-    act(() => result.current.choose('theme', 'small'));
-
-    expect(writes).toHaveLength(0);
-    expect(result.current.preferences).toEqual(DEFAULTS);
-  });
-
   it('puts the confirmed value back when the save is refused', async () => {
     const { port, writes } = controlledPort();
     const { result } = mount(port);
     await waitFor(() => expect(result.current.preferences).not.toBeNull());
 
-    act(() => result.current.choose('theme', 'dark'));
+    act(() => result.current.change({ theme: 'dark' }));
     await waitFor(() => expect(writes).toHaveLength(1));
     await act(async () => {
       writes[0]?.reject(new SettingsError('invalid-request', 'refused'));
@@ -107,9 +92,9 @@ describe('useAppearance', () => {
     const { result } = mount(port);
     await waitFor(() => expect(result.current.preferences).not.toBeNull());
 
-    act(() => result.current.choose('theme', 'dark'));
+    act(() => result.current.change({ theme: 'dark' }));
     await waitFor(() => expect(writes).toHaveLength(1));
-    act(() => result.current.choose('theme', 'light'));
+    act(() => result.current.change({ theme: 'light' }));
     await waitFor(() => expect(writes).toHaveLength(2));
     expect(result.current.preferences?.theme).toBe('light');
 

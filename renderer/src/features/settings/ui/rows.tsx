@@ -210,7 +210,7 @@ export function StatusChip({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 text-[11px] font-medium whitespace-nowrap',
+        'inline-flex items-center gap-1.5 text-ui-11 font-medium whitespace-nowrap',
         tone === 'warn'
           ? 'text-decision'
           : tone === 'on'

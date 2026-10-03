@@ -31,7 +31,7 @@ const diffTheme = EditorView.baseTheme({
   '&': {
     backgroundColor: 'transparent',
     color: 'var(--foreground)',
-    fontSize: '12px',
+    fontSize: 'calc(12px * var(--ui-scale, 1))',
   },
   '&.cm-focused': { outline: 'none' },
   '.cm-scroller': { fontFamily: 'var(--font-mono)', lineHeight: '1.55', overflow: 'visible' },
@@ -75,7 +75,7 @@ const diffTheme = EditorView.baseTheme({
     color: 'var(--muted-foreground)',
     cursor: 'pointer',
     fontFamily: 'var(--font-sans, inherit)',
-    fontSize: '11px',
+    fontSize: 'calc(11px * var(--ui-scale, 1))',
     padding: '2px 10px',
   },
   '.cm-collapsedLines:before, .cm-collapsedLines:after': { content: '""', margin: '0' },
@@ -179,7 +179,7 @@ function PatchView({ label, patch }: { label: string; patch: string }) {
   return (
     <pre
       aria-label={label}
-      className="m-0 py-1 font-mono text-[12px] leading-[1.55] break-words whitespace-pre-wrap"
+      className="m-0 py-1 font-mono text-ui-12 leading-[1.55] break-words whitespace-pre-wrap"
     >
       {rows.map(({ line, offset }) => {
         const header = line.startsWith('+++') || line.startsWith('---');
@@ -216,7 +216,7 @@ function Counts({ additions, deletions }: { additions: number; deletions: number
   return (
     <span
       aria-label={`${additions} added, ${deletions} removed`}
-      className="ml-auto flex shrink-0 gap-1.5 font-mono text-[11px] tabular-nums"
+      className="ml-auto flex shrink-0 gap-1.5 font-mono text-ui-11 tabular-nums"
     >
       {additions > 0 && <span className="text-diff-add">+{additions}</span>}
       {deletions > 0 && <span className="text-diff-remove">−{deletions}</span>}
@@ -241,7 +241,7 @@ export function AgentFileChangeView({ change }: { change: AgentFileChange }) {
       aria-label={label}
       className={cn('overflow-hidden border border-border bg-surface-2', shape.panel)}
     >
-      <header className="flex h-7 items-center gap-1.5 border-b border-border px-2.5 text-[12px]">
+      <header className="flex h-7 items-center gap-1.5 border-b border-border px-2.5 text-ui-12">
         <FileTypeIcon
           aria-hidden="true"
           className="shrink-0 text-muted-foreground"
@@ -301,7 +301,7 @@ export function AgentChangedFiles({
         const source = onOpenSource && sourceFor ? sourceFor(change.path) : null;
         return (
           <li
-            className={cn('flex min-h-8 items-center gap-2 px-2 text-[12px]', shape.item)}
+            className={cn('flex min-h-8 items-center gap-2 px-2 text-ui-12', shape.item)}
             key={change.path}
           >
             <FileTypeIcon
