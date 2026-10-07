@@ -23,15 +23,14 @@ https://github.com/user-attachments/assets/4ba282a3-85d2-4a08-b7af-562a1e71e716
 
 ## Document Diff
 
-Review suggested edits directly in the document as you read it. Paragraphs and
-formatting stay in place, deleted words and phrases are struck through in red, and
-additions are highlighted in green. Revisions appear within the surrounding prose
-rather than as a line-by-line code patch.
+After an Agent changes Markdown documents, its conversation shows **Changed in
+this turn**. Choose **Review** beside an edited file to see its changes in the
+prose: deleted words are struck through in red and additions highlighted in green.
 
-Accept or reject individual changes, or use **Accept All** and **Reject All** to take
-the whole set. Rejecting everything leaves the file exactly as it was. Ask your Agent
-to revise an open Markdown document and it proposes rather than overwrites, so nothing
-reaches the file until you accept a change.
+Use **Undo** or **Keep** for individual changes, or **Undo all** and **Keep all**
+for the remaining set. Changes are already saved; Undo restores earlier text
+through the document's normal save path. Keeping everything leaves the file
+exactly as the Agent wrote it. New files offer **Open** instead of Review.
 
 Agent file diffs and editor save-conflict comparisons are separate features and still
 work the way they did.

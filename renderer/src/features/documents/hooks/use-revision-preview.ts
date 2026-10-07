@@ -7,7 +7,7 @@ import { splitLeadingYamlFrontmatter } from '@/features/documents/domain/markdow
 export interface RevisionPreview {
   /** What the last attempt refused for, or null when the review opened. */
   refusal: string | null;
-  start(proposal: string): void;
+  start(before: string): void;
 }
 
 const NO_DOCUMENT = 'Open a Markdown document first.';
@@ -18,7 +18,7 @@ const NO_DOCUMENT = 'Open a Markdown document first.';
  * It is a harness, not a preference: the build flag decides whether the
  * control exists and this hook refuses again on its own, so a packaged build
  * cannot reach it even if a stray prop arrives. Nothing here is stored, and
- * the proposal is read once at the moment it is offered.
+ * the earlier text is read once when review starts.
  */
 export function useRevisionPreview(
   enabled: boolean,
@@ -28,7 +28,7 @@ export function useRevisionPreview(
 
   return {
     refusal,
-    start(proposal) {
+    start(before) {
       if (!enabled || !documents) return;
       const activeTabId = documents.store.getState().activeTabId;
       const active = activeTabId ? documents.getDocument(activeTabId) : null;
@@ -41,8 +41,7 @@ export function useRevisionPreview(
         {
           baseVersion: editor.version,
           id: `preview-${Date.now()}`,
-          origin: { kind: 'developer' },
-          proposal: splitLeadingYamlFrontmatter(proposal).body,
+          before: splitLeadingYamlFrontmatter(before).body,
         },
         splitLeadingYamlFrontmatter(editor.value).body,
       );

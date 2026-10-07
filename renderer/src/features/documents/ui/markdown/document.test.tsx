@@ -85,7 +85,7 @@ describe('Markdown document surface', () => {
         onModeChange={vi.fn()}
         onOpenExternal={vi.fn(async () => true)}
         navigation={navigation}
-        revision={{ onControls: vi.fn(), onPending: vi.fn(), state: { kind: 'idle' } }}
+        revision={{ onPending: vi.fn(), state: { kind: 'idle' } }}
         readOnly
         source={{ folderPath: '/project/notes', path: 'plan.md' }}
         tabId="tab-1"
@@ -113,7 +113,7 @@ describe('Markdown document surface', () => {
         onModeChange={vi.fn()}
         onOpenExternal={vi.fn(async () => true)}
         navigation={navigation}
-        revision={{ onControls: vi.fn(), onPending: vi.fn(), state: { kind: 'idle' } }}
+        revision={{ onPending: vi.fn(), state: { kind: 'idle' } }}
         readOnly={false}
         source={{ folderPath: '/project/notes', path: 'plan.md' }}
         tabId="tab-1"
@@ -147,7 +147,7 @@ describe('Markdown document surface', () => {
         onModeChange={vi.fn()}
         onOpenExternal={vi.fn(async () => true)}
         navigation={navigation}
-        revision={{ onControls: vi.fn(), onPending: vi.fn(), state: { kind: 'idle' } }}
+        revision={{ onPending: vi.fn(), state: { kind: 'idle' } }}
         readOnly={false}
         source={{ folderPath: '/project/notes', path: 'plan.md' }}
         tabId="tab-1"
@@ -170,7 +170,7 @@ describe('Markdown document surface', () => {
         onModeChange={vi.fn()}
         onOpenExternal={vi.fn(async () => true)}
         navigation={navigation}
-        revision={{ onControls: vi.fn(), onPending: vi.fn(), state: { kind: 'idle' } }}
+        revision={{ onPending: vi.fn(), state: { kind: 'idle' } }}
         readOnly
         source={{ folderPath: '/project/notes', path: 'plan.md' }}
         tabId="tab-1"

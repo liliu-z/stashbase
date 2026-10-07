@@ -7,8 +7,8 @@ import {
   turnChangesApi,
 } from '@/test/fakes/documents';
 
-import { openDocumentRevision, openTurnChangeReview } from './open-revision';
-import { DocumentTurnChangesError, type DocumentRevisionProposal } from './ports';
+import { openTurnChangeReview } from './open-revision';
+import { DocumentTurnChangesError } from './ports';
 import { createDocumentTabsRuntime } from './tabs-runtime';
 
 const folderPath = '/project/notes';
@@ -22,14 +22,18 @@ afterEach(() => {
   for (const runtime of open.splice(0)) runtime.dispose();
 });
 
-function proposal(overrides: Partial<DocumentRevisionProposal> = {}): DocumentRevisionProposal {
+interface ReviewText {
+  id: string;
+  baseVersion: string;
+  content: string;
+}
+
+function proposal(overrides: Partial<ReviewText> = {}): ReviewText {
   return {
     id: 'review-1',
     baseVersion: BASE_VERSION,
     content: '# Revised plan\n',
-    createdAt: 0,
-    origin: { kind: 'agent' },
-    source: { folderPath, path: 'plan.md' },
+
     ...overrides,
   };
 }
@@ -44,8 +48,26 @@ async function openDocument() {
   return document;
 }
 
+function loadReview(
+  document: Awaited<ReturnType<typeof openDocument>>,
+  review: ReviewText,
+  sourcePort: ReturnType<typeof sourceApi>,
+) {
+  return openTurnChangeReview(document, 'turn-1', {
+    source: sourcePort,
+    turnChanges: turnChangesApi({
+      load: vi.fn(async ({ source, turnId }) => ({
+        afterVersion: review.baseVersion,
+        before: review.content,
+        source,
+        turnId,
+      })),
+    }),
+  });
+}
+
 function openRevision(document: Awaited<ReturnType<typeof openDocument>>, proposed = proposal()) {
-  return openDocumentRevision(
+  return loadReview(
     document,
     proposed,
     sourceApi({
@@ -59,7 +81,7 @@ function openRevision(document: Awaited<ReturnType<typeof openDocument>>, propos
   );
 }
 
-describe('opening a parked revision on a document', () => {
+describe('opening a turn review on a document', () => {
   it('starts the review once the tab reports text, however late that is', async () => {
     const document = await openDocument();
     const started = openRevision(document);
@@ -68,7 +90,7 @@ describe('opening a parked revision on a document', () => {
 
     await expect(started).resolves.toBeNull();
     const revision = document.store.getState().revision;
-    expect(revision.kind === 'idle' ? null : revision.review.id).toBe('review-1');
+    expect(revision.kind === 'idle' ? null : revision.review.id).toBe('turn:turn-1:plan.md');
   });
 
   it('strips frontmatter from both sides, so the parser never sees a delimiter', async () => {
@@ -83,7 +105,7 @@ describe('opening a parked revision on a document', () => {
     ).resolves.toBeNull();
 
     const revision = document.store.getState().revision;
-    expect(revision.kind === 'idle' ? null : revision.review.proposal).toBe('# Revised\n');
+    expect(revision.kind === 'idle' ? null : revision.review.before).toBe('# Revised\n');
   });
 
   it('refuses frontmatter edits rather than silently dropping them', async () => {
@@ -134,7 +156,7 @@ describe('opening a parked revision on a document', () => {
     await expect(openRevision(document)).resolves.toBe('review-in-progress');
   });
 
-  it('reports a proposal written against text the document has moved past', async () => {
+  it('reports a review computed against text the document has moved past', async () => {
     const document = await openDocument();
     document.reconcile(textSource({ content: BASE, version: 'sha256:v9' }));
 
@@ -148,9 +170,7 @@ describe('opening a parked revision on a document', () => {
       load: vi.fn(async () => textSource({ content: '# Newer on disk\n', version: 'sha256:v9' })),
     });
 
-    await expect(openDocumentRevision(document, proposal(), current)).resolves.toBe(
-      'stale-version',
-    );
+    await expect(loadReview(document, proposal(), current)).resolves.toBe('stale-version');
     expect(document.store.getState().revision).toEqual({ kind: 'idle' });
   });
 
@@ -163,9 +183,7 @@ describe('opening a parked revision on a document', () => {
       }),
     });
 
-    await expect(openDocumentRevision(document, proposal(), unavailable)).resolves.toBe(
-      'not-verified',
-    );
+    await expect(loadReview(document, proposal(), unavailable)).resolves.toBe('not-verified');
     expect(document.store.getState().revision).toEqual({ kind: 'idle' });
   });
 });
@@ -208,8 +226,8 @@ describe('opening what an Agent turn changed as a reversed review', () => {
     const revision = document.store.getState().revision;
     expect(revision.kind === 'idle' ? null : revision.review).toMatchObject({
       baseVersion: AFTER_VERSION,
-      origin: { kind: 'turn', turnId: 'turn-1' },
-      proposal: BASE,
+
+      before: BASE,
     });
   });
 

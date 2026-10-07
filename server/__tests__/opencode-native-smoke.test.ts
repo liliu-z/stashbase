@@ -180,7 +180,9 @@ test('pinned bundled OpenCode completes one SDK session against a fake compatibl
     .find((candidate) => candidate.name === agent)
     ?.permission.filter((rule) => rule.permission === permission && rule.pattern === '*').at(-1)?.action;
   assert.equal(actionFor('stashbase-folder', 'bash'), 'ask');
-  assert.equal(actionFor('stashbase-folder', 'edit'), 'ask');
+  assert.equal(actionFor('stashbase-folder', 'edit'), 'deny');
+  assert.equal(actionFor('stashbase-folder', 'stashbase_edit_file'), 'ask');
+  assert.equal(actionFor('stashbase-folder', 'stashbase_write_file'), 'ask');
   assert.equal(actionFor('stashbase-folder', 'external_directory'), 'ask');
   const subscription = await client.event.subscribe({ sseMaxRetryAttempts: 1 });
   const events: Event[] = [];

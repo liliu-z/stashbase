@@ -32,6 +32,7 @@
  *     { t: "error", message, failure? }                // failure = classified turn-failure kind
  *     { t: "exit", message? }                          // normal or fatal session end
  */
+import { isStashbaseWorkspaceEdit } from './agent-file-permissions.ts';
 import { randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
@@ -176,19 +177,10 @@ function spawnClaudeCodeProcess(options: SpawnOptions): SpawnedProcess {
   });
 }
 
-// Only known reads, discovery, app-owned reindex work, and proposals that reach
-// no file bypass the callback's approval round trip. New or renamed tools must
-// never become implicitly safe.
-//
-// `suggest_edits` belongs here because it writes nothing. It parks a proposed
-// document in memory for the reader, who accepts or rejects each change in the
-// document itself. That review is the approval; prompting first would ask the
-// same person the same question twice and freeze the turn for the length of
-// their read.
 const LOW_RISK_TOOLS = new Set([
   'Read', 'Glob', 'Grep', 'LS', 'ToolSearch',
   'ListMcpResourcesTool', 'ReadMcpResourceTool',
-  ...['list_projects', 'list_directory', 'read_file', 'search_project', 'reindex', 'suggest_edits']
+  ...['list_projects', 'list_directory', 'read_file', 'search_project', 'reindex']
     .map((name) => `mcp__stashbase__${name}`),
 ]);
 
@@ -442,6 +434,8 @@ export class AgentSession implements AttributedAgentSession {
           // Apply the shared Access choice when the native session starts.
           // Later changes still use the SDK's live setPermissionMode API.
           permissionMode: this.access,
+          // Project documents use StashBase transactions and their version checks.
+          disallowedTools: ['Edit', 'MultiEdit', 'Write'],
           // Preserve Claude's native preset, then append the project's chosen
           // Persona plus StashBase's internal project routing policy. The
           // policy is never stored in the Persona.
@@ -722,7 +716,10 @@ export class AgentSession implements AttributedAgentSession {
       if (redirect) return redirect;
     }
     if (opts.signal.aborted || this.closed) return { behavior: 'deny', message: 'Interrupted.' };
-    if (!needsPrompt(name)) {
+    const projectEdit = name.startsWith('mcp__stashbase__') && isStashbaseWorkspaceEdit({
+      input: { server: 'stashbase', tool: name.slice('mcp__stashbase__'.length), arguments: input },
+    }, cwd ?? null);
+    if (!needsPrompt(name) || (this.access === 'acceptEdits' && projectEdit)) {
       return { behavior: 'allow', updatedInput: input };
     }
     return new Promise<PermissionResult>((resolve) => {

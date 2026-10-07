@@ -84,7 +84,7 @@ test('bundled OpenCode config disables sharing and updates while asking for ever
   assert.equal(config.autoupdate, false);
   assert.equal(config.share, 'disabled');
   assert.deepEqual(config.enabled_providers, ['stashbase']);
-  assert.equal(config.permission?.edit, 'ask');
+  assert.equal(config.permission?.edit, 'deny');
   assert.equal(config.permission?.bash, 'ask');
   assert.equal(config.permission?.external_directory, 'ask');
   assert.equal(config.agent?.['stashbase-folder']?.mode, 'primary');

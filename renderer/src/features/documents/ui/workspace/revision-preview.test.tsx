@@ -12,7 +12,7 @@ it('offers a pasted document for review and shows why one was refused', async ()
   const { rerender } = render(<RevisionPreview onStart={start} refusal={null} />);
   expect(screen.getByRole('button', { name: 'Start review' }).hasAttribute('disabled')).toBe(true);
 
-  await user.type(screen.getByRole('textbox', { name: 'Revised document' }), '# Revised');
+  await user.type(screen.getByRole('textbox', { name: 'Document before the turn' }), '# Revised');
   await user.click(screen.getByRole('button', { name: 'Start review' }));
   expect(start).toHaveBeenCalledWith('# Revised');
 

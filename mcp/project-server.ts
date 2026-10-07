@@ -156,13 +156,6 @@ export function createProjectMcpServer(opts: ProjectMcpServerOptions): Server {
       };
     }
 
-    if (req.params.name === 'suggest_edits') {
-      const result = await operations.suggestEdits({ path: args.path, content: args.content, withinFolder: folder });
-      return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-      };
-    }
-
     if (req.params.name === 'move_file') {
       const result = await operations.move({ path: args.path, newPath: args.new_path, cascade: args.cascade !== false });
       return {
@@ -301,7 +294,9 @@ const BUILTIN_TOOLS = [
       name: 'edit_file',
       description:
         'Patch a Markdown, HTML, JSON, or UTF-8 plain-text file by exact string replacement. By default ' +
-        '`old_text` must match exactly once; set `replace_all` for global replacement.',
+        '`old_text` must match exactly once; set `replace_all` for global replacement. Empty `old_text` ' +
+        'is allowed only for an existing empty file. Changes are saved directly; the reader can review ' +
+        'a built-in Chat turn afterwards with Undo/Keep.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -312,25 +307,6 @@ const BUILTIN_TOOLS = [
           baseVersion: { type: 'string', description: 'Optional version from read_file for optimistic conflict checks.' },
         },
         required: ['path', 'old_text', 'new_text'],
-      },
-    },
-    {
-      name: 'suggest_edits',
-      description:
-        'Propose a revision to a Markdown file without writing it. Send the whole revised document, ' +
-        'not a fragment. StashBase shows it inside the reader\'s open document as tracked insertions ' +
-        'and deletions they accept or reject one at a time, and the file on disk stays unchanged until ' +
-        'they accept. Returns as soon as the proposal is parked; it never waits for their decision, so ' +
-        'keep working. Changes to YAML frontmatter cannot be reviewed in place. A proposal identical to the current file is refused, since there would be ' +
-        'nothing to review. Use write_file or edit_file when the change is yours to make outright.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          path: { type: 'string', description: 'Absolute Markdown file path under one of your folders.' },
-          content: { type: 'string', description: 'The complete revised document. In JavaScript wrappers, use String.raw or escape every Markdown/LaTeX backslash.' },
-          folder: { type: 'string', description: 'The registered project containing the document. Required for external clients; built-in Chats use their bound project.' },
-        },
-        required: ['path', 'content'],
       },
     },
     {

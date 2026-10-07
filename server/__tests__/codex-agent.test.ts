@@ -8,7 +8,7 @@ import { PassThrough } from 'node:stream';
 import test from 'node:test';
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import type { WebSocket } from 'ws';
-import { codexAccessOptions, isStashbaseProposal, isStashbaseWorkspaceEdit, isWorkspaceFileChange, permanentlyDeleteCodexThread } from '../codex-agent.ts';
+import { codexAccessOptions, isStashbaseWorkspaceEdit, isWorkspaceFileChange, permanentlyDeleteCodexThread } from '../codex-agent.ts';
 import { CodexRpcPeer } from '../codex-rpc-transport.ts';
 import { runtimeDescriptorFor } from '../agent-contract.ts';
 import { BUILT_IN_AGENT_ADAPTERS } from '../agent-adapters.ts';
@@ -723,19 +723,6 @@ test('Codex Edit auto-accepts only ordinary StashBase MCP writes inside the open
   assert.equal(isStashbaseWorkspaceEdit(approval('edit_file', '/workspace/other/note.md'), folder), false);
   assert.equal(isStashbaseWorkspaceEdit(approval('edit_file', '/workspace/project/note.md', 'other'), folder), false);
 
-  // A proposal writes nothing and the reader's own accept or reject is the
-  // approval, so it is accepted outside Edit mode too. Containment is the host's
-  // rule, not this predicate's.
-  const proposal = approval('suggest_edits', '/workspace/project/note.md');
-  for (const mode of ['default', 'auto', 'acceptEdits', undefined]) {
-    assert.equal(isStashbaseProposal(proposal, mode), true, `mode ${String(mode)}`);
-  }
-  // Plan mode promises the turn leaves nothing to undo, and a parked proposal
-  // puts the reader's open document into a review they have to clear.
-  assert.equal(isStashbaseProposal(proposal, 'plan'), false);
-  assert.equal(isStashbaseProposal(approval('write_file', '/workspace/project/note.md'), 'auto'), false);
-  assert.equal(isStashbaseProposal(approval('suggest_edits', '/workspace/project/note.md', 'other'), 'auto'), false);
-  assert.equal(isStashbaseWorkspaceEdit(proposal, folder), false);
 });
 
 test('Codex RPC peer enforces request timeout, clears timers, and ignores late responses', async () => {

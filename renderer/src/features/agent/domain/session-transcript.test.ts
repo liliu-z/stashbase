@@ -6,9 +6,7 @@ import {
   finishTool,
   latestUserBlock,
   recordFileChange,
-  recordRevisionProposal,
   replyToolPermission,
-  settledToolName,
   requestToolPermission,
   settleErrorBlock,
   settlePendingTools,
@@ -137,25 +135,6 @@ describe('Agent transcript edits', () => {
     expect(
       stampClosingReply([...stamped, { id: 'user-2', kind: 'user', text: 'Go on' }], 20_000),
     ).toEqual([...stamped, { id: 'user-2', kind: 'user', text: 'Go on' }]);
-  });
-
-  it('records a parked revision once, however often the same tool is replayed', () => {
-    const settled: AgentTranscriptBlock[] = [
-      { ...running, input: { path: 'plan.md' }, name: 'suggest_edits', status: 'done' },
-    ];
-    expect(settledToolName(settled, 'tool-1')).toBe('suggest_edits');
-    expect(settledToolName(settled, 'tool-2')).toBeNull();
-
-    const recorded = recordRevisionProposal(settled, {
-      id: 'tool-1',
-      path: 'plan.md',
-      proposalId: 'proposal-1',
-    });
-    expect(recorded).toHaveLength(2);
-    expect(recorded.at(-1)).toMatchObject({ kind: 'revision', path: 'plan.md' });
-    expect(
-      recordRevisionProposal(recorded, { id: 'tool-1', path: 'plan.md', proposalId: 'proposal-1' }),
-    ).toBe(recorded);
   });
 
   it('finds the prompt a retry would resend, and nothing when there is none', () => {

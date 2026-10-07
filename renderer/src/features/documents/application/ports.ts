@@ -12,12 +12,10 @@ import type {
   DocumentTextSource,
 } from '@/features/documents/domain/document';
 import type { GenericFilePreview } from '@/features/documents/domain/generic-preview';
-import type { RevisionOrigin } from '@/features/documents/domain/revision';
 import {
   featureErrorClass,
   FeatureError,
   type FeatureFailureKind,
-  type TransportFailureKind,
 } from '@/shared/domain/feature-error';
 import type { SourceReference } from '@/shared/domain/source-reference';
 
@@ -82,24 +80,6 @@ export interface DocumentWindowLifecyclePort {
   onPrepareContextRelease(handler: () => boolean | Promise<boolean>): () => void;
 }
 
-export interface DocumentRevisionProposal {
-  readonly id: string;
-  readonly baseVersion: string;
-  readonly content: string;
-  readonly createdAt: number;
-  readonly origin: RevisionOrigin;
-  readonly source: SourceReference;
-}
-
-export interface DrainedRevisions {
-  readonly proposals: readonly DocumentRevisionProposal[];
-  readonly unresolved: readonly string[];
-}
-
-export interface DocumentRevisionsPort {
-  drain(folderPath: string, signal: AbortSignal): Promise<DrainedRevisions>;
-}
-
 /** What one Markdown file held before an Agent turn, kept by the host so the
  *  reader can review the turn inside the document. `afterVersion` is the
  *  version the turn left on disk; a file that moved on since then is no longer
@@ -122,10 +102,6 @@ export interface DocumentTurnChangesPort {
 
 export type DocumentTurnChangesError = FeatureError<'expired'>;
 export const DocumentTurnChangesError = featureErrorClass<'expired'>('DocumentTurnChangesError');
-
-export type DocumentRevisionsFailureKind = TransportFailureKind;
-export type DocumentRevisionsError = FeatureError;
-export const DocumentRevisionsError = featureErrorClass('DocumentRevisionsError');
 
 export type DocumentSourceFailureKind = FeatureFailureKind<'unsupported-encoding' | 'missing'>;
 

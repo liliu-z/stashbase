@@ -1,53 +1,18 @@
-/**
- * One document's inline revision review: a whole-document proposal offered
- * against a known source version, accepted or rejected change by change
- * inside the readable document.
- *
- * The review is a state of the document, so it sits on `DocumentState`
- * beside the view mode rather than in a store of its own, and it is a union
- * rather than a flag beside a proposal string: the count of changes still
- * pending cannot exist before the editor has reported one, so only the
- * variant that has one carries it. Nothing here persists. The editor
- * recomputes the changes against the live document on every transaction, and
- * a review nobody accepts leaves the source byte-identical.
- */
+/** The review of an Agent turn's changes. The document already holds the
+ * turn's result; offering its earlier text makes taking a diff undo that
+ * change. Keeping every diff leaves the source byte-identical. Review state
+ * belongs to the document and is never persisted separately. */
 import type { DocumentState } from './document';
 
-/** Who offered the proposal. The Agent panel and the developer harness are
- *  the same mechanism with different provenance, so they are variants of one
- *  union rather than two review shapes. The host records no instruction
- *  behind a parked proposal, and a field nothing can fill is a lie the type
- *  would then bless, so only the turn variant carries more than its tag.
- *
- *  A `turn` review runs the same mechanism in reverse. The document already
- *  holds what an Agent turn wrote, and the proposal is the text from before
- *  the turn, so accepting a change undoes it and ending the review keeps the
- *  turn's work byte-identical. `baseVersion` is the version the turn left, so
- *  the stale gate refuses a file that moved on after the turn. */
-export type RevisionOrigin =
-  | { kind: 'agent' }
-  | { kind: 'developer' }
-  | { kind: 'turn'; turnId: string };
-
-/** The two ways to end a whole review at once. The document's own header bar
- *  and the Agent panel both drive these, so one review cannot be resolved two
- *  different ways depending on which surface the reader used. The surface
- *  holding the review registers them on its runtime; nobody else has them. */
-export interface RevisionControls {
-  acceptAll(): void;
-  rejectAll(): void;
-}
-
 export interface RevisionReview {
-  /** The `sha256:` token the proposal was computed against. A review whose
+  /** The `sha256:` token the turn left on disk. A review whose
    *  base has moved is refused rather than applied to newer text. */
   readonly baseVersion: string;
   readonly id: string;
-  readonly origin: RevisionOrigin;
-  /** The proposed document body, with any leading frontmatter already
+  /** The document body before the turn, with any leading frontmatter already
    *  stripped: raw frontmatter handed to the parser lands in the document as
    *  a thematic break and a heading. */
-  readonly proposal: string;
+  readonly before: string;
 }
 
 export type DocumentRevision =
@@ -55,7 +20,7 @@ export type DocumentRevision =
   | { kind: 'starting'; review: RevisionReview }
   | { kind: 'reviewing'; pending: number; review: RevisionReview };
 
-/** Why a proposal was not opened. A refusal is a value the caller reports,
+/** Why a review was not opened. A refusal is a value the caller reports,
  *  not an unchanged state it has to notice. */
 export type RevisionRefusal =
   | 'frontmatter-changed'
@@ -75,7 +40,7 @@ export function documentRevisionActive(state: DocumentState): boolean {
 /**
  * Opens `review` against the document's current body.
  *
- * A proposal identical to what is already there is refused, because the diff
+ * A review identical to what is already there is refused, because the diff
  * plugin stays active with no change to resolve and its transaction filter
  * then blocks every edit: the editor would be locked with nothing in the
  * document to click.
@@ -93,7 +58,7 @@ export function startDocumentRevision(
   if (editor.version !== review.baseVersion) {
     return { kind: 'refused', reason: 'stale-version' };
   }
-  if (review.proposal === currentBody) return { kind: 'refused', reason: 'no-changes' };
+  if (review.before === currentBody) return { kind: 'refused', reason: 'no-changes' };
   return { kind: 'started', state: { ...state, revision: { kind: 'starting', review } } };
 }
 

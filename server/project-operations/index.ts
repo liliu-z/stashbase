@@ -11,7 +11,6 @@ import {
 } from '../project-file-access.ts';
 import { listProjectDirectory } from '../project-directory.ts';
 import { readProjectFile, type ProjectFileLineRange } from '../project-file-reader.ts';
-import { suggestProjectFileEdits } from '../document-revisions.ts';
 import {
   deleteProjectFile,
   editProjectFile,
@@ -75,10 +74,6 @@ export interface ProjectOperations {
   read(path: unknown, range?: ProjectFileLineRange): Promise<unknown>;
   write(input: { path: unknown; content: unknown; baseVersion?: string }): Promise<unknown>;
   edit(input: { path: unknown; oldText: unknown; newText: unknown; replaceAll?: boolean; baseVersion?: string }): Promise<unknown>;
-  /** Park a whole-document revision for the reader to accept or reject inside
-   *  the open document. Writes nothing to disk and never waits for the
-   *  decision. */
-  suggestEdits(input: { path: unknown; content: unknown; withinFolder?: string }): Promise<unknown>;
   move(input: { path: unknown; newPath: unknown; cascade?: boolean }): Promise<unknown>;
   delete(path: unknown): Promise<unknown>;
 }
@@ -94,7 +89,6 @@ export interface ProjectOperationsDependencies {
   read: typeof readProjectFile;
   write: typeof writeProjectFile;
   edit: typeof editProjectFile;
-  suggestEdits: typeof suggestProjectFileEdits;
   move: typeof moveProjectFile;
   delete: typeof deleteProjectFile;
   hasEmbeddingKey: () => boolean;
@@ -111,7 +105,6 @@ const productionDependencies: ProjectOperationsDependencies = {
   read: readProjectFile,
   write: writeProjectFile,
   edit: editProjectFile,
-  suggestEdits: suggestProjectFileEdits,
   move: moveProjectFile,
   delete: deleteProjectFile,
   hasEmbeddingKey: isEmbeddingConfigured,
@@ -222,10 +215,6 @@ export function createProjectOperations(
       if (typeof oldText !== 'string') throw routeError('old_text (string) required', 400);
       if (typeof newText !== 'string') throw routeError('new_text (string) required', 400);
       return deps.edit(path, oldText, newText, { replaceAll, baseVersion });
-    }),
-    suggestEdits: ({ path, content, withinFolder }) => asProjectOperation(() => {
-      if (typeof content !== 'string') throw routeError('content (string) required', 400);
-      return deps.suggestEdits(path, content, { withinFolder });
     }),
     move: ({ path, newPath, cascade }) => asProjectOperation(() => deps.move(path, newPath, { cascade })),
     delete: (path) => asProjectOperation(() => deps.delete(path)),

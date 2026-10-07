@@ -39,8 +39,8 @@ const scope = {
 const review: RevisionReview = {
   baseVersion: VERSION,
   id: 'review-1',
-  origin: { kind: 'developer' },
-  proposal: PROPOSAL,
+
+  before: PROPOSAL,
 };
 
 function loaded(content = BASE): DocumentState {
@@ -55,7 +55,6 @@ function loaded(content = BASE): DocumentState {
 function Surface({
   base = BASE,
   onDocumentChange,
-  origin = 'developer',
   proposal,
   reconciled,
 }: {
@@ -64,7 +63,6 @@ function Surface({
   base?: string | undefined;
   onDocumentChange?: ((value: string) => void) | undefined;
   /** Who offered the review; `turn` runs it in reverse. */
-  origin?: 'developer' | 'turn' | undefined;
   proposal: string | null;
   reconciled?: string | undefined;
 }) {
@@ -78,14 +76,13 @@ function Surface({
         current,
         {
           ...review,
-          origin: origin === 'turn' ? { kind: 'turn', turnId: 'turn-1' } : { kind: 'developer' },
-          proposal,
+          before: proposal,
         },
         current.editor?.value ?? '',
       );
       return started.kind === 'started' ? started.state : current;
     });
-  }, [origin, proposal]);
+  }, [proposal]);
 
   useEffect(() => {
     if (reconciled === undefined) return;
@@ -112,7 +109,6 @@ function Surface({
       onOpenExternal={vi.fn(async () => true)}
       readOnly={false}
       revision={{
-        onControls: () => undefined,
         onPending: (reviewId, pending) =>
           setState((current) => publishDocumentRevisionCount(current, reviewId, pending)),
         state: state.revision,
@@ -136,22 +132,20 @@ async function openSurface(props: Parameters<typeof Surface>[0]) {
   return view;
 }
 
-const acceptControls = () => screen.queryAllByRole('button', { name: 'Accept' });
-const undoControls = () => screen.queryAllByRole('button', { name: 'Undo' });
-const root = () => document.querySelector('.markdown-crepe'); // dom-contract: the colour swap is an attribute on the editor host, which has no role
+const acceptControls = () => screen.queryAllByRole('button', { name: 'Undo' });
 
 afterEach(cleanup);
 
 describe('a revision review on the Markdown surface', () => {
   it('opens from the document state and counts what is pending in the header', async () => {
     const { rerender } = await openSurface({ proposal: null });
-    expect(screen.queryByRole('group', { name: 'Suggested changes' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Changes from this turn' })).toBeNull();
     expect(acceptControls()).toHaveLength(0);
 
     rerender(<Surface proposal={PROPOSAL} />);
     await waitFor(() => expect(acceptControls()).toHaveLength(2));
-    expect(screen.getByRole('group', { name: 'Suggested changes' })).not.toBeNull();
-    expect(screen.getByRole('status').textContent).toBe('2 suggested changes');
+    expect(screen.getByRole('group', { name: 'Changes from this turn' })).not.toBeNull();
+    expect(screen.getByRole('status').textContent).toBe('2 changes from this turn');
   });
 
   it('counts down as changes are taken and ends when the last one is resolved', async () => {
@@ -161,29 +155,31 @@ describe('a revision review on the Markdown surface', () => {
     await waitFor(() => expect(acceptControls()).toHaveLength(2));
 
     await user.click(acceptControls()[0] as HTMLElement);
-    await waitFor(() => expect(screen.getByRole('status').textContent).toBe('1 suggested change'));
+    await waitFor(() =>
+      expect(screen.getByRole('status').textContent).toBe('1 change from this turn'),
+    );
 
     await user.click(acceptControls()[0] as HTMLElement);
     await waitFor(() =>
-      expect(screen.queryByRole('group', { name: 'Suggested changes' })).toBeNull(),
+      expect(screen.queryByRole('group', { name: 'Changes from this turn' })).toBeNull(),
     );
     await act(settleMarkdownListener);
 
     expect(changes.at(-1)).toBe(PROPOSAL);
   });
 
-  it('leaves the source untouched when the whole review is rejected', async () => {
+  it('leaves the source untouched when the whole review is kept', async () => {
     const user = userEvent.setup();
     const changes: string[] = [];
     await openSurface({ onDocumentChange: (value) => changes.push(value), proposal: PROPOSAL });
     await waitFor(() => expect(acceptControls()).toHaveLength(2));
 
-    await user.click(screen.getByRole('button', { name: 'Reject all' }));
+    await user.click(screen.getByRole('button', { name: 'Keep all' }));
     await waitFor(() => expect(acceptControls()).toHaveLength(0));
     await act(settleMarkdownListener);
 
     expect(changes).toEqual([]);
-    expect(screen.queryByRole('group', { name: 'Suggested changes' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Changes from this turn' })).toBeNull();
   });
 
   it('takes every remaining change at once', async () => {
@@ -192,11 +188,11 @@ describe('a revision review on the Markdown surface', () => {
     await openSurface({ onDocumentChange: (value) => changes.push(value), proposal: PROPOSAL });
     await waitFor(() => expect(acceptControls()).toHaveLength(2));
 
-    await user.click(screen.getByRole('button', { name: 'Accept all' }));
+    await user.click(screen.getByRole('button', { name: 'Undo all' }));
     await act(settleMarkdownListener);
 
     expect(changes.at(-1)).toBe(PROPOSAL);
-    expect(screen.queryByRole('group', { name: 'Suggested changes' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Changes from this turn' })).toBeNull();
   });
 
   it('holds a background reconcile off the text the review describes', async () => {
@@ -208,7 +204,7 @@ describe('a revision review on the Markdown surface', () => {
     const surface = screen.getByRole('document', { name: 'plan.md Markdown content' });
     expect(surface.textContent).not.toContain('Replaced from disk');
     expect(surface.textContent).toContain('The second lin');
-    expect(screen.getByRole('status').textContent).toBe('2 suggested changes');
+    expect(screen.getByRole('status').textContent).toBe('2 changes from this turn');
   });
 
   it('ends a review whose proposal spells the same document differently', async () => {
@@ -222,7 +218,7 @@ describe('a revision review on the Markdown surface', () => {
     const { rerender } = await openSurface({ base: setext, proposal: BASE });
 
     expect(acceptControls()).toHaveLength(0);
-    expect(screen.queryByRole('group', { name: 'Suggested changes' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Changes from this turn' })).toBeNull();
 
     rerender(<Surface base={setext} proposal={BASE} reconciled="# Replaced from disk\n" />);
     await waitFor(() =>
@@ -241,37 +237,10 @@ describe('a revision review on the Markdown surface', () => {
     });
     await waitFor(() => expect(acceptControls()).toHaveLength(2));
 
-    await user.click(screen.getByRole('button', { name: 'Accept all' }));
+    await user.click(screen.getByRole('button', { name: 'Undo all' }));
     await act(settleMarkdownListener);
 
     expect(changes.at(-1)).toBe(PROPOSAL);
-  });
-
-  it('reads Undo and Keep for a turn review and Accept and Reject for the next proposal', async () => {
-    const user = userEvent.setup();
-    const changes: string[] = [];
-    // The editor holds what the turn wrote; the offer is the text from before.
-    const { rerender } = await openSurface({
-      onDocumentChange: (value) => changes.push(value),
-      origin: 'turn',
-      proposal: PROPOSAL,
-    });
-    await waitFor(() => expect(undoControls()).toHaveLength(2));
-    expect(screen.queryAllByRole('button', { name: 'Keep' })).toHaveLength(2);
-    expect(acceptControls()).toHaveLength(0);
-    expect(screen.getByRole('status').textContent).toBe('2 changes from this turn');
-    expect(root()?.hasAttribute('data-review-reversed')).toBe(true);
-
-    await user.click(screen.getByRole('button', { name: 'Keep all' }));
-    await waitFor(() => expect(undoControls()).toHaveLength(0));
-    await act(settleMarkdownListener);
-    expect(changes).toEqual([]);
-    expect(root()?.hasAttribute('data-review-reversed')).toBe(false);
-
-    rerender(<Surface origin="developer" proposal={PROPOSAL} />);
-    await waitFor(() => expect(acceptControls()).toHaveLength(2));
-    expect(screen.queryAllByRole('button', { name: 'Reject' })).toHaveLength(2);
-    expect(undoControls()).toHaveLength(0);
   });
 
   it('restores the text from before the turn when a turn review is undone', async () => {
@@ -279,10 +248,9 @@ describe('a revision review on the Markdown surface', () => {
     const changes: string[] = [];
     await openSurface({
       onDocumentChange: (value) => changes.push(value),
-      origin: 'turn',
       proposal: PROPOSAL,
     });
-    await waitFor(() => expect(undoControls()).toHaveLength(2));
+    await waitFor(() => expect(acceptControls()).toHaveLength(2));
 
     await user.click(screen.getByRole('button', { name: 'Undo all' }));
     await act(settleMarkdownListener);

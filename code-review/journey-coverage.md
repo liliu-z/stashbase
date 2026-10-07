@@ -291,7 +291,6 @@ font and size presets cross `shared/protocols/http/appearance.ts` to
 `renderer/src/shared/runtime/appearance-surface.ts`.
 Inline review: `renderer/src/features/documents/domain/revision.ts`,
 `renderer/src/features/documents/ui/markdown/use-revision-review.tsx`,
-`renderer/src/features/documents/hooks/use-revision-proposals.ts`, and
 `renderer/src/features/documents/ui/markdown/revision-adapter.ts` over a patched
 `@milkdown/plugin-diff` (`patches/`).
 Turn review: `renderer/src/features/documents/application/open-revision.ts`
@@ -310,7 +309,7 @@ question rendered by `ui/workspace/discard-draft-dialog.tsx`, and `document-runt
 owns the explicit restore, which re-attempts the ordinary save before creating the file
 so a source that came back is compared instead of overwritten.
 Host/services: `server/file-save.ts`, `server/text-file-transaction.ts`,
-`server/document-revisions.ts`, `server/routes/document-revisions.ts`.
+`server/turn-changes.ts`, `server/routes/turn-changes.ts`.
 
 **Status:** Release-dependent.
 
@@ -394,23 +393,13 @@ Host/services: `server/file-save.ts`, `server/text-file-transaction.ts`,
   rename rebinding, immediate Markdown publication, and undo after six other
   kept Markdown editors. No Agent/provider fixture was needed. The source files
   and visible editor contents were checked; this was not a packaged release.
-- **Inline revision runtime pass (2026-09-18):** the built renderer in Electron
-  opened an isolated Markdown project on the X11 display. A controlled
-  window-origin `suggest_edits` request left the Plan.md source unchanged on disk, then
-  its Documents tab showed one inline deletion/insertion and the whole-review
-  controls. The dark desktop composition was inspected by eye with both Chat
-  and Documents visible. Accept all saved the exact proposed text to disk.
-  This pass did not use a live Agent provider or a packaged build.
-- **Per-change Reject runtime pass (2026-09-20):** the built renderer in
-  Electron on macOS, with an isolated HOME, user-data directory and port, opened
-  a seeded Markdown project and its document, then a window-origin
-  `suggest_edits` request parked a proposal holding one pure deletion of a
-  wrapped sentence and one replacement. Real mouse input hovered the deleted
-  text, revealed its card and clicked Reject: the card and the strikethrough
-  went away, the bar dropped to one suggested change, and the file on disk was
-  unchanged. Accept on the remaining card closed the review and autosave wrote
-  exactly the expected text, the kept sentence included. The light composition
-  was inspected by eye. No live Agent provider or packaged build was used.
+- **Turn-only review (2026-10-08):** the proposal tool, transient store,
+  consumptive delivery routes/poll, and Accept/Reject chat controls are retired.
+  The document retains the shared diff engine with fixed Undo/Keep controls,
+  version/frontmatter refusal, and byte-preserving Keep. `open-revision.test.ts`,
+  `document-revision.test.tsx`, and `use-turn-review.test.tsx` exercise the retained
+  entry and failure paths. Earlier proposal-only runtime passes no longer
+  establish the current entry. Current runtime evidence belongs with J07.
 - **AI Eval:** not required.
 - **Release Check:** representative complex PDF/DOCX/media in packaged viewers.
 - **Gap:** packaged multi-format viewer behavior and large-project resource
@@ -1077,7 +1066,7 @@ owns that rule and the history restore.
 
 **Implementation:** Renderer: `renderer/src/features/agent/application/session-runtime.ts`, `renderer/src/features/documents/application/document-runtime.ts`, `renderer/src/app/composition/layout/workspace-panes.tsx`.
 Host/services: `server/project-file-mutations.ts`, `server/text-file-transaction.ts`,
-`server/document-revisions.ts`, `server/project-operations/index.ts`,
+`server/project-operations/index.ts`,
 `server/turn-changes.ts` (turn baselines at the `attachAgentRuntime` seam), and
 `renderer/src/features/agent/ui/transcript/turn-changes-card.tsx`.
 
@@ -1096,27 +1085,27 @@ Host/services: `server/project-file-mutations.ts`, `server/text-file-transaction
   and real document services, clicks both Open and a local Markdown link from
   Chats. Both select Documents and display the file while retaining the same
   Agent session and unfinished follow-up.
-  The 2026-09-18 inline revision pass in J03 drove a controlled proposal through
-  the built desktop and accepted it to disk; a real Agent turn producing that
-  proposal and its matching Chat card remain unproven at runtime.
-- **Proposing or writing (2026-09-22):** a real Claude conversation edited an
-  open draft with the native edit tool and then with `edit_file`, and reached
-  `suggest_edits` only at its end. Its StashBase tools had been deferred behind
-  Claude's tool search, so it held their names without descriptions, and the
-  routing policy said nothing about writes. `server/agent-mcp.ts` now writes
-  Claude's entry with `alwaysLoad`, and `server/agent-runtime-instructions.ts`
-  states when a Markdown revision is proposed and when a file is written.
-  `pnpm test:agent` covers the policy reaching a Claude session and the config
-  write keeping a user's other settings. A controlled Claude CLI probe with tool
-  search forced on read the description of `suggest_edits` with the flag and
-  held only its name without it. Not proven: that a real runtime follows the
-  guidance turn after turn. It is a standing instruction, not a gate, and no
-  conversation was driven after the change.
+- **File tool routing (2026-10-08):** shared runtime instructions require
+  `edit_file` for existing documents and `write_file` for new ones; `suggest_edits`
+  and its approval exceptions are removed from HTTP/MCP and all built-in runtimes.
+  Claude retains `alwaysLoad` for StashBase MCP and removes native edit/write
+  tools; OpenQuill denies native edits. Codex tool routing remains an instruction,
+  not a verified native-tool gate. Shell/subagent writes remain detectable by
+  the common turn scan. `project-file-mutations.test.ts` covers edits of empty
+  files, nonempty-match rejection and stale versions through real MCP.
+- **Driven runtime pass (2026-10-08):** the production renderer in a source
+  Electron launch, with a disposable project and a project-local MCP port
+  override, completed a real Claude turn through two `edit_file` calls. The
+  Chat's Changed in this turn card opened two inline Undo/Keep changes. Undoing
+  one and keeping the other saved the expected mixed result; reviewing the
+  same turn again refused the now-stale source. This establishes the removed
+  proposal path is unnecessary for the Claude flow. It does not establish
+  packaged or other-runtime behavior.
 - **Turn review (2026-10-04):** every turn on a folder-bound Agent socket is
   bracketed by a Markdown baseline taken before the prompt reaches the runtime
   and a rescan at `turn-end`; the Chat card offers Review per edited file, which
-  opens a reversed inline review (Undo/Keep). The runtime policy now has Agents
-  write directly and propose with `suggest_edits` only on request.
+  opens a reversed inline review (Undo/Keep). The runtime policy has Agents
+  write directly through the StashBase file tools.
   `server/turn-changes.test.ts` covers created/edited/deleted detection for
   untooled writes, hidden-note and size exclusion, retention, prompt hold and
   ordering, capture failure, and a refused prompt's baseline;
@@ -1125,8 +1114,7 @@ Host/services: `server/project-file-mutations.ts`, `server/text-file-transaction
   `turn-changes-card.test.tsx`, `session.test.ts` and `events.test.ts` cover the
   renderer path. A driven dev-build pass with a real Claude turn showed the card,
   the reversed review with Undo/Keep labels and swapped colours, a per-change
-  Undo saving, Keep all, a stale refusal on a second Review, and a later
-  `suggest_edits` proposal reading Accept/Reject again. Not proven: Codex and the
+  Undo saving, Keep all, a stale refusal on a second Review, and Keep all. Not proven: Codex and the
   Default runtime driven at runtime (they share the socket seam but were not
   run), a packaged build, and large-vault scan cost per prompt.
 - **Citations (2026-09-25):** `renderer/src/features/agent/domain/citation.ts`
@@ -1154,6 +1142,11 @@ Host/services: `server/project-file-mutations.ts`, `server/text-file-transaction
 
 **Implementation:** Renderer: `renderer/src/features/settings/ui/mcp/mcp-access-panel.tsx`.
 Host/services: `server/project-operations/index.ts`, `mcp/server.ts`, `server/routes/mcp-http.ts`, `server/mcp-http-service.ts`.
+
+**Retired interface (2026-10-08):** `suggest_edits` and its HTTP delivery routes
+are removed. External clients use the existing write/edit tools; unsupported old
+calls fail without writing. Post-write Chat review requires a StashBase-owned
+Agent turn and is not promised for standalone external MCP clients.
 
 **Status:** Partial and release-dependent.
 
@@ -1219,7 +1212,7 @@ Host/services: follow J02/J03/J05/J06/J07 owners for the exercised path. StashBa
   sources are used, not a prerequisite for every brainstorm. J05 is narrower.
 - **Release Check:** packaged empty-project discussion, requested draft,
   inspection/edit/save, and return; also a reference-assisted native-runtime task.
-  These verify writing and revision, including a proposed revision reviewed inline.
+  These verify writing and revision, including saved changes reviewed inline.
 
 ## J11: Conversation to project
 

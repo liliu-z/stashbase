@@ -63,7 +63,6 @@
     "shared/protocols/http/agent-runtime.ts",
     "shared/protocols/http/agent-sessions.ts",
     "shared/protocols/http/appearance.ts",
-    "shared/protocols/http/document-revisions.ts",
     "shared/protocols/http/turn-changes.ts",
     "shared/protocols/http/telemetry.ts",
     "shared/protocols/http/embedder.ts",

@@ -4,7 +4,6 @@ import {
   changedSource,
   fileBasename,
   fileChangesForTool,
-  revisionProposalForTool,
   settledFileChanges,
   turnMayHaveChangedFilesUnseen,
 } from './file-change';
@@ -150,41 +149,6 @@ describe('Agent file changes', () => {
       folderPath: 'C:\\Library\\Research',
       path: 'a.md',
     });
-  });
-
-  it('reads a parked revision as its own kind of call, never as a file change', () => {
-    const parked = JSON.stringify({
-      id: 'proposal-1',
-      baseVersion: 'sha256:v1',
-      parked: true,
-      path: '/project/Research/plan.md',
-    });
-    expect(revisionProposalForTool('mcp__stashbase__suggest_edits', parked)).toEqual({
-      id: 'proposal-1',
-      path: '/project/Research/plan.md',
-    });
-    expect(revisionProposalForTool('Write', parked)).toBeNull();
-    // The host refuses a proposal matching the document without erroring, so
-    // only its answer can tell a parked one from a refused one.
-    expect(
-      revisionProposalForTool(
-        'suggest_edits',
-        JSON.stringify({ parked: false, path: 'plan.md', reason: 'no-changes' }),
-      ),
-    ).toBeNull();
-    expect(revisionProposalForTool('suggest_edits', JSON.stringify({ parked: true }))).toBeNull();
-    expect(revisionProposalForTool('suggest_edits', 'Parked for review.')).toBeNull();
-    // A parked proposal wrote nothing to disk, so the changed-files list must
-    // not claim the document moved.
-    expect(
-      settledFileChanges([
-        {
-          input: { arguments: { content: '# Plan', path: 'plan.md' } },
-          name: 'mcp__stashbase__suggest_edits',
-          status: 'done',
-        },
-      ]),
-    ).toEqual([]);
   });
 
   it('tells a turn that may have written unseen from one that only read or reported', () => {

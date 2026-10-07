@@ -103,12 +103,6 @@ preview, content editing, and rename/delete are separate permissions.
   Structured edits splice source ranges; replacements treat dollar sequences
   literally. Invalid UTF-8 is never rewritten lossily. Agent text writes reject
   unintended control bytes without consuming valid literal backslashes.
-- Proposals are host state, never disk state. Parking takes the source's transaction
-  so a proposal cannot be born against a version that already moved. File moves
-  remap pending paths; folder rename, deletion and project removal retire proposals
-  they orphan. A proposal is handed
-  to one window and forgotten, so delivery is at most once and a failed handoff is
-  reported to the reader rather than retried.
 - Turn changes are host state owned by `server/turn-changes.ts`. Native runtime
   writes and shell commands never pass through the host, so `attachAgentRuntime`
   wraps every Agent socket bound to a folder: a prompt and everything after it
@@ -315,8 +309,8 @@ stable status without download, retry, or a new durable demand latch.
   searches, and questions report nothing.
 - A persona is per-project Settings guidance resolved at native mount and composed
   with internal routing policy. That policy is the one text every runtime always
-  sees, so it owns which StashBase tool orients and reads prepared text, and when
-  a Markdown revision is proposed rather than written; a tool description alone
+  sees, so it owns which StashBase tool orients and reads prepared text, and that
+  existing documents use `edit_file` while new documents use `write_file`; a tool description alone
   cannot own a rule, because a runtime may defer it. Neither is a permission,
   skill contents, or a project-file edit, and StashBase ships no workflow
   guidance of its own: that is the user's `AGENTS.md` / `CLAUDE.md`. Packaged
@@ -340,17 +334,20 @@ stable status without download, retry, or a new durable demand latch.
   identity. No catalog-order default or global CLI rewrite; active turns freeze
   changes. Skills use native invocation, not concatenated skill-file contents.
 - Pending approvals require the exact request id; abort/disposal denies them.
-  Read/orientation/reindex may use the low-risk path, and so does proposing a
-  revision, which reaches no file: the reader's per-change accept is the approval,
-  and prompting first would freeze the turn for the length of a human read. That
-  bypass buys its own guards, because the prompt was also the throttle. A proposal
-  is confined to the caller's own project by the handler rather than by any
-  transport. Built-in sessions use their bound folder; external MCP callers must
-  name an exact registered folder. A caller with neither is refused. Proposals are
-  bounded per folder by count, bytes and age. Codex excludes plan mode, whose promise is that the turn
-  leaves nothing to undo. Edit policy grants only its
+  Read/orientation/reindex may use the low-risk path. Document writes remain
+  permissioned and Review never grants a write in advance. Edit policy grants only its
   bounded writes; move/delete/commands/network/broader access require their own
   authority. `create_project` needs an explicit request or visible approval.
+- Shared instructions require StashBase `edit_file` for existing project
+  documents and `write_file` for creation, including after a failed native attempt.
+  Claude removes native Edit/MultiEdit/Write from its tools and shares the bounded
+  MCP Edit-mode approval predicate with Codex in `server/agent-file-permissions.ts`; OpenQuill denies the
+  native edit permission shared by edit/write/patch. Codex has no independently
+  verified native-edit disable switch in the current app-server integration, so
+  its routing remains guidance. Shells and subagents are not a filesystem
+  isolation guarantee. Turn review therefore continues to detect all scanned
+  Markdown changes regardless of the writing tool. External MCP clients have no
+  app-owned turn socket and do not receive Chat turn-review cards.
 - Codex modes use on-request approval with mode-specific sandbox/review policy;
   Claude maps native modes; OpenQuill always asks. Unbound OpenQuill disables
   native filesystem/command tools; bound native tools cannot escape their cwd.
@@ -503,14 +500,13 @@ registered host boundaries; renderer shared types are a different layer.
   patch carries the reviewed document's trailing empty paragraph into a parsed
   proposal, which Markdown cannot spell. A Milkdown upgrade carries the patch,
   or retires it against the revision engine test.
-- A turn review is that same review reversed, not a second diff surface: the
+- Turn review runs the diff engine in reverse: the
   editor holds the file the turn left, the offer is the text from before it, and
   the offer's base version is the version the turn left, so the existing stale
   gate refuses a file that moved on. Taking a change undoes it through the
-  ordinary save; ending the review keeps the source byte-identical. The origin
-  `{ kind: 'turn' }` selects the Undo/Keep labels and the swapped colours.
-  Upstream keeps its original label config object, so `revision-adapter.ts`
-  supplies the labels through getters set on each start.
+  ordinary save; ending the review keeps the source byte-identical. The adapter supplies fixed
+  Undo/Keep labels and the surface swaps the colours. The retired proposal
+  store, delivery poll, chat controls, and provenance branches have no callers.
 - Surface recovery remounts the smallest boundary. Shell remount loses live buffers
   and reloads only saved source files. HTTP loss must not reload the app.
   Raw failures are mapped to feature-owned messages and recovery kinds.

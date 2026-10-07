@@ -4,7 +4,7 @@
  * renders the header bar while one is open.
  *
  * The runtime drives this rather than the component deciding for itself, so
- * the developer harness and an agent proposal reach the editor through one
+ * the developer harness and a turn review reach the editor through one
  * entry. A rebuilt editor holds no review, so a review the document still has
  * is reopened on the new one.
  */
@@ -12,22 +12,20 @@ import type { CrepeBuilder } from '@milkdown/crepe/builder';
 import { useCallback, useEffect, useRef, type ReactNode } from 'react';
 
 import { splitLeadingYamlFrontmatter } from '@/features/documents/domain/markdown';
-import type { DocumentRevision, RevisionControls } from '@/features/documents/domain/revision';
+import type { DocumentRevision } from '@/features/documents/domain/revision';
 
-import { MarkdownReviewBar, reviewWording } from './review-bar';
+import { MarkdownReviewBar } from './review-bar';
 import { attachRevisionReview, type RevisionSurface } from './revision-adapter';
 
 /** What the surface needs from the document runtime, and what it reports back
- *  to it. One bundle rather than three props, so the surface between the
+ *  to it. One bundle rather than separate props, so the surface between the
  *  runtime and the editor is named in one place. */
 export interface RevisionBinding {
-  /** Registers the whole-set controls with the document runtime. */
-  onControls(controls: RevisionControls | null): void;
   /** How many changes the diff plugin still has pending, reported upward from
    *  the one place that knows. */
   onPending(reviewId: string, pending: number): void;
   /** The review to open, driven from the document runtime so the developer
-   *  harness and an agent proposal reach the editor through one entry. */
+   *  harness and a turn review reach the editor through one entry. */
   state: DocumentRevision;
 }
 
@@ -60,8 +58,6 @@ export function useRevisionReview({
   // rebuild the editor or restart the review it holds.
   const reportRef = useRef(revision.onPending);
   reportRef.current = revision.onPending;
-  const controlsRef = useRef(revision.onControls);
-  controlsRef.current = revision.onControls;
   const state = revision.state;
 
   const attach = useCallback((editor: CrepeBuilder) => {
@@ -71,14 +67,9 @@ export function useRevisionReview({
       if (reviewId !== null) reportRef.current(reviewId, pending);
     });
     surfaceRef.current = surface;
-    controlsRef.current({
-      acceptAll: () => surface.acceptAll(),
-      rejectAll: () => surface.clear(),
-    });
     return () => {
       if (surfaceRef.current !== surface) return;
       surfaceRef.current = null;
-      controlsRef.current(null);
     };
   }, []);
 
@@ -93,11 +84,7 @@ export function useRevisionReview({
     }
     if (openIdRef.current === state.review.id) return;
     openIdRef.current = state.review.id;
-    const wording = reviewWording(state.review.origin);
-    surface.start(splitLeadingYamlFrontmatter(state.review.proposal).body, {
-      accept: wording.accept,
-      reject: wording.reject,
-    });
+    surface.start(splitLeadingYamlFrontmatter(state.review.before).body);
   }, [creationState, state]);
 
   return {
@@ -106,12 +93,11 @@ export function useRevisionReview({
     bar:
       state.kind === 'reviewing' ? (
         <MarkdownReviewBar
-          onAcceptAll={() => surfaceRef.current?.acceptAll()}
-          onRejectAll={() => surfaceRef.current?.clear()}
+          onUndoAll={() => surfaceRef.current?.undoAll()}
+          onKeepAll={() => surfaceRef.current?.clear()}
           pending={state.pending}
-          wording={reviewWording(state.review.origin)}
         />
       ) : null,
-    reversed: state.kind !== 'idle' && state.review.origin.kind === 'turn',
+    reversed: state.kind !== 'idle',
   };
 }

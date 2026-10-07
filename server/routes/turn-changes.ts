@@ -1,6 +1,5 @@
 /** The text a file held before an Agent turn, read when the reader reviews that
- * turn. `server/turn-changes.ts` owns the record and why it expires. Unlike the
- * revision drain, the read leaves the record in place: reviewing is not
+ * turn. `server/turn-changes.ts` owns the record and why it expires. The read leaves the record in place: reviewing is not
  * claiming, and the reader may open the same turn again. */
 import type express from 'express';
 import {

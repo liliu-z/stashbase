@@ -10,10 +10,9 @@
  * including an edit the reader made during it; the review shows that edit like
  * any other and the reader keeps it.
  *
- * Recorded turns live in memory and die with the process, for the same reason
- * pending revisions do: the review is worth less than the session that made
- * it, and a durable copy of old document text would need its own staleness and
- * recovery rules. A renamed file is not followed; its review answers 404 the
+ * Recorded turns live in memory and die with the process: a durable copy of old
+ * document text would need its own staleness and recovery rules. A renamed file
+ * is not followed; its review answers 404 the
  * way an expired turn does.
  *
  * Tracking is best effort by design. A failed scan leaves the turn untracked
@@ -35,8 +34,7 @@ import { textVersion } from './text-file-transaction.ts';
 
 const log = logger('turn-changes');
 
-/** The same ceiling a revision proposal has: past it a document is not
- *  something a person reviews change by change. */
+/** Larger documents are not tracked for per-change prose review. */
 const MAX_TRACKED_FILE_BYTES = 1024 * 1024;
 
 /** Every prompt rescans the folder, so the number of files read and held must
@@ -48,7 +46,7 @@ const MAX_TRACKED_BYTES = 32 * 1024 * 1024;
 /** Enough history to review the turns of one sitting. */
 const MAX_RECORDED_TURNS_PER_FOLDER = 20;
 
-/** A turn nobody reviews is released by age. Matches pending revisions. */
+/** A turn nobody reviews is released by age. */
 const TURN_TTL_MS = 6 * 60 * 60 * 1000;
 
 /** Coarse filesystems store mtime to the second or two. A file whose mtime is

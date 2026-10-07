@@ -85,9 +85,6 @@ export function createHttpProjectOperations(
       method: 'POST', headers: headers({ 'content-type': 'application/json' }),
       body: JSON.stringify({ path, old_text: oldText, new_text: newText, replace_all: replaceAll === true, ...(typeof baseVersion === 'string' ? { baseVersion } : {}) }),
     }),
-    suggestEdits: ({ path, content, withinFolder }) => json(`${webBase}/api/project/file/suggest-edits`, {
-      method: 'POST', headers: headers({ 'content-type': 'application/json' }), body: JSON.stringify({ path, content, ...(withinFolder ? { folder: withinFolder } : {}) }),
-    }),
     move: ({ path, newPath, cascade }) => json(`${webBase}/api/project/file/move`, {
       method: 'PATCH', headers: headers({ 'content-type': 'application/json' }), body: JSON.stringify({ path, new_path: newPath, cascade: cascade !== false }),
     }),

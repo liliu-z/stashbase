@@ -170,46 +170,6 @@ export function fileChangesForTool(
   return [];
 }
 
-/**
- * The identity and Markdown source a settled tool parked a revision against,
- * or null when the call was not one or parked nothing.
- *
- * A sibling of `fileChangesForTool` rather than a branch inside it. That
- * function feeds `settledFileChanges`, which drives the panel's changed-files
- * list, and a parked proposal wrote nothing to disk: listing it there would
- * tell the reader a file changed when it did not.
- *
- * The result is read rather than the call's own arguments, because the host
- * answers a proposal that matches the document with `parked: false` and no
- * error. A card built from the arguments alone would offer the reader a review
- * of a proposal that was correctly refused and will never open. The host's
- * answer also supplies the ID that keeps an older card from controlling a
- * later proposal for the same source.
- */
-export function revisionProposalForTool(
-  name: string,
-  result: string,
-): { id: string; path: string } | null {
-  if (!/suggest_edits$/i.test(name)) return null;
-  let answer: unknown;
-  try {
-    answer = JSON.parse(result);
-  } catch {
-    // swallowed: a runtime that wrapped or truncated the text leaves nothing
-    // to read, and a card promising a review nobody parked is worse than none.
-    return null;
-  }
-  if (!answer || typeof answer !== 'object') return null;
-  const parked = answer as { id?: unknown; parked?: unknown; path?: unknown };
-  if (parked.parked !== true) return null;
-  return typeof parked.id === 'string' &&
-    parked.id !== '' &&
-    typeof parked.path === 'string' &&
-    parked.path !== ''
-    ? { id: parked.id, path: parked.path }
-    : null;
-}
-
 /** Every file a finished tool left changed, one entry per path with the
  *  latest action. Running, denied, failed, and cancelled work leaves none. */
 export function settledFileChanges(tools: readonly ToolLike[]): AgentFileChange[] {

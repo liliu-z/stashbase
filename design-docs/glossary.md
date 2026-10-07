@@ -28,15 +28,16 @@ types. Format capabilities determine whether its body can be edited.
 
 ## Document-specific diff
 
-Inline prose revision with individually reviewable suggestions in Markdown.
+Inline review of an Agent turn's saved Markdown changes, individually undone
+or kept.
 It is distinct from file/conflict comparisons and Agent action approval.
 See [Project Files](capabilities/project-files.md#document-specific-diff).
 
 ## Turn review
 
 The reader-requested review of what one Agent turn changed in a Markdown file,
-shown in the document as changes to undo or keep. It is the same inline
-surface as a proposal, run against the text from before the turn. See
+shown in the document as changes to undo or keep. It compares the saved document
+with the text from before the turn. See
 [Project Files](capabilities/project-files.md#turn-review).
 
 ## Active-folder workspace

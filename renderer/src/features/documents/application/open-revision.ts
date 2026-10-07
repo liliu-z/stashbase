@@ -1,15 +1,9 @@
-/**
- * Turning one drained proposal into an open review on the document's runtime.
- *
- * A freshly opened tab has no editor yet: its text is loaded by react-query in
- * the React tree, some way after the tab exists. So the review waits for the
- * editor to arrive rather than refusing a document that is merely still
- * loading. Every way the wait can end is a value the caller reports, because
- * the host has already forgotten the proposal by the time this runs.
- */
+/** Load the earlier text of a turn and open it as an inline review. A freshly
+ * opened tab may not have an editor yet, so wait for its source before checking
+ * the disk version and entering review. Every refusal is returned to the caller. */
 import type { DocumentEditorState } from '@/features/documents/domain/document';
 import { splitLeadingYamlFrontmatter } from '@/features/documents/domain/markdown';
-import type { RevisionOrigin, RevisionRefusal } from '@/features/documents/domain/revision';
+import type { RevisionRefusal } from '@/features/documents/domain/revision';
 
 import type { DocumentRuntime } from './document-runtime';
 import {
@@ -19,18 +13,15 @@ import {
   type DocumentTurnChangesPort,
 } from './ports';
 
-/** Long enough for a large document to finish its first read over a busy
- *  local server, short enough that a tab which will never load stops holding
- *  the proposal's only report of itself. */
+/** Bound the wait for a newly opened document to finish loading. */
 const EDITOR_WAIT_MS = 20_000;
 
-/** Why a drained proposal never became a review. Everything here is said to
- *  the reader: the host has already forgotten the proposal. */
-export type RevisionPickupFailure = RevisionRefusal | 'not-opened' | 'not-verified';
+/** A refusal opening the requested review. */
+type TurnReviewFailure = RevisionRefusal | 'not-opened' | 'not-verified';
 
 /** Why a turn the reader asked to review never became a review. `expired` is
  *  the host no longer holding the text from before the turn. */
-export type TurnChangeReviewFailure = RevisionPickupFailure | 'expired';
+export type TurnChangeReviewFailure = TurnReviewFailure | 'expired';
 
 /** The document's editor once it has text, or null when the runtime was
  *  disposed or the wait ran out first. */
@@ -61,25 +52,21 @@ function waitForEditor(runtime: DocumentRuntime): Promise<DocumentEditorState | 
   });
 }
 
-/** The text a review offers and what it was computed against. A parked
- *  proposal and a turn's earlier text both reduce to this. */
+/** The text a review offers and the version the turn left on disk. */
 interface ReviewOffer {
   readonly baseVersion: string;
   /** The whole file, frontmatter included. */
   readonly content: string;
   readonly id: string;
-  readonly origin: RevisionOrigin;
 }
 
 /** Opens `offer` as a review on `runtime` once its editor exists and the file
- *  on disk is still the version the offer was computed against. A parked
- *  proposal is already one. Answers why it could not be opened, or null once
- *  the review is up. */
-export async function openDocumentRevision(
+ *  on disk still matches the turn. Returns a refusal or null once review is up. */
+async function openDocumentRevision(
   runtime: DocumentRuntime,
   offer: ReviewOffer,
   sourceApi: DocumentSourcePort,
-): Promise<RevisionPickupFailure | null> {
+): Promise<TurnReviewFailure | null> {
   const editor = await waitForEditor(runtime);
   if (!editor) return 'not-opened';
   const scope = runtime.capture();
@@ -90,7 +77,7 @@ export async function openDocumentRevision(
   } catch {
     return 'not-verified';
   }
-  let result: RevisionPickupFailure | null = 'not-opened';
+  let result: TurnReviewFailure | null = 'not-opened';
   const accepted = runtime.accept(scope, () => {
     if (currentVersion !== offer.baseVersion) {
       result = 'stale-version';
@@ -108,8 +95,7 @@ export async function openDocumentRevision(
       {
         baseVersion: offer.baseVersion,
         id: offer.id,
-        origin: offer.origin,
-        proposal: proposed.body,
+        before: proposed.body,
       },
       current.body,
     );
@@ -142,7 +128,6 @@ export async function openTurnChangeReview(
       baseVersion: change.afterVersion,
       content: change.before,
       id: `turn:${turnId}:${change.source.path}`,
-      origin: { kind: 'turn', turnId },
     },
     ports.source,
   );

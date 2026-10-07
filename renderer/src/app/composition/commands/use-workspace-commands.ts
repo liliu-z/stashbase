@@ -12,7 +12,7 @@
 import { useCallback, useRef, useState } from 'react';
 
 import { useBootProgress } from '@/app/bootstrap/use-boot-progress';
-import type { RevisionPickup } from '@/app/composition/folder/use-revision-pickup';
+import type { TurnReview } from '@/app/composition/folder/use-turn-review';
 import {
   useWorkspaceNotices,
   type WorkspaceNotice,
@@ -98,7 +98,7 @@ export function useWorkspaceCommands({
   hostFailure: string | null;
   project: ProjectRegistrySnapshot | null;
   preparation: Pick<PreparationCommands, 'dismissFailure' | 'failure'>;
-  revisions: RevisionPickup;
+  revisions: TurnReview;
   session: WorkspaceSessionController;
   workspace: WorkspaceRuntime | null;
 }): WorkspaceCommands {

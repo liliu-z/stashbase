@@ -134,7 +134,8 @@ export function buildOpenCodeConfig(
 ): Config {
   const runtimeInstructions = composeAgentRuntimeInstructions(persona);
   const permission = {
-    edit: 'ask',
+    // Native edit/write/patch tools share this permission; MCP writes stay explicit.
+    edit: 'deny',
     bash: 'ask',
     webfetch: 'ask',
     doom_loop: 'ask',

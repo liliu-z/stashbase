@@ -1,3 +1,4 @@
+import { isStashbaseWorkspaceEdit, isWorkspaceFileChange } from './agent-file-permissions.ts';
 import { retireAgentProcess } from './agent-process.ts';
 /**
  * Live Codex WebSocket session runtime.
@@ -32,9 +33,6 @@ import {
   codexAccessOptions,
   commandApprovalInput,
   fileChangeApprovalInput,
-  isStashbaseProposal,
-  isStashbaseWorkspaceEdit,
-  isWorkspaceFileChange,
   mcpToolApprovalFromElicitation,
   requestedPermissions,
 } from './codex-approval.ts';
@@ -717,9 +715,7 @@ export class CodexSession implements AttributedAgentSession {
       case 'mcpServer/elicitation/request': {
         const approval = mcpToolApprovalFromElicitation(params);
         if (approval) {
-          const proposalOrEdit = isStashbaseProposal(approval, this.accessMode)
-            || (this.accessMode === 'acceptEdits' && isStashbaseWorkspaceEdit(approval, this.activeCwd()));
-          if (proposalOrEdit) {
+          if (this.accessMode === 'acceptEdits' && isStashbaseWorkspaceEdit(approval, this.activeCwd())) {
             this.respond(id, { action: 'accept', content: {}, _meta: null });
             break;
           }

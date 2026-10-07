@@ -67,21 +67,9 @@ export type AgentTranscriptBlock =
       retryablePrompt?: string | undefined;
     }
   | {
-      /** A revision an agent parked for the reader to accept or reject inside
-       *  the document. Not a tool block: consecutive tool blocks collapse into
-       *  one activity disclosure, so a review shaped as a tool would be
-       *  swallowed and never seen. */
-      kind: 'revision';
-      id: string;
-      /** The path the tool named, as the runtime reported it. */
-      path: string;
-      /** The parked proposal's identity, shared with the drained review. */
-      proposalId: string;
-    }
-  | {
       /** What one turn changed in the folder's Markdown, offered for review
-       *  inside each document. Not a tool block, for the reason `revision`
-       *  is not: the activity disclosure would swallow it. */
+       *  inside each document. This stays outside the activity disclosure so
+       *  the reader can always find the Review action. */
       kind: 'turn-changes';
       id: string;
       /** The host's identity for the turn, which is what a review asks for. */
@@ -220,33 +208,6 @@ export function recordFileChange(
       name: 'FileDiff',
       status: 'done',
     },
-  ];
-}
-
-/** The name of the tool block `id` names, or null when there is none. A
- *  result arrives carrying only the id, and what the call was is what decides
- *  whether its result is worth reading. */
-export function settledToolName(
-  transcript: readonly AgentTranscriptBlock[],
-  id: string,
-): string | null {
-  for (const block of transcript) {
-    if (block.kind === 'tool' && block.id === id) return block.name;
-  }
-  return null;
-}
-
-/** Records the revision a settled tool parked. Recording twice is as safe as
- *  once, so a replayed history cannot double the card. */
-export function recordRevisionProposal(
-  transcript: AgentTranscriptBlock[],
-  proposal: { id: string; path: string; proposalId: string },
-): AgentTranscriptBlock[] {
-  const id = `${proposal.id}-revision`;
-  if (transcript.some((block) => block.kind === 'revision' && block.id === id)) return transcript;
-  return [
-    ...transcript,
-    { id, kind: 'revision', path: proposal.path, proposalId: proposal.proposalId },
   ];
 }
 

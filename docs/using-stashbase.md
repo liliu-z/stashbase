@@ -50,9 +50,9 @@ project. How the Agent works belongs in your own `AGENTS.md` or `CLAUDE.md`;
 StashBase never creates or rewrites them.
 
 Drafting, editing, Agent file-change reports, and save-conflict comparisons are
-available, and so is the [document diff](../README.md#document-diff): an Agent can
-propose a revision to an open Markdown document, and you accept or reject each change
-in the prose or take the whole set at once.
+available, and so is the [document diff](../README.md#document-diff): after the Agent writes, choose
+**Review** in **Changed in this turn** to undo or keep each change in the document.
+**Keep all** leaves the saved file unchanged; **Undo all** restores the earlier text.
 
 Select text in a Markdown document and choose **Heading** on the selection
 toolbar to turn it into Text, Heading 1, Heading 2 or Heading 3. Deeper

@@ -67,21 +67,13 @@ function pendingIn(view: EditorView): number {
 export interface RevisionSurface {
   /** Takes every change still pending, which edits the document and so runs
    *  through the ordinary dirty and autosave path. */
-  acceptAll(): void;
+  undoAll(): void;
   /** Ends the review without reserializing: the source stays byte-identical
    *  unless something was accepted. */
   clear(): void;
-  /** Opens a review on `proposalBody` whose per-change controls read
-   *  `labels`. A proposal that turns out to hold no change reports zero
-   *  rather than opening one. */
-  start(proposalBody: string, labels: RevisionChangeLabels): void;
-}
-
-/** The words on each change's two controls: the one that takes the offered
- *  text and the one that leaves the document as it is. */
-interface RevisionChangeLabels {
-  accept: string;
-  reject: string;
+  /** Compare the saved document with its pre-turn body. A review without
+   *  any changes reports zero instead of leaving the editor locked. */
+  start(beforeBody: string): void;
 }
 
 /**
@@ -98,11 +90,6 @@ export function attachRevisionReview(
    *  A plain number could not: zero is also what the watcher last sent before
    *  any review existed. */
   let lastReported: number | null = 0;
-  // Upstream reads the two labels off its config each time it rebuilds the
-  // decorations, but keeps the config object it was created with, so a later
-  // `context.update` never reaches it. Getters over this record are how one
-  // editor can say Accept for a proposal and Undo for a turn review.
-  const labels: RevisionChangeLabels = { accept: 'Accept', reject: 'Reject' };
   const publish = (view: EditorView) => {
     const pending = pendingIn(view);
     if (pending === lastReported) return;
@@ -119,12 +106,8 @@ export function attachRevisionReview(
       context.update(diffComponentConfig.key, (previous) => ({
         ...previous,
         customBlockTypes: CUSTOM_BLOCK_TYPES,
-        get acceptLabel() {
-          return labels.accept;
-        },
-        get rejectLabel() {
-          return labels.reject;
-        },
+        acceptLabel: 'Undo',
+        rejectLabel: 'Keep',
       }));
     })
     .use(diff)
@@ -151,13 +134,11 @@ export function attachRevisionReview(
   const pendingNow = () => editor.editor.action((context) => pendingIn(context.get(editorViewCtx)));
 
   return {
-    acceptAll: () => run(acceptAllDiffsCmd),
+    undoAll: () => run(acceptAllDiffsCmd),
     clear: () => run(clearDiffReviewCmd),
-    start: (proposalBody, next) => {
-      labels.accept = next.accept;
-      labels.reject = next.reject;
+    start: (beforeBody) => {
       lastReported = null;
-      run(startDiffReviewCmd, proposalBody);
+      run(startDiffReviewCmd, beforeBody);
       // A proposal that parses to the document it revises opens a review with
       // nothing in it, and upstream's start returns before the auto-deactivate
       // every other action falls through to. The plugin is then active with no

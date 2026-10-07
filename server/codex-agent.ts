@@ -11,9 +11,6 @@ export {
 } from './codex-session-runtime.ts';
 export {
   codexAccessOptions,
-  isStashbaseProposal,
-  isStashbaseWorkspaceEdit,
-  isWorkspaceFileChange,
 } from './codex-approval.ts';
 export {
   deleteCodexSession,
@@ -24,3 +21,5 @@ export {
   type CodexSessionBlock,
   type CodexSessionRow,
 } from './codex-history.ts';
+
+export { isStashbaseWorkspaceEdit, isWorkspaceFileChange } from './agent-file-permissions.ts';

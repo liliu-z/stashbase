@@ -14,5 +14,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 export const Refused: Story = {
-  args: { refusal: 'That proposal matches the document already, so there is nothing to review.' },
+  args: {
+    refusal: 'The earlier text matches the document already, so there is nothing to review.',
+  },
 };

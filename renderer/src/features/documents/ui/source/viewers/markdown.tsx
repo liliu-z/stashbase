@@ -48,7 +48,6 @@ export default function MarkdownViewer({
           readingControl={renderReadingControl?.()}
           readOnly={readOnly || markdownMode === 'reading'}
           revision={{
-            onControls: runtime.bindRevisionControls,
             onPending: runtime.publishRevisionCount,
             state: revision,
           }}

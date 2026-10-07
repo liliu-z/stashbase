@@ -27,10 +27,8 @@ import {
 } from '@/features/documents/domain/document';
 import { documentTextFormat } from '@/features/documents/domain/document-format';
 import {
-  clearDocumentRevision,
   publishDocumentRevisionCount,
   startDocumentRevision,
-  type RevisionControls,
 } from '@/features/documents/domain/revision';
 import { createScopeGuard } from '@/shared/runtime/scope-guard';
 
@@ -73,7 +71,6 @@ export function createDocumentRuntime({
   );
   let disposed = false;
   let saveInFlight: Promise<boolean> | null = null;
-  let revisionControls: RevisionControls | null = null;
 
   const { accept, capture, retireOperations } = createScopeGuard<DocumentScope>({
     disposed: () => disposed,
@@ -216,15 +213,9 @@ export function createDocumentRuntime({
     store,
     accept,
     capture,
-    bindRevisionControls(controls) {
-      revisionControls = controls;
-    },
     change(value) {
       if (disposed) return;
       store.setState((state) => changeDocumentText(state, value));
-    },
-    clearRevision() {
-      store.setState(clearDocumentRevision);
     },
     publishRevisionCount(reviewId, pending) {
       if (disposed) return;
@@ -240,7 +231,6 @@ export function createDocumentRuntime({
       // swallowed: the document is already gone, so a rejected cancellation has no reader.
       void queries.cancel().catch(() => undefined);
       queries.remove();
-      revisionControls = null;
       store.setState(disposeDocumentState);
     },
     setMutationPending(pending) {
@@ -323,7 +313,6 @@ export function createDocumentRuntime({
       }
     },
     retireOperations,
-    revisionControls: () => revisionControls,
     save,
     startRevision(review, currentBody) {
       if (disposed) return 'not-editable';

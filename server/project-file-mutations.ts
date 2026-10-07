@@ -3,7 +3,6 @@ import path from 'node:path';
 import { queueConvertibleSource } from './conversion-dispatch.ts';
 import { clearRecord } from './conversion-status.ts';
 import { deleteDerivedForSource } from './derived-store.ts';
-import { forgetProposal, remapProposalPath } from './document-revisions.ts';
 import { prepareFileOperation } from './file-operation-guard.ts';
 import { saveFileContent } from './file-save.ts';
 import {
@@ -53,10 +52,14 @@ export async function editProjectFile(
   newText: string,
   opts: { replaceAll?: boolean; baseVersion?: string } = {},
 ): Promise<{ path: string; replacements: number; version?: string; indexWarning?: string }> {
-  if (!oldText) throw routeError('old_text must not be empty', 400);
   const current = await readProjectFile(rawPath);
   if (current.derived) {
     throw routeError('edit_file cannot edit derived PDF/DOCX/audio text; create or edit a Markdown, HTML, JSON, or UTF-8 plain-text source file instead', 415, 'UNSUPPORTED_FORMAT');
+  }
+  if (!oldText) {
+    if (current.content !== '') throw routeError('empty old_text only matches an empty file', 409, 'EDIT_MISMATCH');
+    const written = await writeProjectFile(rawPath, newText, { baseVersion: opts.baseVersion ?? current.version });
+    return { ...written, replacements: 1 };
   }
   const count = countOccurrences(current.content, oldText);
   if (count === 0) throw routeError('old_text not found', 409, 'EDIT_MISMATCH');
@@ -131,7 +134,6 @@ export async function moveProjectFile(
       await renameOnDiskAsync(newTarget.folderRel, oldTarget.folderRel);
       throw routeError(`failed to update links in ${applied.failed.map((failure) => failure.name).join(', ')}`, 500);
     }
-    remapProposalPath(oldTarget.abs, newTarget.abs);
     noteTreeChanged();
 
     let indexWarning: string | undefined;
@@ -229,7 +231,6 @@ export async function deleteProjectFile(
     catch (err: unknown) { log.warn(`project delete: derived cleanup failed for ${target.abs}: ${errorMessage(err)}`); }
     try { clearRecord(target.abs); }
     catch (err: unknown) { log.warn(`project delete: preparation status cleanup failed for ${target.abs}: ${errorMessage(err)}`); }
-    forgetProposal(target.abs);
     if (removed) {
       noteTreeChanged();
     }

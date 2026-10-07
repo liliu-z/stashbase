@@ -4,7 +4,6 @@ import { SURFACE_FAILED } from '@/features/agent/application/failure-messages';
 import type { AgentCatalogPort, AgentPersonaPort } from '@/features/agent/application/ports';
 import type { AgentWorkspaceRuntime } from '@/features/agent/application/workspace-runtime';
 import type { AgentScope } from '@/features/agent/domain/session';
-import type { AgentRevisionReview } from '@/features/agent/ui/transcript/revision-card';
 import type { AgentTurnChangeReview } from '@/features/agent/ui/transcript/turn-changes-card';
 import type { SourceReference } from '@/shared/domain/source-reference';
 import { lazySurface } from '@/shared/runtime/lazy-surface';
@@ -37,7 +36,6 @@ export interface AgentWorkspaceProps {
   /** The review open on a document an agent proposed a revision to, by
    *  folder-relative path. The documents feature owns that count, and the
    *  composition layer is where the two features meet. */
-  revisionFor?: ((path: string, proposalId: string) => AgentRevisionReview | null) | undefined;
   runtime: AgentWorkspaceRuntime;
 }
 

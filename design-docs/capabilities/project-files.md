@@ -83,25 +83,15 @@ recoverable work. Rollback must not replace newer user or external changes.
 
 ## Document-specific Diff
 
-An Agent can propose a revision to an existing Markdown document without writing
-it. The reader sees deletions struck through and additions highlighted in the
-document's prose. Each change has Accept and Reject; Accept all and Reject all
-resolve the remaining set. The conversation names the document and shows the
-same remaining count and whole-set actions as the document.
+An Agent applies requested document changes directly through StashBase's file
+tools: `edit_file` for existing documents and `write_file` for new ones. Editing
+an existing empty file may match empty text only while the source is still empty;
+ordinary version checks protect concurrent changes. There is no pending-proposal
+tool or Accept/Reject workflow. A request to discuss or preview wording before
+applying it stays in Chat until the reader authorizes the write.
 
-The proposal is temporary document state. Rejecting every change leaves the
-source byte-identical. Accepting changes edits the live document and uses its
-ordinary versioned save path. A proposal against an older source version is
-refused after a fresh source check; a proposal handed to a window is consumed once, and failed pickup is
-reported rather than silently retried. A new proposal cannot replace a review
-already open on that document.
-
-An Agent writes its changes directly and does not hold them back for review.
-It proposes a revision only when the reader asks to see a change to an existing
-Markdown document before it lands, and a refused proposal is reported rather
-than written directly. This is standing guidance to the Agent, not a gate: the
-runtime's permissions still decide what a write needs. Reviewing a change after
-it lands is the reader's choice, described in Turn Review below.
+The reader chooses whether to review the completed turn as described below.
+Review is distinct from permission to write; normal runtime permissions still apply.
 
 The selection toolbar leads with a **Heading** menu: Text, Heading 1, Heading 2
 and Heading 3, with the selection's current kind checked. A choice turns every
@@ -114,7 +104,7 @@ nothing and needs no service; the selection is saved first so the Agent reads
 what the reader selected. [Agent Sessions](agent-sessions.md) owns how the
 passage is sent.
 
-Markdown frontmatter is outside the prose editor. A proposal that changes it is
+Markdown frontmatter is outside the prose editor. A turn review that would change it is
 refused with a visible reason; its metadata is never silently omitted from a review.
 
 File diffs, save-conflict comparisons, and Agent tool approvals have their own

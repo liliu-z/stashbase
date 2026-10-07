@@ -46,7 +46,7 @@ describe('the developer revision trigger', () => {
 
     const revision = document.store.getState().revision;
     expect(revision.kind).toBe('starting');
-    expect(revision.kind === 'idle' ? null : revision.review.proposal).toBe(PROPOSAL);
+    expect(revision.kind === 'idle' ? null : revision.review.before).toBe(PROPOSAL);
     expect(result.current.refusal).toBeNull();
   });
 
@@ -57,7 +57,7 @@ describe('the developer revision trigger', () => {
     act(() => result.current.start(BASE));
 
     expect(result.current.refusal).toBe(
-      'That proposal matches the document already, so there is nothing to review.',
+      'The earlier text matches the document already, so there is nothing to review.',
     );
   });
 

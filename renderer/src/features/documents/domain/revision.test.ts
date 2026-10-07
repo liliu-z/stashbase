@@ -25,8 +25,8 @@ const scope = {
 const review: RevisionReview = {
   baseVersion: 'sha256:v1',
   id: 'review-1',
-  origin: { kind: 'developer' },
-  proposal: '# Revised plan',
+
+  before: '# Revised plan',
 };
 
 function loaded(version = 'sha256:v1'): DocumentState {
@@ -85,7 +85,7 @@ describe('starting a revision review', () => {
   });
 
   it('refuses a proposal that changes nothing, which would lock the editor', () => {
-    expect(startDocumentRevision(loaded(), { ...review, proposal: '# Plan' }, '# Plan')).toEqual({
+    expect(startDocumentRevision(loaded(), { ...review, before: '# Plan' }, '# Plan')).toEqual({
       kind: 'refused',
       reason: 'no-changes',
     });

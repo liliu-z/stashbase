@@ -1,7 +1,7 @@
 /**
  * Which change the pointer is on.
  *
- * A change and its Accept/Reject card are two separate widgets, and a
+ * A change and its Undo/Keep card are two separate widgets, and a
  * deletion that spans several paragraphs marks every one of them while the
  * card follows the last. CSS can only reach the element directly before the
  * card, so hovering any earlier paragraph of such a change revealed nothing

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vite-plus/test';
 
 import {
   documentFailure,
-  documentRevisionPickupMessage,
+  turnChangeReviewMessage,
   DOCUMENT_ASSET_MESSAGES,
   DOCUMENT_OVERWRITE_MESSAGES,
   DOCUMENT_SAVE_MESSAGES,
@@ -10,7 +10,7 @@ import {
   DOCX_PREVIEW_MESSAGES,
   GENERIC_PREVIEW_MESSAGES,
 } from './failure-messages';
-import type { RevisionPickupFailure } from './open-revision';
+import type { TurnChangeReviewFailure } from './open-revision';
 import { DocumentSaveError, DocumentSourceError, DocumentAssetError } from './ports';
 
 const FAMILIES = [
@@ -74,8 +74,8 @@ describe('documents failure messages', () => {
     );
   });
 
-  it('names the document in every reason a parked revision was not shown', () => {
-    const failures: Array<RevisionPickupFailure | 'outside-folder'> = [
+  it('names the document in every reason a turn review was not shown', () => {
+    const failures: Array<TurnChangeReviewFailure | 'outside-folder'> = [
       'frontmatter-changed',
       'no-changes',
       'not-editable',
@@ -87,12 +87,11 @@ describe('documents failure messages', () => {
     ];
 
     for (const failure of failures) {
-      const sentence = documentRevisionPickupMessage(failure, 'Quarterly plan.md');
+      const sentence = turnChangeReviewMessage(failure, 'Quarterly plan.md');
       expect(sentence).toContain('Quarterly plan.md');
-      expect(sentence).toContain('ask the agent for it again');
     }
-    expect(
-      new Set(failures.map((failure) => documentRevisionPickupMessage(failure, 'a.md'))).size,
-    ).toBe(failures.length);
+    expect(new Set(failures.map((failure) => turnChangeReviewMessage(failure, 'a.md'))).size).toBe(
+      failures.length,
+    );
   });
 });

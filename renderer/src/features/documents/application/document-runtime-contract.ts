@@ -9,11 +9,7 @@ import type {
   JsonDocumentSession,
   MarkdownViewMode,
 } from '@/features/documents/domain/document';
-import type {
-  RevisionControls,
-  RevisionRefusal,
-  RevisionReview,
-} from '@/features/documents/domain/revision';
+import type { RevisionRefusal, RevisionReview } from '@/features/documents/domain/revision';
 import type { SourceReference } from '@/shared/domain/source-reference';
 import type { CapturedScope } from '@/shared/runtime/scope-guard';
 
@@ -30,9 +26,7 @@ export interface DocumentRuntime {
   /** Runs a completion only while its captured scope still owns the document. */
   accept(captured: DocumentOperationScope, completion: () => void): boolean;
   capture(): DocumentOperationScope;
-  bindRevisionControls(controls: RevisionControls | null): void;
   change(value: string): void;
-  clearRevision(): void;
   dispose(): void;
   finishMerge(api: DocumentSourcePort): Promise<boolean>;
   publishRevisionCount(reviewId: string, pending: number): void;
@@ -43,7 +37,6 @@ export interface DocumentRuntime {
   ): void;
   setMutationPending(pending: boolean): void;
   retireOperations(): void;
-  revisionControls(): RevisionControls | null;
   resolveConflict(
     api: DocumentSourcePort,
     resolution: DocumentConflictResolution,

@@ -22,7 +22,6 @@ import { guardExplicitFolder, sendError } from '../http.ts';
 import { renameWithRollback } from '../rename-helpers.ts';
 import { noteTreeChanged } from '../watcher.ts';
 import { clearRecordsUnder } from '../conversion-status.ts';
-import { forgetFolderProposals } from '../document-revisions.ts';
 import { forgetFolderTurnChanges } from '../turn-changes.ts';
 import { cancelConversionsUnderAndWait } from '../conversion.ts';
 import { discoverConvertibleSources } from '../conversion-dispatch.ts';
@@ -70,7 +69,6 @@ export function mount(app: express.Express): void {
       try { deleteDerivedUnderFolder(sourcePrefix); }
       catch (err: unknown) { log.warn(`delete_prefix: derived cleanup failed for ${p}: ${errorMessage(err)}`); }
       const removed = await deleteFolderAsync(p);
-      forgetFolderProposals(sourcePrefix);
       forgetFolderTurnChanges(sourcePrefix);
       if (removed) {
         noteTreeChanged();
@@ -170,7 +168,6 @@ export function mount(app: express.Express): void {
             if (body == null) continue;
             await indexer.upsertFile(toSourcePath(u.name), body);
           }
-          forgetFolderProposals(oldSourcePrefix);
           forgetFolderTurnChanges(oldSourcePrefix);
         } catch (err) {
           await applied?.rollback();

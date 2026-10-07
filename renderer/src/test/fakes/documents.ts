@@ -4,7 +4,6 @@ import type { AppDependencies } from '@/app/dependencies';
 import type {
   DocumentAssetPort,
   DocumentQueryScope,
-  DocumentRevisionsPort,
   DocumentSourcePort,
   DocumentTurnChangesPort,
   DocumentWindowLifecyclePort,
@@ -57,12 +56,6 @@ export function genericPreviewApi(
     load: vi.fn(async () => ({ kind: 'binary' as const, name: 'file.bin', size: 0 })),
     ...overrides,
   };
-}
-
-export function revisionsApi(
-  overrides: Partial<DocumentRevisionsPort> = {},
-): DocumentRevisionsPort {
-  return { drain: vi.fn(async () => ({ proposals: [], unresolved: [] })), ...overrides };
 }
 
 export function turnChangesApi(
@@ -118,7 +111,6 @@ export function documentAdapters(overrides: Partial<DocumentAdapters> = {}): Doc
     asset: assetApi(),
     docxPreview: docxPreviewApi(),
     genericPreview: genericPreviewApi(),
-    revisions: revisionsApi(),
     source: sourceApi(),
     turnChanges: turnChangesApi(),
     windowLifecycle: documentWindowLifecycle(),

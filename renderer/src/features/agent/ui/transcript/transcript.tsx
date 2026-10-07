@@ -32,7 +32,6 @@ import {
 import { DayDivider } from './day-divider';
 import { AgentMarkdown } from './markdown';
 import { AgentQuestionCard } from './question-card';
-import { AgentRevisionCard, type AgentRevisionReview } from './revision-card';
 import { closingReplies } from './transcript-order';
 import { AgentTurnChangesCard, type AgentTurnChangeReview } from './turn-changes-card';
 import { TurnFailure } from './turn-failure';
@@ -110,7 +109,6 @@ const TranscriptBlock = memo(function TranscriptBlock({
   onPermission,
   onRetry,
   promptAt,
-  review,
   runtimeUpdate,
   transientFile,
 }: {
@@ -135,7 +133,6 @@ const TranscriptBlock = memo(function TranscriptBlock({
   onRetry(errorBlockId: string): boolean;
   /** When the prompt a closing reply answers was sent, for the duration. */
   promptAt: number | undefined;
-  review: AgentRevisionReview | null;
   runtimeUpdate?: AgentRuntimeUpdateView | undefined;
   transientFile?: ((path: string) => File | undefined) | undefined;
 }) {
@@ -229,9 +226,6 @@ const TranscriptBlock = memo(function TranscriptBlock({
       <p className="border-l border-border pl-3 text-caption text-muted-foreground">{block.text}</p>
     );
   }
-  if (block.kind === 'revision') {
-    return <AgentRevisionCard name={basePathName(block.path)} review={review} />;
-  }
   if (block.kind === 'turn-changes') {
     return (
       <AgentTurnChangesCard
@@ -262,7 +256,6 @@ export const AgentTranscript = memo(function AgentTranscript({
   onPermission,
   onRetry,
   onReviewTurnChange,
-  revisionFor,
   runtimeUpdate,
   sourceFor,
   transientFile,
@@ -285,7 +278,6 @@ export const AgentTranscript = memo(function AgentTranscript({
   onRetry(errorBlockId: string): boolean;
   /** Opens what a turn changed in one file as a review inside the document. */
   onReviewTurnChange?: ((review: AgentTurnChangeReview) => void) | undefined;
-  revisionFor?: ((path: string, proposalId: string) => AgentRevisionReview | null) | undefined;
   /** The in-place update of the conversation's runtime, offered on a turn
    *  the runtime was too old for. Absent where nothing can run one. */
   runtimeUpdate?: AgentRuntimeUpdateView | undefined;
@@ -328,12 +320,6 @@ export const AgentTranscript = memo(function AgentTranscript({
       : null;
   const tail = blocks.at(-1);
   const narrated = liveGroup !== null || (tail?.kind === 'tool' && tail.status === 'awaiting');
-  const reviewFor = (block: AgentTranscriptBlock): AgentRevisionReview | null => {
-    if (block.kind !== 'revision') return null;
-    const source = sourceFor?.(block.path);
-    return source ? (revisionFor?.(source.path, block.proposalId) ?? null) : null;
-  };
-
   return (
     <>
       {hiddenCount > 0 && (
@@ -374,7 +360,6 @@ export const AgentTranscript = memo(function AgentTranscript({
               onPermission={decide}
               onRetry={onRetry}
               promptAt={closing.get(group.id)}
-              review={reviewFor(group)}
               runtimeUpdate={runtimeUpdate}
               transientFile={transientFile}
             />

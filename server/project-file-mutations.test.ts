@@ -131,6 +131,30 @@ $$`;
   );
   assert.equal(fs.readFileSync(corruptedSource, 'utf8'), literalFormula);
 
+  const { beginTurnBaseline, finishTurn, turnChangeBefore } = await import('./turn-changes.ts');
+  const emptyPath = path.join(root, 'empty.md');
+  const empty = await callTool(base, token, 'write_file', { path: emptyPath, content: '' });
+  const beforeEmptyEdit = await beginTurnBaseline(root);
+  await callTool(base, token, 'edit_file', {
+    path: emptyPath, old_text: '', new_text: 'First paragraph.\n', baseVersion: empty.version,
+  });
+  assert.equal(fs.readFileSync(emptyPath, 'utf8'), 'First paragraph.\n');
+  const turn = await finishTurn(beforeEmptyEdit);
+  assert.ok(turn);
+  assert.deepEqual(turn.files.map(({ change }) => change), ['edited']);
+  assert.equal(turnChangeBefore(root, turn.turnId, emptyPath)?.before, '');
+  await assert.rejects(callTool(base, token, 'suggest_edits', {
+    path: emptyPath, content: 'Must not be written.', folder: root,
+  }), /unknown tool|not found|not available/i);
+  assert.equal(fs.readFileSync(emptyPath, 'utf8'), 'First paragraph.\n');
+  await assert.rejects(callTool(base, token, 'edit_file', {
+    path: emptyPath, old_text: '', new_text: 'Overwritten',
+  }), /EDIT_MISMATCH/);
+  await assert.rejects(callTool(base, token, 'edit_file', {
+    path: emptyPath, old_text: 'First', new_text: 'Stale', baseVersion: empty.version,
+  }), /CONFLICT|changed|version/i);
+  assert.equal(fs.readFileSync(emptyPath, 'utf8'), 'First paragraph.\n');
+
   const literalReplacement = "$& $$ $` $' $1";
   for (const replaceAll of [false, true]) {
     const literalPath = path.join(root, `literal-${replaceAll}.md`);
