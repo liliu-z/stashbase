@@ -138,7 +138,7 @@ export function buildOpenCodeConfig(
     bash: 'ask',
     webfetch: 'ask',
     doom_loop: 'ask',
-    external_directory: 'deny',
+    external_directory: 'ask',
     stashbase_write_file: 'ask',
     stashbase_edit_file: 'ask',
     stashbase_move_file: 'ask',

@@ -607,6 +607,21 @@ Host/services: `server/retrieval/index.ts`, `server/indexer.mfs.ts`, `python/sta
 
 ## J06: Agent
 
+**Explicit external reads (2026-10-07):** `agent-runtime-instructions.ts` now
+makes the bound project the default read/search scope and routes explicitly
+requested external paths through native tools under runtime permissions.
+`opencode-runtime.ts` asks for external-directory access; `agent.ts` no longer
+redirects an external prepared PDF/DOCX to project-scoped MCP. The Claude adapter
+regression failed with the previous policy and external-PDF redirect, then passed
+with the fix. A driven bundled OpenCode read exposed an ignored
+`permission.asked` event; the adapter now translates it into the shared approval
+flow. The native smoke reads an external fixture through the real runtime,
+receives the translated approval, grants it once, and verifies the file content
+reaches the fake model gateway. Host/renderer types, Agent and installed native
+protocol tests, service/renderer builds, Electron tests and built desktop smoke
+passed. These checks do not establish
+live-provider compliance with the prompt or a packaged desktop approval flow.
+
 **Valid-stream interruption (2026-10-06):** a live desktop WebSocket capture
 recorded the renderer sending `close` immediately after an ordinary text delta
 at 00:41:40 local time, while the host subsequently delivered the remaining

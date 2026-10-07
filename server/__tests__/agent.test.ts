@@ -100,6 +100,10 @@ test('Claude appends the chosen Persona before hidden StashBase routing policy',
   assert.equal(resolveAgentPersona(folder), persona);
   assert.match(appended, /StashBase MCP/i);
   assert.match(appended, /search_project/);
+  assert.match(appended, /Default file reads and searches to the bound project/);
+  assert.match(appended, /explicitly specifies files or directories outside the project/);
+  assert.match(appended, /native filesystem or shell tools.*runtime permissions/);
+  assert.doesNotMatch(appended, /Every file operation and search targets the bound project only/);
   assert.match(appended, /read_file/);
   assert.match(appended, /do not install or run a separate parser/i);
   // The policy is the one text a runtime always sees, so the choice between
@@ -183,6 +187,8 @@ function streamingClaudeQuery(prompt: AsyncIterable<unknown>, sessionId = 'test-
 }
 
 test('Claude permission callback asks for mutations and unknown tools, and settles replies or cancellation', async (t) => {
+  const project = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-read-redirect-'));
+  t.after(() => fs.rmSync(project, { recursive: true, force: true }));
   const ws = new FakeAgentWebSocket();
   let canUseTool: CanUseTool | undefined;
   const session = new AgentSession(
@@ -191,7 +197,7 @@ test('Claude permission callback asks for mutations and unknown tools, and settl
       canUseTool = request.options.canUseTool;
       return streamingClaudeQuery(request.prompt);
     }) as never,
-    () => '/fake/claude', undefined, process.cwd(),
+    () => '/fake/claude', undefined, project,
   );
   t.after(() => session.dispose());
   session.begin();
@@ -203,8 +209,6 @@ test('Claude permission callback asks for mutations and unknown tools, and settl
     assert.equal(result.behavior, 'allow');
   }
   assert.equal(permissionEvents().length, 0);
-  const project = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-read-redirect-'));
-  t.after(() => fs.rmSync(project, { recursive: true, force: true }));
   await registerProjectFolderAsync(project);
   const pdf = path.join(project, 'document.pdf');
   fs.writeFileSync(pdf, 'updated source');
@@ -217,6 +221,18 @@ test('Claude permission callback asks for mutations and unknown tools, and settl
   const nativeRead = () => canUseTool!('Read', { file_path: pdf }, { signal: new AbortController().signal, toolUseID: 'pdf' });
   assert.equal((await nativeRead()).behavior, 'allow', 'stale preparation must not redirect a native read');
   fs.utimesSync(prepared, 400, 400);
+  const external = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-external-read-'));
+  t.after(() => fs.rmSync(external, { recursive: true, force: true }));
+  await registerProjectFolderAsync(external);
+  const externalPdf = path.join(external, 'reference.pdf');
+  fs.writeFileSync(externalPdf, 'external source');
+  fs.utimesSync(externalPdf, 300, 300);
+  registerDerivedSource(externalPdf);
+  const externalPrepared = derivedNoteFor(externalPdf);
+  fs.mkdirSync(path.dirname(externalPrepared), { recursive: true });
+  fs.copyFileSync(prepared, externalPrepared);
+  fs.utimesSync(externalPrepared, 400, 400);
+  assert.equal((await canUseTool!('Read', { file_path: externalPdf }, { signal: new AbortController().signal, toolUseID: 'external-pdf' })).behavior, 'allow', 'external reads must not be redirected to project-scoped MCP');
   const redirect = await nativeRead();
   assert.equal(redirect.behavior, 'deny');
   if (redirect.behavior === 'deny') assert.match(redirect.message, /read_file/);

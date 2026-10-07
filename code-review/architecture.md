@@ -238,6 +238,14 @@ stable status without download, retry, or a new durable demand latch.
 
 ## Agent Sessions and Permissions
 
+- Shared runtime instructions default reads/searches to the bound project and
+  route explicitly requested external paths through native tools under runtime
+  permissions. OpenQuill asks for external-directory access instead of denying
+  it unconditionally. The OpenCode adapter routes current `permission.asked`
+  events into the shared permission flow alongside `permission.updated`. Claude’s prepared-text redirect applies only inside its
+  bound project; external reads must not be routed to project-scoped MCP.
+  This guidance does not broaden HTTP/MCP authorization or write permissions.
+
 - Boot performs bounded asynchronous discovery/auth/MCP preparation, never install
   or login. Explicit installation runs only the selected runtime's official
   installer. Preparation/shutdown share one cancellable flight per runtime.

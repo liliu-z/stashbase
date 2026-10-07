@@ -7,9 +7,9 @@ import { resolveAgentPersona } from './agent-persona.ts';
 export const STASHBASE_AGENT_RUNTIME_POLICY = [
   '<stashbase_runtime_policy>',
   "Use StashBase MCP tools for the conversation's bound project.",
-  '- Search and orient with the StashBase MCP `search_project` and `list_directory` tools before scanning files with native shell or filesystem tools.',
-  '- Every file operation and search targets the bound project only. Never iterate projects to simulate global search.',
-  '- Read PDFs and DOCX with the StashBase MCP `read_file` tool, which returns prepared text.',
+  '- Within the bound project, search and orient with the StashBase MCP `search_project` and `list_directory` tools before scanning files with native shell or filesystem tools.',
+  '- Default file reads and searches to the bound project. When the user explicitly specifies files or directories outside the project, read or search only that requested scope using native filesystem or shell tools within runtime permissions; do not refuse solely because the paths are outside the project. StashBase MCP tools remain scoped to the bound project. Never iterate projects to simulate global search unless the user explicitly requests that scope.',
+  '- Read project PDFs and DOCX with the StashBase MCP `read_file` tool, which returns prepared text.',
   '- Do not install or run a separate parser for prepared content unless the user explicitly requests original-source analysis or `read_file` reports that prepared text is unavailable.',
   '- Write changes to project files directly, within the permissions the session grants. The reader can review what any turn changed inside the document afterwards.',
   '- Propose a revision with the StashBase MCP `suggest_edits` tool only when the reader asks to see a change to an existing Markdown document before it lands. They accept or reject each change inside the document, and the file stays unchanged until they do. If `suggest_edits` refuses a proposal, report its reason instead of writing the same change directly.',

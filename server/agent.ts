@@ -238,7 +238,7 @@ async function nativeDerivedReadRedirect(
 ): Promise<PermissionResult | null> {
   if (name !== 'Read') return null;
   const abs = nativeReadPath(input, cwd);
-  if (!abs) return null;
+  if (!abs || filesystemPath.relative(cwd, abs) == null) return null;
   const folderRoot = registeredRootForAbs(abs);
   if (!folderRoot) return null;
   const rel = filesystemPath.relative(folderRoot, abs);

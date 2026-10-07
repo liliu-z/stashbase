@@ -86,7 +86,7 @@ test('bundled OpenCode config disables sharing and updates while asking for ever
   assert.deepEqual(config.enabled_providers, ['stashbase']);
   assert.equal(config.permission?.edit, 'ask');
   assert.equal(config.permission?.bash, 'ask');
-  assert.equal(config.permission?.external_directory, 'deny');
+  assert.equal(config.permission?.external_directory, 'ask');
   assert.equal(config.agent?.['stashbase-folder']?.mode, 'primary');
   assert.equal((config.permission as Record<string, unknown>).stashbase_write_file, 'ask');
   assert.equal((config.permission as Record<string, unknown>).stashbase_delete_file, 'ask');
@@ -321,4 +321,25 @@ test('OpenCode translator isolates sessions and classifies hosted allowance fail
     { t: 'error', message: 'Free Agent credits are exhausted', failure: { kind: 'allowance-exhausted' } },
     { t: 'turn-end', isError: true },
   ]);
+});
+
+test('OpenCode forwards current external-directory permission requests to the reader', () => {
+  const translator = new OpenCodeEventTranslator();
+  translator.bindSession('session-1');
+  const event = {
+    id: 'event-1', type: 'permission.asked' as const,
+    properties: {
+      id: 'permission-1', sessionID: 'session-1', permission: 'external_directory',
+      patterns: ['/outside/*'], always: ['/outside/*'],
+      metadata: { filepath: '/outside/reference.txt' },
+      tool: { messageID: 'message-1', callID: 'call-1' },
+    },
+  };
+  assert.deepEqual(translator.translate(event), [{
+    t: 'permission', id: 'permission-1', toolUseId: 'call-1',
+    name: 'external_directory', title: null, input: { filepath: '/outside/reference.txt' },
+  }]);
+  assert.deepEqual(translator.translate({
+    ...event, properties: { ...event.properties, sessionID: 'other-session' },
+  }), []);
 });

@@ -5,13 +5,17 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { createOpencodeClient, type Event } from '@opencode-ai/sdk';
+import { createOpencodeClient, type Event as LegacyEvent } from '@opencode-ai/sdk';
+import type { EventPermissionAsked } from '@opencode-ai/sdk/v2/types';
+import { OpenCodeEventTranslator } from '../opencode-agent.ts';
 import { ensureMcpLauncher } from '../agent-mcp.ts';
 import {
   BUNDLED_OPENCODE_VERSION,
   buildOpenCodeConfig,
   bundledOpenCodeExecutable,
 } from '../opencode-runtime.ts';
+
+type Event = LegacyEvent | EventPermissionAsked;
 
 async function listen(server: http.Server): Promise<number> {
   await new Promise<void>((resolve, reject) => {
@@ -55,6 +59,10 @@ test('pinned bundled OpenCode completes one SDK session against a fake compatibl
   assert.equal(execFileSync(executable, ['--version'], { encoding: 'utf8' }).trim(), BUNDLED_OPENCODE_VERSION);
 
   const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-opencode-native-'));
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-outside-probe-'));
+  const externalFile = path.join(outside, 'reference.txt');
+  fs.writeFileSync(externalFile, 'EXPLICIT_EXTERNAL_READ_OK');
+  t.after(() => fs.rmSync(outside, { recursive: true, force: true }));
   const gatewayRequests: Array<Record<string, unknown>> = [];
   const gateway = http.createServer(async (request, response) => {
     const chunks: Buffer[] = [];
@@ -64,11 +72,21 @@ test('pinned bundled OpenCode completes one SDK session against a fake compatibl
     const base = { id: 'chatcmpl-stashbase-smoke', object: 'chat.completion.chunk', created: 1, model: 'stashbase-agent-default' };
     response.write(`data: ${JSON.stringify({
       ...base,
-      choices: [{ index: 0, delta: { role: 'assistant', content: 'probe ok' }, finish_reason: null }],
+      choices: [{
+        index: 0,
+        delta: gatewayRequests.length === 1 ? {
+          role: 'assistant',
+          tool_calls: [{
+            index: 0, id: 'external-read', type: 'function',
+            function: { name: 'read', arguments: JSON.stringify({ filePath: externalFile }) },
+          }],
+        } : { role: 'assistant', content: 'probe ok' },
+        finish_reason: null,
+      }],
     })}\n\n`);
     response.write(`data: ${JSON.stringify({
       ...base,
-      choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
+      choices: [{ index: 0, delta: {}, finish_reason: gatewayRequests.length === 1 ? 'tool_calls' : 'stop' }],
       usage: { prompt_tokens: 1, completion_tokens: 2, total_tokens: 3 },
     })}\n\n`);
     response.end('data: [DONE]\n\n');
@@ -163,26 +181,39 @@ test('pinned bundled OpenCode completes one SDK session against a fake compatibl
     ?.permission.filter((rule) => rule.permission === permission && rule.pattern === '*').at(-1)?.action;
   assert.equal(actionFor('stashbase-folder', 'bash'), 'ask');
   assert.equal(actionFor('stashbase-folder', 'edit'), 'ask');
-  assert.equal(actionFor('stashbase-folder', 'external_directory'), 'deny');
+  assert.equal(actionFor('stashbase-folder', 'external_directory'), 'ask');
   const subscription = await client.event.subscribe({ sseMaxRetryAttempts: 1 });
   const events: Event[] = [];
+  const translator = new OpenCodeEventTranslator();
+  const session = (await client.session.create({ throwOnError: true, body: { title: 'Native Smoke' } })).data;
+  translator.bindSession(session.id);
   const consumed = (async () => {
     for await (const event of subscription.stream) {
       events.push(event);
+      for (const translated of translator.translate(event)) {
+        if (translated.t !== 'permission') continue;
+        assert.equal(translated.name, 'Read');
+        await client.postSessionIdPermissionsPermissionId({
+          throwOnError: true,
+          path: { id: session.id, permissionID: translated.id },
+          body: { response: 'once' },
+        });
+      }
       if (event.type === 'session.idle') return;
     }
   })();
-  const session = (await client.session.create({ throwOnError: true, body: { title: 'Native Smoke' } })).data;
   await client.session.promptAsync({
     throwOnError: true,
     path: { id: session.id },
     body: {
       model: { providerID: 'stashbase', modelID: 'stashbase-agent-default' },
       agent: 'stashbase-folder',
-      parts: [{ type: 'text', text: 'Reply with probe ok.' }],
+      parts: [{ type: 'text', text: `Read ${externalFile} and reply with probe ok.` }],
     },
   });
   await consumed;
+  assert.ok(events.some(event => event.type === 'permission.asked'), 'external read must request permission');
+  assert.ok(JSON.stringify(gatewayRequests.slice(1)).includes('EXPLICIT_EXTERNAL_READ_OK'), 'authorized external read must reach model');
   assert.ok(events.some((event) => (
     event.type === 'message.part.updated'
       && event.properties.part.type === 'text'

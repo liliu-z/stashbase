@@ -33,6 +33,12 @@ once setup succeeds; changed work or cancelled consent rejects late completion.
 
 ## Submission and Execution
 
+- File reads and searches default to the conversation’s project. An explicit
+  request for other files or directories allows reading or searching that scope
+  through native tools, subject to runtime permissions. It does not move the
+  conversation or create an implicit global search. Project MCP tools retain
+  their project boundary.
+
 - Capture text, context, and choices on Send. Clear only the accepted snapshot.
   Refused delivery retains it; uncertain delivery forbids automatic resend.
 - One turn runs per conversation. Follow-ups queue explicitly; normal completion

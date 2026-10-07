@@ -1,5 +1,6 @@
 /** OpenCode implementation of StashBase's Shared Agent Contract. */
 import { randomUUID } from 'node:crypto';
+import type { EventPermissionAsked } from '@opencode-ai/sdk/v2/types';
 import type {
   Event,
   FileDiff,
@@ -96,7 +97,7 @@ export class OpenCodeEventTranslator {
   isTurnActive(): boolean { return this.turnActive; }
   endTurnWithError(): AgentServerEvent[] { return this.finishTurn(true); }
 
-  translate(event: Event): AgentServerEvent[] {
+  translate(event: Event | EventPermissionAsked): AgentServerEvent[] {
     switch (event.type) {
       case 'session.status': {
         if (!this.matches(event.properties.sessionID)) return [];
@@ -139,20 +140,21 @@ export class OpenCodeEventTranslator {
       }
       case 'message.part.updated':
         return this.part(event.properties.part, event.properties.delta);
+      case 'permission.asked':
       case 'permission.updated': {
         const permission = event.properties;
         if (!this.matches(permission.sessionID)) return [];
+        const callId = 'permission' in permission ? permission.tool?.callID : permission.callID;
+        const name = 'permission' in permission ? permission.permission : permission.type;
         const input = permission.metadata && typeof permission.metadata === 'object'
           ? permission.metadata
           : {};
         return [{
           t: 'permission',
           id: permission.id,
-          toolUseId: permission.callID ?? permission.id,
-          name: permission.callID
-            ? this.toolNames.get(permission.callID) ?? normalizeOpenCodeToolName(permission.type)
-            : normalizeOpenCodeToolName(permission.type),
-          title: permission.title || null,
+          toolUseId: callId ?? permission.id,
+          name: (callId && this.toolNames.get(callId)) || normalizeOpenCodeToolName(name),
+          title: 'title' in permission ? permission.title || null : null,
           input,
         }];
       }
