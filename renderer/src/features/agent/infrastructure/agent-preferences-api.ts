@@ -20,11 +20,16 @@ const options = (signal: AbortSignal) => ({
 export function createAgentPreferencesAdapter(client: HttpClient): AgentPreferencesPort {
   return {
     load: (signal) => request(client, { ...options(signal), schema: agentPreferencesSchema }),
-    async save(scope, agent, signal, effort) {
+    async save(scope, agent, signal, change = {}) {
       await request(client, {
         ...options(signal),
         method: 'PUT',
-        body: { scope: agentScopeKey(scope), agent, ...(effort === undefined ? {} : { effort }) },
+        body: {
+          scope: agentScopeKey(scope),
+          agent,
+          ...(change.effort === undefined ? {} : { effort: change.effort }),
+          ...(change.persona === undefined ? {} : { persona: change.persona }),
+        },
         schema: projectAgentPreferenceSchema,
       });
     },

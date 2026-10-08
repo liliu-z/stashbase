@@ -39,6 +39,7 @@
   ],
   "contractModules": [
     "shared/account.ts",
+    "shared/agent-persona.ts",
     "shared/agent-protocol.ts",
     "shared/agent-runtime.ts",
     "shared/appearance-themes.ts",

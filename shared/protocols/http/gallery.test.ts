@@ -5,7 +5,6 @@ import { galleryEntrySchema, galleryIndexSchema } from './gallery.ts';
 
 const ENTRY = {
   category: 'course',
-  contents: '20 transcripts',
   description: 'A course.',
   id: 'cs183b',
   name: 'How to Start a Startup',
@@ -14,10 +13,7 @@ const ENTRY = {
 
 test('carries an entry that publishes only its required fields', () => {
   const parsed = galleryEntrySchema.parse(ENTRY);
-  assert.deepEqual(parsed.starterPrompts, []);
-  assert.equal(parsed.files, undefined);
-  assert.equal(parsed.screenshots, undefined);
-  assert.equal(parsed.wikiPrompt, undefined);
+  assert.equal(parsed.screenshot, undefined);
 });
 
 test('ignores a field a newer gallery publishes', () => {
@@ -27,23 +23,15 @@ test('ignores a field a newer gallery publishes', () => {
   assert.equal('difficulty' in parsed, false);
 });
 
-test('refuses a schema version this build does not understand', () => {
-  // Whole-or-nothing: the caller falls back to the bundled snapshot, and a
-  // half-read shop is worse than a slightly stale one. The second case is the
-  // route's own offline envelope, which is a 200 by design.
-  assert.equal(galleryIndexSchema.safeParse({ schemaVersion: 2, wikis: [] }).success, false);
-  assert.equal(
-    galleryIndexSchema.safeParse({ error: 'offline', schemaVersion: 0 }).success,
-    false,
-  );
-  assert.equal(galleryIndexSchema.safeParse({ schemaVersion: 1, wikis: [ENTRY] }).success, true);
+test('refuses an offline error envelope without a catalog', () => {
+  assert.equal(galleryIndexSchema.safeParse({ error: 'offline' }).success, false);
 });
 
 test('refuses the whole index when one entry is unusable', () => {
   // One unusable entry means the publication is wrong; showing the rest would
   // hide that from the publisher as well as the reader.
   const index = galleryIndexSchema.safeParse({
-    schemaVersion: 1,
+
     wikis: [ENTRY, { ...ENTRY, id: '   ' }],
   });
   assert.equal(index.success, false);
@@ -57,9 +45,9 @@ test('refuses an index longer than a shelf a reader browses', () => {
     ...ENTRY,
     id: `entry-${index}`,
   }));
-  assert.equal(galleryIndexSchema.safeParse({ schemaVersion: 1, wikis }).success, false);
+  assert.equal(galleryIndexSchema.safeParse({ wikis }).success, false);
   assert.equal(
-    galleryIndexSchema.safeParse({ schemaVersion: 1, wikis: wikis.slice(0, 500) }).success,
+    galleryIndexSchema.safeParse({ wikis: wikis.slice(0, 500) }).success,
     true,
   );
 });
@@ -67,7 +55,54 @@ test('refuses an index longer than a shelf a reader browses', () => {
 test('repository URLs must be accepted by the public GitHub acquisition contract', () => {
   for (const repo of ['plain text', 'https://gitlab.com/owner/repo', 'https://github.com/owner/repo/tree/main',
     'http://github.com/owner/repo', 'https://user:secret@github.com/owner/repo']) {
-    assert.equal(galleryIndexSchema.safeParse({ schemaVersion: 1, wikis: [ENTRY, { ...ENTRY, id: 'bad', repo }] }).success, false);
+    assert.equal(galleryIndexSchema.safeParse({ wikis: [ENTRY, { ...ENTRY, id: 'bad', repo }] }).success, false);
   }
   assert.equal(galleryEntrySchema.safeParse({ ...ENTRY, repo: 'https://github.com/owner/repo.git/' }).success, true);
+});
+
+const PERSONA = {
+  category: 'news',
+  description: 'A neutral news report',
+  id: 'journalist',
+  name: 'Journalist',
+  prompt: 'Report what happened.',
+};
+
+test('an index without personas still reads, and personas are optional per field', () => {
+  // Personas were added after the first publication; absent is not an error.
+  assert.equal(galleryIndexSchema.parse({ wikis: [ENTRY] }).personas, undefined);
+  const parsed = galleryIndexSchema.parse({ wikis: [], personas: [PERSONA] });
+  assert.equal(parsed.personas?.[0]?.sample, undefined);
+  assert.equal(parsed.personas?.[0]?.icon, undefined);
+});
+
+test('an unknown persona icon reads as none, but an unusable persona refuses the index', () => {
+  const parsed = galleryIndexSchema.parse({
+
+    wikis: [],
+    personas: [{ ...PERSONA, icon: 'rocket' }],
+  });
+  assert.equal(parsed.personas?.[0]?.icon, undefined);
+  // An id names a file in the reader's library, so a path is refused whole.
+  assert.equal(
+    galleryIndexSchema.safeParse({ wikis: [], personas: [{ ...PERSONA, id: '../x' }] }).success,
+    false,
+  );
+  assert.equal(
+    galleryIndexSchema.safeParse({ wikis: [], personas: [{ ...PERSONA, prompt: '' }] }).success,
+    false,
+  );
+});
+
+
+test('reads a catalog without a version gate in publisher order with one cover per project', () => {
+  const cover = 'https://assets.stashbase.ai/wikis/x-content-starter/screenshots/cover.png';
+  const parsed = galleryIndexSchema.safeParse({
+
+    wikis: [{ ...ENTRY, id: 'x-content-starter', screenshot: cover }, ENTRY],
+  });
+  assert.equal(parsed.success, true);
+  if (!parsed.success) return;
+  assert.deepEqual(parsed.data.wikis.map((entry) => entry.id), ['x-content-starter', 'cs183b']);
+  assert.equal(parsed.data.wikis[0]?.screenshot, cover);
 });

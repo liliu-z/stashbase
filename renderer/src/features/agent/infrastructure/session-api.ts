@@ -272,6 +272,7 @@ function socketUrl(serverOrigin: string, request: AgentConnectRequest): string {
     access: ACCESS_MODE_WIRE[request.access ?? 'auto'],
     effort: request.effort,
     model: request.model,
+    persona: request.persona,
     resume: request.resume,
     folder: request.scope.path,
   });
@@ -357,7 +358,7 @@ export function createAgentSessionAdapter(
       const transcript = replay.messages.map((block) =>
         replayedBlock(block, entry.scope, serverOrigin),
       );
-      return { effort: replay.effort, transcript };
+      return { effort: replay.effort, persona: replay.persona ?? null, transcript };
     },
     async rename(entry, title, signal) {
       const row = await httpRequest(client, {

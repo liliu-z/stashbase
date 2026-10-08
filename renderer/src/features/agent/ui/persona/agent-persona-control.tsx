@@ -1,22 +1,16 @@
 /**
  * The composer's persona picker: who the Agent is when it talks and writes in
- * this project.
+ * this Chat.
  *
- * The packaged personas are there so a reader never faces an empty box to get
- * started; Custom opens one for the reader's own. A pick keeps the menu open,
- * the way every choice menu in the composer does, so the check can be seen to
- * move and a refused save can be read where it was made.
+ * The list is the reader's own library, shared by every project. Choosing one
+ * runs this Chat under it from the next message and makes it the persona the
+ * project's next new Chat starts with. A pick keeps the menu open, the way
+ * every choice menu in the composer does, so the check can be seen to move
+ * and a refused save can be read where it was made. Each row edits on its
+ * trailing pencil; the foot of the menu writes a new one or opens the
+ * Gallery to add one.
  */
-import {
-  BookOpen,
-  ChevronDown,
-  CircleDashed,
-  Drama,
-  Hammer,
-  Megaphone,
-  Newspaper,
-  PenLine,
-} from 'lucide-react';
+import { ChevronDown, CircleDashed, Drama, LayoutGrid, Pencil, Plus } from 'lucide-react';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -28,53 +22,35 @@ import {
 } from '@/components/ui/dropdown';
 import { MenuItem } from '@/components/ui/menu-item';
 import { Tooltip } from '@/components/ui/tooltip';
-import type { AgentPersonaChoice } from '@/features/agent/application/ports';
+import type { AgentPersona } from '@/features/agent/application/ports';
 import type { AgentPersonaPicker } from '@/features/agent/hooks/use-agent-persona';
 import { NARROW_LABEL, NARROW_TRIGGER } from '@/features/agent/ui/composer/narrow';
-import type { IconComponent } from '@/lib/icon-context';
 import { cn } from '@/lib/utils';
 import { FailureNotice } from '@/shared/ui/failure-notice';
+import { personaIcon } from '@/shared/ui/persona-icon';
 
 import { AgentPersonaDialog } from './agent-persona-dialog';
-
-type PackagedPersona = Exclude<AgentPersonaChoice, 'custom'>;
-
-interface PersonaCopy {
-  description: string;
-  icon: IconComponent;
-  label: string;
-}
-
-/** The packaged personas in the order the picker lists them. Their prompts
- *  are packaged server-side; this is only what the reader sees. */
-const PACKAGED_ORDER: readonly PackagedPersona[] = [
-  'builder',
-  'marketer',
-  'journalist',
-  'storyteller',
-];
-
-const COPY: Record<AgentPersonaChoice, PersonaCopy> = {
-  builder: { description: 'Build-in-public updates', icon: Hammer, label: 'Builder' },
-  custom: { description: 'Your own persona prompt', icon: PenLine, label: 'Custom' },
-  journalist: { description: 'A neutral news report', icon: Newspaper, label: 'Journalist' },
-  marketer: { description: 'Upbeat launch copy', icon: Megaphone, label: 'Marketer' },
-  storyteller: { description: 'Scene first, point later', icon: BookOpen, label: 'Storyteller' },
-};
 
 export interface AgentPersonaControlProps {
   /** A turn is running; a session's persona is fixed for its run. */
   disabled: boolean;
   picker: AgentPersonaPicker;
-  scopeName: string;
+  /** Opens the Gallery on its personas; absent hides the row. */
+  onBrowse?: (() => void) | undefined;
 }
 
-export function AgentPersonaControl({ disabled, picker, scopeName }: AgentPersonaControlProps) {
-  const [editing, setEditing] = useState(false);
+export function AgentPersonaControl({ disabled, onBrowse, picker }: AgentPersonaControlProps) {
+  // `undefined` is closed, `null` a new persona, otherwise the one in edit.
+  const [editing, setEditing] = useState<AgentPersona | null | undefined>(undefined);
   const [openings, setOpenings] = useState(0);
-  const chosen = picker.selected === null ? null : COPY[picker.selected];
-  const label = chosen ? `Persona: ${chosen.label}` : 'Persona';
-  const locked = disabled || picker.loading || picker.saving;
+  const chosen = picker.selected;
+  const label = chosen ? `Persona: ${chosen.name}` : 'Persona';
+  const locked = disabled || picker.saving;
+  const edit = (persona: AgentPersona | null) => {
+    picker.dismissFailure();
+    setOpenings((count) => count + 1);
+    setEditing(persona);
+  };
 
   return (
     <>
@@ -91,13 +67,13 @@ export function AgentPersonaControl({ disabled, picker, scopeName }: AgentPerson
                 aria-label={label}
                 className={cn('max-w-44', NARROW_TRIGGER)}
                 disabled={locked}
-                leadingIcon={chosen?.icon ?? Drama}
+                leadingIcon={chosen ? personaIcon(chosen.icon) : Drama}
                 size="compact"
                 trailingIcon={ChevronDown}
                 variant="ghost"
               >
                 <span className={cn('min-w-0 truncate', NARROW_LABEL)}>
-                  {chosen?.label ?? 'Persona'}
+                  {chosen?.name ?? 'Persona'}
                 </span>
               </Button>
             }
@@ -105,50 +81,48 @@ export function AgentPersonaControl({ disabled, picker, scopeName }: AgentPerson
         </Tooltip>
         <DropdownContent
           align="start"
-          className="w-72 max-w-[calc(100vw-1rem)]"
+          className="max-h-[min(70vh,32rem)] w-72 max-w-[calc(100vw-1rem)] overflow-y-auto"
           selectionAppearance="none"
           side="top"
         >
           <MenuItem
-            checked={picker.selected === null}
+            checked={chosen === null}
             closeOnClick={false}
             description="The Agent’s own voice"
             icon={CircleDashed}
             label="None"
             onSelect={() => picker.choose(null)}
           />
-          {PACKAGED_ORDER.map((id) => (
+          {picker.personas.map((persona) => (
             <MenuItem
-              checked={picker.selected === id}
+              checked={chosen?.id === persona.id}
               closeOnClick={false}
-              description={COPY[id].description}
-              icon={COPY[id].icon}
-              key={id}
-              label={COPY[id].label}
-              onSelect={() => picker.choose(id)}
+              icon={personaIcon(persona.icon)}
+              key={persona.id}
+              label={persona.name}
+              onSelect={() => picker.choose(persona.id)}
+              trailingAction={{
+                icon: Pencil,
+                label: `Edit ${persona.name}`,
+                onSelect: () => edit(persona),
+              }}
+              {...(persona.description ? { description: persona.description } : {})}
             />
           ))}
           <DropdownSeparator />
-          <MenuItem
-            checked={picker.selected === 'custom'}
-            description={COPY.custom.description}
-            icon={COPY.custom.icon}
-            label={COPY.custom.label}
-            onSelect={() => {
-              picker.dismissFailure();
-              setOpenings((count) => count + 1);
-              setEditing(true);
-            }}
-          />
-          {picker.failure && !editing && <FailureNotice className="m-1" failure={picker.failure} />}
+          <MenuItem icon={Plus} label="New persona…" onSelect={() => edit(null)} />
+          {onBrowse && <MenuItem icon={LayoutGrid} label="Browse personas…" onSelect={onBrowse} />}
+          {picker.failure && editing === undefined && (
+            <FailureNotice className="m-1" failure={picker.failure} />
+          )}
         </DropdownContent>
       </DropdownMenu>
       <AgentPersonaDialog
         key={openings}
-        onClose={() => setEditing(false)}
-        open={editing}
+        onClose={() => setEditing(undefined)}
+        open={editing !== undefined}
+        persona={editing ?? null}
         picker={picker}
-        scopeName={scopeName}
       />
     </>
   );

@@ -90,6 +90,8 @@ export interface AppConfigFile {
     scope: string;
     agent: 'stashbase' | 'codex' | 'claude';
     efforts?: Partial<Record<'stashbase' | 'codex' | 'claude', string | null>>;
+    /** The library persona this project's next new Chat starts with. */
+    persona?: string | null;
   }>;
   telemetry?: import('./telemetry.ts').TelemetryState;
   recentFolders?: RecentFolder[];
@@ -125,12 +127,6 @@ export interface AppConfigFile {
    * reads this through the local server so this process remains the sole
    * config writer. */
   updates?: Partial<UpdatePreferences>;
-  /** Each project's chosen Agent Persona and its custom prompt, owned by
-   * StashBase. Folder entries use the exact spelling of project membership
-   * paths; no project file is created. See `agent-persona.ts`. */
-  agentPersonas?: {
-    folders?: Array<{ path: string; selected?: string; custom?: string }>;
-  };
   /** Each native runtime's last-read model catalog and the model it last ran
    * with nothing chosen. A memory rather than a preference: losing it costs
    * one runtime-level read, and no route accepts it from a request body. See

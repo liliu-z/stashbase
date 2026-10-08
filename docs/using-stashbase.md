@@ -43,11 +43,18 @@ supported files directly.
 - **@ mentions in Chat:** find a file or folder and insert its relative path.
 
 Tool calls and file edits can be reviewed in Chat. Use **Persona** in the
-composer to choose who the Agent is when it talks and writes in this project:
-Builder, Marketer, Journalist, Storyteller, or **Custom**, which opens an empty box for
-your own. A choice applies from your next message and to new chats in the
-project. How the Agent works belongs in your own `AGENTS.md` or `CLAUDE.md`;
-StashBase never creates or rewrites them.
+composer to choose who the Agent is when it talks and writes in this chat. Your
+personas are shared by every project: Builder, Marketer, Journalist, and
+Storyteller to start, any you write with **New persona…**, and any you add from
+**Browse personas…**. Hover a persona to edit or delete it. A choice applies
+from your next message in that chat, and new chats in the project start with
+the persona you chose last. How the Agent works belongs in your own `AGENTS.md`
+or `CLAUDE.md`; StashBase never creates or rewrites them.
+
+Default offers **Ask** (confirm changes and commands), **Edit** (allow ordinary
+document writes in this project; confirm other actions), and **Plan** (read and
+explore without writes or commands). Choose a mode between turns. Default has
+no **Auto** option because its runtime has no automatic risk reviewer.
 
 Drafting, editing, Agent file-change reports, and save-conflict comparisons are
 available, and so is the [document diff](../README.md#document-diff): after the Agent writes, choose

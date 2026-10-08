@@ -87,10 +87,21 @@ export function createSessionControls({
       if (disposed() || state().composerFocusRequested === requested) return;
       transition({ kind: 'request-composer-focus', requested });
     },
-    applyPersona() {
-      const current = state();
-      if (disposed() || agentSessionIsBusy(current) || !isStarted()) return;
-      transport.open({ resume: current.nativeSessionId ?? undefined });
+    /** The persona verbs, grouped so the runtime takes them together. */
+    persona: {
+      setPersona(persona: string | null) {
+        const current = state();
+        if (disposed() || agentSessionIsBusy(current)) return false;
+        if (current.persona === persona) return true;
+        transition({ kind: 'set-persona', persona });
+        if (isStarted()) transport.open({ resume: current.nativeSessionId ?? undefined });
+        return true;
+      },
+      applyPersona() {
+        const current = state();
+        if (disposed() || agentSessionIsBusy(current) || !isStarted()) return;
+        transport.open({ resume: current.nativeSessionId ?? undefined });
+      },
     },
     setModel(model: Parameters<AgentSessionRuntime['setModel']>[0]) {
       const current = state();

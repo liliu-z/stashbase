@@ -14,6 +14,7 @@ import { rememberedCatalogFor } from './agent-model-catalog.ts';
 import { claudeUpgradeOffer } from './claude-model-catalog.ts';
 import { filesystemPath } from './filesystem-path.ts';
 import { trackAgentTurns } from './turn-changes.ts';
+import { trackChatPersona } from './agent-persona.ts';
 import type { AgentModelCatalog, AgentUpgradeOffer } from '../shared/agent-runtime.ts';
 
 /** The renderer↔server wire vocabulary lives in `shared/agent-protocol.ts` so
@@ -80,6 +81,8 @@ export interface AgentConnectionOptions {
   model?: string;
   /** Registered project folder captured at connection time. */
   folder?: string;
+  /** The library persona this Chat runs under; absent runs none. */
+  persona?: string;
 }
 
 export type AgentSessionFolderResolution =
@@ -325,6 +328,7 @@ export function attachAgentRuntime(id: string, ws: WebSocket, options: AgentConn
   // Before the adapter registers its listeners, so its first prompt already
   // waits for the baseline. `server/turn-changes.ts` owns why this is the seam.
   if (options.folder) trackAgentTurns(ws, options.folder);
+  trackChatPersona(ws, adapter.id, options);
   adapter.attach(ws, options);
 }
 

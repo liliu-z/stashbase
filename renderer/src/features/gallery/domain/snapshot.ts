@@ -1,57 +1,47 @@
-/**
- * The bundled copy of the published index.
- *
- * A shop window prefers a slightly stale list over a spinner and a bundled list
- * over an empty state, so this renders first and the published index replaces
- * it when the network answers. It is also the whole answer offline. Refresh it
- * when the gallery changes in a way a release should ship with; the runtime
- * fetch covers everything in between.
- */
+/** Bundled projects render before the network answers and remain usable offline. */
 import type { GalleryEntry } from './entry';
 
 export const GALLERY_SNAPSHOT: readonly GalleryEntry[] = [
   {
-    about: null,
+    about:
+      'Build a consistent posting habit on X with a content partner that learns your background and writing style. For builders, founders, and professionals who want to share their views and develop a personal brand.\n\nFind topics from the accounts you follow, connect them to your own point of view, and turn an approved outline into a Post or Article. Keep your drafts and past posts together so each new piece can build on what you have already shared.',
+    category: 'personal brand',
+    description:
+      'Build your personal brand on X by sharing your ideas consistently, in your own voice.',
+    id: 'x-content-starter',
+    name: 'X Content Starter',
+    repo: 'https://github.com/0-bingwu-0/x-content-starter',
+    screenshot: null,
+  },
+  {
+    about:
+      'Explore the ideas and research directions across 26 ECCV 2026 oral papers. For AI engineers, researchers, and technically curious readers who want to understand where computer vision is heading.\n\nBrowse paper summaries, compare methods across research areas, and explore major trends and emerging signals. Use the collaboration map to discover connections between authors and institutions, and ask the Agent to explain the papers and how their ideas relate.',
+    category: 'research',
+    description: 'A full-paper review of 26 ECCV 2026 oral papers.',
+    id: 'eccv-2026-orals',
+    name: 'ECCV 2026 Orals',
+    repo: 'https://github.com/0-bingwu-0/ECCV_26_oral',
+    screenshot: null,
+  },
+  {
+    about:
+      "Turn Sam Altman's Stanford CS183B course with Y Combinator into a practical reference for building a company. For first-time founders, early-stage teams, and anyone considering a startup.\n\nExplore all 20 lecture transcripts and a founder playbook organized around common questions. Ask about finding an idea, reaching product-market fit, hiring, growth, or competition, and connect advice from different lectures to the decision you are working through.",
     category: 'course',
-    contents:
-      '20 lecture transcripts · distilled founder playbook · STASHBASE.md maintenance rules',
     description: "Sam Altman's Stanford CS183B course with YC.",
-    files: [
-      'README.md',
-      'STASHBASE.md',
-      'founder_playbook.html',
-      'transcripts/Lecture01-HowToStart.md',
-      'transcripts/Lecture02-TeamExecution.md',
-      'transcripts/Lecture03-BeforeStartup.md',
-      'transcripts/Lecture04-BuildTalkGrow.md',
-      'transcripts/Lecture05-BusinessMonopoly.md',
-      'transcripts/Lecture06-Growth.md',
-      'transcripts/Lecture07-ProductsUsersLove.md',
-      'transcripts/Lecture08-DontScalePR.md',
-      'transcripts/Lecture09-RaiseMoney.md',
-      'transcripts/Lecture10-CultureTeamI.md',
-      'transcripts/Lecture11-CultureTeamII.md',
-      'transcripts/Lecture12-Enterprise.md',
-      'transcripts/Lecture13-GreatFounder.md',
-      'transcripts/Lecture14-Operate.md',
-      'transcripts/Lecture15-Manage.md',
-      'transcripts/Lecture16-UserInterview.md',
-      'transcripts/Lecture17-Hardware.md',
-      'transcripts/Lecture18-LegalAccounting.md',
-      'transcripts/Lecture19-SalesMarketing.md',
-      'transcripts/Lecture20-LaterStageAdvice.md',
-    ],
     id: 'how-to-start-a-startup',
-    learnMore: 'https://stashbase.ai/examples/cs183b/',
     name: 'How to Start a Startup',
     repo: 'https://github.com/0-bingwu-0/stashbase-cs183b',
-    screenshots: null,
-    starterPrompts: [
-      'How do I find a startup idea?',
-      'How do I know if I have product-market fit?',
-      'Should I worry about competitors and being copied?',
-    ],
-    wikiPrompt:
-      'Build or update Wiki Pages from these lecture transcripts: one page per lecture with its key ideas, and a founder playbook that connects them.',
+    screenshot: null,
+  },
+  {
+    about:
+      'Understand how AI search discovers and cites products, and turn that knowledge into a plan for your website. For independent developers and small product teams working on visibility in ChatGPT, Perplexity, and other AI search tools.\n\nExplore a Wiki and implementation handbook built from 193 source cards. Ask what to work on first, compare approaches, and work through crawler access, structured data, publishing, and measurement with concrete steps and examples.',
+    category: 'reference',
+    description:
+      '193 source cards on GEO and AI search, distilled into a Wiki and an actionable handbook for small product teams.',
+    id: 'how-to-geo',
+    name: 'How to GEO',
+    repo: 'https://github.com/0-bingwu-0/how-to-geo',
+    screenshot: null,
   },
 ];

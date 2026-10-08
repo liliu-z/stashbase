@@ -9,7 +9,7 @@ import { createGalleryIndexAdapter } from './gallery-api';
 const ENTRY = {
   about: 'Why I made this.',
   category: 'course',
-  contents: '20 transcripts',
+
   description: 'A course.',
   id: 'cs183b',
   name: 'How to Start a Startup',
@@ -32,48 +32,41 @@ const load = (transport: HttpClient) =>
 
 describe('gallery index adapter', () => {
   it('makes every optional slot explicit rather than absent', async () => {
-    const entries = await load(client({ body: { schemaVersion: 1, wikis: [ENTRY] } }));
-    expect(entries).toEqual([
+    const index = await load(client({ body: { wikis: [ENTRY] } }));
+    expect(index?.personas).toBeNull();
+    expect(index?.wikis).toEqual([
       {
         about: 'Why I made this.',
         category: 'course',
-        contents: '20 transcripts',
+
         description: 'A course.',
-        files: null,
+
         id: 'cs183b',
-        learnMore: null,
+
         name: 'How to Start a Startup',
         repo: 'https://github.com/owner/repo',
-        screenshots: null,
-        starterPrompts: [],
-        wikiPrompt: null,
+        screenshot: null,
       },
     ]);
   });
 
-  it('points every published screenshot at the daemon proxy', async () => {
-    // app://renderer serves bundled files; image requests must use the daemon
-    // origin, independently of the page's origin and the production port.
+  it('loads an unversioned catalog and proxies its single cover', async () => {
     const entries = await load(
-      client({
-        body: {
-          schemaVersion: 1,
-          wikis: [{ ...ENTRY, screenshots: ['https://assets.stashbase.ai/a.png', '/local.png'] }],
-        },
-      }),
+      client({ body: { wikis: [{ ...ENTRY, screenshot: 'https://assets.stashbase.ai/a.png' }] } }),
     );
-    expect(entries?.[0]?.screenshots).toEqual([
+    expect(entries?.wikis[0]?.screenshot).toBe(
       'http://127.0.0.1:18196/api/gallery/image?src=https%3A%2F%2Fassets.stashbase.ai%2Fa.png',
-      '/local.png',
-    ]);
+    );
+    const local = await load(client({ body: { wikis: [{ ...ENTRY, screenshot: '/local.png' }] } }));
+    expect(local?.wikis[0]?.screenshot).toBe('/local.png');
   });
 
   it('answers null for every index it cannot read', async () => {
-    // Unreachable, malformed, and a future schema are one outcome to a shop
+    // Unreachable and malformed responses are one outcome to a shop
     // that always has the snapshot. The offline envelope is a 200 by design,
     // so it has to be caught by the schema rather than by the status.
-    expect(await load(client({ body: { error: 'offline', schemaVersion: 0 } }))).toBeNull();
-    expect(await load(client({ body: { schemaVersion: 9, wikis: [] } }))).toBeNull();
+    expect(await load(client({ body: { error: 'offline' } }))).toBeNull();
+    expect(await load(client({ body: { wikis: [{}] } }))).toBeNull();
     expect(await load(client({ body: null, status: 502 }))).toBeNull();
     expect(await load(client(new Error('network down')))).toBeNull();
   });

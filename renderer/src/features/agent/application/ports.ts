@@ -11,29 +11,38 @@ import type {
 } from '@/features/agent/domain/session';
 import type { AgentSessionCommand } from '@/features/agent/domain/session-command';
 import { featureErrorClass, type FeatureError } from '@/shared/domain/feature-error';
+import type { PersonaIconName } from '@/shared/domain/persona-icon';
 import type { SourceReference } from '@/shared/domain/source-reference';
 
-/** A packaged persona, or the reader's own prompt for the project. */
-export type AgentPersonaChoice = 'builder' | 'marketer' | 'journalist' | 'storyteller' | 'custom';
-
-/** The persona a scope's Chats run under: which one is chosen and the
- *  reader's own prompt, never the resolved text. The runtime composes the
- *  real prompt server-side, so nothing here is the text a turn carries. */
+/** One persona in the reader's library. */
 export interface AgentPersona {
-  /** Null runs no persona. */
-  readonly selected: AgentPersonaChoice | null;
-  /** Kept while a packaged persona is chosen, so Custom can return to it. */
-  readonly custom: string;
+  readonly id: string;
+  readonly name: string;
+  /** One line under the name in the picker. */
+  readonly description: string;
+  readonly icon: PersonaIconName;
+  /** The exact text a session receives. */
+  readonly prompt: string;
+  /** The Gallery entry it was copied from; null for the reader's own. */
+  readonly gallery: string | null;
 }
 
-export interface AgentPersonaChange {
-  readonly selected?: AgentPersonaChoice | null;
-  readonly custom?: string;
+/** What a create or an edit sends. */
+export interface AgentPersonaInput {
+  readonly name: string;
+  readonly description: string;
+  readonly icon: PersonaIconName;
+  readonly prompt: string;
+  readonly gallery?: string | null | undefined;
 }
 
+/** The reader's persona library, shared by every project. Which persona a
+ *  Chat runs under is session state; the service composes the real prompt. */
 export interface AgentPersonaPort {
-  load(scope: AgentScope, signal: AbortSignal): Promise<AgentPersona>;
-  save(scope: AgentScope, change: AgentPersonaChange, signal: AbortSignal): Promise<AgentPersona>;
+  list(signal: AbortSignal): Promise<AgentPersona[]>;
+  create(input: AgentPersonaInput, signal: AbortSignal): Promise<AgentPersona>;
+  update(id: string, input: AgentPersonaInput, signal: AbortSignal): Promise<AgentPersona>;
+  remove(id: string, signal: AbortSignal): Promise<void>;
 }
 
 export interface AgentCatalogPort {
@@ -48,6 +57,8 @@ export interface AgentCatalogPort {
 interface AgentReplay {
   transcript: AgentTranscriptBlock[];
   effort: string | null;
+  /** The persona this Chat last ran under, when it still exists. */
+  persona?: string | null | undefined;
 }
 
 export interface AgentSocket {
@@ -71,6 +82,7 @@ export interface AgentConnectRequest {
   effort?: string | undefined;
   model?: string | undefined;
   access?: AgentAccessMode | undefined;
+  persona?: string | undefined;
 }
 
 export interface AgentSessionPort {
@@ -117,6 +129,8 @@ export interface ProjectAgentPreference {
   scope: string;
   agent: AgentId;
   efforts?: Partial<Record<AgentId, string | null | undefined>> | undefined;
+  /** The persona this project's next new Chat starts with. */
+  persona?: string | null | undefined;
 }
 
 export interface AgentPreferencesPort {
@@ -125,6 +139,6 @@ export interface AgentPreferencesPort {
     scope: AgentScope,
     agent: AgentId,
     signal: AbortSignal,
-    effort?: string | null,
+    change?: { effort?: string | null; persona?: string | null },
   ): Promise<void>;
 }

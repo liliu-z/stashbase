@@ -7,44 +7,40 @@ import { enrichedFromSnapshot, type GalleryEntry } from './entry';
 const published: GalleryEntry = {
   about: null,
   category: 'course',
-  contents: '20 transcripts',
+
   description: 'A course.',
-  files: null,
+
   id: 'cs183b',
-  learnMore: null,
+
   name: 'How to Start a Startup',
   repo: 'https://github.com/owner/repo',
-  screenshots: null,
-  starterPrompts: [],
-  wikiPrompt: null,
+  screenshot: null,
 };
 
 const bundled: GalleryEntry = {
   ...published,
   about: 'Why it was made.',
-  files: ['README.md'],
-  screenshots: ['/api/gallery/image?src=bundled'],
-  wikiPrompt: 'Build the wiki.',
+
+  screenshot: '/api/gallery/image?src=bundled',
 };
 
 describe('enrichedFromSnapshot', () => {
   it('fills only the slots the published entry left empty', () => {
     expect(enrichedFromSnapshot(published, [bundled])).toMatchObject({
       about: 'Why it was made.',
-      files: ['README.md'],
-      screenshots: ['/api/gallery/image?src=bundled'],
-      wikiPrompt: 'Build the wiki.',
+
+      screenshot: '/api/gallery/image?src=bundled',
     });
   });
 
   it('never overwrites a published value with a bundled one', () => {
-    // The index is the service contract. A build shipping a stale prompt must
+    // The index is the service contract. A build shipping a stale introduction must
     // not put it back over the one the gallery just published.
-    const fresh = { ...published, wikiPrompt: 'Build it the new way.' };
-    expect(enrichedFromSnapshot(fresh, [bundled]).wikiPrompt).toBe('Build it the new way.');
+    const fresh = { ...published, about: 'A fresh introduction.' };
+    expect(enrichedFromSnapshot(fresh, [bundled]).about).toBe('A fresh introduction.');
   });
 
   it('leaves an entry the snapshot has never heard of alone', () => {
-    expect(enrichedFromSnapshot({ ...published, id: 'new-entry' }, [bundled]).files).toBeNull();
+    expect(enrichedFromSnapshot({ ...published, id: 'new-entry' }, [bundled]).about).toBeNull();
   });
 });

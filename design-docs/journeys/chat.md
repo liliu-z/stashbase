@@ -12,8 +12,9 @@ Chat, Documents assistance, and runtimes.
    its scope; conversation navigation follows actual visits.
 2. Compose an idea, optionally attach context and choose supported Agent options.
    The action clearly sends, queues, or stops work. A persona sets how the Agent
-   talks and writes from the next message on and remains distinct from the
-   current request.
+   talks and writes in this Chat from the next message on and remains distinct
+   from the current request. The reader can switch personas between messages,
+   write a new one, or browse ready-made personas to add one.
 3. Follow replies and useful progress. Routine tools and provided thinking are
    grouped per turn and collapsed. The group holding a running turn names the
    step in hand so long work visibly advances; a settled group states what it

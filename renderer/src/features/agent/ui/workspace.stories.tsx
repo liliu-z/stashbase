@@ -10,13 +10,31 @@ import { cn } from '@/lib/utils';
 
 import ManagedAgentWorkspace from './workspace';
 
-const storyPersona = {
-  load: async () => ({ custom: '', selected: null }),
-  save: async (_scope: unknown, change: { custom?: string; selected?: unknown }) => ({
-    custom: change.custom ?? '',
-    selected: change.selected ?? null,
-  }),
-} as AgentPersonaPort;
+const storyPersonas = [
+  {
+    description: 'Build-in-public updates',
+    gallery: 'builder',
+    icon: 'hammer',
+    id: 'builder',
+    name: 'Builder',
+    prompt: 'Lead with what shipped.',
+  },
+  {
+    description: 'A neutral news report',
+    gallery: 'journalist',
+    icon: 'newspaper',
+    id: 'journalist',
+    name: 'Journalist',
+    prompt: 'Report what happened.',
+  },
+] as const;
+
+const storyPersona: AgentPersonaPort = {
+  list: async () => [...storyPersonas],
+  create: async (input) => ({ ...input, gallery: input.gallery ?? null, id: 'story-persona' }),
+  update: async (id, input) => ({ ...input, gallery: input.gallery ?? null, id }),
+  remove: async () => {},
+};
 
 const abilities: Agent['abilities'] = {
   attachments: true,

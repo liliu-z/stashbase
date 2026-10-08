@@ -255,19 +255,27 @@ completeness, grounding, and link quality require real-Agent evaluation.
 
 ### Flow
 
-Browse Gallery → inspect the project and generating Prompt → optionally copy the prompt
-or make a local project copy → enter.
+Browse Gallery → inspect its single cover and introduction → make a local project
+copy → enter.
+
+Ready-made personas share the Gallery's catalog but not its name or shelf: the
+composer's persona picker opens **Browse personas** → read a persona's sample reply and
+its exact prompt → add a copy to the persona library. The Gallery shows only projects,
+and Browse personas only personas, so personas never read as template projects.
 
 ### Required Results
 
-Browsing requires no project/account. Prompt copying never sends a message or changes
-the persona. Use the current catalog entry and shared project-entry rules; a withdrawn
-entry cannot still be copied.
+Browsing requires no project/account. Project entries show one cover and an
+introduction, without a generating prompt or thumbnail strip. Use the current catalog
+entry and shared project-entry rules; a withdrawn
+entry cannot still be copied. Adding a persona copies it: later Gallery changes never
+reach it, it is edited like the reader's own, and adding it does not choose it for any
+Chat. Every persona sample answers the same request, so pages compare voices.
 
 ### Failure and Recovery
 
 Keep usable offline catalog content and offer retry after loading, screenshot, or
-clipboard failure. A registered copy survives failed entry and can be reopened without
+image failure. A registered copy survives failed entry and can be reopened without
 downloading again.
 
 **Capabilities:** [Project Entry](../capabilities/project-entry.md).

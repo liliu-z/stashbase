@@ -84,6 +84,8 @@ export class CodexSession implements AttributedAgentSession {
   private stdout: readline.Interface | null = null;
   private stderr: readline.Interface | null = null;
   private cwd: string | null = null;
+  /** The library persona this Chat runs under, read when its thread starts. */
+  persona: string | undefined;
   private threadId: string | null = null;
   private resumeThreadId: string | null = null;
   private activeTurnId: string | null = null;
@@ -558,9 +560,7 @@ export class CodexSession implements AttributedAgentSession {
       // Keep the chosen Persona distinct from StashBase's internal
       // project-routing policy even though Codex receives their composition
       // through one native developer-instructions field.
-      developerInstructions: resolveAgentRuntimeInstructions(
-        cwd,
-      ),
+      developerInstructions: resolveAgentRuntimeInstructions(this.persona),
     };
     const result = await this.request(
       this.resumeThreadId ? 'thread/resume' : 'thread/start',
@@ -1120,8 +1120,9 @@ function titleFromPrompt(prompt: string): string {
 
 const sessions = new Set<CodexSession>();
 
-export function attachCodexWebSocket(ws: WebSocket, windowId = 'default', effort?: string, resume?: string, access?: AgentAccessMode, model?: string, folder?: string): void {
+export function attachCodexWebSocket(ws: WebSocket, windowId = 'default', effort?: string, resume?: string, access?: AgentAccessMode, model?: string, folder?: string, persona?: string): void {
   const session = new CodexSession(ws, windowId, effort, resume, access, model, folder, (s) => sessions.delete(s));
+  session.persona = persona;
   sessions.add(session);
   session.begin();
 }

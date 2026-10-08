@@ -5,9 +5,13 @@
  * that belongs to a feature belongs in that feature, and a rule about the
  * window belongs in a hook under `./composition`.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
-import { askAbout, useAgentWorkspaceRuntime } from '@/features/agent/public';
+import {
+  askAbout,
+  useAgentPersonaLibrary,
+  useAgentWorkspaceRuntime,
+} from '@/features/agent/public';
 import {
   RevisionPreview,
   useDocumentCommands,
@@ -35,6 +39,7 @@ import {
   useWorkspace,
   useWorkspaceSession,
 } from '@/features/workspace/public';
+import { DEFAULT_PERSONA_ICON } from '@/shared/domain/persona-icon';
 
 import { usePreparationCommands } from './composition/commands/use-preparation-commands';
 import { useWorkspaceCommands } from './composition/commands/use-workspace-commands';
@@ -190,11 +195,32 @@ function WorkspaceWindow() {
     workspaceDeps.adapters.lifecycle,
     documents ? folderPath : null,
   );
+  const personaLibrary = useAgentPersonaLibrary(dependencies.agent.persona);
+  const addedPersonas = useMemo(
+    () =>
+      new Set(
+        personaLibrary.personas.flatMap((persona) => (persona.gallery ? [persona.gallery] : [])),
+      ),
+    [personaLibrary.personas],
+  );
   const gallery = useGalleryShop(
     dependencies.gallery,
     entry.copy,
     entry.isPending,
     activeFolder?.path ?? null,
+    {
+      added: addedPersonas,
+      // A Gallery persona joins the library as the reader's own copy; it
+      // remembers where it came from so the shop can say it is added.
+      add: async (persona) =>
+        (await personaLibrary.add({
+          description: persona.description,
+          gallery: persona.id,
+          icon: persona.icon ?? DEFAULT_PERSONA_ICON,
+          name: persona.name,
+          prompt: persona.prompt,
+        })) !== null,
+    },
   );
   const updateNotice = useUpdateNotice(dependencies.updates);
   const updatePreview = useUpdatePreview(import.meta.env.DEV);
@@ -265,6 +291,7 @@ function WorkspaceWindow() {
             documents={documents}
             mode={chrome.navigator.mode}
             onAskAgent={askAgent}
+            onBrowsePersonas={gallery.browsePersonas}
             newTab={newTab}
             onCreateDraft={newDraft}
             onPrepare={preparation.prepare}

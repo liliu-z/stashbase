@@ -13,7 +13,7 @@ import { CodexRpcPeer } from '../codex-rpc-transport.ts';
 import { runtimeDescriptorFor } from '../agent-contract.ts';
 import { BUILT_IN_AGENT_ADAPTERS } from '../agent-adapters.ts';
 import { CodexSession } from '../codex-session-runtime.ts';
-import { resolveAgentPersona, setAgentPersona } from '../agent-persona.ts';
+import { agentPersonaLibrary } from '../agent-persona.ts';
 import { clearCurrentFolder, runWithWindowId, openProjectFolder } from '../folder.ts';
 
 class FakeCodexProcess extends EventEmitter {
@@ -187,14 +187,14 @@ test('Codex publishes its native model catalog before ready and forwards a selec
   session.dispose();
 });
 
-test('Codex injects the chosen Persona with hidden StashBase routing policy', async (t) => {
+test("Codex injects the Chat's Persona with hidden StashBase routing policy", async (t) => {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-codex-instructions-'));
   const persona = 'Prefer primary research notes.';
   await runWithWindowId('instructions-window', () => openProjectFolder(folder));
-  setAgentPersona({ kind: 'folder', path: folder }, { custom: persona, selected: 'custom' });
+  const chosen = agentPersonaLibrary().create({ name: 'Researcher', description: '', icon: 'flask-conical', prompt: persona });
   t.after(() => {
     runWithWindowId('instructions-window', () => clearCurrentFolder());
-    setAgentPersona({ kind: 'folder', path: folder }, { custom: '', selected: null });
+    agentPersonaLibrary().remove(chosen.id);
     fs.rmSync(folder, { recursive: true, force: true });
   });
   const ws = new FakeWebSocket();
@@ -210,6 +210,7 @@ test('Codex injects the chosen Persona with hidden StashBase routing policy', as
     undefined,
     () => native.proc as unknown as ChildProcessWithoutNullStreams,
   );
+  session.persona = chosen.id;
   t.after(() => session.dispose());
 
   session.begin();
@@ -220,7 +221,6 @@ test('Codex injects the chosen Persona with hidden StashBase routing policy', as
   const developerInstructions = native.requests.find(
     (request) => request.method === 'thread/start',
   )?.params.developerInstructions;
-  assert.equal(resolveAgentPersona(folder), persona);
   assert.equal(typeof developerInstructions, 'string');
   assert.match(String(developerInstructions), /StashBase MCP/i);
   assert.match(String(developerInstructions), /search_project/);

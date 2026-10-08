@@ -78,7 +78,6 @@ Paths are relative to the repository root.
 - `renderer/src/features/gallery/ui/detail.tsx`
 - `renderer/src/features/gallery/ui/screenshots.tsx`
 - `renderer/src/features/gallery/ui/image.tsx`
-- `renderer/src/features/gallery/ui/prompt.tsx`
 - `renderer/src/features/gallery/ui/index-recovery.tsx`
 - `renderer/src/features/gallery/hooks/use-gallery.ts`
 - `renderer/src/features/gallery/domain/entry.ts`

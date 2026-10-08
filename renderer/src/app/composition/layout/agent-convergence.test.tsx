@@ -52,6 +52,8 @@ vi.mock('@/features/documents/ui/markdown/changes', () => ({
   },
 }));
 
+vi.mock('@/features/documents/ui/markdown/math', () => ({ math: () => undefined }));
+
 vi.mock('@milkdown/kit/utils', () => ({
   $prose: () => ({}),
   replaceAll: (markdown: string) => ({ markdown }),

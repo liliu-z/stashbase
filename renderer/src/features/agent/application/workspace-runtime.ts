@@ -43,6 +43,7 @@ export interface AgentWorkspaceRuntime {
   readonly preferences: ReturnType<typeof createProjectAgents>['store'];
   loadPreferences(): Promise<void>;
   chooseAgent(agent: AgentId): Promise<boolean>;
+  choosePersona(persona: string | null): boolean;
   activate(id: string): void;
   visit(direction: -1 | 1): void;
   activeSession(): AgentSessionRuntime;
@@ -165,7 +166,7 @@ export function createAgentWorkspaceRuntime({
       scope,
       title,
     });
-    projectAgents.seedEffort(session);
+    projectAgents.seed(session);
     const mounted: MountedAgentSession = {
       followsWindow,
       runtime: session,
@@ -209,6 +210,7 @@ export function createAgentWorkspaceRuntime({
       else if (agent !== current.agent) projectAgents.seedEffort(session);
       return true;
     },
+    choosePersona: (persona) => !disposed && projectAgents.choose(runtime.activeSession(), persona),
     activate(id) {
       if (!disposed && sessions.has(id))
         store.setState((state) => activateAgentTab(state, id), true);
@@ -278,7 +280,7 @@ export function createAgentWorkspaceRuntime({
           ? blank
           : mountSession(id, agent, nextScope, followsCurrentFolder);
       mounted.followsWindow = followsCurrentFolder;
-      projectAgents.seedEffort(mounted.runtime);
+      projectAgents.seed(mounted.runtime);
       store.setState((state) => activateAgentTab(state, id), true);
       return mounted.runtime;
     },
@@ -337,11 +339,8 @@ export function createAgentWorkspaceRuntime({
       if (availableAgents) readyAgentIds = new Set(availableAgents);
       started = true;
       for (const { runtime: session } of sessions.values()) {
-        if (
-          !agentSessionIsUnstarted(session.store.getState()) &&
-          readyAgentIds.has(session.store.getState().agent)
-        )
-          session.start();
+        const state = session.store.getState();
+        if (!agentSessionIsUnstarted(state) && readyAgentIds.has(state.agent)) session.start();
       }
     },
     startActive() {

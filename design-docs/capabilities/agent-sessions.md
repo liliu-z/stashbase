@@ -72,11 +72,19 @@ once setup succeeds; changed work or cancelled consent rejects late completion.
   the choice actually runs. A model chosen while a session is still starting applies
   before its first turn.
   Options remain fixed during a turn. A persona is standing session guidance
-  chosen per project in the composer: a packaged persona, the reader's own
-  Custom prompt, or none. Choosing one applies from the chat's next message by
-  resuming its own conversation, and to new chats in the project. It is
-  distinct from permissions, requests, and user-owned native instruction files,
-  which own how the Agent works.
+  chosen per Chat in the composer from the reader's persona library, or none.
+  Switching between personas is the reason to keep several; a persona that
+  never changes belongs in the project's own instruction files. Choosing one
+  applies from that Chat's next message by resuming its own conversation, and
+  becomes the persona the project's next new Chat starts with; other open
+  Chats keep theirs. Reopening a Chat from history restores its persona. The
+  library is shared by every project and lives in app data, never in a project
+  folder. A new library starts with the packaged personas; the reader can
+  write, edit, and delete any of them, and add copies from the Gallery. Editing
+  a persona applies to every Chat that runs it from that Chat's next message; a
+  deleted persona leaves its Chats running none. A persona is distinct from
+  permissions, requests, and user-owned native instruction files, which own
+  how the Agent works.
 - Approval applies to its pending action only. Stop cancels unanswered approvals,
   retires model/tool work, and preserves transcripts and completed file edits.
   Cancellation is confirmed before reporting Stopped; it does not roll back edits.

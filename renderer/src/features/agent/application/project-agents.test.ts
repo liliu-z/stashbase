@@ -44,7 +44,8 @@ describe('project Agent preferences', () => {
     const entries = new Map<string, Awaited<ReturnType<AgentPreferencesPort['load']>>[number]>();
     const preferences: AgentPreferencesPort = {
       load: vi.fn(async () => [...entries.values()]),
-      save: vi.fn(async (project, agent, _signal, effort) => {
+      save: vi.fn(async (project, agent, _signal, change = {}) => {
+        const { effort } = change;
         const previous = entries.get(project.path);
         entries.set(project.path, {
           ...previous,
@@ -191,6 +192,46 @@ describe('project Agent preferences', () => {
       draft: 'Keep this',
     });
     runtime.dispose();
+  });
+  it("starts each new Chat with the project's last persona, and keeps a started Chat's own", async () => {
+    const entries = new Map<string, Awaited<ReturnType<AgentPreferencesPort['load']>>[number]>();
+    const preferences: AgentPreferencesPort = {
+      load: vi.fn(async () => [...entries.values()]),
+      save: vi.fn(async (project, agent, _signal, change = {}) => {
+        const previous = entries.get(project.path);
+        entries.set(project.path, {
+          ...previous,
+          scope: project.path,
+          agent: previous?.agent ?? agent,
+          ...(change.persona === undefined ? {} : { persona: change.persona }),
+        });
+      }),
+    };
+    const runtime = workspace(preferences);
+    await runtime.loadPreferences();
+    const first = runtime.activeSession();
+    expect(first.store.getState().persona).toBeNull();
+
+    expect(runtime.choosePersona('journalist')).toBe(true);
+    expect(first.store.getState().persona).toBe('journalist');
+    await vi.waitFor(() => expect(entries.get(scope.path)?.persona).toBe('journalist'));
+
+    first.setDraft('Keep the first chat started');
+    first.store.setState({ nativeSessionId: 'native-1', connection: { kind: 'live', turn: null } });
+    const second = runtime.newChat();
+    expect(second).not.toBe(first);
+    expect(second.store.getState().persona).toBe('journalist');
+
+    runtime.choosePersona('builder');
+    expect(second.store.getState().persona).toBe('builder');
+    expect(first.store.getState().persona).toBe('journalist');
+    await vi.waitFor(() => expect(entries.get(scope.path)?.persona).toBe('builder'));
+    runtime.dispose();
+
+    const reopened = workspace(preferences);
+    await reopened.loadPreferences();
+    expect(reopened.activeSession().store.getState().persona).toBe('builder');
+    reopened.dispose();
   });
   it('waits for acknowledged setup and the requested native login to finish', async () => {
     const port = agentCatalogPort([], {

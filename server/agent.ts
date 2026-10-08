@@ -307,6 +307,9 @@ export class AgentSession implements AttributedAgentSession {
   private sessionId: string | null = null;
   /** The folder this session is bound to, captured at start. */
   private cwd: string | null = null;
+  /** The library persona this Chat runs under, read when the native
+   *  session starts. */
+  persona: string | undefined;
   private models: AgentModel[] = [];
   /** Whether publishModels has run, so a model picked earlier is held for it
    *  rather than refused against a catalog that is not read yet. */
@@ -436,13 +439,13 @@ export class AgentSession implements AttributedAgentSession {
           permissionMode: this.access,
           // Project documents use StashBase transactions and their version checks.
           disallowedTools: ['Edit', 'MultiEdit', 'Write'],
-          // Preserve Claude's native preset, then append the project's chosen
+          // Preserve Claude's native preset, then append the Chat's chosen
           // Persona plus StashBase's internal project routing policy. The
           // policy is never stored in the Persona.
           systemPrompt: {
             type: 'preset',
             preset: 'claude_code',
-            append: resolveAgentRuntimeInstructions(cwd),
+            append: resolveAgentRuntimeInstructions(this.persona),
           },
           // Resuming a past session loads its conversation history so the
           // user can continue it. The transcript itself is rendered from
@@ -1048,6 +1051,7 @@ export function attachAgentWebSocket(
   access?: AgentAccessMode,
   model?: string,
   folder?: string,
+  persona?: string,
 ): void {
   const session = new AgentSession(
     ws,
@@ -1065,6 +1069,7 @@ export function attachAgentWebSocket(
     undefined,
     folder,
   );
+  session.persona = persona;
   sessions.add(session);
   if (resume) session.begin(() => nativeOwnership.acquire(resume, session));
   else session.begin();

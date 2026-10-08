@@ -1,173 +1,40 @@
-/** A Gallery entry's published screenshots: one 16:9 hero and a strip of
- *  thumbnails beneath it that picks which shot the hero shows. The frame and
- *  the strip keep their geometry whether an entry published ten shots, one,
- *  or none, so the page never reshapes around what is missing. */
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
-
-import { Button } from '@/components/ui/button';
-import { focusRing } from '@/lib/focus-ring';
+/** One cover with the same frame in loaded, missing, and retry states. */
 import { useShape } from '@/lib/shape-context';
 import { cn } from '@/lib/utils';
 
 import { GalleryImage } from './image';
 
-/** The hero is a 16:9 frame, full stop. It never trades its ratio for the
- *  column's width: a wide window gives the frame a wider column only up to
- *  the cap the entry page sets on that column, and the width past it goes to
- *  the text. A frame that stretched into a banner cropped every screenshot
- *  to a strip. */
 const HERO_FRAME = { aspectRatio: '16 / 9' } as const;
 
-/** A thumbnail is a picture to recognize, not a dot to count: three fill the
- *  column exactly, whatever width the window gives it, and the rest are one
- *  nudge away. Fluid rather than a fixed width, because a fixed one left a
- *  ragged gutter at the strip's right on every column it did not divide, and
- *  read as a row that had run out rather than one that continued. */
-const THUMB_GAP = 8;
-const THUMB_WIDTH = 'w-[calc((100%-1rem)/3)]';
-
-/**
- * The curated screenshots: one hero across the page's full width, and a strip
- * of thumbnails beneath it.
- *
- * One geometry across every state. The hero keeps its frame and the strip
- * keeps its row whether an entry published ten shots, one, or none, so an
- * entry that has published nothing empties a slot rather than reshaping the
- * page — which is also what a reader sees offline, since these bytes cross the
- * daemon's proxy exactly as the index does.
- */
-export function GalleryScreenshots({
+export function GalleryScreenshot({
   name,
-  screenshots,
+  screenshot,
 }: {
   name: string;
-  screenshots: readonly string[];
+  screenshot: string | null;
 }) {
   const shape = useShape();
-  const [shot, setShot] = useState(0);
-  const stripRef = useRef<HTMLDivElement>(null);
-  // Which sides still have content, read from real scroll geometry rather than
-  // counted: the strip is a native scroller and the trackpad moves it too.
-  const [canScroll, setCanScroll] = useState({ left: false, right: false });
-
-  const updateArrows = useCallback(() => {
-    const strip = stripRef.current;
-    if (!strip) return;
-    setCanScroll({
-      left: strip.scrollLeft > 4,
-      right: strip.scrollLeft + strip.clientWidth < strip.scrollWidth - 4,
-    });
-  }, []);
-
-  useEffect(() => {
-    setShot(0);
-    updateArrows();
-  }, [name, screenshots.length, updateArrows]);
-
-  /** One thumbnail plus its gap, measured off the strip rather than assumed,
-   *  since the thumbnails size to the column. The native scroller supplies
-   *  the easing; the arrow only picks the destination. */
-  const nudge = (direction: 1 | -1) => {
-    const strip = stripRef.current;
-    if (!strip) return;
-    const first = strip.firstElementChild;
-    const step = first ? first.getBoundingClientRect().width + THUMB_GAP : strip.clientWidth / 3;
-    strip.scrollBy({ behavior: 'smooth', left: direction * step });
-  };
-
-  const hero = screenshots[shot];
-
   return (
-    <div className="min-w-0">
-      {hero ? (
-        <div
-          className={cn(
-            'relative w-full overflow-hidden border border-border bg-surface-3',
-            shape.panel,
-          )}
-          style={HERO_FRAME}
-        >
-          <GalleryImage
-            key={hero}
-            retryable
-            alt={`${name} screenshot ${shot + 1}`}
-            className="absolute inset-0 size-full object-cover object-top"
-            src={hero}
-          />
-        </div>
-      ) : (
-        <div
-          className={cn(
-            'flex w-full items-center justify-center border border-dashed border-border bg-surface-3',
-            shape.panel,
-          )}
-          style={HERO_FRAME}
-        >
-          <p className="m-0 max-w-xs text-center text-caption text-muted-foreground">
-            Screenshots for this project aren’t published yet.
-          </p>
-        </div>
+    <div
+      className={cn(
+        'relative flex w-full items-center justify-center overflow-hidden border border-border bg-surface-3',
+        !screenshot && 'border-dashed',
+        shape.panel,
       )}
-
-      {screenshots.length > 1 && (
-        <div className="relative mt-2">
-          <div
-            className="flex snap-x [scrollbar-width:none] gap-2 overflow-x-auto"
-            onScroll={updateArrows}
-            ref={stripRef}
-          >
-            {screenshots.map((url, index) => (
-              <button
-                aria-current={index === shot || undefined}
-                aria-label={`Screenshot ${index + 1}`}
-                className={focusRing(
-                  cn(
-                    `block ${THUMB_WIDTH} shrink-0 cursor-pointer snap-start overflow-hidden border bg-surface-3 p-0 transition-colors duration-fast outline-none`,
-                    shape.chip,
-                    // Selected reads as ink, not accent: the accent is reserved
-                    // for the page's one action, and these repeat.
-                    index === shot
-                      ? 'border-foreground'
-                      : 'border-border hover:border-foreground/40',
-                  ),
-                )}
-                key={url}
-                onClick={() => setShot(index)}
-                type="button"
-              >
-                <GalleryImage
-                  key={url}
-                  alt=""
-                  className="block aspect-video w-full object-cover object-top"
-                  src={url}
-                />
-              </button>
-            ))}
-          </div>
-          {canScroll.left && (
-            <Button
-              aria-label="Previous screenshots"
-              className="absolute top-1/2 -left-3 -translate-y-1/2 rounded-full shadow-surface-3"
-              onClick={() => nudge(-1)}
-              size="icon-compact"
-              variant="secondary"
-            >
-              <ChevronLeft />
-            </Button>
-          )}
-          {canScroll.right && (
-            <Button
-              aria-label="More screenshots"
-              className="absolute top-1/2 -right-3 -translate-y-1/2 rounded-full shadow-surface-3"
-              onClick={() => nudge(1)}
-              size="icon-compact"
-              variant="secondary"
-            >
-              <ChevronRight />
-            </Button>
-          )}
-        </div>
+      style={HERO_FRAME}
+    >
+      {screenshot ? (
+        <GalleryImage
+          key={screenshot}
+          retryable
+          alt={`${name} cover`}
+          className="absolute inset-0 size-full object-cover object-top"
+          src={screenshot}
+        />
+      ) : (
+        <p className="m-0 max-w-xs text-center text-caption text-muted-foreground">
+          The cover for this project isn’t published yet.
+        </p>
       )}
     </div>
   );

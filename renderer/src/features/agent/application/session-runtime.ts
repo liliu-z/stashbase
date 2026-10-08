@@ -307,7 +307,7 @@ export function createAgentSessionRuntime({
       }
     },
     setAccessMode: controls.setAccessMode,
-    applyPersona: controls.applyPersona,
+    ...controls.persona,
     setEffort(effort) {
       const previous = state().effort;
       controls.setEffort(effort);
@@ -347,10 +347,9 @@ export function createAgentSessionRuntime({
         return accept(capturedScope, () => {
           restoreEntry = null;
           transition({
-            effort: replay.effort,
+            ...replay,
             lastModified: entry.lastModified,
             nativeSessionId: entry.id,
-            transcript: replay.transcript,
             kind: 'restore',
           });
           if (connectWhenReady) {

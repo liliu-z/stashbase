@@ -82,6 +82,7 @@ describe('Agent session domain', () => {
     const connecting = transitionAgentSession(draft, { attempt: 0, kind: 'connect' });
     const restored = transitionAgentSession(connecting, {
       effort: 'high',
+      persona: 'journalist',
       lastModified: 42,
       nativeSessionId: 'native-1',
       transcript: [{ id: 'reply-1', kind: 'assistant', text: 'Retained answer' }],
@@ -93,6 +94,7 @@ describe('Agent session domain', () => {
     expect(connecting.connection).toEqual({ attempt: 0, kind: 'connecting' });
     expect(restored).toMatchObject({
       effort: 'high',
+      persona: 'journalist',
       lastModified: 42,
       nativeSessionId: 'native-1',
       transcript: [{ id: 'reply-1', kind: 'assistant', text: 'Retained answer' }],

@@ -18,7 +18,6 @@ import {
   agentTurnIsActive,
   agentSessionIsBusy,
   agentCanChangeAgent,
-  scopeLabel,
 } from '@/features/agent/domain/session';
 import { EMPTY_CHAT_PROMPTS } from '@/features/agent/domain/starters';
 import { useAgentAccess } from '@/features/agent/hooks/use-agent-access';
@@ -59,6 +58,7 @@ function ChatWorkspace({
   catalogPort,
   header = true,
   persona: personaApi,
+  onBrowsePersonas,
   onOpenAgentSettings,
   onSignIn,
   onOpenExternal,
@@ -85,6 +85,7 @@ function ChatWorkspace({
       delivery: session.delivery,
       queuePaused: session.queuePaused,
       effort: session.effort,
+      persona: session.persona,
       model: session.model,
       models: session.models,
       nativeSessionId: session.nativeSessionId,
@@ -118,8 +119,12 @@ function ChatWorkspace({
   const notice = connectionNotice(state.connection);
   const armedSkill = agentSkills(state.skillCatalog).find((skill) => skill.id === state.skill);
   const empty = state.transcript.length === 0;
-  const scopeName = scopeLabel(state.scope);
-  const persona = useAgentPersona(personaApi, state.scope, active.applyPersona);
+  const persona = useAgentPersona(
+    personaApi,
+    state.persona,
+    runtime.choosePersona,
+    active.applyPersona,
+  );
   const honoredModes = readyAgent?.abilities.modes;
   useEffect(() => {
     if (!honoredModes || honoredModes.length === 0) return;
@@ -283,7 +288,11 @@ function ChatWorkspace({
                       onChange={active.setAccessMode}
                     />
                   )}
-                  <AgentPersonaControl disabled={busy} picker={persona} scopeName={scopeName} />
+                  <AgentPersonaControl
+                    disabled={busy}
+                    onBrowse={onBrowsePersonas}
+                    picker={persona}
+                  />
                 </>
               }
               rightSlot={

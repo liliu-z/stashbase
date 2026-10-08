@@ -10,6 +10,7 @@ import type { WebSocket } from 'ws';
 import { registerAgentAdapter, type AgentHistoryActions } from '../agent-contract.ts';
 import * as claudeHistory from '../claude-history.ts';
 import * as sharedRoutes from '../routes/agent-sessions.ts';
+import { agentPersonaLibrary } from '../agent-persona.ts';
 
 const member = fs.mkdtempSync(path.join(os.homedir(), 'history-project-'));
 writeAppConfigStrict({ recentFolders: [{ path: member, openedAt: new Date().toISOString() }] });
@@ -55,7 +56,13 @@ test('shared replay adds metadata without changing messages responses', async ()
   sharedRoutes.mount(app);
 
   assert.deepEqual(await invoke(app, '/api/agents/:agent/sessions/:id/replay', { agent: 'claude', id: 's1' }),
-    { status: 200, body: { protocol: 2, messages, effort: 'max' } });
+    { status: 200, body: { protocol: 2, messages, effort: 'max', persona: null } });
+  // The Chat's persona is StashBase's record, joined beside the native replay.
+  agentPersonaLibrary().recordChat('claude', 's1', 'journalist');
+  assert.equal(
+    ((await invoke(app, '/api/agents/:agent/sessions/:id/replay', { agent: 'claude', id: 's1' })).body as { persona?: unknown }).persona,
+    'journalist',
+  );
   assert.deepEqual(await invoke(app, '/api/agents/:agent/sessions/:id/messages', { agent: 'claude', id: 's1' }),
     { status: 200, body: messages });
 });

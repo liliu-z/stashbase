@@ -418,15 +418,14 @@ export function createOpenCodeSessionRuntime(
   context: {
     windowId: string;
     agentSessionId: string;
-    cwd: string;
+    /** The library persona this Chat runs under. */
+    persona: string | undefined;
   },
 ): OpenCodeSessionRuntime {
   const sessionRuntime = new OpenCodeRuntime({
     STASHBASE_WINDOW_ID: context.windowId,
     STASHBASE_AGENT_SESSION_ID: context.agentSessionId,
-  }, resolveAgentPersona(
-    context.cwd,
-  ), true, context.agentSessionId);
+  }, resolveAgentPersona(context.persona), true, context.agentSessionId);
   return {
     client: (directory) => sessionRuntime.client(directory),
     beginTurn: (turnId, profile) => beginHostedAgentTurn(context.agentSessionId, turnId, profile),

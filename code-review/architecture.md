@@ -307,17 +307,23 @@ stable status without download, retry, or a new durable demand latch.
   subagent, or another tool whose writes name no file reports that the folder
   may have changed, and the shell reconciles it the same way. Reads, listings,
   searches, and questions report nothing.
-- A persona is per-project Settings guidance resolved at native mount and composed
+- A persona is per-Chat guidance resolved at native mount and composed
   with internal routing policy. That policy is the one text every runtime always
   sees, so it owns which StashBase tool orients and reads prepared text, and that
   existing documents use `edit_file` while new documents use `write_file`; a tool description alone
   cannot own a rule, because a runtime may defer it. Neither is a permission,
   skill contents, or a project-file edit, and StashBase ships no workflow
-  guidance of its own: that is the user's `AGENTS.md` / `CLAUDE.md`. Packaged
-  personas live in `assets/agent-personas/`; no persona is the default. A save
-  never mutates a running native prompt: the renderer resumes the chat's own
-  conversation, as it does for effort, so the persona applies from the next
-  turn. Brainstorming needs no sources/wiki/index.
+  guidance of its own: that is the user's `AGENTS.md` / `CLAUDE.md`.
+  `server/agent-persona.ts` owns the library: one Markdown file per persona in
+  app data, seeded once from `assets/agent-personas/`, plus the record of each
+  native session's persona. The Chat's persona id travels on its connection;
+  the shared Agent Contract records it against the `session-id` every runtime
+  announces, and replay returns it. The project's choice for new Chats is an
+  Agent preference. A change never mutates a running native prompt: the
+  renderer resumes the Chat's own conversation, as it does for effort, so the
+  persona applies from the next turn. Gallery personas are Gallery index data;
+  the composition layer adds them through the Agent's library, since the
+  features do not import each other. Brainstorming needs no sources/wiki/index.
 - Attachment age cleanup excludes batches created by the active server process;
   drafts, queues, and retries may retain them until process exit. They remain
   temporary files, not durable historical attachments.
@@ -615,15 +621,20 @@ production image CSP permits only that server’s `/api/gallery/image` proxy in
 addition to bundled/data/blob images; native main-frame request authorization
 still applies. Normalize URLs before exact host/path
 checks, refuse redirects, validate before caching, and fall back to the bundled
-snapshot on unsupported/unreachable publications. Index reads carry no project
+snapshot on malformed/unreachable publications. The index has no version gate;
+project entries carry one `screenshot` URL and a plain-text introduction. Index reads carry no project
 or composer content. Both entrances share one copy latch. Acquisition uses the
 ordinary import transaction; later window failure preserves the registered copy.
 Only successful catalog loads remain fresh for the window session. Failed loads
 retain any successful catalog (or the bundled fallback) and remain retryable.
 The selected entry is an ID resolved against that catalog, not an independent
-copy of its metadata. Image retries retain the restricted proxy origin. Prompt
-clipboard feedback belongs to the displayed prompt and ignores retired requests;
-Gallery metadata never installs ongoing Agent instructions.
+copy of its metadata. Image retries retain the restricted proxy origin. Gallery metadata never installs
+ongoing Agent instructions. Personas ride the
+same index as an optional array; an index without it keeps the bundled persona
+snapshot. The overlay frame is shared, but its entrance fixes one shop: the
+sidebar's Gallery shows projects and the picker's Browse personas shows
+personas, with no switch between them. Adding one copies it into the reader's library through the Agent's
+library port and chooses it for no Chat.
 
 ## Validation
 

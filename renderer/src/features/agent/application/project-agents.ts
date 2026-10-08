@@ -27,11 +27,23 @@ export function createProjectAgents(port: AgentPreferencesPort | undefined, sign
     const effort = choices.get(agentScopeKey(state.scope))?.efforts?.[state.agent] ?? null;
     session.store.setState({ effort: supportedEffort(state, effort) });
   };
-  const save = (scope: AgentScope, agent: AgentId, effort?: string | null) => {
+  /** A new Chat starts with its project's persona; a started one keeps the
+   *  persona it already runs under. */
+  const seedPersona = (session: AgentSessionRuntime) => {
+    const state = session.store.getState();
+    if (!agentSessionIsUnstarted(state)) return;
+    const persona = choices.get(agentScopeKey(state.scope))?.persona ?? null;
+    if (state.persona !== persona) session.store.setState({ persona });
+  };
+  const save = (
+    scope: AgentScope,
+    agent: AgentId,
+    change?: { effort?: string | null; persona?: string | null },
+  ) => {
     pendingSave = pendingSave.then(async () => {
       if (signal.aborted) return false;
       try {
-        await port?.save(scope, agent, signal, effort);
+        await port?.save(scope, agent, signal, change);
         signal.throwIfAborted();
         return true;
       } catch {
@@ -69,12 +81,18 @@ export function createProjectAgents(port: AgentPreferencesPort | undefined, sign
     store,
     load,
     seedEffort,
+    /** What a new or reused Chat starts from: its project's effort and persona. */
+    seed(session: AgentSessionRuntime) {
+      seedEffort(session);
+      seedPersona(session);
+    },
     apply(session: AgentSessionRuntime) {
       const state = session.store.getState();
       if (!agentSessionIsUnstarted(state)) return;
       const agent = choices.get(agentScopeKey(state.scope))?.agent ?? DEFAULT_AGENT_ID;
       if (state.agent !== agent) session.changeAgent(agent);
       seedEffort(session);
+      seedPersona(session);
     },
     get: (scope: AgentScope) => choices.get(agentScopeKey(scope))?.agent ?? DEFAULT_AGENT_ID,
     rememberEffort(scope: AgentScope, agent: AgentId, effort: string | null) {
@@ -86,7 +104,21 @@ export function createProjectAgents(port: AgentPreferencesPort | undefined, sign
         agent: previous?.agent ?? agent,
         efforts: { ...previous?.efforts, [agent]: effort },
       });
-      void save(scope, agent, effort);
+      void save(scope, agent, { effort });
+    },
+    /** Runs a Chat under a persona, or none. A persona chosen in any Chat
+     *  becomes the one this project's next new Chat starts with. Refused while
+     *  the Chat's turn runs. */
+    choose(session: AgentSessionRuntime, persona: string | null): boolean {
+      if (!session.setPersona(persona)) return false;
+      const { agent, scope } = session.store.getState();
+      if (signal.aborted || store.getState().loading || store.getState().failure) return true;
+      const key = agentScopeKey(scope);
+      const previous = choices.get(key);
+      if ((previous?.persona ?? null) === persona) return true;
+      choices.set(key, { ...previous, scope: key, agent: previous?.agent ?? agent, persona });
+      void save(scope, agent, { persona });
+      return true;
     },
     async select(scope: AgentScope, agent: AgentId): Promise<boolean> {
       if (saving || signal.aborted || store.getState().loading || store.getState().failure)

@@ -1,73 +1,98 @@
 /**
- * The persona a scope's Chats run under.
+ * The reader's persona library.
  *
- * The scope reaches the wire through one helper, so the `?scope=` parameter a
- * read sends and the identity a re-read keys on cannot disagree. Deriving them
- * separately is how a picker shows one scope's persona and saves it into
- * another's.
- *
- * The resolved prompt is never spoken here. The server composes what a
- * session actually carries; this is only which persona is chosen and the
- * reader's own prompt.
+ * Which persona a Chat runs under never crosses here: it travels with the
+ * Chat's own connection, and the service composes the prompt a session
+ * actually carries.
  */
 import {
   AgentSessionError,
   type AgentPersona,
+  type AgentPersonaInput,
   type AgentPersonaPort,
 } from '@/features/agent/application/ports';
-import { agentScopeKey } from '@/features/agent/domain/session';
 import { request, type TransportRequest } from '@/platform/http/classify';
 import type { HttpClient } from '@/platform/http/client';
 import {
-  agentPersonaRequestSchema,
-  agentPersonaStateSchema,
-  type AgentPersonaStateWire,
+  agentPersonaInputSchema,
+  agentPersonaListSchema,
+  agentPersonaRemovedSchema,
+  agentPersonaSchema,
+  type AgentPersonaInputWire,
+  type AgentPersonaWire,
 } from '@/protocols/http/agent-persona';
 import { agentRuntimeFailureSchema } from '@/protocols/http/agent-runtime';
 
-function toPersona(wire: AgentPersonaStateWire): AgentPersona {
-  return { custom: wire.custom, selected: wire.selected };
+const PATH = '/api/agent-personas';
+
+/** Both directions are typed, so the wire's icons and the renderer's icons
+ *  cannot drift apart without this file failing to compile. */
+function toPersona(wire: AgentPersonaWire): AgentPersona {
+  return { ...wire };
+}
+
+function toInput(input: AgentPersonaInput): AgentPersonaInputWire {
+  return agentPersonaInputSchema.parse({
+    ...input,
+    gallery: input.gallery ?? null,
+  } satisfies AgentPersonaInputWire);
 }
 
 function personaRequest(
   path: string,
   signal: AbortSignal,
-  method: 'GET' | 'PUT',
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
 ): TransportRequest {
   return {
     error: AgentSessionError,
     failureSchema: agentRuntimeFailureSchema,
     messages: {
       'invalid-response': 'The persona service returned an unexpected response.',
-      'scope-lost': 'That folder is no longer available in this window.',
       unauthorized: 'Personas are unavailable.',
       unavailable: 'StashBase could not reach the Agent service.',
     },
     method,
     path,
+    serverMessage: true,
     signal,
   };
 }
 
+const itemPath = (id: string) => `${PATH}/${encodeURIComponent(id)}`;
+
 export function createAgentPersonaAdapter(client: HttpClient): AgentPersonaPort {
   return {
-    async load(scope, signal) {
-      const value = agentScopeKey(scope);
+    async list(signal) {
+      return (
+        await request(client, {
+          ...personaRequest(PATH, signal, 'GET'),
+          schema: agentPersonaListSchema,
+        })
+      ).map(toPersona);
+    },
+    async create(input, signal) {
       return toPersona(
         await request(client, {
-          ...personaRequest(`/api/agent-persona?scope=${encodeURIComponent(value)}`, signal, 'GET'),
-          schema: agentPersonaStateSchema,
+          ...personaRequest(PATH, signal, 'POST'),
+          body: toInput(input),
+          schema: agentPersonaSchema,
         }),
       );
     },
-    async save(scope, change, signal) {
+    async update(id, input, signal) {
       return toPersona(
         await request(client, {
-          ...personaRequest('/api/agent-persona', signal, 'PUT'),
-          body: agentPersonaRequestSchema.parse({ ...change, scope: agentScopeKey(scope) }),
-          schema: agentPersonaStateSchema,
+          ...personaRequest(itemPath(id), signal, 'PUT'),
+          body: toInput(input),
+          schema: agentPersonaSchema,
         }),
       );
+    },
+    async remove(id, signal) {
+      await request(client, {
+        ...personaRequest(itemPath(id), signal, 'DELETE'),
+        schema: agentPersonaRemovedSchema,
+      });
     },
   };
 }

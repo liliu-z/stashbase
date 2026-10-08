@@ -72,6 +72,7 @@ import { runShutdownCleanup } from './shutdown-cleanup.ts';
 import { mount as mountAgentSessionsRoutes } from './routes/agent-sessions.ts';
 import { mount as mountAgentPreferencesRoutes } from './routes/agent-preferences.ts';
 import { mount as mountAgentPersonaRoutes } from './routes/agent-persona.ts';
+import { isAgentPersonaId } from '../shared/agent-persona.ts';
 import { createRendererOriginPolicy } from './middleware/renderer-origin.ts';
 import { mount as mountAccountRoutes } from './routes/account.ts';
 import { BUILT_IN_AGENT_ADAPTERS } from './agent-adapters.ts';
@@ -448,7 +449,7 @@ function agentIdOf(req: import('node:http').IncomingMessage): string {
 }
 
 function connectionOptionsOf(req: import('node:http').IncomingMessage): AgentConnectionOptions {
-  return { windowId: windowIdOf(req), effort: effortOf(req), resume: resumeOf(req), access: accessOf(req), model: modelOf(req) };
+  return { windowId: windowIdOf(req), effort: effortOf(req), resume: resumeOf(req), access: accessOf(req), model: modelOf(req), persona: personaOf(req) };
 }
 
 /** Model ids are opaque native identifiers. Keep only a small URL safety bound;
@@ -457,6 +458,16 @@ function modelOf(req: import('node:http').IncomingMessage): string | undefined {
   try {
     const value = new URL(req.url ?? '', `http://${req.headers.host ?? '127.0.0.1'}`).searchParams.get('model')?.trim();
     return value && value.length <= 200 ? value : undefined;
+  } catch { return undefined; }
+}
+
+/** The library persona the Chat runs under, off the WS URL. Only a
+ *  well-formed id passes; whether it still exists is read at session start,
+ *  and an unknown one runs none. */
+function personaOf(req: import('node:http').IncomingMessage): string | undefined {
+  try {
+    const value = new URL(req.url ?? '', `http://${req.headers.host ?? '127.0.0.1'}`).searchParams.get('persona');
+    return isAgentPersonaId(value) ? value : undefined;
   } catch { return undefined; }
 }
 

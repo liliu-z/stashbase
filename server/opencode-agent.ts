@@ -258,7 +258,7 @@ export class OpenCodePanelSession {
     this.runtime = runtime ?? createOpenCodeSessionRuntime({
       windowId: this.windowId,
       agentSessionId: this.attributionId,
-      cwd: this.cwd,
+      persona: options.persona,
     });
     this.stopRuntimeExitListener = this.runtime.onExit((error) => {
       if (!this.disposed) this.fail(error, true);

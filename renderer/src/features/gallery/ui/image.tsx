@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-/** Each source owns its failure. Cards and thumbnails stay single click
+/** Each source owns its failure. Cards stay single click
  * targets; the full screenshot offers a retry through the same image proxy. */
 export function GalleryImage({
   src,

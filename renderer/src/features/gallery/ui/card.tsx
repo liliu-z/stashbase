@@ -30,7 +30,7 @@ export function GalleryCard({
   onOpen(entry: GalleryEntry): void;
 }) {
   const shape = useShape();
-  const hero = entry.screenshots?.[0] ?? null;
+  const hero = entry.screenshot;
   return (
     <button
       className={cn(

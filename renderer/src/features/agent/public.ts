@@ -13,6 +13,7 @@ export type { AgentScopeEnvironment } from './domain/context';
 export type { AgentScope } from './domain/session';
 export type { AgentPersonaPort } from './application/ports';
 export { createAgentPersonaAdapter } from './infrastructure/agent-persona-api';
+export { useAgentPersonaLibrary } from './hooks/use-agent-persona';
 export type { AgentWorkspaceRuntime } from './application/workspace-runtime';
 
 export { createAgentPreferencesAdapter } from './infrastructure/agent-preferences-api';

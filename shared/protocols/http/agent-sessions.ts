@@ -89,6 +89,8 @@ export const agentSessionReplaySchema = z
     protocol: z.literal(2),
     messages: z.array(agentSessionBlockSchema).max(50_000),
     effort: boundedText(64).nullable(),
+    /** The library persona this Chat last ran under, when it still exists. */
+    persona: z.string().max(96).nullable().optional(),
   })
   .strict();
 

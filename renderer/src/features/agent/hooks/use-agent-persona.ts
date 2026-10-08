@@ -1,117 +1,167 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+/** The reader's persona library and the composer's view of it. */
+import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 
 import { agentFailure } from '@/features/agent/application/failure-messages';
 import type {
   AgentPersona,
-  AgentPersonaChange,
-  AgentPersonaChoice,
+  AgentPersonaInput,
   AgentPersonaPort,
 } from '@/features/agent/application/ports';
-import { agentScopeKey } from '@/features/agent/domain/session';
-import type { AgentScope } from '@/features/agent/domain/session-state';
 import type { FailureView } from '@/shared/domain/feature-error';
 import { useRequestSignals } from '@/shared/runtime/use-request-signals';
 
-export interface AgentPersonaPicker {
-  readonly selected: AgentPersonaChoice | null;
-  /** The reader's own prompt, empty until one is written. */
-  readonly custom: string;
-  readonly failure: FailureView | null;
+const LIBRARY_KEY = ['agent-personas'] as const;
+
+/** A write shows at once, then the library re-reads so a list read that was
+ *  already in flight cannot land over it. */
+function settle(client: QueryClient): void {
+  void client.invalidateQueries({ queryKey: LIBRARY_KEY });
+}
+
+export interface AgentPersonaLibrary {
+  readonly personas: readonly AgentPersona[];
   readonly loading: boolean;
-  readonly saving: boolean;
-  /** Runs a packaged persona, the stored custom prompt, or none. */
-  choose(choice: AgentPersonaChoice | null): void;
-  /** Stores the reader's own prompt and runs it. Answers whether it stored. */
-  saveCustom(text: string): Promise<boolean>;
-  dismissFailure(): void;
-}
-
-function queryKey(scope: AgentScope | null) {
-  return ['agent-persona', scope ? agentScopeKey(scope) : null] as const;
-}
-
-function resolved(persona: AgentPersona): string {
-  return persona.selected === 'custom' ? `custom:${persona.custom}` : String(persona.selected);
+  /** Adds a persona and answers it, or null when the library refused it. */
+  add(input: AgentPersonaInput): Promise<AgentPersona | null>;
 }
 
 /**
- * The persona one scope's Chats run under, as the picker reads and changes it.
+ * The reader's persona library, one cache for every surface that reads it:
+ * the composer's picker and the Gallery's Add both land here, so a persona
+ * added in the Gallery is in the picker the moment the add answers.
+ */
+export function useAgentPersonaLibrary(port: AgentPersonaPort): AgentPersonaLibrary {
+  const client = useQueryClient();
+  const signalFor = useRequestSignals<'add'>();
+  const library = useQuery({
+    queryFn: ({ signal }) => port.list(signal),
+    queryKey: LIBRARY_KEY,
+    retry: false,
+  });
+  const add = useCallback(
+    async (input: AgentPersonaInput) => {
+      try {
+        const created = await port.create(input, signalFor('add'));
+        client.setQueryData<AgentPersona[]>(LIBRARY_KEY, (previous) => [
+          ...(previous ?? []),
+          created,
+        ]);
+        settle(client);
+        return created;
+      } catch {
+        return null;
+      }
+    },
+    [client, port, signalFor],
+  );
+  return { add, loading: library.isPending, personas: library.data ?? [] };
+}
+
+export interface AgentPersonaPicker {
+  readonly personas: readonly AgentPersona[];
+  /** The persona this Chat runs under, when it is still in the library. */
+  readonly selected: AgentPersona | null;
+  readonly failure: FailureView | null;
+  readonly loading: boolean;
+  readonly saving: boolean;
+  /** Runs this Chat under a persona, or none. */
+  choose(id: string | null): void;
+  /** Creates a persona and runs it, or edits one. Answers whether it saved. */
+  save(id: string | null, input: AgentPersonaInput): Promise<boolean>;
+  /** Deletes a persona; a Chat running it falls back to none. */
+  remove(id: string): Promise<boolean>;
+  dismissFailure(): void;
+}
+
+/**
+ * The composer's view of the library and of the active Chat's persona.
  *
- * A session reads its persona when it starts, so a change that alters what
- * runs calls `onApplied`, captured when the change was asked for: the Chat the
- * reader chose it in restarts on its own conversation and the persona applies
- * from its next message. The scope's wire spelling is the query key, and a
- * save lands in the scope it was asked for even if the reader has moved on.
+ * `choose` belongs to the workspace: it runs the Chat under the persona and
+ * makes it the project's choice for new Chats. A session reads its persona's
+ * prompt when it starts, so editing the running persona calls `onEdited`,
+ * which restarts the Chat on its own conversation.
  */
 export function useAgentPersona(
   port: AgentPersonaPort,
-  scope: AgentScope | null,
-  onApplied: () => void,
+  current: string | null,
+  choose: (id: string | null) => void,
+  onEdited: () => void,
 ): AgentPersonaPicker {
   const client = useQueryClient();
-  const signalFor = useRequestSignals<'save'>();
-
-  const stored = useQuery({
-    enabled: scope !== null,
-    queryFn: ({ signal }: { signal: AbortSignal }) =>
-      scope ? port.load(scope, signal) : Promise.reject(new Error('no scope')),
-    queryKey: queryKey(scope),
-    retry: false,
-  });
+  const signalFor = useRequestSignals<'save' | 'remove'>();
+  const library = useAgentPersonaLibrary(port);
 
   const write = useMutation({
-    mutationFn: ({
-      change,
-      target,
-    }: {
-      change: AgentPersonaChange;
-      target: AgentScope;
-      applied(): void;
-    }) => port.save(target, change, signalFor('save')),
-    onSuccess: (next, { applied, target }) => {
-      const previous = client.getQueryData<AgentPersona>(queryKey(target));
-      client.setQueryData(queryKey(target), next);
-      if (!previous || resolved(previous) !== resolved(next)) applied();
+    mutationFn: async ({ id, input }: { id: string | null; input: AgentPersonaInput }) =>
+      id === null
+        ? port.create(input, signalFor('save'))
+        : port.update(id, input, signalFor('save')),
+    onSuccess: (saved, { id }) => {
+      client.setQueryData<AgentPersona[]>(LIBRARY_KEY, (previous = []) =>
+        id === null
+          ? [...previous, saved]
+          : previous.map((persona) => (persona.id === saved.id ? saved : persona)),
+      );
+      settle(client);
+    },
+  });
+  const drop = useMutation({
+    mutationFn: (id: string) => port.remove(id, signalFor('remove')),
+    onSuccess: (_result, id) => {
+      client.setQueryData<AgentPersona[]>(LIBRARY_KEY, (previous = []) =>
+        previous.filter((persona) => persona.id !== id),
+      );
+      settle(client);
     },
   });
 
-  const { isPending: saving, mutate, mutateAsync, reset } = write;
-  const current = stored.data;
+  const saving = write.isPending || drop.isPending;
+  const { mutateAsync: saveAsync, reset: resetWrite } = write;
+  const { mutateAsync: removeAsync, reset: resetDrop } = drop;
 
-  const choose = useCallback(
-    (choice: AgentPersonaChoice | null) => {
-      if (saving || scope === null || current?.selected === choice) return;
-      mutate({ applied: onApplied, change: { selected: choice }, target: scope });
-    },
-    [current?.selected, mutate, onApplied, saving, scope],
-  );
-
-  const saveCustom = useCallback(
-    async (text: string) => {
-      if (saving || scope === null) return false;
+  const save = useCallback(
+    async (id: string | null, input: AgentPersonaInput) => {
+      if (saving) return false;
       try {
-        await mutateAsync({
-          applied: onApplied,
-          change: { custom: text, selected: 'custom' },
-          target: scope,
-        });
+        const saved = await saveAsync({ id, input });
+        if (id === null) choose(saved.id);
+        else if (id === current) onEdited();
         return true;
       } catch {
         return false;
       }
     },
-    [mutateAsync, onApplied, saving, scope],
+    [choose, current, onEdited, saveAsync, saving],
   );
 
+  const remove = useCallback(
+    async (id: string) => {
+      if (saving) return false;
+      try {
+        await removeAsync(id);
+        if (id === current) choose(null);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [choose, current, removeAsync, saving],
+  );
+
+  const failure = write.error ?? drop.error;
   return {
-    custom: current?.custom ?? '',
-    dismissFailure: reset,
-    failure: write.error ? agentFailure(write.error) : null,
-    loading: stored.isPending && scope !== null,
-    saveCustom,
-    saving,
-    selected: current?.selected ?? null,
     choose,
+    dismissFailure: () => {
+      resetWrite();
+      resetDrop();
+    },
+    failure: failure ? agentFailure(failure) : null,
+    loading: library.loading,
+    personas: library.personas,
+    remove,
+    save,
+    saving,
+    selected: library.personas.find((persona) => persona.id === current) ?? null,
   };
 }

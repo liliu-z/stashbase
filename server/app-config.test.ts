@@ -121,41 +121,6 @@ function runConfigMutation(home: string, statement: string) {
   );
 }
 
-test('removing project membership clears only its StashBase-owned Agent Persona', () => {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-agent-persona-remove-'));
-  const configDir = path.join(home, '.stashbase');
-  const configPath = path.join(configDir, 'config.json');
-  const removed = path.join(home, 'removed');
-  const retained = path.join(home, 'retained');
-  fs.mkdirSync(configDir);
-  fs.mkdirSync(removed);
-  fs.mkdirSync(retained);
-  fs.writeFileSync(configPath, JSON.stringify({
-    recentFolders: [removed, retained].map((folder, index) => ({
-      path: folder,
-      openedAt: `2026-08-0${index + 1}T00:00:00.000Z`,
-    })),
-    agentPersonas: {
-      folders: [
-        { path: removed, selected: 'marketer' },
-        { path: retained, selected: 'custom', custom: 'Retained persona' },
-      ],
-    },
-  }));
-  try {
-    const result = runConfigMutation(home, `
-      const folder = await import('./server/folder.ts');
-      await folder.removeRecentAsync(${JSON.stringify(removed)});
-    `);
-    assert.equal(result.status, 0, result.stderr);
-    const saved = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-    assert.deepEqual(saved.recentFolders.map((entry: { path: string }) => entry.path), [retained]);
-    assert.deepEqual(saved.agentPersonas.folders, [{ path: retained, selected: 'custom', custom: 'Retained persona' }]);
-  } finally {
-    fs.rmSync(home, { recursive: true, force: true });
-  }
-});
-
 test('retired folder metadata does not escape project APIs or survive a membership write', () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-folder-metadata-test-'));
   const configDir = path.join(home, '.stashbase');

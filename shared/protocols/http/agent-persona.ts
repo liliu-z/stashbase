@@ -1,36 +1,43 @@
 import { z } from 'zod';
 
-import { AGENT_PERSONA_PRESETS } from '../../agent-persona';
+import {
+  AGENT_PERSONA_ICONS,
+  AGENT_PERSONA_ID_PATTERN,
+  MAX_AGENT_PERSONA_DESCRIPTION_LENGTH,
+  MAX_AGENT_PERSONA_LENGTH,
+  MAX_AGENT_PERSONA_NAME_LENGTH,
+} from '../../agent-persona';
 
-/** A persona always belongs to one project. */
-export const agentPersonaScopeSchema = z.object({ kind: z.literal('folder'), path: z.string().min(1) }).strict();
+export const agentPersonaIdSchema = z.string().regex(AGENT_PERSONA_ID_PATTERN);
 
-export const agentPersonaChoiceSchema = z.enum([...AGENT_PERSONA_PRESETS, 'custom']);
-
-export const agentPersonaStateSchema = z
+/** One persona in the reader's library, as the service answers it. */
+export const agentPersonaSchema = z
   .object({
-    custom: z.string(),
-    scope: agentPersonaScopeSchema,
-    selected: agentPersonaChoiceSchema.nullable(),
+    id: agentPersonaIdSchema,
+    name: z.string().min(1).max(MAX_AGENT_PERSONA_NAME_LENGTH),
+    description: z.string().max(MAX_AGENT_PERSONA_DESCRIPTION_LENGTH),
+    icon: z.enum(AGENT_PERSONA_ICONS),
+    prompt: z.string().min(1).max(MAX_AGENT_PERSONA_LENGTH),
+    gallery: agentPersonaIdSchema.nullable(),
   })
   .strip();
 
-/** The write sends the scope as its wire spelling, not as the object the read
- *  answers with. The asymmetry is the route's: it reads a string and
- *  re-derives the scope server-side, which keeps membership authority there
- *  rather than trusting a shape the renderer composed. A write changes the
- *  choice, the custom prompt, or both. */
-export const agentPersonaRequestSchema = z
-  .object({
-    custom: z.string().optional(),
-    scope: z.string().min(1),
-    selected: agentPersonaChoiceSchema.nullable().optional(),
-  })
-  .strict()
-  .refine((request) => request.selected !== undefined || request.custom !== undefined, {
-    message: 'a persona write changes selected, custom, or both',
-  });
+export const agentPersonaListSchema = z.array(agentPersonaSchema).max(10_000);
 
-export type AgentPersonaScopeWire = z.infer<typeof agentPersonaScopeSchema>;
-export type AgentPersonaStateWire = z.infer<typeof agentPersonaStateSchema>;
-export type AgentPersonaRequestWire = z.infer<typeof agentPersonaRequestSchema>;
+/** What a create or an edit sends. The service owns trimming and the
+ *  readable limits; this only refuses a shape it could never accept. */
+export const agentPersonaInputSchema = z
+  .object({
+    name: z.string(),
+    description: z.string(),
+    icon: z.enum(AGENT_PERSONA_ICONS),
+    prompt: z.string(),
+    gallery: agentPersonaIdSchema.nullable().optional(),
+  })
+  .strict();
+
+/** A delete answers with an empty object. */
+export const agentPersonaRemovedSchema = z.object({}).strip();
+
+export type AgentPersonaWire = z.infer<typeof agentPersonaSchema>;
+export type AgentPersonaInputWire = z.infer<typeof agentPersonaInputSchema>;

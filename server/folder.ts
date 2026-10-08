@@ -543,7 +543,7 @@ export async function assertProjectFolderAvailableAsync(absPath: string): Promis
   }
 }
 
-/** Forget membership and its app-owned persona without deleting source files. */
+/** Forget membership and its app-owned Agent preferences without deleting source files. */
 export async function removeRecentAsync(absPath: string): Promise<void> {
   const target = filesystemPath.absolute(absPath);
   for (let attempt = 0; attempt < 8; attempt += 1) {
@@ -551,26 +551,14 @@ export async function removeRecentAsync(absPath: string): Promise<void> {
     const revision = JSON.stringify(snapshot);
     const list = (snapshot.recentFolders ?? []).map(currentRecentFolder);
     const matches = await Promise.all(list.map((value) => storedFolderPathEqualsAsync(value.path, target)));
-    const personaFolders = Array.isArray(snapshot.agentPersonas?.folders)
-      ? snapshot.agentPersonas.folders
-      : [];
-    const personaMatches = await Promise.all(
-      personaFolders.map((value) => storedFolderPathEqualsAsync(value?.path, target)),
-    );
     const preferenceMatches = await Promise.all((snapshot.agentPreferences ?? []).map(entry =>
       storedFolderPathEqualsAsync(entry.scope, target)));
     const current = readConfigStrict();
     if (JSON.stringify(current) !== revision) continue;
     const filtered = list.filter((_, index) => !matches[index]);
-    const retainedPersonas = personaFolders.filter((_, index) => !personaMatches[index]);
-    const personasChanged = retainedPersonas.length !== personaFolders.length;
-    if (filtered.length === list.length && !personasChanged && !preferenceMatches.some(Boolean)) return;
+    if (filtered.length === list.length && !preferenceMatches.some(Boolean)) return;
     current.recentFolders = filtered;
     if (preferenceMatches.some(Boolean)) current.agentPreferences = current.agentPreferences!.filter((_, index) => !preferenceMatches[index]);
-    if (personasChanged) {
-      if (retainedPersonas.length) current.agentPersonas!.folders = retainedPersonas;
-      else delete current.agentPersonas;
-    }
     writeConfigStrict(current);
     return;
   }

@@ -1,44 +1,39 @@
 import type express from 'express';
-import type { AgentPersonaScope } from '../../shared/agent-persona.ts';
-import { agentPersonaRequestSchema } from '../../shared/protocols/http/agent-persona.ts';
-import { getAgentPersona, setAgentPersona } from '../agent-persona.ts';
-import { exactRegisteredFolderRootAsync } from '../folder.ts';
-import { filesystemPath } from '../filesystem-path.ts';
+import { agentPersonaListSchema, agentPersonaSchema } from '../../shared/protocols/http/agent-persona.ts';
+import { agentPersonaLibrary } from '../agent-persona.ts';
 import { sendError } from '../http.ts';
 
-function requestError(message: string, status = 400): Error {
-  const error = new Error(message) as Error & { status: number };
-  error.status = status;
-  return error;
-}
-
-async function resolveScope(value: unknown): Promise<AgentPersonaScope> {
-  if (typeof value !== 'string' || !value.trim()) {
-    throw requestError('scope must be an absolute project-folder path');
-  }
-  if (!filesystemPath.isAbsolute(value)) {
-    throw requestError('folder scope must be an absolute path');
-  }
-  const member = await exactRegisteredFolderRootAsync(value);
-  if (!member) throw requestError('folder is not in your registered projects', 404);
-  return { kind: 'folder', path: member };
-}
-
+/** The reader's persona library. Which persona a Chat runs under travels with
+ * its connection; a project's choice for new Chats is an Agent preference. */
 export function mount(app: express.Express): void {
-  app.get('/api/agent-persona', async (req, res) => {
+  app.get('/api/agent-personas', (_req, res) => {
     try {
-      res.json(getAgentPersona(await resolveScope(req.query.scope)));
+      res.json(agentPersonaListSchema.parse(agentPersonaLibrary().list()));
     } catch (err: unknown) {
       sendError(res, err);
     }
   });
 
-  app.put('/api/agent-persona', async (req, res) => {
+  app.post('/api/agent-personas', (req, res) => {
     try {
-      const parsed = agentPersonaRequestSchema.safeParse(req.body);
-      if (!parsed.success) throw requestError(parsed.error.issues[0]?.message ?? 'invalid persona');
-      const { scope: rawScope, ...change } = parsed.data;
-      res.json(setAgentPersona(await resolveScope(rawScope), change));
+      res.json(agentPersonaSchema.parse(agentPersonaLibrary().create(req.body)));
+    } catch (err: unknown) {
+      sendError(res, err);
+    }
+  });
+
+  app.put('/api/agent-personas/:id', (req, res) => {
+    try {
+      res.json(agentPersonaSchema.parse(agentPersonaLibrary().update(req.params.id, req.body)));
+    } catch (err: unknown) {
+      sendError(res, err);
+    }
+  });
+
+  app.delete('/api/agent-personas/:id', (req, res) => {
+    try {
+      agentPersonaLibrary().remove(req.params.id);
+      res.json({});
     } catch (err: unknown) {
       sendError(res, err);
     }

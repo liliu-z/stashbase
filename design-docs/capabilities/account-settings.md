@@ -82,8 +82,8 @@ simulators use a separate development-only entry. Neither belongs in normal Sett
   offers the runtime's update, the conversation reconnects on the updated
   runtime, and the refused request is sent again. Settings offers the same
   update without a conversation.
-- A persona applies from the chat's next message and to new chats; a running
-  turn keeps its guidance. It does not rewrite native instruction files or
+- A persona applies from its Chat's next message; a running turn keeps its
+  guidance. It does not rewrite native instruction files or
   change permissions.
 - External MCP rotation invalidates the old token. Disable retires exposed access
   promptly, including unfinished requests, while ordinary local work remains usable.

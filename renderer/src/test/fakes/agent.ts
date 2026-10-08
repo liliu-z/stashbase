@@ -9,7 +9,6 @@ import type {
   AgentConnectionListener,
   AgentContextPort,
   AgentPersona,
-  AgentPersonaChange,
   AgentPersonaPort,
   AgentSessionPort,
 } from '@/features/agent/application/ports';
@@ -105,18 +104,41 @@ export function idleAgentSessionPort(overrides: Partial<AgentSessionPort> = {}):
   }).port;
 }
 
-/** A project with no persona chosen that stores what it is given. Override
- *  `load` to exercise a chosen persona. */
-export function agentPersonaApi(overrides: Partial<AgentPersonaPort> = {}): AgentPersonaPort {
-  let stored: AgentPersona = { custom: '', selected: null };
+/** One packaged persona, as a new library holds it. */
+export function agentPersona(overrides: Partial<AgentPersona> = {}): AgentPersona {
   return {
-    load: vi.fn(async () => stored),
-    save: vi.fn(async (_scope, change: AgentPersonaChange) => {
-      stored = {
-        custom: change.custom ?? stored.custom,
-        selected: change.selected === undefined ? stored.selected : change.selected,
-      };
-      return stored;
+    description: 'A neutral news report',
+    gallery: 'journalist',
+    icon: 'newspaper',
+    id: 'journalist',
+    name: 'Journalist',
+    prompt: 'Report what happened.',
+    ...overrides,
+  };
+}
+
+/** A library that stores what it is given, starting from `initial`. */
+export function agentPersonaApi(
+  overrides: Partial<AgentPersonaPort> = {},
+  initial: AgentPersona[] = [agentPersona()],
+): AgentPersonaPort {
+  let stored = [...initial];
+  let created = 0;
+  return {
+    list: vi.fn(async () => [...stored]),
+    create: vi.fn(async (input) => {
+      created += 1;
+      const persona = { ...input, gallery: input.gallery ?? null, id: `persona-${created}` };
+      stored = [...stored, persona];
+      return persona;
+    }),
+    update: vi.fn(async (id, input) => {
+      const persona = { ...input, gallery: input.gallery ?? null, id };
+      stored = stored.map((entry) => (entry.id === id ? persona : entry));
+      return persona;
+    }),
+    remove: vi.fn(async (id) => {
+      stored = stored.filter((entry) => entry.id !== id);
     }),
     ...overrides,
   };

@@ -18,7 +18,7 @@ import {
   claudeSkillPrompt,
   selectClaudeModel,
 } from '../agent.ts';
-import { resolveAgentPersona, setAgentPersona } from '../agent-persona.ts';
+import { agentPersonaLibrary } from '../agent-persona.ts';
 import { clearCurrentFolder, runWithWindowId, openProjectFolder, registerProjectFolderAsync } from '../folder.ts';
 import { derivedNoteFor, registerDerivedSource } from '../derived-store.ts';
 import { claudeTranscriptEffort } from '../claude-history.ts';
@@ -66,12 +66,12 @@ function fakeClaudeQuery(failureOrMessages?: Error | SDKMessage[], failure?: Err
   } as unknown as Query;
 }
 
-test('Claude appends the chosen Persona before hidden StashBase routing policy', async (t) => {
+test("Claude appends the Chat's Persona before hidden StashBase routing policy", async (t) => {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-claude-instructions-'));
   const persona = 'Prefer primary research notes.';
-  setAgentPersona({ kind: 'folder', path: folder }, { custom: persona, selected: 'custom' });
+  const chosen = agentPersonaLibrary().create({ name: 'Researcher', description: '', icon: 'flask-conical', prompt: persona });
   t.after(() => {
-    setAgentPersona({ kind: 'folder', path: folder }, { custom: '', selected: null });
+    agentPersonaLibrary().remove(chosen.id);
     fs.rmSync(folder, { recursive: true, force: true });
   });
 
@@ -94,11 +94,11 @@ test('Claude appends the chosen Persona before hidden StashBase routing policy',
     undefined,
     folder,
   );
+  session.persona = chosen.id;
   t.after(() => session.dispose());
 
   session.begin();
   await settle();
-  assert.equal(resolveAgentPersona(folder), persona);
   assert.match(appended, /StashBase MCP/i);
   assert.match(appended, /search_project/);
   assert.match(appended, /Default file reads and searches to the bound project/);

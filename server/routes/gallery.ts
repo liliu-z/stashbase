@@ -75,13 +75,9 @@ export function mount(app: express.Express): void {
         lastError = errorMessage(err);
       }
     }
-    // Every upstream failed. A 200 envelope with an unsupported
-    // schemaVersion, not a 5xx: the renderer's behavior is identical
-    // either way (an index it cannot parse falls back WHOLE to the
-    // bundled snapshot), and a non-OK response would only stamp a
-    // console error into every offline session. `error` names the cause
-    // for anyone probing the route directly.
-    res.json({ schemaVersion: 0, error: lastError });
+    // An error envelope is not a catalog. The renderer keeps its bundled
+    // snapshot without producing an HTTP error in every offline session.
+    res.json({ error: lastError });
   });
 
   // One screenshot, passed through. The CDN and the browser cache do the

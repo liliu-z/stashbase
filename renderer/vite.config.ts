@@ -41,6 +41,10 @@ export default defineConfig({
         replacement: fileURLToPath(new URL('../shared/account.ts', import.meta.url)),
       },
       {
+        find: '@/contracts/agent-persona',
+        replacement: fileURLToPath(new URL('../shared/agent-persona.ts', import.meta.url)),
+      },
+      {
         find: '@/contracts/appearance-themes',
         replacement: fileURLToPath(new URL('../shared/appearance-themes.ts', import.meta.url)),
       },

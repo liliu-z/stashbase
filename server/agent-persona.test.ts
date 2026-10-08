@@ -1,82 +1,115 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
-import { AGENT_PERSONA_PRESETS, MAX_AGENT_PERSONA_LENGTH } from '../shared/agent-persona.ts';
-import { createAgentPersonaStore, readAgentPersonaPresets } from './agent-persona.ts';
-import type { AppConfigFile } from './app-config.ts';
+import { MAX_AGENT_PERSONA_LENGTH } from '../shared/agent-persona.ts';
+import {
+  createAgentPersonaLibrary,
+  PACKAGED_AGENT_PERSONAS_DIR,
+  parsePersonaFile,
+  trackChatPersona,
+} from './agent-persona.ts';
 
-const presets = { builder: 'Builder prompt.', marketer: 'Marketer prompt.', journalist: 'Journalist prompt.', storyteller: 'Storyteller prompt.' };
-
-function fixture(initial: AppConfigFile = {}) {
-  let config = structuredClone(initial);
-  const store = createAgentPersonaStore({
-    read: () => structuredClone(config),
-    readStrict: () => structuredClone(config),
-    write: (next) => { config = structuredClone(next); },
-    equalPath: (left, right) => left.toLocaleLowerCase('en-US') === right.toLocaleLowerCase('en-US'),
-    presets,
-  });
-  return { store, config: () => config };
+function fixture(t: test.TestContext) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-personas-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const io = {
+    directory: path.join(root, 'personas'),
+    chatsFile: path.join(root, 'persona-chats.json'),
+    packagedDirectory: PACKAGED_AGENT_PERSONAS_DIR,
+  };
+  return { io, library: createAgentPersonaLibrary(io) };
 }
 
-test('a project runs no persona until one is chosen, and each project keeps its own', () => {
-  const { store, config } = fixture({ appearance: { theme: 'dark' } });
-  assert.equal(store.resolve('/Work/Alpha'), '');
-  store.set({ kind: 'folder', path: '/Work/Alpha' }, { selected: 'journalist' });
-  store.set({ kind: 'folder', path: '/Work/Beta' }, { custom: 'Write like me.', selected: 'custom' });
+test('a new library installs the packaged personas once, as Gallery copies', (t) => {
+  const { io, library } = fixture(t);
+  const ids = library.list().map((persona) => persona.id).sort();
+  assert.deepEqual(ids, ['builder', 'journalist', 'marketer', 'storyteller']);
+  const journalist = library.list().find((persona) => persona.id === 'journalist');
+  assert.equal(journalist?.name, 'Journalist');
+  assert.equal(journalist?.icon, 'newspaper');
+  assert.equal(journalist?.gallery, 'journalist');
+  assert.match(journalist?.prompt ?? '', /^Take the persona of a news journalist/u);
 
-  assert.equal(store.resolve('/work/alpha'), 'Journalist prompt.');
-  assert.equal(store.resolve('/work/beta'), 'Write like me.');
-  assert.equal(config().appearance?.theme, 'dark');
+  // Deleting a packaged persona is the reader's choice; it is not reinstalled.
+  for (const id of ids) library.remove(id);
+  assert.deepEqual(createAgentPersonaLibrary(io).list(), []);
 });
 
-test('the custom prompt survives choosing a preset and choosing none compacts config', () => {
-  const { store, config } = fixture();
-  const scope = { kind: 'folder', path: '/Work/Alpha' } as const;
-  store.set(scope, { custom: '  Short sentences.  ', selected: 'custom' });
-  assert.deepEqual(store.set(scope, { selected: 'storyteller' }), {
-    scope,
-    selected: 'storyteller',
-    custom: 'Short sentences.',
+test('a reader can keep adding personas, edit them, and delete them', (t) => {
+  const { io, library } = fixture(t);
+  const first = library.create({ name: 'My Twitter voice', description: 'Short and dry', icon: 'feather', prompt: '  Write short.\n\nNo emoji.  ' });
+  const second = library.create({ name: '我的口吻', description: '', icon: 'smile', prompt: '简洁。' });
+  assert.match(first.id, /^my-twitter-voice-[0-9a-f]{6}$/u);
+  assert.match(second.id, /^persona-[0-9a-f]{6}$/u);
+  assert.equal(first.prompt, 'Write short.\n\nNo emoji.');
+  assert.equal(first.gallery, null);
+  assert.deepEqual(library.list().slice(-2).map((persona) => persona.id), [first.id, second.id]);
+
+  const edited = library.update(first.id, { name: 'Twitter', description: '', icon: 'mic', prompt: 'Shorter.' });
+  assert.equal(edited.prompt, 'Shorter.');
+  assert.equal(library.prompt(first.id), 'Shorter.');
+  assert.ok(fs.readFileSync(path.join(io.directory, `${first.id}.md`), 'utf8').includes('name: Twitter'));
+
+  library.remove(first.id);
+  assert.equal(library.prompt(first.id), '');
+  assert.throws(() => library.update(first.id, edited), /no longer exists/u);
+  assert.throws(() => library.remove(first.id), /no longer exists/u);
+});
+
+test('editing a Gallery copy keeps its origin, and a persona refuses unusable input', (t) => {
+  const { library } = fixture(t);
+  const builder = library.update('builder', { name: 'Builder', description: '', icon: 'hammer', prompt: 'Mine now.' });
+  assert.equal(builder.gallery, 'builder');
+
+  const valid = { name: 'X', description: '', icon: 'drama', prompt: 'P' };
+  assert.throws(() => library.create({ ...valid, name: '   ' }), /name/u);
+  assert.throws(() => library.create({ ...valid, prompt: '  ' }), /Write the persona/u);
+  assert.throws(() => library.create({ ...valid, icon: 'rocket' }), /icon/u);
+  assert.throws(() => library.create({ ...valid, prompt: 'x'.repeat(MAX_AGENT_PERSONA_LENGTH + 1) }), /characters or fewer/u);
+  assert.throws(() => library.create({ ...valid, gallery: '../escape' }), /gallery/u);
+  // An id is a file name in the library, never a path out of it.
+  assert.equal(library.prompt('../personas/builder'), '');
+  assert.throws(() => library.remove('../builder'), /no longer exists/u);
+});
+
+test('a hand-edited file reads as the nearest valid persona, and an empty one is not listed', () => {
+  assert.deepEqual(parsePersonaFile('plain', 'Just a prompt.\n'), {
+    id: 'plain', name: 'plain', description: '', icon: 'drama', prompt: 'Just a prompt.', gallery: null,
   });
-  store.set(scope, { selected: null, custom: '' });
-  assert.equal(config().agentPersonas, undefined);
+  assert.equal(parsePersonaFile('odd', '---\nname: Odd\nicon: rocket\n---\nBody')?.icon, 'drama');
+  assert.equal(parsePersonaFile('empty', '---\nname: Empty\n---\n\n'), null);
+  assert.equal(parsePersonaFile('broken', '---\nname: [unclosed\n---\nBody'), null);
 });
 
-test('Custom cannot be chosen without a prompt, and clearing its prompt chooses none', () => {
-  const { store } = fixture();
-  const scope = { kind: 'folder', path: '/Work/Alpha' } as const;
-  assert.throws(() => store.set(scope, { selected: 'custom' }), /Write a custom persona/);
-  store.set(scope, { custom: 'Mine.', selected: 'custom' });
-  assert.equal(store.set(scope, { custom: '   ' }).selected, null);
-  assert.equal(store.resolve(scope.path), '');
+test('each Chat remembers its own persona, and a deleted persona restores as none', (t) => {
+  const { library } = fixture(t);
+  library.recordChat('claude', 'session-a', 'journalist');
+  library.recordChat('codex', 'session-a', 'marketer');
+  assert.equal(library.chatPersona('claude', 'session-a'), 'journalist');
+  assert.equal(library.chatPersona('codex', 'session-a'), 'marketer');
+
+  library.recordChat('claude', 'session-a', null);
+  assert.equal(library.chatPersona('claude', 'session-a'), null);
+
+  library.recordChat('claude', 'session-b', 'storyteller');
+  library.remove('storyteller');
+  assert.equal(library.chatPersona('claude', 'session-b'), null);
 });
 
-test('a persona rejects unbounded input and defensively reads hand-edited config', () => {
-  const tooLong = 'x'.repeat(MAX_AGENT_PERSONA_LENGTH + 1);
-  const scope = { kind: 'folder', path: '/Work/Alpha' } as const;
-  const { store } = fixture({ agentPersonas: { folders: [{ path: scope.path, selected: 'custom', custom: tooLong }] } });
-  assert.equal(store.get(scope).custom.length, MAX_AGENT_PERSONA_LENGTH);
-  assert.throws(() => store.set(scope, { custom: tooLong }), /characters or fewer/);
+test('the socket seam records the persona against the id the runtime announces', (t) => {
+  const { library } = fixture(t);
+  const sent: unknown[] = [];
+  const fresh = { send: (data: unknown) => { sent.push(data); } };
+  trackChatPersona(fresh, 'claude', { persona: 'builder' }, () => library);
+  fresh.send(JSON.stringify({ t: 'ready' }));
+  fresh.send(JSON.stringify({ t: 'session-id', id: 'native-1' }));
+  assert.equal(sent.length, 2);
+  assert.equal(library.chatPersona('claude', 'native-1'), 'builder');
 
-  const unknown = fixture({ agentPersonas: { folders: [{ path: scope.path, selected: 'poet' }] } });
-  assert.equal(unknown.store.get(scope).selected, null);
-  const empty = fixture({ agentPersonas: { folders: [{ path: scope.path, selected: 'custom' }] } });
-  assert.equal(empty.store.resolve(scope.path), '');
-});
-
-test('a malformed persona object cannot block a later strict save', () => {
-  const { store, config } = fixture({ agentPersonas: 'noise' as unknown as AppConfigFile['agentPersonas'] });
-  const scope = { kind: 'folder', path: '/Work/Alpha' } as const;
-  assert.equal(store.get(scope).selected, null);
-  store.set(scope, { selected: 'marketer' });
-  assert.deepEqual(config().agentPersonas, { folders: [{ path: '/Work/Alpha', selected: 'marketer' }] });
-});
-
-test('every packaged persona ships a prompt without internal runtime routing policy', () => {
-  const packaged = readAgentPersonaPresets();
-  assert.deepEqual(Object.keys(packaged), [...AGENT_PERSONA_PRESETS]);
-  for (const text of Object.values(packaged)) {
-    assert.match(text, /persona/i);
-    assert.doesNotMatch(text, /StashBase MCP|mcp__stashbase__|`search_project`|`read_file`/i);
-  }
+  // Resuming under none clears what the Chat ran before.
+  const resumed = { send: () => {} };
+  trackChatPersona(resumed, 'claude', { resume: 'native-1' }, () => library);
+  assert.equal(library.chatPersona('claude', 'native-1'), null);
 });

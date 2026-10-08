@@ -21,7 +21,7 @@ function close(server: HttpServer): Promise<void> {
 
 test('gallery index proxies the configured upstream and serves the cached copy after', async (t) => {
   resetGalleryProxyCacheForTests();
-  const payload = { schemaVersion: 1, wikis: [] };
+  const payload = { wikis: [] };
   let upstreamHits = 0;
   const upstreamApp = express();
   upstreamApp.get('/gallery.json', (_req, res) => {
@@ -49,7 +49,7 @@ test('gallery index proxies the configured upstream and serves the cached copy a
   assert.equal(upstreamHits, 1, 'second request must come from the proxy cache');
 });
 
-test('gallery index answers an unsupported-schema envelope when every upstream fails', async (t) => {
+test('gallery index answers an error envelope when every upstream fails', async (t) => {
   resetGalleryProxyCacheForTests();
   // A just-closed listener: connection refused, no 6s timeout wait.
   const dead = await listen(express());
@@ -65,12 +65,11 @@ test('gallery index answers an unsupported-schema envelope when every upstream f
   });
 
   // 200 on purpose: a non-OK response would stamp a console error into
-  // every offline session; the schemaVersion 0 envelope is what tells the
+  // every offline session; the error envelope is what tells the
   // renderer to fall back whole to its bundled snapshot.
   const response = await fetch(`http://127.0.0.1:${proxy.port}/api/gallery/index`);
   assert.equal(response.status, 200);
-  const body = await response.json() as { schemaVersion: number; error: string };
-  assert.equal(body.schemaVersion, 0);
+  const body = await response.json() as { error: string };
   assert.ok(body.error.length > 0);
 });
 
@@ -152,17 +151,17 @@ test('invalid gallery publications are not cached and recover on the next reques
     resetGalleryProxyCacheForTests();
     await close(proxy.server); await close(upstream.server);
   });
-  for (const invalid of [{ schemaVersion: 999, wikis: [] }, { schemaVersion: 1, wikis: [{}] }]) {
+  for (const invalid of [{ wikis: null }, { wikis: [{}] }]) {
     resetGalleryProxyCacheForTests();
     hits = 0;
     body = invalid;
     const url = `http://127.0.0.1:${proxy.port}/api/gallery/index`;
     const failed = await fetch(url);
     assert.equal(failed.status, 200);
-    assert.equal((await failed.json() as { schemaVersion: number }).schemaVersion, 0);
-    body = { schemaVersion: 1, wikis: [], futureField: 'strip me' };
-    assert.deepEqual(await fetch(url).then((res) => res.json()), { schemaVersion: 1, wikis: [] });
-    assert.deepEqual(await fetch(url).then((res) => res.json()), { schemaVersion: 1, wikis: [] });
+    assert.match((await failed.json() as { error: string }).error, /invalid/);
+    body = { wikis: [], futureField: 'strip me' };
+    assert.deepEqual(await fetch(url).then((res) => res.json()), { wikis: [] });
+    assert.deepEqual(await fetch(url).then((res) => res.json()), { wikis: [] });
     assert.equal(hits, 2);
   }
 });
@@ -176,10 +175,10 @@ test('invalid primary index falls through to the published secondary mirror', as
   const calls: string[] = [];
   t.mock.method(globalThis, 'fetch', async (input: string | URL | Request) => {
     calls.push(String(input));
-    return Response.json({ schemaVersion: calls.length === 1 ? 999 : 1, wikis: [] });
+    return Response.json({ wikis: calls.length === 1 ? null : [] });
   });
   const response = await realFetch(`http://127.0.0.1:${proxy.port}/api/gallery/index`);
-  assert.deepEqual(await response.json(), { schemaVersion: 1, wikis: [] });
+  assert.deepEqual(await response.json(), { wikis: [] });
   assert.equal(calls.length, 2);
   assert.ok(calls[0].startsWith('https://assets.stashbase.ai/'));
   assert.ok(calls[1].startsWith('https://cdn.jsdelivr.net/gh/0-bingwu-0/stashbase-gallery@'));

@@ -106,6 +106,9 @@ export interface AgentSessionState {
   /** The skill armed for the next turn, by id; a skill applies to one turn. */
   skill: string | null;
   effort: string | null;
+  /** The library persona this Chat runs under; null runs none. Read when
+   *  its session starts. */
+  persona: string | null;
   connection: AgentConnection;
 }
 
@@ -143,6 +146,7 @@ export function createAgentSessionState(options: {
     skillCatalog: { kind: 'empty' },
     skill: null,
     effort: null,
+    persona: null,
   };
 }
 
@@ -226,6 +230,7 @@ type AgentSessionLocalAction =
   | { kind: 'set-access-mode'; mode: AgentAccessMode }
   | { kind: 'set-model'; model: string | null }
   | { kind: 'set-effort'; effort: string | null }
+  | { kind: 'set-persona'; persona: string | null }
   | { kind: 'set-skill'; skill: string | null }
   | { kind: 'set-draft'; draft: string }
   | { kind: 'select-agent'; agent: AgentId }
@@ -276,6 +281,8 @@ type AgentSessionLocalAction =
   | {
       kind: 'restore';
       effort: string | null;
+      /** Absent when no persona is recorded for the Chat. */
+      persona?: string | null | undefined;
       lastModified: number;
       nativeSessionId: string;
       transcript: AgentTranscriptBlock[];

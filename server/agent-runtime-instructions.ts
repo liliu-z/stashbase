@@ -24,6 +24,8 @@ export function composeAgentRuntimeInstructions(persona?: string): string {
     : STASHBASE_AGENT_RUNTIME_POLICY;
 }
 
-export function resolveAgentRuntimeInstructions(folderPath: string): string {
-  return composeAgentRuntimeInstructions(resolveAgentPersona(folderPath));
+/** The instructions a session starts with: its Chat's persona, if any, then
+ * the routing policy. */
+export function resolveAgentRuntimeInstructions(persona: string | undefined): string {
+  return composeAgentRuntimeInstructions(resolveAgentPersona(persona));
 }

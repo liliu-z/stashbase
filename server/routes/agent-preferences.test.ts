@@ -46,6 +46,17 @@ test('project Agent choices persist in isolation, reject unregistered scopes, an
       const saved = (await (await fetch(url)).json()).find(entry => entry.scope === filesystemPath.absolute(project));
       assert.deepEqual(saved.efforts, {codex:null,claude:'medium'});
       assert.equal(saved.agent, 'claude');
+      // A persona chosen in an older Chat becomes the project's choice for new
+      // Chats without changing its Agent; null starts them with none.
+      const choose = (scope, agent, persona) => fetch(url, { method:'PUT', headers:{'content-type':'application/json'}, body:JSON.stringify({scope,agent,persona}) });
+      assert.equal((await choose(project, 'codex', 'journalist')).status, 200);
+      let chosen = (await (await fetch(url)).json()).find(entry => entry.scope === filesystemPath.absolute(project));
+      assert.equal(chosen.persona, 'journalist');
+      assert.equal(chosen.agent, 'claude');
+      assert.equal((await choose(project, 'claude', null)).status, 200);
+      chosen = (await (await fetch(url)).json()).find(entry => entry.scope === filesystemPath.absolute(project));
+      assert.equal(chosen.persona, null);
+      assert.equal((await choose(project, 'claude', '../escape')).status, 400);
       assert.equal(config.readAppConfigStrict().workspace.showHiddenFiles, true);
       const { removeRecentAsync } = await import('./server/folder.ts');
       await removeRecentAsync(project);

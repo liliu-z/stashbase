@@ -6,9 +6,10 @@
  * sidebar. Both take the same entries and the same open handler, so there is
  * one shop with two frames rather than two shops.
  */
-export type { GalleryPort } from './application/ports';
+export type { GalleryIndex, GalleryPort } from './application/ports';
 export type { GalleryEntry } from './domain/entry';
+export type { GalleryPersona } from './domain/persona';
 export { createGalleryIndexAdapter } from './infrastructure/gallery-api';
 export { useGallery } from './hooks/use-gallery';
-export { GalleryOverlay } from './ui/overlay';
+export { GalleryOverlay, type GallerySection } from './ui/overlay';
 export { GalleryShop } from './ui/shop';

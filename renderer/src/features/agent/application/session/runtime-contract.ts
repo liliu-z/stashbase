@@ -73,9 +73,13 @@ export interface AgentSessionRuntime {
   sendPrompt(text?: string, options?: { queuedId?: string }): Promise<AgentSendResult>;
   setAccessMode(mode: AgentAccessMode): void;
   setEffort(effort: string | null): void;
-  /** Restarts a started session on its own conversation so it runs under the
-   *  project's persona as stored now. The runtime reads the persona only when
-   *  a session starts; an unstarted one picks it up on its own. */
+  /** Runs this Chat under a library persona, or none. A started session
+   *  restarts on its own conversation so the persona applies from the next
+   *  message; an unstarted one starts with it. Answers false when refused
+   *  because a turn is running. */
+  setPersona(persona: string | null): boolean;
+  /** Restarts a started session on its own conversation so it reads its
+   *  persona's prompt as stored now, after the reader edited it. */
   applyPersona(): void;
   setModel(model: string | null): void;
   /** Arms a catalog skill for the next turn, or disarms with null. */

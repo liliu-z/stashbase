@@ -68,11 +68,13 @@ that Documents locates on open. A plain file link is not a citation.
 
 ## Persona
 
-Who the Agent is when it talks and writes in a project: one of the packaged
-personas, the reader's own **Custom** prompt, or none. StashBase stores the
-choice per project and resolves it when a session starts. How the Agent works
-belongs to the user-owned `AGENTS.md` / `CLAUDE.md` native instruction files;
-a persona is distinct from them, from access control, and from internal routing.
+Who the Agent is when it talks and writes in a Chat. The reader keeps a
+library of personas shared by every project: written themselves, or added as a
+copy from **Browse personas**. Each Chat runs under one persona or none, and a
+project's next new Chat starts with the persona last chosen there. How the
+Agent works belongs to the user-owned `AGENTS.md` / `CLAUDE.md` native
+instruction files; a persona is distinct from them, from access control, and
+from internal routing.
 
 ## OpenQuill
 

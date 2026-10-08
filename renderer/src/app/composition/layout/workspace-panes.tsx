@@ -43,6 +43,8 @@ export interface WorkspacePanesProps {
   newTab: NewTab;
   /** Binds a document selection to the chat beside it. */
   onAskAgent(selection: DocumentSelection): void;
+  /** Opens the Gallery at its personas, for the composer's picker. */
+  onBrowsePersonas(): void;
   /** What the New tab's page starts: a draft beside the tree's selection. */
   onCreateDraft(): void;
   onPrepare(source: SourceReference): void;
@@ -63,6 +65,7 @@ export function WorkspacePanes({
   mode,
   newTab,
   onAskAgent,
+  onBrowsePersonas,
   onCreateDraft,
   onPrepare,
   onReprocess,
@@ -86,6 +89,7 @@ export function WorkspacePanes({
           accountSignedIn={account.account?.signedIn ?? false}
           header={mode === 'documents'}
           persona={dependencies.agent.persona}
+          onBrowsePersonas={onBrowsePersonas}
           onOpenAgentSettings={() => settings.openSettings('agents')}
           onOpenExternal={(href) => void dependencies.documents.openExternal(href)}
           onOpenSource={(source, phrase) => {

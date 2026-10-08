@@ -8,6 +8,7 @@ import {
   agentSessionReplaySchema,
 } from '../../shared/protocols/http/agent-sessions.ts';
 import { agentAdapter, resolveAgentSessionScope } from '../agent-contract.ts';
+import { agentPersonaLibrary } from '../agent-persona.ts';
 import { registeredFolderRoots } from '../folder.ts';
 import { sendError } from '../http.ts';
 
@@ -52,9 +53,10 @@ export function mount(app: express.Express): void {
     try {
       const history = historyFor(req.params.agent);
       if (!history.replay) return res.status(404).json({ error: 'replay metadata unavailable' });
-      res.json(
-        agentSessionReplaySchema.parse(await history.replay(req.params.id, historyFolderOf(req))),
-      );
+      const replay = await history.replay(req.params.id, historyFolderOf(req));
+      // The persona is StashBase's record, not the runtime's transcript.
+      const persona = agentPersonaLibrary().chatPersona(req.params.agent, req.params.id);
+      res.json(agentSessionReplaySchema.parse({ ...(replay as object), persona }));
     } catch (err) {
       sendError(res, err);
     }
@@ -77,6 +79,7 @@ export function mount(app: express.Express): void {
   app.delete('/api/agents/:agent/sessions/:id', async (req, res) => {
     try {
       await historyFor(req.params.agent).remove(req.params.id, historyFolderOf(req));
+      try { agentPersonaLibrary().forgetChat(req.params.agent, req.params.id); } catch { /* an orphan record is harmless */ }
       res.json(agentSessionEmptyResponseSchema.parse({}));
     } catch (err) {
       sendError(res, err);

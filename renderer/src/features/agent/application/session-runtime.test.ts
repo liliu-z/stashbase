@@ -138,7 +138,7 @@ describe('AgentSessionRuntime', () => {
     expect(runtime.store.getState().effort).toBe('high');
   });
 
-  it('applies a persona by resuming its own conversation, and leaves a draft to start with it', () => {
+  it('runs a chosen persona by resuming its own conversation, and a draft starts with it', () => {
     const test = harness();
     const runtime = createAgentSessionRuntime({
       agent: 'claude',
@@ -150,9 +150,18 @@ describe('AgentSessionRuntime', () => {
     test.listeners[0]?.onEvent({ kind: 'ready' });
     test.listeners[0]?.onEvent({ id: 'native-1', kind: 'identified' });
 
-    runtime.applyPersona();
+    expect(runtime.setPersona('journalist')).toBe(true);
     expect(test.requests()).toHaveLength(2);
-    expect(test.requests().at(-1)).toMatchObject({ resume: 'native-1' });
+    expect(test.requests().at(-1)).toMatchObject({ persona: 'journalist', resume: 'native-1' });
+
+    // Choosing what already runs restarts nothing.
+    expect(runtime.setPersona('journalist')).toBe(true);
+    expect(test.requests()).toHaveLength(2);
+
+    // Editing the running persona restarts on the same conversation.
+    runtime.applyPersona();
+    expect(test.requests()).toHaveLength(3);
+    expect(test.requests().at(-1)).toMatchObject({ persona: 'journalist', resume: 'native-1' });
 
     const draft = createAgentSessionRuntime({
       agent: 'claude',
@@ -162,8 +171,10 @@ describe('AgentSessionRuntime', () => {
       scheduler: test.scheduler,
       scope: { kind: 'folder', path: '/project/Research' },
     });
-    draft.applyPersona();
-    expect(test.requests()).toHaveLength(2);
+    draft.setPersona('builder');
+    expect(test.requests()).toHaveLength(3);
+    draft.start();
+    expect(test.requests().at(-1)).toMatchObject({ persona: 'builder' });
   });
 
   it('loads replay before reconnecting exactly that native session', async () => {

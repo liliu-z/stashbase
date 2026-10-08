@@ -7,8 +7,7 @@ import { Button } from '@/components/ui/button';
 import type { GalleryEntry } from '@/features/gallery/domain/entry';
 import { cn } from '@/lib/utils';
 
-import { GalleryPrompt } from './prompt';
-import { GalleryScreenshots } from './screenshots';
+import { GalleryScreenshot } from './screenshots';
 
 /** Plain text into paragraphs: a blank line is the one separator the index
  *  promises, and a stray run of them is not a third paragraph. Each carries a
@@ -46,7 +45,7 @@ function Section({
   );
 }
 
-/** Details describe the project and its generating prompt. Local acquisition
+/** Details show one cover and the project introduction. Local acquisition
  * and window allocation belong to the shared project-entry flow. */
 export function GalleryEntryPage({
   copying,
@@ -61,54 +60,36 @@ export function GalleryEntryPage({
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* Wide, the images keep a 16:9 frame in a column capped at the width
-       * that frame needs, and the text takes the rest: the prompt and the
-       * file list are what a reader weighs, and a screenshot stretched to
-       * fill a wide window was a banner, not a preview. The text column
-       * never drops below the width it reads well at. Narrow, the same
-       * blocks stack with the screenshot first — what a project looks like is
-       * the reason to want one, and it should not be below the fold. The
-       * screenshots come first in the source for exactly that. */}
+      {/* The website's order: the name across the top, then the cover on the
+       * left and the introduction beside it, so one template reads the same
+       * in both places. */}
+      <div className="mb-6 min-w-0 shrink-0">
+        <div className="flex items-center gap-2">
+          <h3 className="m-0 text-title font-semibold tracking-tight text-foreground">
+            {entry.name}
+          </h3>
+          {/* The same badge the card carried, so the shelf and the page
+           * agree about what this is. */}
+          <Badge color="gray" size="compact">
+            {entry.category}
+          </Badge>
+        </div>
+        <p className="m-0 mt-1.5 text-body leading-relaxed text-muted-foreground">
+          {entry.description}
+        </p>
+      </div>
+
       <div
         className={cn(
-          'grid min-h-0 flex-1 gap-8 overflow-y-auto',
-          '@2xl:grid-cols-[minmax(22rem,1fr)_minmax(0,39rem)] @2xl:overflow-hidden',
+          'grid min-h-0 flex-1 content-start gap-8 overflow-y-auto',
+          '@2xl:grid-cols-[minmax(0,1.3fr)_minmax(18rem,1fr)] @2xl:overflow-hidden',
         )}
       >
-        {/* `min-h-0` on both columns, or a grid item's automatic minimum
-         * keeps the row as tall as its content and a long build prompt walks
-         * straight out of the dialog. */}
-        <div className="min-h-0 min-w-0 @2xl:col-start-2 @2xl:row-start-1">
-          <GalleryScreenshots name={entry.name} screenshots={entry.screenshots ?? []} />
+        <div className="min-w-0 @2xl:min-h-0">
+          <GalleryScreenshot name={entry.name} screenshot={entry.screenshot} />
         </div>
 
-        {/* The prose column is one scroller for everything a reader weighs,
-         * introduction and request together, and it says so at its edge: the
-         * fade is scroll-aware, so a column with nothing below it stays crisp
-         * and a column with more dissolves into the action row rather than
-         * ending on a cut. Without it a folded request sat below the fold
-         * with nothing to suggest it was there. */}
-        <div className="scroll-fade flex min-h-0 min-w-0 flex-col gap-5 [--scroll-fade-size:1.25rem] @2xl:col-start-1 @2xl:row-start-1 @2xl:overflow-y-auto">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h3 className="m-0 text-title font-semibold tracking-tight text-foreground">
-                {entry.name}
-              </h3>
-              {/* The same badge the card carried, so the shelf and the page
-               * agree about what this is. */}
-              <Badge color="gray" size="compact">
-                {entry.category}
-              </Badge>
-            </div>
-            <p className="m-0 mt-1.5 text-body leading-relaxed text-muted-foreground">
-              {entry.description}
-            </p>
-          </div>
-
-          {/* Reading sizes, not control sizes: the description and the
-           * instructions read at body, and the introduction one step above
-           * it, because this column is prose a reader weighs rather than a
-           * form they scan. The labels stay at caption, as labels do. */}
+        <div className="scroll-fade flex min-w-0 flex-col gap-5 [--scroll-fade-size:1.25rem] @2xl:min-h-0 @2xl:overflow-y-auto">
           <Section label="About">
             {entry.about ? (
               <div className="flex flex-col gap-2">
@@ -127,8 +108,6 @@ export function GalleryEntryPage({
               </p>
             )}
           </Section>
-
-          <GalleryPrompt key={entry.wikiPrompt} prompt={entry.wikiPrompt} />
         </div>
       </div>
 

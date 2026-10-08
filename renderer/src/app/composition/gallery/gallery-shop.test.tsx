@@ -24,23 +24,23 @@ afterEach(cleanup);
 const PUBLISHED: GalleryEntry = {
   about: 'Why I made this.\n\nWhat is in it, and who it is for.',
   category: 'reference',
-  contents: 'Two pages',
+
   description: 'Everything about widgets.',
-  files: ['README.md', 'wiki/index.md'],
+
   id: 'widgets',
-  learnMore: null,
+
   name: 'Widget Handbook',
   repo: 'https://github.com/owner/widgets',
-  screenshots: null,
-  starterPrompts: [],
-  wikiPrompt: 'Build wiki pages from these notes.',
+  screenshot: null,
 };
 
 function harness({ folderOpen }: { folderOpen: boolean }) {
   const copy = vi.fn(async () => '/project/Widget Handbook');
   const snapshot = projectRegistrySnapshot();
   const dependencies = appDependencies({
-    gallery: galleryPort({ loadIndex: vi.fn(async () => [PUBLISHED]) }),
+    gallery: galleryPort({
+      loadIndex: vi.fn(async () => ({ personas: null, wikis: [PUBLISHED] })),
+    }),
     workspace: {
       adapters: workspaceAdapters({
         githubImport: githubImportApi({ run: copy }),
@@ -105,10 +105,8 @@ describe('Gallery shop', () => {
     // The instructions are folded beneath the introduction: most readers
     // never need them, and they are one press away for the ones who do. Copy
     // is all the Gallery ever does with them: it never places composer text.
-    expect(within(page).queryByText('Build wiki pages from these notes.')).toBeNull();
-    await user.click(within(page).getByRole('button', { name: 'Prompt' }));
-    expect(within(page).getByText('Build wiki pages from these notes.')).not.toBeNull();
-    expect(within(page).getByRole('button', { name: 'Copy prompt' })).not.toBeNull();
+    expect(within(page).queryByRole('button', { name: 'Prompt' })).toBeNull();
+    expect(within(page).queryByRole('button', { name: 'Copy prompt' })).toBeNull();
 
     await user.click(within(page).getByRole('button', { name: 'Make a copy' }));
     await waitFor(() =>

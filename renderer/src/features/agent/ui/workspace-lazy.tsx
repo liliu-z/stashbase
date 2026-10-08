@@ -17,8 +17,11 @@ export interface AgentWorkspaceProps {
    *  names the chat then, and the Chats panel beside it manages the history
    *  and New chat. */
   header?: boolean | undefined;
-  /** The persona this scope's Chats run under. */
+  /** The reader's persona library. */
   persona: AgentPersonaPort;
+  /** Opens the Gallery on its personas. The Gallery is a sibling feature, so
+   *  the composition layer supplies this. */
+  onBrowsePersonas?: (() => void) | undefined;
   onOpenExternal(href: string): void;
   onOpenAgentSettings(): void;
   /** Explicit account choice; a caller signal waits for completion without
