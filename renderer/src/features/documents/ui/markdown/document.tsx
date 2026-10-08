@@ -8,7 +8,6 @@ import { CrepeBuilder } from '@milkdown/crepe/builder';
 import { blockEdit } from '@milkdown/crepe/feature/block-edit';
 import { codeMirror } from '@milkdown/crepe/feature/code-mirror';
 import { cursor } from '@milkdown/crepe/feature/cursor';
-import { latex } from '@milkdown/crepe/feature/latex';
 import { linkTooltip } from '@milkdown/crepe/feature/link-tooltip';
 import { listItem } from '@milkdown/crepe/feature/list-item';
 import { placeholder } from '@milkdown/crepe/feature/placeholder';
@@ -34,6 +33,7 @@ import { writeToClipboard } from '@/shared/ui/clipboard';
 
 import { watchMarkdownChanges } from './changes';
 import { createMarkdownFindController } from './find-controller';
+import { math } from './math';
 import { MarkdownOpenFailure } from './open-failure';
 
 import '@milkdown/crepe/theme/common/style.css';
@@ -171,7 +171,7 @@ export function MarkdownDocument({
       .addFeature(toolbar, selectionToolbar({ askAgent: askAgentRun }))
       .addFeature(table)
       .addFeature(codeMirror, { copyText: 'Copy code', languages })
-      .addFeature(latex);
+      .addFeature(math);
     const releaseReview = attachReview(editor);
     const updateHeadings = () => {
       const view = currentEditorView(editor);

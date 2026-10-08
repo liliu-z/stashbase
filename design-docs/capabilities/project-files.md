@@ -107,6 +107,10 @@ passage is sent.
 Markdown frontmatter is outside the prose editor. A turn review that would change it is
 refused with a visible reason; its metadata is never silently omitted from a review.
 
+Markdown math uses double-dollar delimiters or `math` / `latex` fenced blocks.
+Single-dollar amounts remain ordinary text in Documents and Chat, including
+when a Markdown document is saved.
+
 File diffs, save-conflict comparisons, and Agent tool approvals have their own
 flows. Other editable formats currently have no inline revision surface.
 

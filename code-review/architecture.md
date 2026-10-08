@@ -493,6 +493,9 @@ registered host boundaries; renderer shared types are a different layer.
   the live document without mutating editor DOM during change callbacks. The sole
   double-cast exemption is its Find controller's structural DOM corpus and guarded
   CSS Highlight probe; other exceptions need their code-owned rationale.
+- Markdown's `math.ts` owns the double-dollar math rule and code-block preview.
+  Single-dollar prices remain prose; math serialization retains double-dollar
+  blocks and explicit `math` / `latex` fences.
 - Inline review runs Milkdown's diff plugin, registered directly by
   `revision-adapter.ts`. `@milkdown/plugin-diff` is patched under `patches/` so a
   per-change Reject also resolves a pure deletion, which holds no span in the

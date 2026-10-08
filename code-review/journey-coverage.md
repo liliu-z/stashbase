@@ -279,6 +279,15 @@ Host/services: `server/folder.ts`, `server/github-import.ts`, `server/project-fi
 
 ## J03: Documents
 
+**Currency and math (2026-10-08):** `ui/markdown/math.ts` replaces Crepe's
+single-dollar math interpretation. `math.test.ts` runs the real Milkdown editor
+and verifies price rendering/save preservation, inline double-dollar math, and
+block/fence round trips. An isolated built macOS source app opened a fixture
+with multiple dollar amounts, an inline formula, and a block formula. After a
+normal text edit, the saved file retained every price and both double-dollar
+forms; the rendered editor and formula preview were reviewed by eye. This is
+source-runtime evidence, not packaged delivery.
+
 **Intent:** [J03](../design-docs/journeys/README.md#j03-read-and-edit-source-documents).
 The [Documents design](../design-docs/journeys/documents.md) owns navigation, continuity,
 and recovery behavior; the evidence below establishes its exercised paths.
