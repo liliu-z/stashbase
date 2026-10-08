@@ -101,6 +101,26 @@ describe('Agent session domain', () => {
     });
   });
 
+  it('keeps each Agent in its own permission mode across a switch', () => {
+    const claude = createAgentSessionState({
+      agent: 'claude',
+      id: 'chat-1',
+      scope: { kind: 'folder', path: '/project' },
+    });
+    const asking = transitionAgentSession(claude, { kind: 'set-access-mode', mode: 'default' });
+    const switched = transitionAgentSession(asking, { agent: 'stashbase', kind: 'select-agent' });
+    expect(switched.accessMode).toBe('auto');
+    const editing = transitionAgentSession(switched, {
+      kind: 'set-access-mode',
+      mode: 'acceptEdits',
+    });
+    const back = transitionAgentSession(editing, { agent: 'claude', kind: 'select-agent' });
+    expect(back.accessMode).toBe('default');
+    expect(
+      transitionAgentSession(back, { agent: 'stashbase', kind: 'select-agent' }).accessMode,
+    ).toBe('acceptEdits');
+  });
+
   it('requires and labels project scopes', () => {
     expect(() => scopeForWindowFolder(null)).toThrow('Open a project');
     expect(scopeForWindowFolder('/project/Research')).toEqual({

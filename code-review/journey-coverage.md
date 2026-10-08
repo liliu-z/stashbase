@@ -605,6 +605,27 @@ Host/services: `server/retrieval/index.ts`, `server/indexer.mfs.ts`, `python/sta
 
 ## J06: Agent
 
+**Default permissions and desktop commands (2026-10-08):** Default now declares
+Ask/Edit/Plan and maps each turn to an OpenCode profile. Edit uses the shared
+realpath-aware project-write predicate; commands, deletion, and broader access
+still need approval. Plan denies mutating and delegated tools. Auto remains
+unavailable because OpenCode has no native risk reviewer. MCP approvals wait
+for the same call's running arguments, which the real runtime can emit after
+its permission request. Grants apply once to a pending id; Stop rejects late
+grants. A reproduced duplicate idle event could finish the next optimistic
+turn before native work began; the translator now requires native busy before
+ordinary completion, while acknowledged interruption settles a pre-busy turn.
+The bundled runtime restores common CLI directories through `agentCliPath`
+without inheriting credentials or injection flags. The desktop-PATH regression
+failed with `zsh:1: command not found: node`, then passed with the fix.
+`opencode-agent.test.ts` covers mode changes, scoped/symlink writes, delayed
+arguments, duplicate approvals/idle, and interruption. The driven native smoke
+uses the pinned executable, a fake model gateway, and an isolated MCP writer:
+approved Node exits zero under a desktop PATH; Edit writes automatically, Plan
+rejects MCP and shell writes, and Ask confirms writes after switching back.
+This establishes adapter/native protocol behavior, not live-model judgment,
+the owner's X script, or a released desktop build.
+
 **Explicit external reads (2026-10-07):** `agent-runtime-instructions.ts` now
 makes the bound project the default read/search scope and routes explicitly
 requested external paths through native tools under runtime permissions.

@@ -22,6 +22,7 @@ import { getHostedAccountSession } from './app-config.ts';
 import { ensureMcpLauncher } from './agent-mcp.ts';
 import { resolveAgentPersona } from './agent-persona.ts';
 import { composeAgentRuntimeInstructions } from './agent-runtime-instructions.ts';
+import { agentCliPath } from './agent-cli.ts';
 import { appDataRoot } from './local-data.ts';
 import { logger } from './log.ts';
 import {
@@ -100,10 +101,15 @@ async function availablePort(): Promise<number> {
  * credentials, user OpenCode settings, proxy credentials, and Electron/Node
  * injection flags must never cross into the private Agent process. */
 export function safeOpenCodeInheritedEnvironment(source: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  return Object.fromEntries(Object.entries(source).filter(([name]) => {
+  const environment = Object.fromEntries(Object.entries(source).filter(([name]) => {
     const upper = name.toUpperCase();
     return OPEN_CODE_RUNTIME_ENV_KEYS.has(upper) || upper.startsWith('LC_');
   }));
+  // Desktop launches omit common CLI directories. Keep the credential filter,
+  // but give native shell tools the same executable search path as our other Agents.
+  const inheritedPath = Object.entries(environment).find(([name]) => name.toUpperCase() === 'PATH')?.[1];
+  for (const name of Object.keys(environment)) if (name.toUpperCase() === 'PATH') delete environment[name];
+  return { ...environment, PATH: agentCliPath([], inheritedPath ?? '') };
 }
 
 function privateRuntimeEnvironment(config: Config, username: string, password: string): NodeJS.ProcessEnv {
@@ -184,6 +190,23 @@ export function buildOpenCodeConfig(
         description: 'The StashBase Agent for one authorized project folder.',
         mode: 'primary',
         prompt: runtimeInstructions,
+      },
+      'stashbase-edit': {
+        description: 'Edit project documents; ask before commands and other actions.',
+        mode: 'primary',
+        prompt: runtimeInstructions,
+      },
+      'stashbase-plan': {
+        description: 'Explore the project without changing files or running commands.',
+        mode: 'primary',
+        prompt: `${runtimeInstructions}\n\nPlan mode: read and explore only. Show proposed changes in chat; do not write files, run commands, or delegate work.`,
+        permission: {
+          '*': 'deny',
+          read: 'allow', glob: 'allow', grep: 'allow', list: 'allow',
+          webfetch: 'ask', websearch: 'allow', external_directory: 'ask', question: 'allow',
+          stashbase_list_projects: 'allow', stashbase_list_directory: 'allow',
+          stashbase_read_file: 'allow', stashbase_search_project: 'allow',
+        } as typeof permission,
       },
     },
     permission,

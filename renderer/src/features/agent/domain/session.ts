@@ -125,6 +125,10 @@ export function transitionAgentSession(
       return {
         ...state,
         agent: action.agent,
+        // An Agent never seen in this chat starts at Auto and settles on what
+        // its runtime honors.
+        accessMode: state.accessModes[action.agent] ?? 'auto',
+        accessModes: { ...state.accessModes, [state.agent]: state.accessMode },
         nativeSessionId: null,
         models: [],
         model: null,

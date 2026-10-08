@@ -53,8 +53,8 @@ export const BUILT_IN_AGENT_ADAPTERS: readonly AgentAdapter[] = [
     capabilities: {
       ...SHARED_PANEL_CAPABILITIES,
       attachments: false,
-      // OpenQuill's permissions are fixed to ask, so it honors no mode.
-      modes: [],
+      // OpenCode has no native risk reviewer for the product's Auto promise.
+      modes: ['default', 'acceptEdits', 'plan'],
       effort: false,
       models: false,
       skills: false,

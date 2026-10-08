@@ -1,6 +1,10 @@
 import './isolated-home.ts';
 import assert from 'node:assert/strict';
-import { EventEmitter } from 'node:events';
+import { EventEmitter, on } from 'node:events';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import type { Event } from '@opencode-ai/sdk';
 import type { WebSocket } from 'ws';
@@ -11,6 +15,43 @@ import {
   openCodeSessionHasContent,
 } from '../opencode-agent.ts';
 import { buildOpenCodeConfig, safeOpenCodeInheritedEnvironment, type OpenCodeSessionRuntime } from '../opencode-runtime.ts';
+import { agentCliPath } from '../agent-cli.ts';
+import type { AgentAccessMode } from '../../shared/agent-runtime.ts';
+
+function modeHarness(access: AgentAccessMode, folder = '/workspace', nativeStart = true) {
+  const ws = new FakeWebSocket();
+  const feed = new EventEmitter();
+  const prompts: Array<{ agent: string }> = [];
+  const replies: Array<{ path: { permissionID: string }; body: { response: string } }> = [];
+  const session = new OpenCodePanelSession(ws as unknown as WebSocket, {
+    windowId: 'mode-window', folder, access,
+  }, {
+    async client(directory) {
+      return {
+        event: { subscribe: async ({ signal }: { signal: AbortSignal }) => ({
+          stream: (async function* () {
+            for await (const [event] of on(feed, 'event', { signal })) yield event;
+          })(),
+        }) },
+        session: {
+          create: async () => ({ data: { id: 'mode-session', title: 'New Chat', directory } }),
+          promptAsync: async ({ body }: { body: { agent: string } }) => {
+            prompts.push(body);
+            if (nativeStart) feed.emit('event', { type: 'session.status', properties: { sessionID: 'mode-session', status: { type: 'busy' } } });
+            return { data: true };
+          },
+          abort: async () => ({ data: true }),
+        },
+        postSessionIdPermissionsPermissionId: async (reply: typeof replies[number]) => { replies.push(reply); return { data: true }; },
+      } as never;
+    },
+    beginTurn: () => {}, endTurn: () => {}, onExit: () => () => {}, close: async () => {},
+  });
+  return { ws, feed, session, prompts, replies,
+    send: (event: unknown) => ws.emit('message', Buffer.from(JSON.stringify(event))),
+    events: () => ws.sent.map(value => JSON.parse(value)),
+  };
+}
 
 class FakeWebSocket extends EventEmitter {
   OPEN = 1;
@@ -29,10 +70,137 @@ async function settle(): Promise<void> {
   await new Promise<void>((resolve) => setImmediate(resolve));
 }
 
+test('Default Agent applies the selected mode to each turn and freezes it while working', async () => {
+  const { session, prompts, send, feed } = modeHarness('plan');
+  try {
+    await settle();
+    send({ t: 'prompt', text: 'Explore the draft' });
+    await settle();
+    assert.equal(prompts[0]?.agent, 'stashbase-plan');
+    feed.emit('event', { type: 'session.idle', properties: { sessionID: 'mode-session' } });
+    await settle();
+    send({ t: 'set-mode', mode: 'acceptEdits' });
+    send({ t: 'prompt', text: 'Edit my draft' });
+    await settle();
+    assert.equal(prompts[1]?.agent, 'stashbase-edit');
+    send({ t: 'set-mode', mode: 'default' });
+    send({ t: 'prompt', text: 'Do not overlap a running turn' });
+    await settle();
+    assert.equal(prompts.length, 2);
+    feed.emit('event', { type: 'session.idle', properties: { sessionID: 'mode-session' } });
+    await settle();
+    send({ t: 'prompt', text: 'The running turn did not change mode' });
+    await settle();
+    assert.equal(prompts[2]?.agent, 'stashbase-edit');
+  } finally { session.dispose(); }
+});
+
+// Auto is not offered for Default; a chat that opens asking for it runs as Edit.
+for (const access of ['default', 'acceptEdits', 'plan', 'auto'] as const) {
+  test(`Default ${access} handles scoped edits, commands, and pending approvals`, async (t) => {
+    const effective = access === 'auto' ? 'acceptEdits' : access;
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-mode-'));
+    const folder = path.join(root, 'project');
+    const outside = path.join(root, 'outside');
+    fs.mkdirSync(folder); fs.mkdirSync(outside);
+    fs.symlinkSync(outside, path.join(folder, 'escape'), process.platform === 'win32' ? 'junction' : 'dir');
+    const harness = modeHarness(access, folder);
+    t.after(() => { harness.session.dispose(); fs.rmSync(root, { recursive: true, force: true }); });
+    await settle();
+    harness.send({ t: 'prompt', text: 'Work on my draft' });
+    await settle();
+    for (const [id, tool, input] of [
+      ['edit', 'stashbase_edit_file', { path: path.join(folder, 'note.md') }],
+      ['write', 'stashbase_write_file', { path: path.join(folder, 'new.md') }],
+      ['escape', 'stashbase_write_file', { path: path.join(folder, 'escape', 'new.md') }],
+      ['delete', 'stashbase_delete_file', { path: path.join(folder, 'note.md') }],
+      ['command', 'bash', { command: 'node workflows/scripts/x-search.mjs 24' }],
+    ] as const) {
+      harness.feed.emit('event', { type: 'message.part.updated', properties: {
+        part: { id, sessionID: 'mode-session', messageID: 'message', type: 'tool', callID: id, tool,
+          state: { status: 'running', input, time: { start: 1 } } },
+      } });
+      const permission = { type: 'permission.asked', properties: {
+        id: `permission-${id}`, sessionID: 'mode-session', permission: tool, patterns: ['*'], always: ['*'],
+        metadata: input, tool: { messageID: 'message', callID: id },
+      } };
+      harness.feed.emit('event', permission);
+      harness.feed.emit('event', permission);
+      await settle();
+      const automatic = effective === 'plan' || (effective === 'acceptEdits' && (id === 'edit' || id === 'write'));
+      assert.equal(harness.events().filter(event => event.t === 'permission' && event.id === `permission-${id}`).length, automatic ? 0 : 1);
+      if (!automatic) harness.send({ t: 'permission-reply', id: `permission-${id}`, allow: true, always: true });
+      await settle();
+      assert.deepEqual(harness.replies.filter(reply => reply.path.permissionID === `permission-${id}`).map(reply => reply.body.response), [effective === 'plan' ? 'reject' : 'once']);
+    }
+    harness.send({ t: 'permission-reply', id: 'unrequested', allow: true });
+    await settle();
+    assert.equal(harness.replies.length, 5);
+  });
+}
+
+test('Default approvals wait for MCP arguments and Stop rejects late grants', async (t) => {
+  const harness = modeHarness('acceptEdits');
+  t.after(() => harness.session.dispose());
+  await settle();
+  harness.send({ t: 'prompt', text: 'Edit the draft' });
+  await settle();
+  const permission = (id: string, tool = 'stashbase_write_file') => ({
+    type: 'permission.asked', properties: {
+      id, sessionID: 'mode-session', permission: tool, patterns: ['*'], always: ['*'], metadata: {},
+      tool: { messageID: 'message', callID: id },
+    },
+  });
+  harness.feed.emit('event', permission('early'));
+  await settle();
+  assert.equal(harness.replies.length, 0, 'a tool name alone grants no write');
+  assert.equal(harness.events().filter(event => event.t === 'permission').length, 0);
+  harness.feed.emit('event', { type: 'message.part.updated', properties: {
+    part: { id: 'early', sessionID: 'mode-session', messageID: 'message', type: 'tool', callID: 'early', tool: 'stashbase_write_file',
+      state: { status: 'running', input: { path: '/workspace/new.md' }, time: { start: 1 } } },
+  } });
+  await settle();
+  assert.deepEqual(harness.replies.map(reply => reply.body.response), ['once']);
+  harness.feed.emit('event', permission('command', 'bash'));
+  await settle();
+  assert.equal(harness.events().filter(event => event.t === 'permission').length, 1);
+  harness.send({ t: 'interrupt' });
+  harness.send({ t: 'permission-reply', id: 'command', allow: true });
+  harness.feed.emit('event', permission('late'));
+  await settle();
+  assert.deepEqual(harness.replies.map(reply => [reply.path.permissionID, reply.body.response]), [['early', 'once'], ['late', 'reject']]);
+});
+
+test('Stop settles a Default submission even before native busy is published', async (t) => {
+  const harness = modeHarness('default', '/workspace', false);
+  t.after(() => harness.session.dispose());
+  await settle();
+  harness.send({ t: 'prompt', text: 'Start work' });
+  await settle();
+  assert.equal(harness.session.turnInFlight(), true);
+  harness.send({ t: 'interrupt' });
+  await settle();
+  assert.equal(harness.session.turnInFlight(), false);
+  assert.deepEqual(harness.events().filter(event => event.t === 'turn-end'), [{ t: 'turn-end', isError: false }]);
+});
+
 test('OpenCode history distinguishes allocated blanks from started conversations', () => {
   assert.equal(openCodeSessionHasContent({ title: 'New Chat' }, 0), false);
   assert.equal(openCodeSessionHasContent({ title: 'New Chat' }, 2), true);
   assert.equal(openCodeSessionHasContent({ title: 'Summarize the research folder' }, 0), true);
+});
+
+test('a trailing native idle event cannot finish the next submitted Default turn', () => {
+  const translator = new OpenCodeEventTranslator();
+  translator.bindSession('session-1');
+  translator.beginTurn();
+  translator.translate({ type: 'session.status', properties: { sessionID: 'session-1', status: { type: 'busy' } } });
+  assert.deepEqual(translator.translate({ type: 'session.status', properties: { sessionID: 'session-1', status: { type: 'idle' } } }), [{ t: 'turn-end', isError: false }]);
+  translator.beginTurn();
+  assert.deepEqual(translator.translate({ type: 'session.idle', properties: { sessionID: 'session-1' } }), []);
+  assert.equal(translator.isTurnActive(), true);
+  translator.translate({ type: 'session.status', properties: { sessionID: 'session-1', status: { type: 'busy' } } });
+  assert.deepEqual(translator.translate({ type: 'session.idle', properties: { sessionID: 'session-1' } }), [{ t: 'turn-end', isError: false }]);
 });
 
 test('the Default Agent publishes scope retirement once before closing its transport', () => {
@@ -69,12 +237,21 @@ test('bundled OpenCode inherits launch plumbing but no ambient credentials or in
     NODE_OPTIONS: '--require /tmp/inject.cjs',
     ELECTRON_RUN_AS_NODE: '1',
   }), {
-    PATH: '/usr/bin',
+    PATH: agentCliPath([], '/usr/bin'),
     SHELL: '/bin/zsh',
     LANG: 'en_US.UTF-8',
     LC_ALL: 'C',
     SSL_CERT_FILE: '/private/cert.pem',
   });
+});
+
+test('Default Agent commands find installed Node from a macOS desktop PATH', { skip: process.platform !== 'darwin' }, () => {
+  const result = spawnSync('/bin/zsh', ['-c', 'node -p process.versions.node'], {
+    encoding: 'utf8',
+    env: safeOpenCodeInheritedEnvironment({ PATH: '/usr/bin:/bin:/usr/sbin:/sbin', SHELL: '/bin/zsh' }),
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout.trim(), /^\d+\.\d+\.\d+$/);
 });
 
 test('bundled OpenCode config disables sharing and updates while asking for every risky local action', () => {
@@ -171,6 +348,7 @@ test('OpenCode events normalize into the Shared Agent Contract without duplicate
   const translator = new OpenCodeEventTranslator();
   translator.bindSession('session-1');
   assert.deepEqual(translator.beginTurn(), [{ t: 'turn-start' }]);
+  assert.deepEqual(translator.translate({ type: 'session.status', properties: { sessionID: 'session-1', status: { type: 'busy' } } }), []);
 
   const text = (value: string, delta?: string) => translator.translate({
     type: 'message.part.updated',

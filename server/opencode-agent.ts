@@ -27,6 +27,8 @@ import { getCurrentFolder, runWithWindowId } from './folder.ts';
 import { filesystemPath } from './filesystem-path.ts';
 import { agentTurnErrorEvent } from './agent-turn-failure.ts';
 import { restoreHistoryAttachments } from './agent-history-attachments.ts';
+import { isStashbaseWorkspaceEdit } from './agent-file-permissions.ts';
+import type { AgentAccessMode } from '../shared/agent-runtime.ts';
 import {
   createOpenCodeSessionRuntime,
   openCodeClient,
@@ -77,9 +79,11 @@ function eventErrorMessage(event: Extract<Event, { type: 'session.error' }>): st
 export class OpenCodeEventTranslator {
   private sessionId: string | null = null;
   private turnActive = false;
+  private nativeTurnStarted = false;
   private readonly content = new Map<string, string>();
   private readonly tools = new Map<string, ToolPart['state']['status']>();
   private readonly toolNames = new Map<string, string>();
+  private readonly toolInputs = new Map<string, Record<string, unknown>>();
   private readonly diffs = new Set<string>();
   private diffCounter = 0;
   private readonly errors = new Set<string>();
@@ -91,17 +95,23 @@ export class OpenCodeEventTranslator {
   beginTurn(): AgentServerEvent[] {
     if (this.turnActive) return [];
     this.turnActive = true;
+    this.nativeTurnStarted = false;
     this.diffs.clear();
     return [{ t: 'turn-start' }];
   }
   isTurnActive(): boolean { return this.turnActive; }
   endTurnWithError(): AgentServerEvent[] { return this.finishTurn(true); }
+  endTurnAfterInterrupt(): AgentServerEvent[] { return this.finishTurn(false, true); }
 
   translate(event: Event | EventPermissionAsked): AgentServerEvent[] {
     switch (event.type) {
       case 'session.status': {
         if (!this.matches(event.properties.sessionID)) return [];
-        if (event.properties.status.type === 'busy') return this.beginTurn();
+        if (event.properties.status.type === 'busy') {
+          const events = this.beginTurn();
+          this.nativeTurnStarted = true;
+          return events;
+        }
         if (event.properties.status.type === 'retry') {
           return [{ t: 'notice', message: event.properties.status.message }];
         }
@@ -146,14 +156,14 @@ export class OpenCodeEventTranslator {
         if (!this.matches(permission.sessionID)) return [];
         const callId = 'permission' in permission ? permission.tool?.callID : permission.callID;
         const name = 'permission' in permission ? permission.permission : permission.type;
-        const input = permission.metadata && typeof permission.metadata === 'object'
-          ? permission.metadata
-          : {};
+        const toolName = (callId && this.toolNames.get(callId)) || normalizeOpenCodeToolName(name);
+        const input = (toolName.startsWith('stashbase_') && callId && this.toolInputs.get(callId))
+          || (permission.metadata && typeof permission.metadata === 'object' ? permission.metadata : {});
         return [{
           t: 'permission',
           id: permission.id,
           toolUseId: callId ?? permission.id,
-          name: (callId && this.toolNames.get(callId)) || normalizeOpenCodeToolName(name),
+          name: toolName,
           title: 'title' in permission ? permission.title || null : null,
           input,
         }];
@@ -165,8 +175,11 @@ export class OpenCodeEventTranslator {
 
   private matches(id: string): boolean { return this.sessionId === id; }
 
-  private finishTurn(isError: boolean): AgentServerEvent[] {
+  private finishTurn(isError: boolean, interrupted = false): AgentServerEvent[] {
     if (!this.turnActive) return [];
+    // `session.status: idle` and `session.idle` can straddle the next prompt.
+    // Its optimistic start is not evidence that the native runtime started it.
+    if (!isError && !interrupted && !this.nativeTurnStarted) return [];
     this.turnActive = false;
     this.errors.clear();
     return [{ t: 'turn-end', isError }];
@@ -195,6 +208,7 @@ export class OpenCodeEventTranslator {
     const name = normalizeOpenCodeToolName(part.tool);
     const events: AgentServerEvent[] = [];
     this.toolNames.set(id, name);
+    if (part.state.status !== 'pending') this.toolInputs.set(id, part.state.input);
     // Pending carries a partially parsed argument object. Wait for running
     // (or a direct terminal state) so the stable protocol opens one card with
     // the complete input rather than freezing the first partial snapshot.
@@ -240,6 +254,11 @@ export class OpenCodePanelSession {
   private sessionId: string | null = null;
   private client: Awaited<ReturnType<typeof openCodeClient>> | null = null;
   private disposed = false;
+  private interrupted = false;
+  private access: AgentAccessMode;
+  private readonly pendingPermissions = new Set<string>();
+  private readonly seenPermissions = new Set<string>();
+  private readonly waitingToolPermissions = new Map<string, Extract<AgentServerEvent, { t: 'permission' }>>();
   private readonly stopRuntimeExitListener: () => void;
   private readonly onMessage = (data: RawData) => { void this.handleMessage(data); };
   private readonly onClose = () => this.dispose();
@@ -254,6 +273,10 @@ export class OpenCodePanelSession {
       currentFolder: getCurrentFolder(),
     }));
     this.cwd = binding.cwd;
+    // Auto is not offered here; a new chat asks for it before the renderer
+    // settles, and Edit is where it settles.
+    this.access = options.access === 'auto' ? 'acceptEdits'
+      : options.access === 'acceptEdits' || options.access === 'plan' ? options.access : 'default';
     this.windowId = options.windowId;
     this.runtime = runtime ?? createOpenCodeSessionRuntime({
       windowId: this.windowId,
@@ -277,6 +300,9 @@ export class OpenCodePanelSession {
     if (this.disposed) return;
     if (termination) send(this.ws, { t: 'exit', reason: termination.kind, folder: termination.folder });
     this.disposed = true;
+    this.pendingPermissions.clear();
+    this.seenPermissions.clear();
+    this.waitingToolPermissions.clear();
     this.abort.abort();
     this.stopRuntimeExitListener();
     this.runtime.endTurn();
@@ -323,8 +349,35 @@ export class OpenCodePanelSession {
       for await (const event of stream) {
         if (this.disposed) return;
         const translated = this.translator.translate(event);
-        for (const item of translated) send(this.ws, item);
-        if (translated.some((item) => item.t === 'turn-end')) this.runtime.endTurn();
+        for (const item of translated) {
+          if (item.t === 'permission') {
+            if (this.seenPermissions.has(item.id)) continue;
+            // OpenCode can ask for MCP permission before publishing the running
+            // tool's arguments. Wait for that same call rather than granting a
+            // tool-wide rule or showing an approval card without its file path.
+            if (!this.interrupted && this.access !== 'plan'
+                && item.name.startsWith('stashbase_') && Object.keys(item.input).length === 0) {
+              this.waitingToolPermissions.set(item.id, item);
+              continue;
+            }
+            await this.handlePermission(item);
+            continue;
+          }
+          send(this.ws, item);
+          if (item.t === 'tool') {
+            for (const permission of this.waitingToolPermissions.values()) {
+              if (permission.toolUseId !== item.id) continue;
+              this.waitingToolPermissions.delete(permission.id);
+              await this.handlePermission({ ...permission, input: item.input });
+            }
+          }
+        }
+        if (translated.some((item) => item.t === 'turn-end')) {
+          this.pendingPermissions.clear();
+          this.seenPermissions.clear();
+          this.waitingToolPermissions.clear();
+          this.runtime.endTurn();
+        }
       }
     } catch (error) {
       if (!this.abort.signal.aborted) this.fail(error, true);
@@ -335,11 +388,18 @@ export class OpenCodePanelSession {
     let event: AgentClientEvent;
     try { event = JSON.parse(raw.toString()) as AgentClientEvent; } catch { return; }
     if (event.t === 'close') { this.dispose(); return; }
-    if (event.t === 'set-mode') return;
+    if (event.t === 'set-mode') {
+      if (!this.turnInFlight() && (event.mode === 'default' || event.mode === 'acceptEdits' || event.mode === 'plan')) {
+        this.access = event.mode;
+      }
+      return;
+    }
     if (!this.client || !this.sessionId) return;
     try {
       switch (event.t) {
         case 'prompt':
+          if (this.turnInFlight()) return;
+          this.interrupted = false;
           this.runtime.beginTurn(randomUUID());
           for (const translated of this.translator.beginTurn()) send(this.ws, translated);
           if (event.titleHint) {
@@ -354,20 +414,22 @@ export class OpenCodePanelSession {
             path: { id: this.sessionId },
             body: {
               model: { providerID: 'stashbase', modelID: 'stashbase-agent-default' },
-              agent: 'stashbase-folder',
+              agent: this.access === 'plan' ? 'stashbase-plan' : this.access === 'acceptEdits' ? 'stashbase-edit' : 'stashbase-folder',
               parts: [{ type: 'text', text: event.text }],
             },
           });
           break;
         case 'interrupt':
+          this.interrupted = true;
+          this.pendingPermissions.clear();
+          this.waitingToolPermissions.clear();
           await this.client.session.abort({ ...DATA_REQUEST, path: { id: this.sessionId } });
+          for (const item of this.translator.endTurnAfterInterrupt()) send(this.ws, item);
+          this.runtime.endTurn();
           break;
         case 'permission-reply':
-          await this.client.postSessionIdPermissionsPermissionId({
-            ...DATA_REQUEST,
-            path: { id: this.sessionId, permissionID: event.id },
-            body: { response: event.allow ? (event.always ? 'always' : 'once') : 'reject' },
-          });
+          if (!this.pendingPermissions.delete(event.id)) return;
+          await this.replyPermission(event.id, event.allow);
           break;
         case 'refresh-skills':
           send(this.ws, { t: 'skills', skills: [], state: 'empty' });
@@ -381,7 +443,44 @@ export class OpenCodePanelSession {
     }
   }
 
+  private async handlePermission(item: Extract<AgentServerEvent, { t: 'permission' }>): Promise<void> {
+    if (this.seenPermissions.has(item.id)) return;
+    this.seenPermissions.add(item.id);
+    if (this.interrupted || !this.turnInFlight()) {
+      await this.replyPermission(item.id, false);
+      return;
+    }
+    if (this.access === 'plan' && ![
+      'Read', 'Glob', 'Grep', 'WebFetch', 'WebSearch', 'AskUserQuestion', 'external_directory',
+      'stashbase_read_file', 'stashbase_list_directory', 'stashbase_list_projects', 'stashbase_search_project',
+    ].includes(item.name)) {
+      await this.replyPermission(item.id, false);
+      return;
+    }
+    const projectEdit = item.name.startsWith('stashbase_') && isStashbaseWorkspaceEdit({
+      input: { server: 'stashbase', tool: item.name.slice('stashbase_'.length), arguments: item.input },
+    }, this.cwd);
+    if (this.access === 'acceptEdits' && projectEdit) {
+      await this.replyPermission(item.id, true);
+      return;
+    }
+    this.pendingPermissions.add(item.id);
+    send(this.ws, item);
+  }
+
+  private async replyPermission(id: string, allow: boolean): Promise<void> {
+    if (!this.client || !this.sessionId) return;
+    await this.client.postSessionIdPermissionsPermissionId({
+      ...DATA_REQUEST,
+      path: { id: this.sessionId, permissionID: id },
+      body: { response: allow ? 'once' : 'reject' },
+    });
+  }
+
   private fail(error: unknown, terminal: boolean): void {
+    this.pendingPermissions.clear();
+    this.seenPermissions.clear();
+    this.waitingToolPermissions.clear();
     const message = errorMessage(error);
     send(this.ws, agentTurnErrorEvent(message));
     this.runtime.endTurn();

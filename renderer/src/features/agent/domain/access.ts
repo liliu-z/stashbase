@@ -16,7 +16,8 @@ export const AGENT_ACCESS_MODES: readonly AgentAccessMode[] = [
 ];
 
 /** Where a session settles when its runtime cannot honor the mode it is in:
- *  Auto when the runtime offers it, else Ask, else whatever comes first. A
+ *  Auto when the runtime offers it, else Edit, else Ask, else whatever comes
+ *  first, so a new chat starts as hands-off as the runtime can keep. A
  *  runtime that honors nothing takes no mode at all, so the current one is
  *  left alone rather than replaced with a promise nobody keeps. */
 export function honoredAccessMode(
@@ -24,6 +25,8 @@ export function honoredAccessMode(
   current: AgentAccessMode,
 ): AgentAccessMode {
   if (honored.length === 0 || honored.includes(current)) return current;
-  const preferred = (['auto', 'default'] as const).find((mode) => honored.includes(mode));
+  const preferred = (['auto', 'acceptEdits', 'default'] as const).find((mode) =>
+    honored.includes(mode),
+  );
   return preferred ?? honored[0] ?? current;
 }

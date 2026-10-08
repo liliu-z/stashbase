@@ -86,6 +86,9 @@ export interface AgentSessionState {
   delivery: 'idle' | 'preparing' | 'stopping' | 'stopped' | 'completed' | 'failed' | 'unknown';
   queuePaused: boolean;
   accessMode: AgentAccessMode;
+  /** The mode each other Agent was left in, so switching Agents never carries
+   *  one Agent's mode to another and switching back restores it. */
+  accessModes: Partial<Record<AgentId, AgentAccessMode>>;
   draft: string;
   /** Bound context for the draft: mentioned sources and transient uploads. */
   context: AgentContextItem[];
@@ -131,6 +134,7 @@ export function createAgentSessionState(options: {
     delivery: 'idle',
     queuePaused: false,
     accessMode: 'auto',
+    accessModes: {},
     connection: { kind: 'draft' },
     draft: '',
     context: [],

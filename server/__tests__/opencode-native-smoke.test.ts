@@ -5,17 +5,49 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { createRequire } from 'node:module';
+import { EventEmitter } from 'node:events';
+import type { WebSocket } from 'ws';
 import { createOpencodeClient, type Event as LegacyEvent } from '@opencode-ai/sdk';
 import type { EventPermissionAsked } from '@opencode-ai/sdk/v2/types';
-import { OpenCodeEventTranslator } from '../opencode-agent.ts';
+import { OpenCodeEventTranslator, OpenCodePanelSession } from '../opencode-agent.ts';
 import { ensureMcpLauncher } from '../agent-mcp.ts';
 import {
   BUNDLED_OPENCODE_VERSION,
   buildOpenCodeConfig,
   bundledOpenCodeExecutable,
+  safeOpenCodeInheritedEnvironment,
 } from '../opencode-runtime.ts';
 
 type Event = LegacyEvent | EventPermissionAsked;
+
+class PanelSocket extends EventEmitter {
+  OPEN = 1;
+  readyState = 1;
+  events: Array<{ t: string; id?: string }> = [];
+  send(value: string): void {
+    const event = JSON.parse(value);
+    this.events.push(event);
+    this.emit('server-event', event);
+  }
+  close(): void { this.readyState = 3; this.emit('close'); }
+  waitFor(type: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const listener = (event: { t: string; message?: string }) => {
+        if (event.t === 'error' || event.t === 'exit') {
+          this.off('server-event', listener);
+          reject(new Error(event.message ?? 'Panel exited'));
+          return;
+        }
+        if (event.t !== type) return;
+        this.off('server-event', listener);
+        resolve();
+      };
+      this.on('server-event', listener);
+    });
+  }
+  request(event: unknown): void { this.emit('message', Buffer.from(JSON.stringify(event))); }
+}
 
 async function listen(server: http.Server): Promise<number> {
   await new Promise<void>((resolve, reject) => {
@@ -64,21 +96,27 @@ test('pinned bundled OpenCode completes one SDK session against a fake compatibl
   fs.writeFileSync(externalFile, 'EXPLICIT_EXTERNAL_READ_OK');
   t.after(() => fs.rmSync(outside, { recursive: true, force: true }));
   const gatewayRequests: Array<Record<string, unknown>> = [];
+  let nextTool: { name: string; arguments: string } | undefined;
   const gateway = http.createServer(async (request, response) => {
     const chunks: Buffer[] = [];
     for await (const chunk of request) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
     gatewayRequests.push(JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<string, unknown>);
+    const tool = nextTool ?? (gatewayRequests.length === 1
+      ? { name: 'read', arguments: JSON.stringify({ filePath: externalFile }) }
+      : gatewayRequests.length === 3
+        ? { name: 'bash', arguments: JSON.stringify({ command: 'node -p process.versions.node', description: 'Check installed Node' }) }
+        : undefined);
+    nextTool = undefined;
     response.writeHead(200, { 'content-type': 'text/event-stream' });
     const base = { id: 'chatcmpl-stashbase-smoke', object: 'chat.completion.chunk', created: 1, model: 'stashbase-agent-default' };
     response.write(`data: ${JSON.stringify({
       ...base,
       choices: [{
         index: 0,
-        delta: gatewayRequests.length === 1 ? {
+        delta: tool ? {
           role: 'assistant',
           tool_calls: [{
-            index: 0, id: 'external-read', type: 'function',
-            function: { name: 'read', arguments: JSON.stringify({ filePath: externalFile }) },
+            index: 0, id: `smoke-tool-${gatewayRequests.length}`, type: 'function', function: tool,
           }],
         } : { role: 'assistant', content: 'probe ok' },
         finish_reason: null,
@@ -86,7 +124,7 @@ test('pinned bundled OpenCode completes one SDK session against a fake compatibl
     })}\n\n`);
     response.write(`data: ${JSON.stringify({
       ...base,
-      choices: [{ index: 0, delta: {}, finish_reason: gatewayRequests.length === 1 ? 'tool_calls' : 'stop' }],
+      choices: [{ index: 0, delta: {}, finish_reason: tool ? 'tool_calls' : 'stop' }],
       usage: { prompt_tokens: 1, completion_tokens: 2, total_tokens: 3 },
     })}\n\n`);
     response.end('data: [DONE]\n\n');
@@ -117,7 +155,10 @@ test('pinned bundled OpenCode completes one SDK session against a fake compatibl
     'serve', '--hostname=127.0.0.1', `--port=${serverPort}`, '--pure', '--log-level=WARN',
   ], {
     env: {
-      ...process.env,
+      ...safeOpenCodeInheritedEnvironment({
+        ...process.env,
+        ...(process.platform === 'darwin' ? { PATH: '/usr/bin:/bin:/usr/sbin:/sbin', SHELL: '/bin/zsh' } : {}),
+      }),
       HOME: temporaryRoot,
       USERPROFILE: temporaryRoot,
       OPENCODE_CONFIG_CONTENT: JSON.stringify(config),
@@ -178,12 +219,16 @@ test('pinned bundled OpenCode completes one SDK session against a fake compatibl
   }>;
   const actionFor = (agent: string, permission: string) => agents
     .find((candidate) => candidate.name === agent)
-    ?.permission.filter((rule) => rule.permission === permission && rule.pattern === '*').at(-1)?.action;
+    ?.permission.filter((rule) => (rule.permission === permission || rule.permission === '*') && rule.pattern === '*').at(-1)?.action;
   assert.equal(actionFor('stashbase-folder', 'bash'), 'ask');
   assert.equal(actionFor('stashbase-folder', 'edit'), 'deny');
   assert.equal(actionFor('stashbase-folder', 'stashbase_edit_file'), 'ask');
   assert.equal(actionFor('stashbase-folder', 'stashbase_write_file'), 'ask');
   assert.equal(actionFor('stashbase-folder', 'external_directory'), 'ask');
+  for (const permission of ['bash', 'edit', 'task', 'stashbase_edit_file', 'stashbase_write_file', 'stashbase_delete_file', 'stashbase_create_project']) {
+    assert.equal(actionFor('stashbase-plan', permission), 'deny', `Plan allowed ${permission}`);
+  }
+  assert.equal(actionFor('stashbase-plan', 'stashbase_read_file'), 'allow');
   const subscription = await client.event.subscribe({ sseMaxRetryAttempts: 1 });
   const events: Event[] = [];
   const translator = new OpenCodeEventTranslator();
@@ -223,6 +268,100 @@ test('pinned bundled OpenCode completes one SDK session against a fake compatibl
   )), 'the fake gateway response did not reach the OpenCode event stream');
   assert.ok(events.some((event) => event.type === 'session.diff'));
   assert.ok(events.some((event) => event.type === 'session.idle'));
+
+  const commandSubscription = await client.event.subscribe({ sseMaxRetryAttempts: 1 });
+  const commandEvents: Event[] = [];
+  const commandConsumed = (async () => {
+    for await (const event of commandSubscription.stream) {
+      commandEvents.push(event);
+      for (const translated of translator.translate(event)) {
+        if (translated.t !== 'permission') continue;
+        assert.equal(translated.name, 'Bash');
+        await client.postSessionIdPermissionsPermissionId({
+          throwOnError: true,
+          path: { id: session.id, permissionID: translated.id },
+          body: { response: 'once' },
+        });
+      }
+      if (event.type === 'session.idle') return;
+    }
+  })();
+  await client.session.promptAsync({
+    throwOnError: true, path: { id: session.id },
+    body: { agent: 'stashbase-folder', parts: [{ type: 'text', text: 'Check the installed Node version.' }] },
+  });
+  await commandConsumed;
+  assert.ok(commandEvents.some(event => event.type === 'permission.asked'), 'Ask must still request command approval');
+  const commandResult = commandEvents.find(event => event.type === 'message.part.updated'
+    && event.properties.part.type === 'tool' && event.properties.part.tool === 'bash'
+    && event.properties.part.state.status === 'completed');
+  assert.ok(commandResult && commandResult.type === 'message.part.updated' && commandResult.properties.part.type === 'tool');
+  const commandState = commandResult.properties.part.state;
+  assert.equal(commandState.status, 'completed');
+  if (commandState.status === 'completed') {
+    assert.match(commandState.output, /\d+\.\d+\.\d+/);
+    assert.ok(!commandState.output.includes('command not found'), commandState.output);
+    assert.equal(commandState.metadata?.exit, 0);
+  }
+
+  // Use the real MCP permission protocol with an isolated file writer, so the
+  // panel's Edit decision is exercised without relying on a running app host.
+  const require = createRequire(import.meta.url);
+  const fixture = path.join(temporaryRoot, 'fixture-mcp.mjs');
+  fs.writeFileSync(fixture, `
+    import fs from 'node:fs';
+    import { Server } from ${JSON.stringify(require.resolve('@modelcontextprotocol/sdk/server/index.js'))};
+    import { StdioServerTransport } from ${JSON.stringify(require.resolve('@modelcontextprotocol/sdk/server/stdio.js'))};
+    import { ListToolsRequestSchema, CallToolRequestSchema } from ${JSON.stringify(require.resolve('@modelcontextprotocol/sdk/types.js'))};
+    const server = new Server({ name: 'fixture', version: '1' }, { capabilities: { tools: {} } });
+    server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [{
+      name: 'write_file', description: 'Write a fixture file',
+      inputSchema: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' } }, required: ['path', 'content'] },
+    }] }));
+    server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
+      fs.writeFileSync(params.arguments.path, params.arguments.content);
+      return { content: [{ type: 'text', text: 'fixture written' }] };
+    });
+    await server.connect(new StdioServerTransport());
+  `);
+  await client.mcp.add({ throwOnError: true, body: {
+    name: 'stashbase', config: { type: 'local', command: [process.execPath, fixture], enabled: true },
+  } });
+  const socket = new PanelSocket();
+  const panel = new OpenCodePanelSession(socket as unknown as WebSocket, {
+    windowId: 'native-modes', folder: fs.realpathSync(temporaryRoot), access: 'acceptEdits',
+  }, {
+    client: async () => client, beginTurn: () => {}, endTurn: () => {},
+    onExit: () => () => {}, close: async () => {},
+  });
+  t.after(() => panel.dispose());
+  await socket.waitFor('ready');
+  const modeFile = path.join(temporaryRoot, 'mode-result.md');
+  const runPanelTurn = async () => {
+    const ended = socket.waitFor('turn-end');
+    socket.request({ t: 'prompt', text: 'Run the fixture probe.' });
+    await ended;
+  };
+  nextTool = { name: 'stashbase_write_file', arguments: JSON.stringify({ path: modeFile, content: 'Edit allowed' }) };
+  await runPanelTurn();
+  assert.equal(fs.readFileSync(modeFile, 'utf8'), 'Edit allowed');
+  assert.equal(socket.events.filter(event => event.t === 'permission').length, 0, 'Edit should approve its scoped write automatically');
+  socket.request({ t: 'set-mode', mode: 'plan' });
+  nextTool = { name: 'stashbase_write_file', arguments: JSON.stringify({ path: modeFile, content: 'Plan must not overwrite' }) };
+  await runPanelTurn();
+  assert.equal(fs.readFileSync(modeFile, 'utf8'), 'Edit allowed', 'Plan must reject a provider that attempts a write');
+  nextTool = { name: 'bash', arguments: JSON.stringify({ command: `echo changed > '${modeFile}'`, description: 'Attempt a command in Plan' }) };
+  await runPanelTurn();
+  assert.equal(fs.readFileSync(modeFile, 'utf8'), 'Edit allowed', 'Plan must reject shell writes');
+  socket.request({ t: 'set-mode', mode: 'default' });
+  socket.on('server-event', (event: { t: string; id?: string }) => {
+    if (event.t === 'permission') socket.request({ t: 'permission-reply', id: event.id, allow: true });
+  });
+  nextTool = { name: 'stashbase_write_file', arguments: JSON.stringify({ path: modeFile, content: 'Ask approved' }) };
+  await runPanelTurn();
+  assert.equal(fs.readFileSync(modeFile, 'utf8'), 'Ask approved', 'switching out of Plan must restore approved writes');
+  assert.equal(socket.events.filter(event => event.t === 'permission').length, 1);
+  panel.dispose();
 
   const toolNames = (request: Record<string, unknown>) => (
     Array.isArray(request.tools)

@@ -355,8 +355,17 @@ stable status without download, retry, or a new durable demand latch.
   Markdown changes regardless of the writing tool. External MCP clients have no
   app-owned turn socket and do not receive Chat turn-review cards.
 - Codex modes use on-request approval with mode-specific sandbox/review policy;
-  Claude maps native modes; OpenQuill always asks. Unbound OpenQuill disables
-  native filesystem/command tools; bound native tools cannot escape their cwd.
+  Claude maps native modes. Default maps Ask/Edit/Plan to OpenCode profiles;
+  Edit shares `agent-file-permissions.ts` with the other adapters, granting only
+  ordinary StashBase document writes inside the bound project (including
+  realpath checks). Plan denies unlisted tools in the native profile and rejects
+  unexpected mutating permission requests. Default offers no Auto reviewer.
+  Approval replies grant once, require a pending request id, and never persist
+  an `always` grant across modes. Options stay frozen while a turn runs.
+  The bundled runtime filters inherited credentials and injection flags while
+  using `agentCliPath` to restore CLI directories omitted by desktop launchers.
+  Its private home does not provide the user's interactive shell setup;
+  commands still require their dependencies to be installed and discoverable.
 - Turn failure settles once without destroying a live session. Advisory notices
   never become terminal errors. Recover by structured kind: authentication needs
   process/session refresh, credits/restrictions need account recovery, transient
