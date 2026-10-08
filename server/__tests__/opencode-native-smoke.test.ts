@@ -13,6 +13,7 @@ import { createOpencodeClient, type Event as LegacyEvent } from '@opencode-ai/sd
 import type { EventPermissionAsked } from '@opencode-ai/sdk/v2/types';
 import { OpenCodeEventTranslator, OpenCodePanelSession } from '../opencode-agent.ts';
 import { ensureMcpLauncher } from '../agent-mcp.ts';
+import { filesystemPath } from '../filesystem-path.ts';
 import {
   BUNDLED_OPENCODE_VERSION,
   buildOpenCodeConfig,
@@ -93,7 +94,7 @@ test('pinned bundled OpenCode completes one SDK session against a fake compatibl
 
   // Windows TEMP can use an 8.3 alias; the SDK and panel must bind the same
   // canonical directory rather than canonicalizing only the panel's scope.
-  const temporaryRoot = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-opencode-native-')));
+  const temporaryRoot = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-opencode-native-')));
   const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-outside-probe-'));
   const externalFile = path.join(outside, 'reference.txt');
   fs.writeFileSync(externalFile, 'EXPLICIT_EXTERNAL_READ_OK');
@@ -236,6 +237,8 @@ test('pinned bundled OpenCode completes one SDK session against a fake compatibl
   const events: Event[] = [];
   const translator = new OpenCodeEventTranslator();
   const session = (await client.session.create({ throwOnError: true, body: { title: 'Native Smoke' } })).data;
+  assert.ok(filesystemPath.equal(session.directory, temporaryRoot),
+    `SDK session scope ${JSON.stringify(session.directory)} differs from fixture ${JSON.stringify(temporaryRoot)}`);
   translator.bindSession(session.id);
   const consumed = (async () => {
     for await (const event of subscription.stream) {
