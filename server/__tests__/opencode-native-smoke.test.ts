@@ -7,6 +7,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { createRequire } from 'node:module';
 import { EventEmitter } from 'node:events';
+import { pathToFileURL } from 'node:url';
 import type { WebSocket } from 'ws';
 import { createOpencodeClient, type Event as LegacyEvent } from '@opencode-ai/sdk';
 import type { EventPermissionAsked } from '@opencode-ai/sdk/v2/types';
@@ -90,7 +91,9 @@ test('pinned bundled OpenCode completes one SDK session against a fake compatibl
   assert.ok(executable, 'bundled OpenCode postinstall target is missing');
   assert.equal(execFileSync(executable, ['--version'], { encoding: 'utf8' }).trim(), BUNDLED_OPENCODE_VERSION);
 
-  const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-opencode-native-'));
+  // Windows TEMP can use an 8.3 alias; the SDK and panel must bind the same
+  // canonical directory rather than canonicalizing only the panel's scope.
+  const temporaryRoot = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-opencode-native-')));
   const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-outside-probe-'));
   const externalFile = path.join(outside, 'reference.txt');
   fs.writeFileSync(externalFile, 'EXPLICIT_EXTERNAL_READ_OK');
@@ -307,12 +310,13 @@ test('pinned bundled OpenCode completes one SDK session against a fake compatibl
   // Use the real MCP permission protocol with an isolated file writer, so the
   // panel's Edit decision is exercised without relying on a running app host.
   const require = createRequire(import.meta.url);
+  const moduleUrl = (name: string) => pathToFileURL(require.resolve(name)).href;
   const fixture = path.join(temporaryRoot, 'fixture-mcp.mjs');
   fs.writeFileSync(fixture, `
     import fs from 'node:fs';
-    import { Server } from ${JSON.stringify(require.resolve('@modelcontextprotocol/sdk/server/index.js'))};
-    import { StdioServerTransport } from ${JSON.stringify(require.resolve('@modelcontextprotocol/sdk/server/stdio.js'))};
-    import { ListToolsRequestSchema, CallToolRequestSchema } from ${JSON.stringify(require.resolve('@modelcontextprotocol/sdk/types.js'))};
+    import { Server } from ${JSON.stringify(moduleUrl('@modelcontextprotocol/sdk/server/index.js'))};
+    import { StdioServerTransport } from ${JSON.stringify(moduleUrl('@modelcontextprotocol/sdk/server/stdio.js'))};
+    import { ListToolsRequestSchema, CallToolRequestSchema } from ${JSON.stringify(moduleUrl('@modelcontextprotocol/sdk/types.js'))};
     const server = new Server({ name: 'fixture', version: '1' }, { capabilities: { tools: {} } });
     server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [{
       name: 'write_file', description: 'Write a fixture file',
@@ -329,7 +333,7 @@ test('pinned bundled OpenCode completes one SDK session against a fake compatibl
   } });
   const socket = new PanelSocket();
   const panel = new OpenCodePanelSession(socket as unknown as WebSocket, {
-    windowId: 'native-modes', folder: fs.realpathSync(temporaryRoot), access: 'acceptEdits',
+    windowId: 'native-modes', folder: temporaryRoot, access: 'acceptEdits',
   }, {
     client: async () => client, beginTurn: () => {}, endTurn: () => {},
     onExit: () => () => {}, close: async () => {},
