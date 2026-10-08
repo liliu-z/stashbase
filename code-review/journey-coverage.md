@@ -623,6 +623,8 @@ arguments, duplicate approvals/idle, and interruption. The driven native smoke
 uses the pinned executable, a fake model gateway, and an isolated MCP writer:
 approved Node exits zero under a desktop PATH; Edit writes automatically, Plan
 rejects MCP and shell writes, and Ask confirms writes after switching back.
+Its fixture shares one canonical temporary directory between the SDK and Chat
+binding, and uses file URLs for generated ESM imports on Windows.
 This establishes adapter/native protocol behavior, not live-model judgment,
 the owner's X script, or a released desktop build.
 
