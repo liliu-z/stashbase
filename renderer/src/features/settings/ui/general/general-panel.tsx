@@ -50,7 +50,7 @@ export function GeneralPanel({
         >
           <SettingsList>
             <SettingsRow
-              detail="Get notified when a new version is available."
+              detail="Check every 15 minutes and when returning to the app. You choose when to install."
               title="Check for updates automatically"
               trail={
                 <Switch

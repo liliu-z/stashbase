@@ -127,6 +127,13 @@ fixture text nor its path. The complete renderer gate, host boundary suites,
 types, services build and real Electron smoke passed. This local sink establishes
 desktop wiring, not provider ingestion or signed-package identity merging.
 
+**Resident update checks:** `electron/update-manager.cjs` owns startup, 15-minute
+checks and a shared five-minute foreground/wake throttle. `electron/main.cjs`
+binds native focus and power-resume events. Manager tests cover discovering a
+release without restarting, concurrent windows, in-flight announcements, opt-out,
+manual override, disposal and explicit-only downloads. Real N→N+1 package updates
+remain the release checklist's platform-specific evidence.
+
 A later 2026-09-15 source-desktop startup pass used an empty temporary HOME and
 isolated profile, with any application access to Electron safeStorage made fatal.
 It reached the real welcome screen, showed no statistics banner, and exited

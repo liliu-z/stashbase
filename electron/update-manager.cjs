@@ -1,6 +1,6 @@
 const DEFAULT_RELEASE_URL = 'https://github.com/liliu-z/stashbase/releases/latest';
 const DEFAULT_STARTUP_DELAY_MS = 30_000;
-const DEFAULT_CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000;
+const DEFAULT_CHECK_INTERVAL_MS = 15 * 60 * 1000;
 const UPDATE_SIMULATIONS = new Set(['off', 'available', 'downloading', 'ready', 'installing', 'error']);
 
 function nextPatchVersion(version) {
@@ -34,6 +34,8 @@ function createUpdateManager(options) {
     startupDelayMs = DEFAULT_STARTUP_DELAY_MS,
     checkIntervalMs = DEFAULT_CHECK_INTERVAL_MS,
     debugEnabled = false,
+    now = Date.now,
+    activityIntervalMs = 5 * 60 * 1000,
   } = options;
 
   let state = {
@@ -45,6 +47,9 @@ function createUpdateManager(options) {
   let timer = null;
   let disposed = false;
   let started = false;
+  let startPromise = null;
+  let checking = null;
+  let lastCheckAt = null;
   let updateSimulation = 'off';
   let installAttempt = null;
 
@@ -158,8 +163,9 @@ function createUpdateManager(options) {
     }
   }
 
-  async function start() {
-    if (started || disposed) return snapshot();
+  function start() {
+    if (startPromise) return startPromise;
+    if (disposed) return Promise.resolve(snapshot());
     started = true;
     updater.autoDownload = false;
     updater.autoInstallOnAppQuit = false;
@@ -167,10 +173,14 @@ function createUpdateManager(options) {
     updater.allowDowngrade = false;
     updater.disableWebInstaller = true;
     for (const [name, listener] of listeners) updater.on(name, listener);
-    const autoCheckEnabled = await readPreference();
-    publish({ autoCheckEnabled });
-    if (autoCheckEnabled) scheduleCheck(startupDelayMs);
-    return snapshot();
+    startPromise = (async () => {
+      const autoCheckEnabled = await readPreference();
+      if (disposed) return snapshot();
+      publish({ autoCheckEnabled });
+      if (autoCheckEnabled) scheduleCheck(startupDelayMs);
+      return snapshot();
+    })();
+    return startPromise;
   }
 
   async function refreshPreference({ checkIfEnabled = true } = {}) {
@@ -189,28 +199,42 @@ function createUpdateManager(options) {
   }
 
   async function check({ manual = true } = {}) {
-    if (!started) await start();
-    cancelScheduledCheck();
+    await start();
+    if (disposed) return snapshot();
+    if (checking) return checking;
     if (!isPackaged) {
-      publish({
-        phase: 'unsupported',
-        message: 'Update checks are available in packaged builds.',
-      });
-      return snapshot();
+      return publish({ phase: 'unsupported', message: 'Update checks are available in packaged builds.' });
     }
-    if (state.phase === 'checking' || state.phase === 'downloading' || state.phase === 'ready' || state.phase === 'installing') {
+    if (['checking', 'downloading', 'ready', 'installing'].includes(state.phase)) {
+      if (timer === null) scheduleCheck(checkIntervalMs);
       return snapshot();
     }
     if (!manual && !state.autoCheckEnabled) return snapshot();
+    cancelScheduledCheck();
+    lastCheckAt = now();
     publish({ phase: 'checking', message: undefined });
-    try {
-      await updater.checkForUpdates();
-    } catch (error) {
-      onError(error);
-    } finally {
-      if (state.autoCheckEnabled) scheduleCheck(checkIntervalMs);
-    }
-    return snapshot();
+    const work = Promise.resolve().then(async () => {
+      try {
+        await updater.checkForUpdates();
+      } catch (error) {
+        onError(error);
+      } finally {
+        if (checking === work) checking = null;
+        if (state.autoCheckEnabled) scheduleCheck(checkIntervalMs);
+      }
+      return snapshot();
+    });
+    checking = work;
+    return checking;
+  }
+
+  async function checkOnActivity() {
+    // Focus and resume share one throttle across all windows. They neither
+    // postpone the periodic timer when throttled nor override the saved choice.
+    if (!started || disposed) return snapshot();
+    await start();
+    if (lastCheckAt !== null && now() >= lastCheckAt && now() - lastCheckAt < activityIntervalMs) return snapshot();
+    return check({ manual: false });
   }
 
   async function installReadyUpdate() {
@@ -237,7 +261,9 @@ function createUpdateManager(options) {
   }
 
   async function primaryAction() {
-    if (!started) await start();
+    await start();
+    if (checking) await checking;
+    if (disposed) return snapshot();
     if (state.phase === 'ready') return installReadyUpdate();
     if (!state.availableVersion) return snapshot();
     if (state.phase === 'downloading' || state.phase === 'installing') return snapshot();
@@ -277,6 +303,7 @@ function createUpdateManager(options) {
   return {
     start,
     check,
+    checkOnActivity,
     refreshPreference,
     primaryAction,
     openDownloadPage,

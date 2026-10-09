@@ -104,7 +104,10 @@ simulators use a separate development-only entry. Neither belongs in normal Sett
 
 ## Other Settings Decisions
 
-- Update installation is explicit and waits for affected document saves. Failure
+- Automatic update checks run throughout an open application, every 15 minutes
+  and on foreground return or system wake, with a shared five-minute activity
+  throttle. Disabling automatic checks still permits a manual check at any time.
+  Update installation is explicit and waits for affected document saves. Failure
   leaves the current application and downloaded update recoverable. Development
   notification previews have no authority to invoke the updater.
 - Official desktop builds disclose default-on usage statistics and redacted error

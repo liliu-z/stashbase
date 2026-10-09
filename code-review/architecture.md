@@ -647,6 +647,11 @@ identity and a dead parent before killing. Foreign/live-parented listeners remai
   interaction and new-window creation throughout save/install preparation so
   later edits cannot invalidate approval. Failure restores prior enabled state,
   revokes exactly its approvals, and leaves the download retryable.
+- One main-process update manager owns startup and recurring checks plus a
+  shared foreground/wake throttle. In-flight requests are shared across windows;
+  throttled focus does not postpone periodic checks. Manual checks bypass the
+  automatic preference, while timers/focus/wake honor it. Disposal prevents new
+  requests and retires the timer.
 - Renderer requests never choose feed, path, or phase. Automatic checks do not
   authorize downloads/install. Production exposes no development simulator.
   Update offers render in the sidebar footer. The separate development tools

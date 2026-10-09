@@ -9,7 +9,7 @@
  * bundled, typed preload bridge.
  */
 
-const { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, net, protocol, session, shell } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, net, powerMonitor, protocol, session, shell } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const { spawn } = require('node:child_process');
 const crypto = require('node:crypto');
@@ -1119,6 +1119,8 @@ if (!hasSingleInstanceLock) {
     installApplicationMenu();
     await initialWindowFlight.run();
     await desktopUpdates.start();
+    app.on('browser-window-focus', () => { void desktopUpdates.checkOnActivity(); });
+    powerMonitor.on('resume', () => { void desktopUpdates.checkOnActivity(); });
     if (initialProtocolLaunch === 'oauth-return') focusOAuthReturn();
   });
 

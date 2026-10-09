@@ -194,6 +194,7 @@ test('an updater error during pending saves cancels installation without hiding 
   await manager.start();
   updater.emit('update-downloaded', { version: '2.1.0' });
   const pending = manager.primaryAction();
+  await new Promise((resolve) => setImmediate(resolve));
   updater.emit('error', new Error('native preparation failed'));
   release(true);
   await pending;
@@ -211,9 +212,11 @@ test('a late save completion cannot install or overwrite a retry after an update
   await manager.start();
   updater.emit('update-downloaded', { version: '2.1.0' });
   const first = manager.primaryAction();
+  await new Promise((resolve) => setImmediate(resolve));
   updater.emit('error', new Error('native preparation failed'));
   updater.emit('update-downloaded', { version: '2.1.0' });
   const retry = manager.primaryAction();
+  await new Promise((resolve) => setImmediate(resolve));
   replies[0](false);
   await first;
   assert.equal(manager.getState().phase, 'installing');
@@ -221,4 +224,93 @@ test('a late save completion cannot install or overwrite a retry after an update
   replies[1](true);
   await retry;
   assert.equal(updater.installs, 1);
+});
+
+test('a resident application discovers releases periodically without a restart', async () => {
+  const { manager, updater, scheduled } = harness();
+  updater.checkForUpdates = async () => {
+    updater.checks++;
+    updater.emit(updater.checks === 1 ? 'update-not-available' : 'update-available', { version: '2.1.0' });
+  };
+  await manager.start();
+  scheduled.shift().fn();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(manager.getState().phase, 'current');
+  assert.equal(scheduled[0].delay, 15 * 60_000);
+  scheduled.shift().fn();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(manager.getState().phase, 'available');
+  assert.equal(updater.downloads, 0);
+  manager.dispose();
+});
+
+test('focus and wake share a throttle, while manual checks bypass it and automatic opt-out wins', async () => {
+  let time = 1000;
+  let enabled = true;
+  const { manager, updater } = harness({ now: () => time, readAutoCheck: async () => enabled });
+  updater.checkForUpdates = async () => { updater.checks++; updater.emit('update-not-available'); };
+  await manager.start();
+  await Promise.all([manager.checkOnActivity(), manager.checkOnActivity()]);
+  assert.equal(updater.checks, 1);
+  time += 4 * 60_000;
+  await manager.checkOnActivity();
+  assert.equal(updater.checks, 1);
+  await manager.check();
+  assert.equal(updater.checks, 2);
+  time += 5 * 60_000;
+  await manager.checkOnActivity();
+  assert.equal(updater.checks, 3);
+  enabled = false;
+  await manager.refreshPreference();
+  time += 60 * 60_000;
+  await manager.checkOnActivity();
+  assert.equal(updater.checks, 3);
+  await manager.check();
+  assert.equal(updater.checks, 4);
+  manager.dispose();
+  time += 60 * 60_000;
+  await manager.checkOnActivity();
+  assert.equal(updater.checks, 4);
+});
+
+test('focus cannot restart a check after availability was announced but the request is unfinished', async () => {
+  let finish;
+  let time = 0;
+  const { manager, updater } = harness({ now: () => time });
+  updater.checkForUpdates = async () => {
+    updater.checks++;
+    updater.emit('update-available', { version: '2.1.0' });
+    await new Promise((resolve) => { finish = resolve; });
+  };
+  await manager.start();
+  const first = manager.check();
+  await new Promise((resolve) => setImmediate(resolve));
+  time += 10 * 60_000;
+  const second = manager.checkOnActivity();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(updater.checks, 1);
+  finish();
+  await Promise.all([first, second]);
+  manager.dispose();
+});
+
+test('an explicit Update click waits for a foreground check before deciding what to download', async () => {
+  let finish;
+  const { manager, updater } = harness();
+  updater.checkForUpdates = async () => {
+    updater.checks++;
+    await new Promise((resolve) => { finish = resolve; });
+    updater.emit('update-not-available');
+  };
+  await manager.start();
+  updater.emit('update-available', { version: '2.1.0' });
+  const check = manager.checkOnActivity();
+  await new Promise((resolve) => setImmediate(resolve));
+  const action = manager.primaryAction();
+  assert.equal(updater.downloads, 0);
+  finish();
+  await Promise.all([check, action]);
+  assert.equal(updater.downloads, 0);
+  assert.equal(manager.getState().phase, 'current');
+  manager.dispose();
 });
