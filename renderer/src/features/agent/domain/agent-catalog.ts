@@ -45,9 +45,9 @@ export interface Agent {
   /** Whether the one thing between it and ready is the user signing in. */
   readonly needsSignIn: boolean;
   readonly preparing?: boolean;
-  /** Whether the installed runtime exposes an in-place updater. */
+  /** Whether the host can update this runtime. */
   readonly updatable?: boolean;
-  readonly setupFailure?: string;
+  readonly setupFailure?: AgentSetupFailure;
   readonly abilities: AgentAbilities;
   /** The catalog the service remembers for this runtime, so a fresh chat can
    *  name the model and level it will run on before a session exists. Empty
@@ -57,6 +57,12 @@ export interface Agent {
    *  conversation reads it to offer the update once; absence is the normal
    *  state and says nothing. */
   readonly upgrade?: AgentUpgradeOffer;
+}
+
+/** The step that stopped preparation and the service's explanation. */
+export interface AgentSetupFailure {
+  readonly stage: 'discovery' | 'installation' | 'authentication' | 'mcp';
+  readonly message: string;
 }
 
 /** A model an installed runtime cannot run yet, named by that runtime. */

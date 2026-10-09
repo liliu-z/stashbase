@@ -63,7 +63,7 @@ it('keeps a refused update on the turn and leaves the conversation where it was'
   const stuck = {
     ...CLAUDE_AGENT,
     ready: false,
-    setupFailure: 'npm global folder is not writable',
+    setupFailure: { stage: 'installation' as const, message: 'npm global folder is not writable' },
   };
   const catalog = agentCatalogPort([stuck], {
     prepareAgent: vi.fn(async () => ({ agents: [stuck] })),

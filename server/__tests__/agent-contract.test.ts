@@ -108,7 +108,7 @@ test('capability discovery reports installed and unavailable native runtimes wit
     assert.equal(available.source, 'system');
     assert.equal(available.bootstrap.phase, 'idle');
     assert.equal(available.version, null, 'an executable that cannot report a version is still discovered');
-    assert.equal(available.updatable, true, 'both native runtimes ship a verified in-place updater');
+    assert.equal(available.updatable, true, 'both native runtimes support the official native installer');
     const unavailable = runtimeDescriptorFor(adapter, null);
     assert.equal(unavailable.state, 'unavailable');
     assert.equal(unavailable.source, null);
@@ -118,9 +118,9 @@ test('capability discovery reports installed and unavailable native runtimes wit
 
 });
 
-test('capability discovery publishes the registered adapter catalog', () => {
+test('capability discovery publishes the registered adapter catalog', async () => {
   for (const adapter of BUILT_IN_AGENT_ADAPTERS) registerAgentAdapter(adapter);
-  const discovered = discoverAgentRuntimes();
+  const discovered = await discoverAgentRuntimes();
   assert.deepEqual(discovered.map((runtime) => runtime.id), ['codex', 'claude', 'stashbase']);
   for (const runtime of discovered) {
     const adapter = BUILT_IN_AGENT_ADAPTERS.find((candidate) => candidate.id === runtime.id)!;

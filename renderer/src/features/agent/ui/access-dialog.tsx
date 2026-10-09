@@ -73,7 +73,11 @@ export function AgentAccessDialog({
         if (!next) onCancel();
       }}
     >
-      <DialogContent initialFocus="panel">
+      <DialogContent
+        initialFocus="panel"
+        width={failure ? 'wide' : 'narrow'}
+        className="max-h-[calc(100dvh-2rem)] overflow-y-auto"
+      >
         <DialogHeader>
           <DialogTitle>{copy.title}</DialogTitle>
           <DialogDescription>{copy.description}</DialogDescription>
@@ -84,7 +88,7 @@ export function AgentAccessDialog({
           </p>
         )}
         {failure && (
-          <FailureLine className="mt-1" tone="capability">
+          <FailureLine className="mt-1 wrap-anywhere whitespace-pre-wrap" tone="capability">
             {failure}
           </FailureLine>
         )}

@@ -51,6 +51,12 @@ The prompt is about the selected Agent. On explicit confirmation, keep the reque
 while access is prepared. Readiness may continue only this same submission once.
 Changing the request, project, conversation, or Agent, or cancelling the prompt,
 retires that continuation. Standalone Settings setup never sends a draft.
+If preparation fails, the same prompt shows the failed step and the service's
+specific explanation, including any supplied error code or file location. Keep
+the diagnostic visible as wrapping plain text alongside draft retention and
+retry guidance; users do not need to visit Settings to explain the failure.
+Both Claude and Codex continue from installation into their provider's browser
+sign-in when needed, and resume the retained submission only after readiness.
 
 ## Failure and Return
 
@@ -59,7 +65,9 @@ selected model offers its update in the failed turn; after the update, the same
 request is sent again. A runtime that reports a model its installed
 version cannot run offers the same update beside the composer, in that
 runtime's own words; the offer is dismissed for the window, never blocks a
-turn, and is absent whenever the runtime reports nothing. Repair setup/account failures
+turn, and is absent whenever the runtime reports nothing. An executable override
+the app cannot replace offers no Update; an outdated turn explains external
+update or override removal instead. Repair setup/account failures
 without losing the idea. Keep partial output and file results after a turn fails.
 A missing context item needs refresh, replacement, or deliberate removal.
 

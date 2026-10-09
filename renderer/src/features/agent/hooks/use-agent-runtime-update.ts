@@ -1,11 +1,11 @@
 /**
- * The in-place update of a conversation's runtime, run from the turn that
+ * The native update of a conversation's runtime, run from the turn that
  * runtime was too old for, or from the offer of a model it cannot reach.
  *
- * The service runs the runtime's own updater and reports the runtime ready
+ * The service runs the provider's native installer and reports the runtime ready
  * again; the conversation's process still runs the old executable, so the
  * session is reconnected to spawn the updated one, and the request the old
- * one refused is sent again. Nothing here is a second installation: the
+ * one refused is sent again. Installation stays owned by the host; the
  * runtime keeps ownership of its own files throughout.
  *
  * The same update also runs with nothing to resend, from a chat that offers

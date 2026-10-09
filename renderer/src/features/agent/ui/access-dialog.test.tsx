@@ -124,7 +124,18 @@ describe('first-send Agent access', () => {
     const { port } = agentSessionPort();
     const prepareAgent = vi
       .fn()
-      .mockRejectedValueOnce(new Error('Connection failed'))
+      .mockResolvedValueOnce({
+        agents: [
+          {
+            ...CODEX_AGENT,
+            ready: false,
+            setupFailure: {
+              stage: 'installation',
+              message: 'Download failed (403) from chatgpt.com.',
+            },
+          },
+        ],
+      })
       .mockResolvedValue({ agents: [CODEX_AGENT] });
     const { runtime } = renderWorkspace(
       port,
@@ -138,11 +149,10 @@ describe('first-send Agent access', () => {
     await userEvent.click(await screen.findByRole('menuitemradio', { name: 'Codex' }));
     const dialog = await requestAccess('Connect Codex');
     await userEvent.click(dialog.getByRole('button', { name: 'Connect Codex' }));
-    expect(
-      await dialog.findByText(
-        'Could not connect. Your message was kept. Try again or check Agent settings.',
-      ),
-    ).not.toBeNull();
+    const failure = await dialog.findByRole('status');
+    expect(failure.textContent).toContain('Installation failed.');
+    expect(failure.textContent).toContain('Download failed (403) from chatgpt.com.');
+    expect(failure.textContent).toContain('Your message was kept. Try again.');
     expect(port.connect).not.toHaveBeenCalled();
     expect(draftOf(runtime)).toBe('Help me write an introduction');
     await userEvent.click(dialog.getByRole('button', { name: 'Connect Codex' }));

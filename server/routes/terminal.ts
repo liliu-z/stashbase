@@ -29,8 +29,8 @@ function nativeAgentId(value: unknown): NativeAgentId | null {
   return value === 'claude' || value === 'codex' ? value : null;
 }
 
-function agentCatalogResponse() {
-  return { clis: discoverAgentRuntimes(), debug: getAgentRuntimeDebugState() };
+async function agentCatalogResponse() {
+  return { clis: await discoverAgentRuntimes(), debug: getAgentRuntimeDebugState() };
 }
 
 /** A runtime that can run a turn gets its catalog memory completed before
@@ -41,7 +41,7 @@ function agentCatalogResponse() {
  * that cannot answer never slows the listing twice in a row. */
 async function primeAgentModelCatalogs(): Promise<void> {
   await Promise.all(
-    discoverAgentRuntimes()
+    (await discoverAgentRuntimes())
       .filter((runtime) => runtime.capabilities.models && runtime.installed && runtime.state === 'available')
       .map((runtime) => ensureAgentModelCatalog(runtime.id)),
   );
@@ -52,12 +52,12 @@ export function mount(app: express.Express): void {
   // and know each CLI's installed-state.
   app.get('/api/terminal/clis', async (_req, res) => {
     await primeAgentModelCatalogs();
-    res.json(agentCatalogResponse());
+    res.json(await agentCatalogResponse());
   });
 
   /** New Chat readiness gate. Existing runtimes only receive the idempotent
    * MCP connection; missing runtimes begin an application-scoped download. */
-  app.post('/api/terminal/clis/:id/bootstrap', (req, res) => {
+  app.post('/api/terminal/clis/:id/bootstrap', async (req, res) => {
     const id = agentId(req.params.id);
     if (!id) {
       res.status(404).json({ error: 'Unsupported Agent runtime.' });
@@ -65,11 +65,11 @@ export function mount(app: express.Express): void {
     }
     try {
       if (id === 'stashbase') {
-        res.json(agentCatalogResponse());
+        res.json(await agentCatalogResponse());
         return;
       }
       beginAgentBootstrap(id);
-      res.status(202).json(agentCatalogResponse());
+      res.status(202).json(await agentCatalogResponse());
     } catch (error) {
       sendError(res, error);
     }
@@ -78,7 +78,7 @@ export function mount(app: express.Express): void {
   /** Explicit recheck after the user installs or repairs a CLI outside the
    * app. This may perform idempotent MCP preparation for a discovered runtime
    * but never starts a managed download when the CLI is still missing. */
-  app.post('/api/terminal/clis/:id/check', (req, res) => {
+  app.post('/api/terminal/clis/:id/check', async (req, res) => {
     const id = agentId(req.params.id);
     if (!id) {
       res.status(404).json({ error: 'Unsupported Agent runtime.' });
@@ -86,61 +86,57 @@ export function mount(app: express.Express): void {
     }
     try {
       if (id === 'stashbase') {
-        res.json(agentCatalogResponse());
+        res.json(await agentCatalogResponse());
         return;
       }
       recheckAgentBootstrap(id);
-      res.json(agentCatalogResponse());
+      res.json(await agentCatalogResponse());
     } catch (error) {
       sendError(res, error);
     }
   });
 
-  /** Launch the selected Codex executable's provider-owned browser login.
+  /** Launch the selected native executable's provider-owned browser login.
    * This never installs another CLI or handles provider credentials itself. */
-  app.post('/api/terminal/clis/:id/login', (req, res) => {
+  app.post('/api/terminal/clis/:id/login', async (req, res) => {
     const id = nativeAgentId(req.params.id);
     if (!id) {
       res.status(404).json({ error: 'Unsupported Agent runtime.' });
       return;
     }
-    if (id !== 'codex') {
-      res.status(400).json({ error: 'In-app login is available only for Codex.' });
-      return;
-    }
     try {
       loginAgentBootstrap(id);
-      res.status(202).json(agentCatalogResponse());
+      res.status(202).json(await agentCatalogResponse());
     } catch (error) {
       sendError(res, error);
     }
   });
 
-  /** Run the installed runtime's own updater in place. Offered where a chat
+  /** Update through the provider's official native installer. Offered where a chat
    * reports the runtime too old for its model and on the Settings row; the
-   * runtime keeps ownership of its installation throughout. */
-  app.post('/api/terminal/clis/:id/update', (req, res) => {
+   * provider owns the resulting installation and old npm copies stay intact. */
+  app.post('/api/terminal/clis/:id/update', async (req, res) => {
     const id = nativeAgentId(req.params.id);
     if (!id) {
       res.status(404).json({ error: 'Unsupported Agent runtime.' });
       return;
     }
     if (!agentSupportsInAppUpdate(id)) {
-      res.status(400).json({ error: 'In-app update is not available for this Agent.' });
+      res.status(400).json({ error: 'This Agent uses an explicit executable override. Remove the override to update its native installation through StashBase.' });
       return;
     }
     try {
       updateAgentBootstrap(id);
-      res.status(202).json(agentCatalogResponse());
+      res.status(202).json(await agentCatalogResponse());
     } catch (error) {
       sendError(res, error);
     }
   });
 
-  app.put('/api/terminal/debug', (req, res) => {
+  app.put('/api/terminal/debug', async (req, res) => {
     try {
       setAgentRuntimeDebugState(req.body ?? {});
-      res.json(agentCatalogResponse());
+      res.json(await agentCatalogResponse());
     } catch (error) {
       sendError(res, error);
     }

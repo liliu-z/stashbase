@@ -156,7 +156,7 @@ describe('describeRuntime', () => {
     });
   });
 
-  it('offers Update for an installed runtime whose own updater runs here, naming the installed version', () => {
+  it('offers Update for an installed runtime that the host can update, naming the installed version', () => {
     const display = describeRuntime(
       codex({
         id: 'claude',

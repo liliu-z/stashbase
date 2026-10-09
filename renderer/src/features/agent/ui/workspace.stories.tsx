@@ -5,7 +5,7 @@ import { expect, screen, userEvent, waitFor } from 'storybook/test';
 
 import type { AgentPersonaPort } from '@/features/agent/application/ports';
 import { createAgentWorkspaceRuntime } from '@/features/agent/application/workspace-runtime';
-import type { Agent } from '@/features/agent/domain/agent-catalog';
+import type { Agent, AgentSetupFailure } from '@/features/agent/domain/agent-catalog';
 import { cn } from '@/lib/utils';
 
 import ManagedAgentWorkspace from './workspace';
@@ -88,6 +88,7 @@ function WorkspacePreview({
   empty = false,
   interrupted = false,
   ready = true,
+  setupFailure,
   skills = false,
 }: {
   context?: boolean;
@@ -96,6 +97,7 @@ function WorkspacePreview({
   interrupted?: boolean;
   /** False draws the window a reader meets before any runtime is set up. */
   ready?: boolean;
+  setupFailure?: AgentSetupFailure;
   skills?: boolean;
 }) {
   const queryClient = useMemo(
@@ -268,7 +270,15 @@ function WorkspacePreview({
           <ManagedAgentWorkspace
             catalog={{
               listAgents: async () => ({ agents: ready ? agents : pendingAgents }),
-              prepareAgent: async () => ({ agents }),
+              prepareAgent: async (id) => {
+                const selected = agents.find((agent) => agent.id === id);
+                return {
+                  agents:
+                    setupFailure && selected
+                      ? [{ ...selected, ready: false, needsSignIn: false, setupFailure }]
+                      : agents,
+                };
+              },
             }}
             persona={storyPersona}
             onOpenExternal={() => undefined}
@@ -337,12 +347,31 @@ export const Docked: Story = {
 
 /** Access is offered only after an explicit Send, while keeping the draft. It
  *  asks about the Agent this chat is on, which here is Codex. */
+async function requestSetup() {
+  const input = await screen.findByRole('textbox', { name: 'Message' });
+  await userEvent.type(input, 'Help me write');
+  await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+  await screen.findByRole('dialog', { name: 'Connect Codex' });
+}
+
 export const SetupOffer: Story = {
   args: { empty: true, ready: false },
+  play: requestSetup,
+};
+
+export const SetupFailure: Story = {
+  args: {
+    empty: true,
+    ready: false,
+    setupFailure: {
+      stage: 'mcp',
+      message:
+        'Could not read Codex configuration at /Users/writer/.codex/config.toml.\nInvalid TOML at line 12, column 1: duplicate key mcp_servers.stashbase.',
+    },
+  },
   play: async () => {
-    const input = await screen.findByRole('textbox', { name: 'Message' });
-    await userEvent.type(input, 'Help me write');
-    await userEvent.click(screen.getByRole('button', { name: 'Send' }));
-    await screen.findByRole('dialog', { name: 'Connect Codex' });
+    await requestSetup();
+    await userEvent.click(screen.getByRole('button', { name: 'Connect Codex' }));
+    await screen.findByText(/Invalid TOML at line 12/);
   },
 };

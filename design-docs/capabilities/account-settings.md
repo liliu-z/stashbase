@@ -48,9 +48,18 @@ Settings owns lasting preferences and connection configuration:
   appearance are out of scope.
 - **Agents:** group account, credit balance/refill, and connection state under
   Default, with the account's subscription and the plans it can buy; manage Codex and Claude individually. An installed runtime shows its
-  version; a runtime whose own updater StashBase can run offers Update, which
-  runs that updater in place and never replaces a provider-owned installation
-  with a second copy. A runtime that reports a model its
+  version and offers Update when StashBase can select the resulting installation.
+  Install and Update both use the provider's official native installer, without
+  an installation-method choice. Updating an npm installation selects the
+  verified native copy for subsequent sessions and leaves the npm copy intact.
+  Explicit executable overrides remain authoritative; an override outside the
+  native installation must be removed before updating through StashBase.
+  Both native Agents check their own sign-in status before readiness and offer
+  their provider's browser sign-in when needed. An expired sign-in reported by
+  a running conversation restores that action without clearing credentials.
+  Setup and update failures show the failed operation, stage, and available
+  diagnostic in place, including service refusals and download errors.
+  A runtime that reports a model its
   installed version cannot run leads its row with that model instead of its
   readiness; the requirement shown is the runtime's own, never one StashBase
   worked out. Credits refresh automatically; token accounting is not a
@@ -81,7 +90,12 @@ simulators use a separate development-only entry. Neither belongs in normal Sett
 - A runtime too old for a chosen model is repaired where it failed: the turn
   offers the runtime's update, the conversation reconnects on the updated
   runtime, and the refused request is sent again. Settings offers the same
-  update without a conversation.
+  update without a conversation. A failed installation or update retries that
+  operation; reconnecting an existing copy alone does not count as an update.
+  Identical setup requests share progress. A different request during setup is
+  explicitly refused with the running operation and retry guidance. Downloads,
+  installation, and sign-in have bounded waits; timeout releases their process
+  ownership before retry becomes available.
 - A persona applies from its Chat's next message; a running turn keeps its
   guidance. It does not rewrite native instruction files or
   change permissions.

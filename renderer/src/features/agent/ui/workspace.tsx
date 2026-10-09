@@ -212,7 +212,7 @@ function ChatWorkspace({
               onPermission={active.replyPermission}
               onRetry={active.retry}
               onReviewTurnChange={onReviewTurnChange}
-              runtimeUpdate={runtimeUpdate}
+              runtimeUpdate={selectedAgent.updatable ? runtimeUpdate : undefined}
               sourceFor={sourceFor}
               transientFile={active.fileForTransient}
             />
@@ -235,7 +235,7 @@ function ChatWorkspace({
         <AgentConnectionNotice connection={state.connection} onReconnect={active.reconnect} />
       )}
 
-      {composerShown && selectedAgent.upgrade && (
+      {composerShown && selectedAgent.updatable && selectedAgent.upgrade && (
         <AgentUpgradeOfferCard offer={selectedAgent.upgrade} runtimeUpdate={runtimeUpdate} />
       )}
 

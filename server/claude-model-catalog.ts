@@ -14,6 +14,7 @@ import path from 'node:path';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import type { AgentModel } from '../shared/agent-protocol.ts';
 import { agentCliEnv, commandDir, resolveAgentCli } from './agent-cli.ts';
+import { claudeConfigPath } from './agent-config-paths.ts';
 
 /** The two persisted choices this read cares about; everything else in the
  * file is the CLI's own business. */
@@ -82,13 +83,6 @@ interface ClaudeModelOption {
   label?: unknown;
   description?: unknown;
   disabled?: unknown;
-}
-
-/** Resolved the way the CLI resolves it, so a reader who moved Claude's
- *  configuration is read where they moved it. */
-export function claudeConfigPath(): string {
-  const dir = process.env.CLAUDE_CONFIG_DIR;
-  return dir ? path.join(dir, '.claude.json') : path.join(os.homedir(), '.claude.json');
 }
 
 /** The label without the parenthetical Claude appends to a disabled entry

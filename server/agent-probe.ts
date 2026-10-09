@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { terminateExtractorTree } from './extractor-process.ts';
+import { terminateExtractorTree, waitForExtractorTree } from './extractor-process.ts';
 
 /** Bounded, cancellable CLI probes must never block the shared HTTP server. */
 export async function probeAgentCommand(
@@ -16,6 +16,7 @@ export async function probeAgentCommand(
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
+    const completion = waitForExtractorTree(child);
     let stdout = '';
     let stderr = '';
     let timedOut = false;
@@ -31,12 +32,11 @@ export async function probeAgentCommand(
     options.signal?.addEventListener('abort', abort, { once: true });
     child.stdout.on('data', (chunk) => { stdout = (stdout + chunk.toString()).slice(-4000); });
     child.stderr.on('data', (chunk) => { stderr = (stderr + chunk.toString()).slice(-4000); });
-    child.once('error', (error) => { cleanup(); reject(error); });
-    child.once('close', (status) => {
+    void completion.then((status) => {
       cleanup();
       if (options.signal?.aborted) reject(new Error('Agent probe was cancelled.'));
       else if (timedOut) reject(new Error(`Agent probe timed out after ${options.timeoutMs}ms.`));
       else resolve({ status, stdout, stderr });
-    });
+    }, (error) => { cleanup(); reject(error); });
   });
 }

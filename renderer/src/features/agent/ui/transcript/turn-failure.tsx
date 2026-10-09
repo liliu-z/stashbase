@@ -35,7 +35,9 @@ export function TurnFailure({
       <p className="mt-1 text-caption text-muted-foreground">{block.text}</p>
       <p className="mt-1 text-caption text-muted-foreground">
         {outdated && !updated
-          ? `Update ${runtimeUpdate?.label ?? 'the Agent'} here and the same request is sent again. Partial output and completed file changes are kept.`
+          ? runtimeUpdate
+            ? `Update ${runtimeUpdate.label} here and the same request is sent again. Partial output and completed file changes are kept.`
+            : 'This installation cannot be updated here. Update it externally or remove the executable override, then reconnect. Your conversation is kept.'
           : 'Partial output and completed file changes are kept. Retrying may repeat work.'}
       </p>
       {outdated && !updated && runtimeUpdate && (
@@ -53,7 +55,10 @@ export function TurnFailure({
               : `Update ${runtimeUpdate.label}`}
           </Button>
           {runtimeUpdate.failure && (
-            <p className="mt-1 text-caption text-muted-foreground" role="alert">
+            <p
+              className="mt-1 text-caption wrap-anywhere whitespace-pre-wrap text-muted-foreground"
+              role="alert"
+            >
               {runtimeUpdate.failure}
             </p>
           )}

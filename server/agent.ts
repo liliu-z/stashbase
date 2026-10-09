@@ -33,6 +33,7 @@
  *     { t: "exit", message? }                          // normal or fatal session end
  */
 import { isStashbaseWorkspaceEdit } from './agent-file-permissions.ts';
+import { agentBootstrapCoordinator } from './agent-runtime-installer.ts';
 import { randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
@@ -883,7 +884,9 @@ export class AgentSession implements AttributedAgentSession {
   /** Turn-scoped runtime errors carry their classified failure kind so the
    * renderer can offer the matching recovery without parsing the message. */
   private sendTurnError(message: string): void {
-    this.send(agentTurnErrorEvent(message));
+    const event = agentTurnErrorEvent(message);
+    if (event.failure?.kind === 'auth-expired') agentBootstrapCoordinator.requireSignIn('claude', message);
+    this.send(event);
   }
 
   /** Development-only: play the armed turn-failure script through the normal

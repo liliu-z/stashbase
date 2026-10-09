@@ -1,9 +1,35 @@
 import { describe, expect, it } from 'vite-plus/test';
 
-import { agentFailure, failureKind, failureMessage } from './failure-messages';
+import { AgentSetupRefused } from './connect-agent';
+import { agentAccessFailure, agentFailure, failureKind, failureMessage } from './failure-messages';
 import { AgentContextError, AgentSessionError } from './ports';
 
 describe('agent failure messages', () => {
+  it('keeps service and unexpected error details in the access prompt', () => {
+    expect(
+      agentAccessFailure(
+        new AgentSessionError('unavailable', 'Request failed', {
+          cause: new Error('Codex sign-in exited with code 1.'),
+        }),
+      ),
+    ).toContain('Codex sign-in exited with code 1.');
+    expect(agentAccessFailure(new Error('Connection timed out.'))).toContain(
+      'Connection timed out.',
+    );
+  });
+
+  it('keeps recovery readable when no detail was supplied, without repeating a mapped sentence', () => {
+    const fallback = 'Could not connect.\n\nYour message was kept. Try again.';
+    expect(agentAccessFailure(null)).toBe(fallback);
+    expect(agentAccessFailure(new AgentSetupRefused(undefined))).toBe(fallback);
+    const summary = failureMessage('unavailable');
+    expect(
+      agentAccessFailure(
+        new AgentSessionError('unavailable', summary, { cause: new Error(summary) }),
+      ),
+    ).toBe(`${summary}\n\nYour message was kept. Try again.`);
+  });
+
   it('names every kind either Agent ladder can report', () => {
     expect(failureMessage('not-found')).toBe('That file is no longer in this folder.');
     expect(failureMessage('unsupported')).toContain('cannot be given to the Agent');

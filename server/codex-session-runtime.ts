@@ -17,6 +17,7 @@ import {
   type AgentTurnFailureSimulation,
 } from './agent-runtime-paths.ts';
 import { agentTurnErrorEvent } from './agent-turn-failure.ts';
+import { agentBootstrapCoordinator } from './agent-runtime-installer.ts';
 import {
   disposeSessionsBoundToFolder,
   isAgentAccessMode,
@@ -411,6 +412,7 @@ export class CodexSession implements AttributedAgentSession {
    * renderer can offer the matching recovery without parsing the message. */
   private sendTurnError(message: string): void {
     const event = agentTurnErrorEvent(message);
+    if (event.failure?.kind === 'auth-expired') agentBootstrapCoordinator.requireSignIn('codex', message);
     if (!event.failure && this.isModelCompatibilityFailure(message)) {
       event.failure = { kind: 'runtime-outdated' };
     }

@@ -3,6 +3,7 @@ import type {
   AgentRuntimeFailureKind,
   SettingsFailureKind,
 } from '@/features/settings/application/ports';
+import { AgentRuntimeError } from '@/features/settings/application/ports';
 /**
  * How a Settings failure reaches the reader.
  *
@@ -42,7 +43,10 @@ export function failureMessage(kind: SettingsAreaFailureKind): string {
  *  that is not a Settings failure at all is reported as an unreachable
  *  capability rather than guessed at. */
 export function settingsFailure(error: unknown): FailureView {
-  return readFailure<'invalid-request' | 'rejected'>(error, MESSAGES, { inputKinds: INPUT_KINDS });
+  return readFailure<'invalid-request' | 'rejected'>(error, MESSAGES, {
+    inputKinds: INPUT_KINDS,
+    serverSentenceFor: error instanceof AgentRuntimeError ? [error.kind] : [],
+  });
 }
 
 /** The first failure among several commands that share one notice. */

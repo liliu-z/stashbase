@@ -39,11 +39,14 @@ export function AgentUpgradeOfferCard({
         <div className="min-w-0 flex-1">
           <p className="text-caption text-foreground">{offer.note}</p>
           <p className="mt-0.5 text-caption text-muted-foreground">
-            The installed {runtimeUpdate.label} is replaced in place and this chat reconnects. Your
-            conversation is kept.
+            StashBase installs the latest {runtimeUpdate.label} and reconnects this chat. Your
+            conversation and existing installations are kept.
           </p>
           {runtimeUpdate.failure && (
-            <p className="mt-1 text-caption text-muted-foreground" role="alert">
+            <p
+              className="mt-1 text-caption wrap-anywhere whitespace-pre-wrap text-muted-foreground"
+              role="alert"
+            >
               {runtimeUpdate.failure}
             </p>
           )}

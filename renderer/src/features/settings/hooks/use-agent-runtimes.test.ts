@@ -122,7 +122,7 @@ describe('useAgentRuntimes', () => {
     );
   });
 
-  it('updates an agent through its own updater and writes the response into the shared catalog cache', async () => {
+  it('updates an agent through the native installer and writes the response into the shared catalog cache', async () => {
     const updated = catalog([
       codex({ id: 'claude', label: 'Claude', preparation: { kind: 'ready' }, version: '2.1.276' }),
     ]);

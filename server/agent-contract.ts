@@ -216,7 +216,7 @@ export interface AgentRuntimeDescriptor {
   bootstrap: ReturnType<typeof agentBootstrapStatus>;
   /** The installed executable's own version, when it reports one. */
   version?: string | null;
-  /** Whether the runtime's own updater can be run from the app. */
+  /** Whether the official native installation can be updated from the app. */
   updatable?: boolean;
   error?: string;
   capabilities: AgentCapabilities;
@@ -268,7 +268,7 @@ export function runtimeDescriptorFor(
     endpoint: '/ws/agent',
     installed,
     source: installed ? 'system' : null,
-    version: executable ? agentCliVersion(executable) : null,
+    version: null,
     updatable: installed && agentSupportsInAppUpdate(adapter.id),
     state,
     bootstrap: agentBootstrapStatus(adapter.id),
@@ -283,9 +283,11 @@ export function agentAdapter(id: string): AgentAdapter | null {
 /** Native discovery is performed at request time so a CLI installed or
  * upgraded while StashBase is open is reflected without a bundled-version
  * assumption. */
-export function discoverAgentRuntimes(): AgentRuntimeDescriptor[] {
-  return [...adapters.values()].map((adapter) => {
-    const descriptor = runtimeDescriptorFor(adapter);
+export async function discoverAgentRuntimes(): Promise<AgentRuntimeDescriptor[]> {
+  return Promise.all([...adapters.values()].map(async (adapter) => {
+    const executable = adapter.id === 'stashbase' ? null : agentExecutableFor(adapter.id);
+    const descriptor = runtimeDescriptorFor(adapter, executable);
+    if (executable) descriptor.version = await agentCliVersion(executable);
     const catalog = rememberedCatalogFor(descriptor);
     // Claude is the only runtime that reports a model it is too old to run;
     // Codex's catalog simply omits what its app-server does not offer.
@@ -295,7 +297,7 @@ export function discoverAgentRuntimes(): AgentRuntimeDescriptor[] {
       ...(catalog ? { catalog } : {}),
       ...(upgrade ? { upgrade } : {}),
     };
-  });
+  }));
 }
 
 export function attachAgentRuntime(id: string, ws: WebSocket, options: AgentConnectionOptions): void {

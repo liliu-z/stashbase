@@ -44,7 +44,7 @@ export function RuntimeRow({
   return (
     <SettingsRow
       as="li"
-      detail={display.description}
+      detail={<span className="wrap-anywhere whitespace-pre-wrap">{display.description}</span>}
       lead={
         <span
           className={cn(
@@ -75,7 +75,9 @@ export function RuntimeRow({
         ) : null
       }
     >
-      {failure && <FailureNotice className="mt-1" failure={failure} />}
+      {failure && (
+        <FailureNotice className="mt-1 wrap-anywhere whitespace-pre-wrap" failure={failure} />
+      )}
     </SettingsRow>
   );
 }

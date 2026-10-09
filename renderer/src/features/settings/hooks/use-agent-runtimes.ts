@@ -55,6 +55,7 @@ interface AgentCatalogView {
   /** Development-only controls, when the server reports them enabled. */
   readonly debug: AgentDebugControls | null;
   readonly failed: boolean;
+  readonly failure: FailureView | null;
   readonly loading: boolean;
 }
 
@@ -75,7 +76,7 @@ export interface AgentRuntimesViewModel {
   failure(id: AgentId): FailureView | null;
   install(id: AgentId): void;
   login(id: AgentId): void;
-  /** Runs the runtime's own updater in place. */
+  /** Updates through the provider's official native installer. */
   update(id: AgentId): void;
   refreshAllowance(): void;
   refreshCatalog(): void;
@@ -176,6 +177,7 @@ export function useAgentRuntimes(port: AgentRuntimePort): AgentRuntimesViewModel
     catalog: {
       debug,
       failed: catalog.isError,
+      failure: catalog.isError ? settingsFailure(catalog.error) : null,
       loading: catalog.isLoading,
       runtimes: catalog.data?.runtimes ?? [],
     },

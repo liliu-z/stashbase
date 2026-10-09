@@ -29,6 +29,7 @@ export type AgentBootstrapFailureCode =
   | 'authentication-check-failed';
 
 export type AgentBootstrapManualRecovery = 'install-command' | 'mcp-settings';
+export type AgentBootstrapAction = 'bootstrap' | 'login' | 'update';
 
 export interface AgentBootstrapFailure {
   stage: AgentBootstrapFailureStage;
@@ -36,6 +37,8 @@ export interface AgentBootstrapFailure {
   message: string;
   retryable: boolean;
   manualRecovery?: AgentBootstrapManualRecovery;
+  /** Retry the operation that failed, rather than only rechecking readiness. */
+  retryAction?: AgentBootstrapAction;
 }
 
 export interface AgentBootstrapStatus {
@@ -96,7 +99,7 @@ export interface Agent {
   /** The installed runtime's own version string, when its executable reports
    * one; null for a runtime that is missing or does not say. */
   version?: string | null;
-  /** Whether StashBase can run this runtime's own updater in place. */
+  /** Whether StashBase can update this runtime through its official native installer. */
   updatable?: boolean;
   bootstrap?: AgentBootstrapStatus;
   /** Full shell command the panel feeds to the shell once it's ready

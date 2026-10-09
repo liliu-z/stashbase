@@ -247,4 +247,31 @@ describe('AgentRuntimesPanel', () => {
     expect(await screen.findByText(failureMessage('unavailable'))).not.toBeNull();
     expect(await screen.findByRole('button', { name: 'Install' })).not.toBeNull();
   });
+
+  it('retries a failed update as an update instead of only reconnecting the installed runtime', async () => {
+    const failed = agentRuntime({
+      id: 'claude',
+      label: 'Claude',
+      installed: true,
+      updatable: true,
+      preparation: {
+        kind: 'failed',
+        failure: {
+          note: 'Could not download the official Claude installer.',
+          refusal: 'operation-failed',
+          stage: 'install',
+          retryAction: 'update',
+        },
+      },
+    });
+    const port = agentRuntimePort({
+      listAgents: vi.fn(async () => catalog([failed])),
+      prepareAgent: vi.fn(async () => catalog([{ ...failed, preparation: { kind: 'ready' } }])),
+    });
+    renderPanel(port);
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Retry' }));
+    expect(port.prepareAgent).toHaveBeenCalledWith('claude', 'update', expect.anything());
+    expect(await screen.findByRole('button', { name: 'Update' })).not.toBeNull();
+    expect(screen.queryByText('Could not download the official Claude installer.')).toBeNull();
+  });
 });

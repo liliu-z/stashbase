@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vite-plus/test';
 
+import { agentUpdateFailure } from '@/features/agent/application/failure-messages';
 import { httpClient } from '@/test/fakes/http';
 
 import { createAgentCatalogAdapter } from './catalog-api';
@@ -39,6 +40,42 @@ function runtime(overrides: Record<string, unknown>) {
 const signal = new AbortController().signal;
 
 describe('agent catalog adapter', () => {
+  it('preserves an HTTP rejection all the way to the Update failure message', async () => {
+    const detail = 'Codex is already running login. Wait for it to finish, then retry update.';
+    const adapter = createAgentCatalogAdapter({
+      request: async () => ({ status: 409, body: { error: detail } }),
+    });
+    await expect(adapter.prepareAgent('codex', 'update', signal)).rejects.toSatisfy(
+      (error) => agentUpdateFailure(error) === detail,
+    );
+  });
+  it('keeps the failed setup step and explanation for the first-send dialog', async () => {
+    const adapter = createAgentCatalogAdapter(
+      httpClient({
+        clis: [
+          runtime({
+            state: 'failed',
+            bootstrap: {
+              phase: 'failed',
+              failure: {
+                stage: 'mcp',
+                code: 'operation-failed',
+                retryable: true,
+                message: 'Could not read Codex config.toml: permission denied.',
+              },
+            },
+          }),
+        ],
+      }),
+    );
+    const { agents } = await adapter.prepareAgent('codex', 'bootstrap', signal);
+    expect(agents[0]?.ready).toBe(false);
+    expect(agents[0]?.setupFailure).toEqual({
+      stage: 'mcp',
+      message: 'Could not read Codex config.toml: permission denied.',
+    });
+  });
+
   it('hands a fresh chat the catalog the service remembers, flags and all', async () => {
     const adapter = createAgentCatalogAdapter(
       httpClient({

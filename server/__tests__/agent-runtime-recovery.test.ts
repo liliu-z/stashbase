@@ -9,6 +9,29 @@ import { ensureAgentMcp } from '../agent-mcp.ts';
 import { resolveAgentCli, resolveAgentCliWithLoginShell } from '../agent-cli.ts';
 import { ownAgentProcess, retireAgentProcess, closeAgentProcesses } from '../agent-process.ts';
 
+test('MCP preparation uses each CLI custom config home without changing default configs', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-custom-agent-home-'));
+  const keys = ['CODEX_HOME', 'CLAUDE_CONFIG_DIR'] as const;
+  const previous = keys.map((key) => process.env[key]);
+  t.after(() => {
+    keys.forEach((key, index) => { if (previous[index] === undefined) delete process.env[key]; else process.env[key] = previous[index]; });
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+  for (const [id, key, file] of [['codex', 'CODEX_HOME', 'config.toml'], ['claude', 'CLAUDE_CONFIG_DIR', '.claude.json']] as const) {
+    const home = path.join(root, id);
+    fs.mkdirSync(home);
+    process.env[key] = home;
+    const config = path.join(home, file);
+    fs.writeFileSync(config, id === 'codex' ? 'model = "kept"\n' : '{"theme":"kept"}');
+    const defaultConfig = id === 'codex' ? path.join(os.homedir(), '.codex', 'config.toml') : path.join(os.homedir(), '.claude.json');
+    const before = fs.existsSync(defaultConfig) ? fs.readFileSync(defaultConfig, 'utf8') : null;
+    ensureAgentMcp(id);
+    assert.match(fs.readFileSync(config, 'utf8'), /stashbase/);
+    assert.match(fs.readFileSync(config, 'utf8'), /kept/);
+    assert.equal(fs.existsSync(defaultConfig) ? fs.readFileSync(defaultConfig, 'utf8') : null, before);
+  }
+});
+
 test('MCP setup preserves unrelated commented/quoted tables and multiline text, and refuses invalid config', () => {
   const config = path.join(os.homedir(), '.codex', 'config.toml');
   fs.mkdirSync(path.dirname(config), { recursive: true });

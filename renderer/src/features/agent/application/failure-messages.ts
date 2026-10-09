@@ -1,3 +1,4 @@
+import type { AgentSetupFailure } from '@/features/agent/domain/agent-catalog';
 /**
  * One reader-facing sentence per Agent refusal.
  *
@@ -13,7 +14,7 @@ import {
   type FeatureFailureKind,
 } from '@/shared/domain/feature-error';
 
-import { AgentUpdateRefused } from './connect-agent';
+import { AgentSetupRefused, AgentUpdateRefused } from './connect-agent';
 
 /** Refusals only the Agent's context resolution can meet: the file is gone, or
  *  its format is one the Agent cannot be given. */
@@ -62,10 +63,32 @@ export function agentFailure(error: unknown): FailureView {
   return readFailure<AgentContextExtra>(error, MESSAGES, { inputKinds: INPUT_KINDS });
 }
 
-/** Access setup failures keep the retained request available for another try. */
+const SETUP_FAILURE_MESSAGES: Readonly<Record<AgentSetupFailure['stage'], string>> = {
+  discovery: 'Agent detection failed.',
+  installation: 'Installation failed.',
+  authentication: 'Sign-in failed.',
+  mcp: 'MCP connection failed.',
+};
+
+/** Keep the failed step and diagnostic visible where setup was requested.
+ * Error messages are plain text; stack traces and error objects are not rendered. */
 export function agentAccessFailure(error: unknown): string {
-  if (isFeatureError(error)) return agentFailure(error).message;
-  return 'Could not connect. Your message was kept. Try again or check Agent settings.';
+  const setup = error instanceof AgentSetupRefused ? error.setup : undefined;
+  const summary =
+    error instanceof AgentSetupRefused
+      ? setup
+        ? SETUP_FAILURE_MESSAGES[setup.stage]
+        : 'Could not connect.'
+      : isFeatureError(error)
+        ? agentFailure(error).message
+        : 'Could not connect.';
+  const cause = isFeatureError(error) ? error.cause : error;
+  const detail = setup?.message.trim() ?? (cause instanceof Error ? cause.message.trim() : '');
+  return [
+    summary,
+    ...(detail && detail !== summary ? [detail] : []),
+    'Your message was kept. Try again.',
+  ].join('\n\n');
 }
 
 /** What an update that did not finish reads as: the service's own sentence
@@ -76,8 +99,12 @@ export function agentUpdateFailure(error: unknown): string {
     const sentence = error.cause instanceof Error ? error.cause.message.trim() : '';
     return sentence || UPDATE_FAILED;
   }
-  if (isFeatureError(error)) return agentFailure(error).message;
-  return UPDATE_FAILED;
+  if (isFeatureError<AgentContextExtra>(error)) {
+    return readFailure(error, MESSAGES, { serverSentenceFor: [error.kind] }).message;
+  }
+  return error instanceof Error && error.message.trim()
+    ? `${UPDATE_FAILED}\n\n${error.message}`
+    : UPDATE_FAILED;
 }
 
 const UPDATE_FAILED = 'The update did not finish. Check Agent settings and try again.';

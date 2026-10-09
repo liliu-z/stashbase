@@ -55,7 +55,10 @@ export function describeRuntime(
         ? { kind: 'account', label: 'Sign in' }
         : failure.stage === 'authenticate'
           ? { kind: 'login', label: 'Sign in' }
-          : { kind: 'retry', label: failure.stage === 'configure' ? 'Retry connection' : 'Retry' };
+          : {
+              kind: failure.stage === 'configure' ? 'retry' : (failure.retryAction ?? 'retry'),
+              label: failure.stage === 'configure' ? 'Retry connection' : 'Retry',
+            };
     return {
       description: failure.note ?? PREPARATION_FAILED,
       stage: failure.stage,

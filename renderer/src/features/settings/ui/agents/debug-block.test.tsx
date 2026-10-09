@@ -17,7 +17,7 @@ function viewModel(overrides: Partial<AgentRuntimesViewModel> = {}): AgentRuntim
   return {
     allowance: { allowance: null, failed: false },
     busy: () => false,
-    catalog: { runtimes: [], debug: enabledDebug, failed: false, loading: false },
+    catalog: { runtimes: [], debug: enabledDebug, failed: false, failure: null, loading: false },
     debugBusy: false,
     debugFailure: null,
     failure: () => null,
@@ -36,7 +36,7 @@ describe('DebugBlock', () => {
     const { container } = render(
       <DebugBlock
         runtimes={viewModel({
-          catalog: { runtimes: [], debug: null, failed: false, loading: false },
+          catalog: { runtimes: [], debug: null, failed: false, failure: null, loading: false },
         })}
       />,
     );

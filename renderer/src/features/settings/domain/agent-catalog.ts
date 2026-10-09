@@ -45,6 +45,7 @@ export interface AgentPreparationFailure {
   /** The service's own sentence, or null when it sent none. Only the service
    *  knows which piece is missing, so its wording is what the row shows. */
   readonly note: string | null;
+  readonly retryAction?: 'install' | 'login' | 'update';
 }
 
 /**
@@ -79,7 +80,7 @@ export interface AgentRuntime {
   readonly preparation: AgentPreparation;
   /** The installed runtime's own version, or null when it reports none. */
   readonly version: string | null;
-  /** Whether the runtime's own updater can be run from here. */
+  /** Whether the host can update the runtime's native installation. */
   readonly updatable: boolean;
   /** A model the runtime says it is too old to run, when it says so. Null is
    *  the normal state, and a runtime that reports nothing reads the same as

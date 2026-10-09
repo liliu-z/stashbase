@@ -13,6 +13,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { parseTOML, getStaticTOMLValue } from 'toml-eslint-parser';
 import os from 'node:os';
 import path from 'node:path';
+import { claudeConfigPath, codexConfigPath } from './agent-config-paths.ts';
 
 const APP_ROOT = process.env.STASHBASE_APP_ROOT
   ? path.resolve(process.env.STASHBASE_APP_ROOT)
@@ -49,13 +50,13 @@ export function ensureAgentMcp(id: 'claude' | 'codex'): void {
   }
   const wrapper = writeMcpWrapper();
   if (id === 'codex') {
-    configureCodex(path.join(os.homedir(), '.codex', 'config.toml'), wrapper);
+    configureCodex(codexConfigPath(), wrapper);
   } else {
     // Claude defers MCP tool definitions behind its tool search once a user's
     // connectors grow past a share of the context, leaving the model a bare
     // name such as `edit_file` and no account of what it does. The routing
     // policy names these tools, so their descriptions must always be loaded.
-    configureJsonMcp(path.join(os.homedir(), '.claude.json'), { type: 'stdio', command: wrapper, alwaysLoad: true });
+    configureJsonMcp(claudeConfigPath(), { type: 'stdio', command: wrapper, alwaysLoad: true });
   }
 }
 

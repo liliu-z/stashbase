@@ -15,20 +15,24 @@ import {
   type NativeAgentId,
 } from './agent-runtime-paths.ts';
 import { probeAgentCommand } from './agent-probe.ts';
+import { agentSetupDiagnostic } from './agent-setup-diagnostic.ts';
 import { ensureAgentMcp } from './agent-mcp.ts';
 import {
   agentCliEnv,
+  agentCliOverride,
   agentCliNeedsShell,
   commandDir,
   resolveAgentCli,
   resolveAgentCliWithLoginShell,
+  resolveNativeAgentCli,
 } from './agent-cli.ts';
-import { terminateExtractorTree as terminateInstallerTree } from './extractor-process.ts';
+import { terminateExtractorTree as terminateInstallerTree, waitForExtractorTree } from './extractor-process.ts';
 import type {
   AgentBootstrapFailureCode,
   AgentBootstrapFailureStage,
   AgentBootstrapManualRecovery,
   AgentBootstrapStatus,
+  AgentBootstrapAction,
 } from '../shared/agent-runtime.ts';
 
 export type {
@@ -44,11 +48,8 @@ type ProgressUpdate = Pick<AgentBootstrapStatus, 'progress' | 'message'>;
 
 export interface AgentBootstrapDependencies {
   resolveExecutable(id: NativeAgentId, options?: { probeLoginShell?: boolean; signal?: AbortSignal }): string | null | Promise<string | null>;
+  resolveNativeExecutable(id: NativeAgentId): string | null;
   installRuntime(id: NativeAgentId, update: (next: ProgressUpdate) => void, signal: AbortSignal): Promise<void>;
-  /** Runs the installed runtime's own updater on the resolved executable. */
-  updateRuntime(
-    id: NativeAgentId, executable: string, update: (next: ProgressUpdate) => void, signal: AbortSignal,
-  ): Promise<void>;
   isAuthenticated(id: NativeAgentId, executable: string, signal?: AbortSignal): boolean | Promise<boolean>;
   login(id: NativeAgentId, executable: string, signal: AbortSignal): Promise<void>;
   configureMcp(id: NativeAgentId): void;
@@ -57,23 +58,39 @@ export interface AgentBootstrapDependencies {
 
 const IDLE_STATUS: AgentBootstrapStatus = { phase: 'idle' };
 
+export class AgentSetupBusyError extends Error { readonly status = 409; }
+
+const INSTALLATION_TIMEOUT_MS = 8 * 60_000;
+const ACTION_LABELS = { bootstrap: 'Install / connect', login: 'Sign in', update: 'Update', connect: 'Check' } as const;
+const ACTION_PROGRESS = { bootstrap: 'setting up', login: 'signing in', update: 'updating', connect: 'checking its installation' } as const;
+
 export class AgentBootstrapCoordinator {
   private readonly statuses = new Map<NativeAgentId, AgentBootstrapStatus>();
   private readonly controllers = new Map<NativeAgentId, AbortController>();
   private readonly runs = new Map<NativeAgentId, Promise<void>>();
+  private readonly actions = new Map<NativeAgentId, AgentBootstrapAction | 'connect'>();
 
-  constructor(private readonly dependencies: AgentBootstrapDependencies) {}
+  constructor(
+    private readonly dependencies: AgentBootstrapDependencies,
+    private readonly limits = { installationTimeoutMs: INSTALLATION_TIMEOUT_MS },
+  ) {}
 
   status(id: NativeAgentId): AgentBootstrapStatus {
     return this.statuses.get(id) ?? IDLE_STATUS;
   }
 
   begin(id: NativeAgentId): AgentBootstrapStatus {
-    return this.start(id, 'prepare', { probeLoginShell: true });
+    return this.start(id, 'bootstrap', { probeLoginShell: true });
   }
 
   login(id: NativeAgentId): AgentBootstrapStatus {
     return this.start(id, 'login', { probeLoginShell: true });
+  }
+
+  /** A provider refusal invalidates readiness without deleting its credentials. */
+  requireSignIn(id: NativeAgentId, message: string): void {
+    if (this.runs.has(id)) return;
+    this.fail(id, 'login', 'authentication', 'authentication-required', new Error(message));
   }
 
   /** Startup and explicit recheck can repair installed runtimes, never download. */
@@ -81,22 +98,31 @@ export class AgentBootstrapCoordinator {
     return this.start(id, 'connect', options);
   }
 
-  /** Runs an installed runtime's own updater in place, then the same
-   * authentication and MCP steps a fresh preparation runs, so a chat that
-   * reconnects afterwards spawns the newer executable at the same path. */
+  /** Run the official standalone installer, then reconnect authentication and
+   * MCP using the verified native copy. Existing npm installations stay intact. */
   update(id: NativeAgentId): AgentBootstrapStatus {
     return this.start(id, 'update', { probeLoginShell: true });
   }
 
   private start(
     id: NativeAgentId,
-    action: 'prepare' | 'connect' | 'login' | 'update',
+    action: AgentBootstrapAction | 'connect',
     options?: { probeLoginShell?: boolean },
   ): AgentBootstrapStatus {
-    if (this.runs.has(id)) return this.status(id);
+    if (this.runs.has(id)) {
+      if (action !== 'connect' && action !== this.actions.get(id)) {
+        const running = this.actions.get(id)!;
+        throw new AgentSetupBusyError(`${agentLabel(id)} is already ${ACTION_PROGRESS[running]}. Wait for it to finish, then retry ${ACTION_LABELS[action]}.`);
+      }
+      return this.status(id);
+    }
+    // A failed first install can leave an executable behind. Retry must rerun
+    // the installer and its verification instead of accepting that partial copy.
+    const retryInstallation = action === 'bootstrap' && this.status(id).failure?.stage === 'installation';
     const controller = new AbortController();
     const { signal } = controller;
     this.controllers.set(id, controller);
+    this.actions.set(id, action);
     this.statuses.set(id, {
       phase: action === 'login' ? 'authenticating' : action === 'update' ? 'installing' : 'configuring',
       message: `Checking ${agentLabel(id)}…`,
@@ -109,67 +135,62 @@ export class AgentBootstrapCoordinator {
         signal.throwIfAborted();
         let executable = await this.dependencies.resolveExecutable(id, { ...options, signal });
         signal.throwIfAborted();
-        if (!executable) {
+        if (!executable || action === 'update' || retryInstallation) {
           if (action === 'connect') {
             this.statuses.set(id, IDLE_STATUS);
             return;
           }
-          if (action === 'login' || action === 'update') {
-            this.fail(id, 'discovery', 'runtime-unavailable', new Error(`${agentLabel(id)} is not installed.`));
+          if (!executable && (action === 'login' || action === 'update')) {
+            this.fail(id, action, 'discovery', 'runtime-unavailable', new Error(`${agentLabel(id)} is not installed.`));
             return;
           }
           stage = 'installation';
           if (this.dependencies.consumeFailure('installation')) {
-            this.fail(id, stage, 'simulated', new Error('Simulated Agent installation failure.'));
+            this.fail(id, action, stage, 'simulated', new Error('Simulated Agent installation failure.'));
             return;
           }
-          this.statuses.set(id, { phase: 'installing', progress: 0, message: `Preparing ${agentLabel(id)}…` });
-          await this.dependencies.installRuntime(id, (next) => {
-            if (!signal.aborted) this.statuses.set(id, { phase: 'installing', ...next });
-          }, signal);
+          this.statuses.set(id, { phase: 'installing', progress: 0, message: `${action === 'update' ? 'Updating' : 'Preparing'} ${agentLabel(id)}…` });
+          const timer = setTimeout(() => controller.abort(new Error(
+            `${agentLabel(id)} installation timed out after ${Math.ceil(this.limits.installationTimeoutMs / 60_000)} minutes. Retry to download and install again.`,
+          )), this.limits.installationTimeoutMs);
+          try {
+            await this.dependencies.installRuntime(id, (next) => {
+              if (!signal.aborted) this.statuses.set(id, { phase: 'installing', ...next });
+            }, signal);
+          } finally {
+            clearTimeout(timer);
+          }
           signal.throwIfAborted();
           executable = await this.dependencies.resolveExecutable(id, { signal });
           signal.throwIfAborted();
           if (!executable) {
-            this.fail(id, stage, 'runtime-unavailable',
+            this.fail(id, action, stage, 'runtime-unavailable',
               new Error(`${agentLabel(id)} installation finished without a usable executable.`), 'install-command');
             return;
           }
-        }
-        if (action === 'update') {
-          stage = 'installation';
-          this.statuses.set(id, { phase: 'installing', progress: 0, message: `Updating ${agentLabel(id)}…` });
-          await this.dependencies.updateRuntime(id, executable, (next) => {
-            if (!signal.aborted) this.statuses.set(id, { phase: 'installing', ...next });
-          }, signal);
-          signal.throwIfAborted();
-          executable = await this.dependencies.resolveExecutable(id, { signal });
-          signal.throwIfAborted();
-          if (!executable) {
-            this.fail(id, stage, 'runtime-unavailable',
-              new Error(`${agentLabel(id)} update finished without a usable executable.`), 'install-command');
-            return;
+          if (executable !== this.dependencies.resolveNativeExecutable(id)) {
+            throw new Error(`${agentLabel(id)} native installation is not the selected executable. Check your executable override, then retry.`);
           }
         }
         stage = 'authentication';
         if (action === 'login') {
-          if (id !== 'codex') throw new Error('In-app login is not supported for this Agent.');
-          this.statuses.set(id, { phase: 'authenticating', message: 'Finish signing in to Codex in your browser…' });
+          this.statuses.set(id, { phase: 'authenticating', message: `Finish signing in to ${agentLabel(id)} in your browser…` });
           await this.dependencies.login(id, executable, signal);
           signal.throwIfAborted();
         }
-        if (!await this.checkAuthentication(id, executable, action === 'prepare', signal)) return;
+        if (!await this.checkAuthentication(id, executable, action, signal)) return;
         signal.throwIfAborted();
         this.statuses.set(id, { phase: 'configuring', progress: 1, message: 'Connecting StashBase MCP…' });
-        this.configure(id, action !== 'connect');
+        this.configure(id, action);
       } catch (error) {
-        this.fail(id, stage, 'operation-failed', error, stage === 'installation' ? 'install-command' : undefined);
+        this.fail(id, action, stage, 'operation-failed', signal.aborted ? signal.reason : error, stage === 'installation' ? 'install-command' : undefined);
       }
     }).finally(() => {
       if (action !== 'connect') telemetry.capture({ event: 'agent_setup_result', runtime: id,
         stage: action === 'login' ? 'login' : action === 'update' ? 'update' : 'prepare',
         outcome: signal.aborted ? 'cancelled' : this.status(id).phase === 'ready' ? 'success' : 'failed' });
       this.controllers.delete(id);
+      this.actions.delete(id);
       this.runs.delete(id);
     });
     this.runs.set(id, run);
@@ -177,34 +198,34 @@ export class AgentBootstrapCoordinator {
   }
 
   private async checkAuthentication(
-    id: NativeAgentId, executable: string, allowSimulation: boolean, signal: AbortSignal,
+    id: NativeAgentId, executable: string, action: AgentBootstrapAction | 'connect', signal: AbortSignal,
   ): Promise<boolean> {
-    if (allowSimulation && id === 'codex' && this.dependencies.consumeFailure('authentication')) {
-      this.fail(id, 'authentication', 'authentication-required', new Error('Simulated signed-out Codex runtime.'));
+    if (action === 'bootstrap' && id === 'codex' && this.dependencies.consumeFailure('authentication')) {
+      this.fail(id, action, 'authentication', 'authentication-required', new Error('Simulated signed-out Codex runtime.'));
       return false;
     }
     try {
       const authenticated = await this.dependencies.isAuthenticated(id, executable, signal);
       signal.throwIfAborted();
       if (authenticated) return true;
-      this.fail(id, 'authentication', 'authentication-required',
+      this.fail(id, action, 'authentication', 'authentication-required',
         new Error(`${agentLabel(id)} is installed, but it is not signed in.`));
     } catch (error) {
-      this.fail(id, 'authentication', 'authentication-check-failed', error);
+      this.fail(id, action, 'authentication', 'authentication-check-failed', error);
     }
     return false;
   }
 
-  private configure(id: NativeAgentId, allowSimulation = true): void {
-    if (allowSimulation && this.dependencies.consumeFailure('mcp')) {
-      this.fail(id, 'mcp', 'simulated', new Error('Simulated MCP configuration failure.'));
+  private configure(id: NativeAgentId, action: AgentBootstrapAction | 'connect'): void {
+    if (action !== 'connect' && this.dependencies.consumeFailure('mcp')) {
+      this.fail(id, action, 'mcp', 'simulated', new Error('Simulated MCP configuration failure.'));
       return;
     }
     try {
       this.dependencies.configureMcp(id);
       this.statuses.set(id, { phase: 'ready', progress: 1, message: `${agentLabel(id)} is ready.` });
     } catch (error) {
-      this.fail(id, 'mcp', 'operation-failed', error, 'mcp-settings');
+      this.fail(id, action, 'mcp', 'operation-failed', error, 'mcp-settings');
     }
   }
 
@@ -222,20 +243,22 @@ export class AgentBootstrapCoordinator {
 
   private fail(
     id: NativeAgentId,
+    action: AgentBootstrapAction | 'connect',
     stage: AgentBootstrapFailureStage,
     code: AgentBootstrapFailureCode,
     error: unknown,
     manualRecovery?: AgentBootstrapManualRecovery,
   ): void {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = agentSetupDiagnostic(error);
     this.statuses.set(id, {
       phase: 'failed',
       failure: {
         stage,
         code,
-        message: message.slice(0, 1000),
+        message: `${agentLabel(id)} · ${ACTION_LABELS[action]} · ${stage}\n${message}`,
         retryable: true,
         manualRecovery,
+        retryAction: action === 'connect' ? 'bootstrap' : action,
       },
     });
   }
@@ -255,14 +278,11 @@ function resolveInstalledExecutable(id: NativeAgentId): string | null {
   return resolveAgentCli(agentCliSpec(id));
 }
 
-/** Claude reports authentication through its native SDK connection. Codex
- * exposes a cheap, side-effect-free status command, so preparation can stop
- * before opening an app-server that cannot serve a turn. */
+/** Ask the selected CLI before declaring readiness; this never starts login. */
 export async function agentIsAuthenticated(
   id: NativeAgentId, executable: string, signal?: AbortSignal,
 ): Promise<boolean> {
-  if (id !== 'codex') return true;
-  const result = await probeAgentCommand(executable, ['login', 'status'], {
+  const result = await probeAgentCommand(executable, id === 'claude' ? ['auth', 'status'] : ['login', 'status'], {
     timeoutMs: 10_000,
     signal,
     shell: agentCliNeedsShell(executable),
@@ -270,13 +290,13 @@ export async function agentIsAuthenticated(
   });
   const output = `${result.stdout}\n${result.stderr}`.replace(/\s+/g, ' ').trim().slice(-800);
   if (result.status === 0) return true;
-  if (result.status === 1 && /not logged in/i.test(output)) return false;
-  throw new Error(`Could not check Codex sign-in (exit ${result.status ?? 'unknown'}${output ? `: ${output}` : ''}).`);
+  if (result.status === 1 && (id === 'claude' ? /"loggedIn"\s*:\s*false/.test(output) : /not logged in/i.test(output))) return false;
+  throw new Error(`Could not check ${agentLabel(id)} sign-in using ${executable} (exit ${result.status ?? 'unknown'}${output ? `: ${output}` : ''}).`);
 }
 
-const CODEX_LOGIN_TIMEOUT_MS = 10 * 60_000;
+const AGENT_LOGIN_TIMEOUT_MS = 10 * 60_000;
 
-/** Run Codex's own browser-based login. The selected CLI opens the provider
+/** Run the Agent's own browser-based login. The selected CLI opens the provider
  * page and writes credentials to its normal home; no token passes through
  * StashBase. */
 export async function loginToAgent(
@@ -284,15 +304,17 @@ export async function loginToAgent(
   executable: string,
   signal: AbortSignal,
 ): Promise<void> {
-  if (id !== 'codex') throw new Error('In-app login is available only for Codex.');
+  signal.throwIfAborted();
+  const label = agentLabel(id);
   await new Promise<void>((resolve, reject) => {
-    const child = spawn(executable, ['login'], {
+    const child = spawn(executable, id === 'claude' ? ['auth', 'login'] : ['login'], {
       env: agentCliEnv({}, [commandDir(executable)]),
       detached: true,
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
       shell: agentCliNeedsShell(executable),
     });
+    const completion = waitForExtractorTree(child);
     let output = '';
     let settled = false;
     let timedOut = false;
@@ -314,19 +336,18 @@ export async function loginToAgent(
     const timeout = setTimeout(() => {
       timedOut = true;
       terminateInstallerTree(child);
-    }, CODEX_LOGIN_TIMEOUT_MS);
+    }, AGENT_LOGIN_TIMEOUT_MS);
     timeout.unref?.();
     signal.addEventListener('abort', abort, { once: true });
     child.stdout.on('data', append);
     child.stderr.on('data', append);
-    child.once('error', (error) => finish(error));
-    child.once('close', (code) => {
+    void completion.then((code) => {
       const detail = output.replace(/\s+/g, ' ').trim().slice(-800);
-      if (signal.aborted) finish(new Error('Codex sign-in was cancelled.'));
+      if (signal.aborted) finish(new Error(`${label} sign-in was cancelled.`));
       else if (code === 0) finish();
-      else if (timedOut) finish(new Error('Codex sign-in timed out after 10 minutes.'));
-      else finish(new Error(detail || `Codex sign-in exited with code ${code ?? 'unknown'}.`));
-    });
+      else if (timedOut) finish(new Error(`${label} sign-in timed out after 10 minutes. Retry to open sign-in again.`));
+      else finish(new Error(detail || `${label} sign-in exited with code ${code ?? 'unknown'}.`));
+    }, (error) => finish(error));
   });
 }
 
@@ -334,8 +355,8 @@ export const agentBootstrapCoordinator = new AgentBootstrapCoordinator({
   resolveExecutable: (id, options) => options?.probeLoginShell
     ? resolveAgentCliWithLoginShell(agentCliSpec(id), undefined, options.signal)
     : resolveInstalledExecutable(id),
+  resolveNativeExecutable: resolveNativeAgentCli,
   installRuntime: installNativeRuntime,
-  updateRuntime: updateNativeRuntime,
   isAuthenticated: agentIsAuthenticated,
   login: loginToAgent,
   configureMcp: (id) => { ensureAgentMcp(id); },
@@ -354,15 +375,17 @@ export function loginAgentBootstrap(id: NativeAgentId): AgentBootstrapStatus {
   return agentBootstrapCoordinator.login(id);
 }
 
-/** Which runtimes ship an updater StashBase can run for the user: both do,
- * each through its own `update` subcommand. */
+/** Updates use each provider's standalone installer. Explicit executable
+ * overrides outside that layout cannot be replaced by an in-app update. */
 export function agentSupportsInAppUpdate(id: NativeAgentId): boolean {
-  return id === 'claude' || id === 'codex';
+  const override = agentCliOverride(agentCliSpec(id));
+  return !override || override === resolveNativeAgentCli(id);
 }
 
 /** Explicit user recovery when the installed runtime is too old for what a
- * chat asked of it: the runtime updates itself in place. */
+ * chat asked of it: install and select the provider's native copy. */
 export function updateAgentBootstrap(id: NativeAgentId): AgentBootstrapStatus {
+  if (!agentSupportsInAppUpdate(id)) throw new Error(`Remove the ${agentLabel(id)} executable override before updating its native installation.`);
   return agentBootstrapCoordinator.update(id);
 }
 
@@ -394,96 +417,6 @@ async function installNativeRuntime(
   return installCodex(update, signal);
 }
 
-async function updateNativeRuntime(
-  id: NativeAgentId,
-  executable: string,
-  update: (next: ProgressUpdate) => void,
-  signal: AbortSignal,
-): Promise<void> {
-  if (!agentSupportsInAppUpdate(id)) throw new Error(`In-app update is not available for ${agentLabel(id)}.`);
-  return updateAgentInPlace(id, executable, update, signal);
-}
-
-export interface AgentUpdateDependencies {
-  runCommand: typeof runAgentUpdateCommand;
-  verifyExecutable: typeof verifyAgentExecutable;
-}
-
-/** The runtime's own updater, run on the executable StashBase resolved. Each
- * CLI knows whether it was installed natively or through npm and updates that
- * installation, so the next session spawns the same path, newer. Running an
- * official installer instead would leave a second copy in another directory
- * that discovery might never prefer. Verified on npm installations of both:
- * `claude update` moved 2.1.220 to the current release in place, and
- * `codex update` moved 0.153.4 to 0.155.0 the same way. A session already
- * open keeps its old process until it reconnects; a new one spawns the
- * updated executable. */
-export async function updateAgentInPlace(
-  id: NativeAgentId,
-  executable: string,
-  update: (next: ProgressUpdate) => void,
-  signal: AbortSignal,
-  dependencies: Partial<AgentUpdateDependencies> = {},
-): Promise<void> {
-  const runCommand = dependencies.runCommand ?? runAgentUpdateCommand;
-  const verifyExecutable = dependencies.verifyExecutable ?? verifyAgentExecutable;
-  const label = agentLabel(id);
-  update({ message: `Checking for a newer ${label}…` });
-  await runCommand(executable, ['update'], agentCliEnv({}, [commandDir(executable)]), signal, (line) => {
-    const message = line.trim();
-    if (message) update({ message });
-  });
-  verifyExecutable(executable, label, agentCliEnv());
-  update({ progress: 1, message: `${label} is up to date.` });
-}
-
-/** Runs a provider CLI's own command, narrating its stdout line by line.
- * Updaters explain themselves on stdout, so the tail of both streams is the
- * failure message when the command exits with an error. */
-export async function runAgentUpdateCommand(
-  command: string,
-  args: string[],
-  env: NodeJS.ProcessEnv,
-  signal: AbortSignal,
-  onLine: (line: string) => void,
-): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn(command, args, {
-      env,
-      detached: process.platform !== 'win32',
-      stdio: ['ignore', 'pipe', 'pipe'],
-      windowsHide: true,
-      shell: agentCliNeedsShell(command),
-    });
-    let tail = '';
-    let buffered = '';
-    const abort = () => terminateInstallerTree(child);
-    signal.addEventListener('abort', abort, { once: true });
-    child.stdout.setEncoding('utf8');
-    child.stderr.setEncoding('utf8');
-    child.stdout.on('data', (chunk: string) => {
-      tail = (tail + chunk).slice(-4000);
-      buffered += chunk;
-      const lines = buffered.split(/\r?\n/);
-      buffered = lines.pop() ?? '';
-      for (const line of lines) onLine(line);
-    });
-    child.stderr.on('data', (chunk: string) => { tail = (tail + chunk).slice(-4000); });
-    child.on('error', (error) => {
-      signal.removeEventListener('abort', abort);
-      reject(error);
-    });
-    child.on('close', (code) => {
-      signal.removeEventListener('abort', abort);
-      if (buffered.trim()) onLine(buffered);
-      const detail = tail.replace(/\s+/g, ' ').trim().slice(-800);
-      if (signal.aborted) reject(new Error('Agent update was cancelled.'));
-      else if (code === 0) resolve();
-      else reject(new Error(detail || `${path.basename(command)} ${args.join(' ')} exited with code ${code ?? 'unknown'}.`));
-    });
-  });
-}
-
 const CLAUDE_INSTALLER = process.platform === 'win32'
   ? 'https://claude.ai/install.ps1'
   : 'https://claude.ai/install.sh';
@@ -509,7 +442,7 @@ export async function installClaude(
   const resolveInstallerShell = dependencies.resolveInstallerShell ?? resolveClaudeInstallerShell;
   const runScript = dependencies.runInstallerScript ?? claudeInstallerScriptRunner;
   const resolveInstalled = dependencies.resolveInstalledExecutable
-    ?? (() => resolveInstalledExecutable('claude'));
+    ?? (() => resolveNativeAgentCli('claude'));
   update({ message: 'Downloading the official Claude installer…' });
   const script = await fetchBoundedText(CLAUDE_INSTALLER, signal, 2_000_000);
   const env: NodeJS.ProcessEnv = {
@@ -529,7 +462,7 @@ export async function installClaude(
       + 'Check whether security software quarantined Claude, then retry the installation.',
     );
   }
-  verifyExecutable(executable, 'Claude', agentCliEnv());
+  await verifyExecutable(executable, 'Claude', agentCliEnv(), 20_000, signal);
   // Unlike Codex's Windows installer, `claude.exe install` leaves its bin
   // dir off the user Path, so the CLI would be invisible to the user's own
   // terminal (StashBase discovery scans the directory and is unaffected).
@@ -612,7 +545,9 @@ type AgentExecutableVerifier = (
   executable: string,
   label: string,
   env: NodeJS.ProcessEnv,
-) => void;
+  timeoutMs?: number,
+  signal?: AbortSignal,
+) => void | Promise<void>;
 
 type InstallerScriptRunner = (
   shell: CodexInstallerShell,
@@ -626,9 +561,8 @@ export interface AgentInstallDependencies {
   verifyExecutable: AgentExecutableVerifier;
   resolveInstallerShell: () => CodexInstallerShell;
   runInstallerScript: InstallerScriptRunner;
-  /** Post-install discovery of the freshly installed executable. Defaults to
-   * the same system CLI discovery the coordinator uses, which
-   * covers the official user-level locations (`~/.local/bin`, the official
+  /** Post-install discovery of the freshly installed native executable in
+   * the official user-level locations (`~/.local/bin`, the official
    * Windows standalone bin). Injected by tests so a developer machine's own
    * CLIs can never satisfy an install check. */
   resolveInstalledExecutable: () => string | null;
@@ -709,7 +643,7 @@ export async function installCodex(
   const resolveInstallerShell = dependencies.resolveInstallerShell ?? resolveCodexInstallerShell;
   const runScript = dependencies.runInstallerScript ?? codexInstallerScriptRunner;
   const resolveInstalled = dependencies.resolveInstalledExecutable
-    ?? (() => resolveInstalledExecutable('codex'));
+    ?? (() => resolveNativeAgentCli('codex'));
   update({ message: 'Downloading the official Codex installer…' });
   const script = await fetchBoundedText(CODEX_INSTALLER, signal, 2_000_000);
   // The official installer owns its layout and the user's PATH profile:
@@ -744,7 +678,7 @@ export async function installCodex(
       + 'Check whether security software quarantined Codex, then retry the installation.',
     );
   }
-  verifyExecutable(executable, 'Codex', agentCliEnv());
+  await verifyExecutable(executable, 'Codex', agentCliEnv(), 20_000, signal);
   update({ progress: 1, message: 'Codex installed.' });
 }
 
@@ -762,47 +696,47 @@ function codexInstallerScriptRunner(
 }
 
 async function fetchBoundedText(url: string, signal: AbortSignal, maxBytes: number): Promise<string> {
-  const response = await fetch(url, { signal, redirect: 'follow' });
-  if (!response.ok || !response.body) throw new Error(`Download failed (${response.status}) from ${new URL(url).host}.`);
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > maxBytes) throw new Error(`Download from ${new URL(url).host} exceeded its size limit.`);
-    chunks.push(value);
+  const bounded = AbortSignal.any([signal, AbortSignal.timeout(60_000)]);
+  try {
+    const response = await fetch(url, { signal: bounded, redirect: 'follow' });
+    if (!response.ok || !response.body) throw new Error(`HTTP ${response.status}`);
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        total += value.byteLength;
+        if (total > maxBytes) throw new Error('Installer exceeded its size limit.');
+        chunks.push(value);
+      }
+      return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk))).toString('utf8');
+    } finally {
+      await reader.cancel().catch(() => {});
+      reader.releaseLock();
+    }
+  } catch (error) {
+    throw new Error(`Download failed from ${new URL(url).host}: ${agentSetupDiagnostic(bounded.aborted ? bounded.reason : error)}`);
   }
-  return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk))).toString('utf8');
 }
 
-export function verifyAgentExecutable(
+export async function verifyAgentExecutable(
   executable: string,
   label: string,
   env: NodeJS.ProcessEnv = process.env,
   timeoutMs = 20_000,
-): void {
-  const result = spawnSync(executable, ['--version'], {
-    encoding: 'utf8',
-    timeout: timeoutMs,
-    windowsHide: true,
-    env: { ...env, ELECTRON_RUN_AS_NODE: undefined },
-  });
-  if (result.status !== 0) {
-    const nativeError = result.error as NodeJS.ErrnoException | undefined;
-    const stderr = typeof result.stderr === 'string'
-      ? result.stderr.replace(/\s+/g, ' ').trim().slice(-800)
-      : '';
-    let detail: string;
-    if (nativeError?.code === 'ETIMEDOUT') detail = `timed out after ${timeoutMs}ms`;
-    else if (nativeError) detail = `could not start: ${nativeError.message}`;
-    else if (result.status !== null) detail = `exited with code ${result.status}`;
-    else if (result.signal) detail = `terminated by ${result.signal}`;
-    else detail = 'returned no exit status';
-    throw new Error(
-      `${label} was downloaded but did not pass its executable check (${detail}${stderr ? `: ${stderr}` : ''}).`,
-    );
+  signal?: AbortSignal,
+): Promise<void> {
+  try {
+    const result = await probeAgentCommand(executable, ['--version'], {
+      env, timeoutMs, signal, shell: agentCliNeedsShell(executable),
+    });
+    if (result.status !== 0) {
+      throw new Error(`exited with code ${result.status ?? 'unknown'}: ${[result.stderr, result.stdout].filter(Boolean).join('\n').trim()}`);
+    }
+  } catch (error) {
+    throw new Error(`${label} was downloaded but did not pass its executable check at ${executable}: ${agentSetupDiagnostic(error)}`);
   }
 }
 
@@ -814,6 +748,7 @@ async function runInstallerScript(
   onLine: (line: string) => void,
   options: { tempRoot: string; bootstrap: readonly string[] },
 ): Promise<void> {
+  signal.throwIfAborted();
   let scriptDir: string | null = null;
   let scriptFile: string | null = null;
   if (shell.kind !== 'posix') {
@@ -833,29 +768,34 @@ async function runInstallerScript(
         stdio: ['pipe', 'pipe', 'pipe'],
         windowsHide: true,
       });
-      let stderr = '';
+      const completion = waitForExtractorTree(child);
+      let output = '';
       let buffered = '';
+      const append = (chunk: string) => { output = (output + chunk).slice(-4000); };
       const abort = () => terminateInstallerTree(child);
       signal.addEventListener('abort', abort, { once: true });
       child.stdout.setEncoding('utf8');
       child.stderr.setEncoding('utf8');
       child.stdout.on('data', (chunk: string) => {
+        append(chunk);
         buffered += chunk;
         const lines = buffered.split(/\r?\n/);
-        buffered = lines.pop() ?? '';
-        for (const line of lines) onLine(line);
+        buffered = (lines.pop() ?? '').slice(-4000);
+        for (const line of lines) onLine(agentSetupDiagnostic(line));
       });
-      child.stderr.on('data', (chunk: string) => { stderr = (stderr + chunk).slice(-4000); });
-      child.on('error', (error) => {
+      child.stderr.on('data', append);
+      void completion.then((code) => {
+        signal.removeEventListener('abort', abort);
+        if (buffered.trim()) onLine(agentSetupDiagnostic(buffered));
+        if (signal.aborted) reject(new Error('Agent installation was cancelled.'));
+        else if (code === 0) resolve();
+        else reject(new Error(`Official Agent installer exited with code ${code ?? 'unknown'}.\n${output.trim()}`));
+      }, (error) => {
         signal.removeEventListener('abort', abort);
         reject(error);
       });
-      child.on('close', (code) => {
-        signal.removeEventListener('abort', abort);
-        if (buffered.trim()) onLine(buffered);
-        if (signal.aborted) reject(new Error('Agent installation was cancelled.'));
-        else if (code === 0) resolve();
-        else reject(new Error(stderr.trim() || `Official Agent installer exited with code ${code ?? 'unknown'}.`));
+      child.stdin.on('error', (error: NodeJS.ErrnoException) => {
+        if (error.code !== 'EPIPE') append(error.message);
       });
       if (scriptFile) child.stdin.end();
       else child.stdin.end(script);

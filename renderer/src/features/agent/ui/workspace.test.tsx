@@ -14,6 +14,7 @@ import {
   agentSessionPort,
   BUILT_IN_AGENT,
   CODEX_AGENT,
+  CLAUDE_AGENT,
   idleAgentSessionPort,
 } from '@/test/fakes/agent';
 
@@ -22,6 +23,32 @@ import { registerWorkspaceCleanup, renderWorkspace } from './workspace.harness';
 registerWorkspaceCleanup();
 
 describe('Agent workspace', () => {
+  it('does not offer updates for an externally controlled executable in the composer or failed turn', async () => {
+    const { port, listeners } = agentSessionPort();
+    const claude = {
+      ...CLAUDE_AGENT,
+      updatable: false,
+      upgrade: { model: 'New model', note: 'New model needs a newer Claude' },
+    };
+    const { runtime } = renderWorkspace(port, [claude]);
+    await agentGateLifted();
+    await userEvent.click(screen.getByRole('button', { name: 'Provider: Default' }));
+    await userEvent.click(await screen.findByRole('menuitemradio', { name: 'Claude' }));
+    expect(screen.queryByRole('button', { name: 'Update Claude' })).toBeNull();
+    const session = runtime.activeSession();
+    await act(async () => {
+      session.start();
+      listeners[0]?.onEvent({ kind: 'ready' });
+      await session.sendPrompt('Use the new model');
+      listeners[0]?.onEvent({
+        kind: 'failed',
+        failure: 'runtime-outdated',
+        message: 'Claude is too old for this model.',
+      });
+    });
+    expect(screen.queryByRole('button', { name: 'Update Claude' })).toBeNull();
+    expect(screen.getByText(/This installation cannot be updated here/)).not.toBeNull();
+  });
   it('shows the native exit cause when an interrupted turn has an unknown outcome', async () => {
     const { port, listeners, sent } = agentSessionPort();
     const { runtime } = renderWorkspace(port);
@@ -209,7 +236,11 @@ describe('Agent workspace', () => {
           agents: [
             outcome === 'success'
               ? codex
-              : { ...codex, ready: false, setupFailure: 'Codex update failed' },
+              : {
+                  ...codex,
+                  ready: false,
+                  setupFailure: { stage: 'installation' as const, message: 'Codex update failed' },
+                },
           ],
         };
       });

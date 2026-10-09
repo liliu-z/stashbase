@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vite-plus/test';
 
+import { settingsFailure } from '@/features/settings/application/failure-messages';
 import type { HttpClient } from '@/platform/http/client';
 
 import { createAgentRuntimeAdapter } from './agent-runtime-api';
@@ -21,6 +22,15 @@ const catalogBody = {
 };
 
 describe('agent runtime API', () => {
+  it('preserves the service diagnostic through the Settings failure presenter', async () => {
+    const detail = 'EACCES: unable to write /Users/example/.local/bin/codex';
+    const adapter = createAgentRuntimeAdapter({
+      request: async () => ({ status: 500, body: { error: detail } }),
+    });
+    await expect(
+      adapter.prepareAgent('codex', 'update', new AbortController().signal),
+    ).rejects.toSatisfy((error) => settingsFailure(error).message === detail);
+  });
   it('lists the catalog and maps a well-formed response', async () => {
     const client: HttpClient = { request: vi.fn(async () => ({ body: catalogBody, status: 200 })) };
     const signal = new AbortController().signal;
@@ -70,6 +80,43 @@ describe('agent runtime API', () => {
       method: 'POST',
       path: '/api/terminal/clis/codex/bootstrap',
       signal,
+    });
+  });
+
+  it('preserves the failed operation so a runtime retry does not become a readiness check', async () => {
+    const client: HttpClient = {
+      request: vi.fn(async () => ({
+        status: 200,
+        body: {
+          clis: [
+            {
+              ...catalogBody.clis[0],
+              id: 'claude',
+              label: 'Claude',
+              bootstrap: {
+                phase: 'failed',
+                failure: {
+                  stage: 'installation',
+                  code: 'operation-failed',
+                  message: 'Download failed',
+                  retryable: true,
+                  retryAction: 'update',
+                },
+              },
+            },
+          ],
+        },
+      })),
+    };
+    const result = await createAgentRuntimeAdapter(client).listAgents(new AbortController().signal);
+    expect(result.runtimes[0]?.preparation).toEqual({
+      kind: 'failed',
+      failure: {
+        stage: 'install',
+        refusal: 'operation-failed',
+        note: 'Download failed',
+        retryAction: 'update',
+      },
     });
   });
 

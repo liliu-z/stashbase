@@ -605,6 +605,22 @@ Host/services: `server/retrieval/index.ts`, `server/indexer.mfs.ts`, `python/sta
 
 ## J06: Agent
 
+**First-send setup diagnostics (2026-10-09):** the access prompt previously
+replaced a known bootstrap failure with a generic connection sentence.
+`infrastructure/catalog-api.ts` now retains its stage and explanation;
+`application/connect-agent.ts` carries them in `AgentSetupRefused`, and
+`application/failure-messages.ts` presents the failed step and diagnostic in
+`ui/access-dialog.tsx`. Transport causes and unexpected Error messages likewise
+remain visible as plain text. The dialog wraps details, expands for failure,
+and bounds its height without truncating the message. A mounted regression
+first failed on the generic sentence, then passed with the download reason,
+retained draft, and successful retry; the wire adapter covers MCP details and
+the `SetupFailure` Story covers multiline composition/accessibility. A built
+macOS Electron pass used an isolated home, empty project, and controlled Codex
+executable: its login failure displayed the step, auth host, and ECONNREFUSED
+in the same prompt; Not now preserved the draft. This proves error propagation
+and UI recovery, not the original reporter's underlying Codex failure.
+
 **Default permissions and desktop commands (2026-10-08):** Default now declares
 Ask/Edit/Plan and maps each turn to an OpenCode profile. Edit uses the shared
 realpath-aware project-write predicate; commands, deletion, and broader access
@@ -809,29 +825,77 @@ untouched runtime, the held pick, and the name mapping; the renderer transport
 re-sends a model picked while the socket was still opening. The reproduction was
 a scratch SDK script against the live CLI, not the packaged application.
 
-**Runtime update (2026-09-18):** `server/agent-turn-failure.ts` classifies a
+**Runtime update (2026-10-09):** `server/agent-turn-failure.ts` classifies a
 runtime too old for its model as `runtime-outdated` (observed live: Claude
 2.1.220 refusing Fable 5.1 with a 400 naming 2.1.251 as required).
-`server/agent-runtime-installer.ts` runs the runtime's own updater in place
-through the bootstrap coordinator, then re-verifies the executable and
-reconnects MCP; the updater was verified on an isolated npm-prefix copy of
-2.1.220, which moved to 2.1.276 with a clean exit. The listing carries the
-installed version and whether an in-app update exists. The failed turn offers
+`server/agent-runtime-installer.ts` runs the provider's official native installer
+for both installation and Update through one cancellable bootstrap coordinator,
+then verifies the native launcher, confirms discovery selects it, and reconnects
+MCP. An npm installation switches to native without an extra choice or removing
+the old npm copy. `server/agent-cli.ts` prioritizes native launchers over npm
+copies, rejects npm shims as native installation output, and preserves explicit
+executable overrides. Overrides outside the native layout disable in-app updates.
+The listing carries the installed version and whether an in-app update exists. The failed turn offers
 Update Claude through `hooks/use-agent-runtime-update.ts`, which waits for the
 runtime to be ready, reconnects the conversation so the service spawns the
 updated executable, and resends the refused request; Settings → Agents shows
-the version and the same Update. Tests cover the coordinator's update paths, the
-updater command runner against a real shell, the classifier, the version cache,
+the version and the same Update. Focused tests cover native selection, npm-copy
+preservation, installation/update verification, failure retry (including partial
+first installs), the classifier, the version cache,
 descriptor and schema fields, the hook's reconnect-and-resend and refused-update
-paths, the transcript's action swap, and the Settings action. Codex offers the
-same Settings update through its own update subcommand, verified on an isolated
-npm-prefix copy of 0.153.4 that moved to 0.155.0; its catalog comes from the
-installed app-server. An old catalog can hide newer models, but the native
+paths, the transcript's action swap, and the Settings action. Failed updates carry
+`retryAction: update` through the wire adapter to the mounted Settings panel;
+Retry runs the installer again rather than reconnecting the old executable.
+Codex uses the same installer-based update; its catalog comes from the installed
+app-server. An old catalog can hide newer models, but the native
 configuration can still name one and fail at inference (see the Codex recovery
 entry below). A Codex model
 chosen while its catalog is still being read is now held for that read instead
-of being refused as unavailable. Not proven: the packaged application running
-a real update end to end.
+of being refused as unavailable.
+
+A macOS arm64 Electron pass used the built renderer, preload, and server with an
+isolated home and controlled installer scripts served for the official URLs.
+Settings → Agents updated an existing npm Claude fixture; an injected download
+failure showed Retry, which downloaded again and selected the native fixture.
+Codex Update likewise selected its native fixture. Both rows refreshed their
+versions and readiness, with no migration choice. Command logs showed native
+verification/authentication, no npm updater call, and unchanged npm executables.
+
+This proves the application flow with controlled downloads, not provider
+distribution behavior. Not proven: a real update through the packaged app, or
+the native update journey on Windows and Linux.
+
+**Onboarding recovery (2026-10-09):** Both native providers now gate readiness on
+their asynchronous status commands and expose provider browser login. A turn's
+authentication refusal restores the sign-in action without clearing credentials.
+The setup coordinator rejects conflicting explicit operations with HTTP 409;
+identical operations share progress. Installation/download deadlines retire the
+owned process tree before Retry can start another attempt. Version discovery and
+post-install verification no longer block the shared server. MCP configuration
+uses the provider's effective custom home through `server/agent-config-paths.ts`.
+Bounded setup diagnostics retain installer stdout/stderr and nested fetch causes;
+Settings and chat Update preserve HTTP errors. Every chat update entry respects
+the runtime's update capability, including failed turns and proactive offers.
+
+Focused host regressions exercise fresh Claude sign-in with a CLI fixture,
+conflicting login/Update, actual installer timeout and process retirement before
+retry, concurrent asynchronous version reads, custom-home config preservation,
+and stdout/network diagnostic propagation. Renderer regressions exercise Claude
+bootstrap-to-login, HTTP diagnostics through the real adapters/presenters, and
+unsupported update offers in a mounted workspace. These fixtures establish
+StashBase's decisions and recovery, not real-provider browser authentication or
+Windows package-manager migration and executable-lock behavior.
+
+A driven built-Electron pass used an isolated home, custom provider config
+directories, and controlled CLI/official-URL installer fixtures. First-send
+Claude sign-in failure displayed its ECONNREFUSED cause in the access prompt;
+Not now preserved the draft. Settings sign-in retry reached Ready. A Claude
+Update script failed with stdout-only EACCES and exit 13; both were visible on
+the row, and Retry selected native 2.1.300 from npm 2.1.81. Codex Update selected
+native 0.162.0 from npm 0.153.4. Both final versions and Ready states were seen
+in Settings. Fixture logs confirmed native verification/authentication, intact
+npm copies, no updater subcommands, and MCP writes only in the custom provider
+config files. No real provider credentials or browser authorization were used.
 
 **Codex model compatibility recovery (2026-10-04):** an older runtime using
 `gpt-6.1-sol` from native configuration reported missing model metadata and then

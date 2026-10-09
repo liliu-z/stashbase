@@ -141,7 +141,7 @@ export function AgentRuntimesPanel({ agentRuntimeApi }: AgentRuntimesPanelProps)
           {catalog.failed && (
             <SettingsMessage
               as="li"
-              message="Could not load agents."
+              message={catalog.failure?.message ?? 'Could not load agents.'}
               onRetry={runtimes.refreshCatalog}
             />
           )}

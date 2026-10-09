@@ -1,4 +1,3 @@
-import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -20,10 +19,8 @@ export function isWindowsLaunchableAgentCliPath(file: string): boolean {
 function isExecutable(file: string): boolean {
   try {
     fs.accessSync(file, process.platform === 'win32' ? fs.constants.F_OK : fs.constants.X_OK);
-    if (process.platform === 'win32') {
-      return fs.statSync(file).isFile() && isWindowsLaunchableAgentCliPath(file);
-    }
-    return true;
+    return fs.statSync(file).isFile()
+      && (process.platform !== 'win32' || isWindowsLaunchableAgentCliPath(file));
   } catch {
     return false;
   }
@@ -52,17 +49,17 @@ export function agentCliSearchDirs(
 ): string[] {
   const join = platform === 'win32' ? path.win32.join : path.posix.join;
   const dirs = [
-    join(home, '.npm-global', 'bin'),
     join(home, '.local', 'bin'),
+    join(home, '.npm-global', 'bin'),
   ];
   if (platform === 'win32') {
     const appData = environmentValue(env, 'APPDATA');
     const localAppData = environmentValue(env, 'LOCALAPPDATA');
     return unique([
+      localAppData ? join(localAppData, 'Programs', 'OpenAI', 'Codex', 'bin') : '',
       ...dirs,
       appData ? join(appData, 'npm') : '',
       localAppData ? join(localAppData, 'npm') : '',
-      localAppData ? join(localAppData, 'Programs', 'OpenAI', 'Codex', 'bin') : '',
     ]);
   }
   return unique([...dirs, '/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin']);
@@ -92,6 +89,48 @@ export function agentCliExecutableCandidates(name: string, platform: NodeJS.Plat
   return [`${name}.exe`, `${name}.cmd`, `${name}.bat`, `${name}.com`, name];
 }
 
+/** Inspect the package target rather than guessing from a global bin directory:
+ * Homebrew and npm can both publish commands into /usr/local/bin. Windows npm
+ * shims are small scripts rather than symlinks. Never execute a CLI to classify it. */
+function isNpmAgentCli(executable: string, name: string): boolean {
+  const packageName = name === 'claude' ? '@anthropic-ai/claude-code' : name === 'codex' ? '@openai/codex' : null;
+  if (!packageName) return false;
+  try {
+    const target = fs.realpathSync(executable).replaceAll('\\', '/');
+    if (target.includes(`/node_modules/${packageName}/`)) return true;
+    if (fs.statSync(executable).size > 8192) return false;
+    return fs.readFileSync(executable, 'utf8').replaceAll('\\', '/').includes(`/${packageName}/`);
+  } catch {
+    return false;
+  }
+}
+
+/** Official per-user launchers. A leftover npm shim in the same directory must
+ * not satisfy post-install verification of a standalone installation. */
+export function resolveNativeAgentCli(name: string): string | null {
+  const dirs = [path.join(os.homedir(), '.local', 'bin')];
+  const localAppData = environmentValue(process.env, 'LOCALAPPDATA');
+  if (process.platform === 'win32' && name === 'codex' && localAppData) {
+    dirs.unshift(path.join(localAppData, 'Programs', 'OpenAI', 'Codex', 'bin'));
+  }
+  for (const dir of dirs) {
+    const candidate = path.join(dir, process.platform === 'win32' ? `${name}.exe` : name);
+    if (isExecutable(candidate) && !isNpmAgentCli(candidate, name)) return candidate;
+  }
+  return null;
+}
+
+export function agentCliOverride(spec: AgentCliSpec): string | null {
+  for (const name of spec.envNames) {
+    const candidate = process.env[name];
+    if (candidate?.trim()) {
+      const resolved = path.resolve(expandHome(candidate));
+      if (isExecutable(resolved)) return resolved;
+    }
+  }
+  return null;
+}
+
 function resolveSystemAgentCli(
   spec: AgentCliSpec,
   warn?: (message: string) => void,
@@ -104,6 +143,9 @@ function resolveSystemAgentCli(
     if (isExecutable(resolved)) return resolved;
     warn?.(`${spec.logLabel} binary override is not executable: ${candidate}`);
   }
+
+  const native = resolveNativeAgentCli(spec.name);
+  if (native) return native;
 
   for (const dir of agentCliPath().split(path.delimiter)) {
     for (const name of agentCliExecutableCandidates(spec.name)) {
@@ -167,17 +209,17 @@ export function parseAgentCliVersion(output: string): string | null {
   return /\b(\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?)\b/.exec(output)?.[1] ?? null;
 }
 
-const versionCache = new Map<string, { mtimeMs: number; version: string | null }>();
+const versionCache = new Map<string, { mtimeMs: number; version: Promise<string | null> }>();
 
 /** What the installed executable says its version is, read once per file
  * change: the listing is polled while a runtime prepares, and the binary a
  * provider's updater replaces in place gets a new modification time, so the
  * cache never outlives the install it describes. Any failure to run or read
  * the executable reads as an unknown version, never as a missing runtime. */
-export function agentCliVersion(
+export async function agentCliVersion(
   executable: string,
-  read: (executable: string) => string | null = readAgentCliVersion,
-): string | null {
+  read: (executable: string) => string | null | Promise<string | null> = readAgentCliVersion,
+): Promise<string | null> {
   let mtimeMs: number;
   try {
     mtimeMs = fs.statSync(executable).mtimeMs;
@@ -186,17 +228,15 @@ export function agentCliVersion(
   }
   const cached = versionCache.get(executable);
   if (cached && cached.mtimeMs === mtimeMs) return cached.version;
-  const version = read(executable);
+  const version = Promise.resolve().then(() => read(executable));
   versionCache.set(executable, { mtimeMs, version });
   return version;
 }
 
-function readAgentCliVersion(executable: string): string | null {
+async function readAgentCliVersion(executable: string): Promise<string | null> {
   try {
-    const result = spawnSync(executable, ['--version'], {
-      encoding: 'utf8',
-      timeout: 10_000,
-      windowsHide: true,
+    const result = await probeAgentCommand(executable, ['--version'], {
+      timeoutMs: 10_000,
       shell: agentCliNeedsShell(executable),
       env: agentCliEnv({}, [path.dirname(executable)]),
     });

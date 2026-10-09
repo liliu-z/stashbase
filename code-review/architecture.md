@@ -241,13 +241,38 @@ stable status without download, retry, or a new durable demand latch.
   This guidance does not broaden HTTP/MCP authorization or write permissions.
 
 - Boot performs bounded asynchronous discovery/auth/MCP preparation, never install
-  or login. Explicit installation runs only the selected runtime's official
-  installer. Preparation/shutdown share one cancellable flight per runtime.
+  or login. Explicit installation and updates run only the selected runtime's
+  official native installer, including when the current copy was installed by
+  npm. Preparation/shutdown share one cancellable flight per runtime.
   Stage/code/retryability are structured; the renderer never parses error prose.
+  The first-send access prompt preserves the failed setup stage and diagnostic
+  through its catalog adapter and application error. It displays the explanation
+  as plain text at the failure site; generic transport wording must not replace
+  an available setup or service error.
+  A failed operation carries its retry action so Update cannot degrade to a
+  readiness check of the old executable.
+  Only identical explicit actions share a flight; a conflicting action receives
+  an HTTP 409 and never observes another operation as its own success. Startup
+  discovery may observe an existing flight without changing its intent.
+  Installation has an eight-minute host deadline, installer-script downloads a
+  one-minute deadline, and browser sign-in a ten-minute deadline. Timeout awaits
+  process-tree retirement before releasing the flight. Renderer polling allows
+  these host deadlines to report their cause. Version reads and executable
+  verification use asynchronous bounded probes; concurrent version readers
+  share the per-executable/file-version result.
+  Both providers' status commands gate readiness and their login commands own
+  browser sign-in. Native authentication refusals restore the sign-in action;
+  they never delete credentials. Setup errors retain bounded stdout/stderr and
+  nested network causes, with Agent/action/stage context. Settings and chat
+  update surfaces preserve HTTP diagnostics as well as bootstrap failures.
 - User-installed CLIs keep their native account/history ownership. StashBase discovers provider-owned
   installations and never uninstalls them; AppData stores temporary installer
   scripts, not a second installation. Valid login-shell discoveries remain usable
   while their executable exists. Session failures do not disable the runtime.
+  Official native launchers take priority over npm discoveries, while explicit
+  executable overrides remain authoritative. Updates preserve old npm copies;
+  success requires verification and subsequent discovery of the native launcher.
+  Overrides outside the native layout do not offer in-app updates.
 - Installer completion means successful native exit plus verified discoverable
   output. Own temporary scripts and descendant cancellation; neither cleanup nor
   shell wrappers may mask failure. Do not redirect official installs into private
@@ -257,10 +282,13 @@ stable status without download, retry, or a new durable demand latch.
   compares no versions and infers no requirement, and the renderer only renders
   what the runtime said. A file that is absent, unreadable, or differently
   shaped leaves every runtime unchanged. The offer is advisory and shares the
-  existing in-place updater; it never gates a turn, a session, or a model
+  existing native update flow; it never gates a turn, a session, or a model
   choice.
 - Codex MCP setup parses TOML and replaces only StashBase table ranges, preserving
   unrelated configuration. Invalid or unsupported configuration fails untouched.
+  `server/agent-config-paths.ts` owns configuration identity for setup and Claude
+  model metadata; MCP writes respect the same `CODEX_HOME` / `CLAUDE_CONFIG_DIR`
+  inherited by provider processes.
 - Each OpenQuill chat owns an authenticated loopback OpenCode process; each Codex
   chat owns its app-server/thread. History readers have separate ownership. All Codex app-server
   owners share retirement that waits for exit and escalates process-tree termination;

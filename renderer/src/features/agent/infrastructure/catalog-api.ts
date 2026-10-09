@@ -67,7 +67,14 @@ function toAgent(wire: AgentWire): Agent {
     preparing: ['installing', 'authenticating', 'configuring'].includes(
       wire.bootstrap?.phase ?? '',
     ),
-    ...(wire.bootstrap?.failure ? { setupFailure: wire.bootstrap.failure.message } : {}),
+    ...(wire.bootstrap?.failure
+      ? {
+          setupFailure: {
+            stage: wire.bootstrap.failure.stage,
+            message: wire.bootstrap.failure.message,
+          },
+        }
+      : {}),
     ready: wire.bootstrap?.phase === 'ready' && wire.state !== 'failed',
     updatable: wire.updatable === true,
     ...(wire.upgrade ? { upgrade: wire.upgrade } : {}),

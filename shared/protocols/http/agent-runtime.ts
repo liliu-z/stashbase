@@ -38,6 +38,7 @@ export const agentBootstrapFailureSchema = z
     message: z.string().max(2000),
     retryable: z.boolean(),
     manualRecovery: agentBootstrapManualRecoverySchema.optional(),
+    retryAction: z.enum(['bootstrap', 'login', 'update']).optional(),
   })
   .strict();
 

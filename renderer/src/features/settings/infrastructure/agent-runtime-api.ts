@@ -86,6 +86,9 @@ function toFailure(wire: AgentBootstrapFailureWire): AgentPreparationFailure {
     note: wire.message.trim() === '' ? null : wire.message,
     refusal: wire.code,
     stage: toStage(wire.stage),
+    ...(wire.retryAction
+      ? { retryAction: wire.retryAction === 'bootstrap' ? ('install' as const) : wire.retryAction }
+      : {}),
   };
 }
 

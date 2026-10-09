@@ -16,10 +16,11 @@ import {
   loginToAgent,
   resolveClaudeInstallerShell,
   resolveCodexInstallerShell,
-  runAgentUpdateCommand,
-  updateAgentInPlace,
   verifyAgentExecutable,
   windowsUserPathRepairScript,
+  agentBootstrapCoordinator,
+  agentSupportsInAppUpdate,
+  updateAgentBootstrap,
   type AgentBootstrapDependencies,
 } from '../agent-runtime-installer.ts';
 import {
@@ -38,14 +39,11 @@ function fakeDependencies(overrides: Partial<AgentBootstrapDependencies> = {}) {
   let configured = 0;
   const dependencies: AgentBootstrapDependencies = {
     resolveExecutable: () => installed ? '/managed/codex' : null,
+    resolveNativeExecutable: () => installed ? '/managed/codex' : null,
     installRuntime: async (_id, update) => {
       update({ progress: 0.5, message: 'Downloading… 50%' });
       await Promise.resolve();
       installed = true;
-    },
-    updateRuntime: async (_id, _executable, update) => {
-      update({ message: 'Successfully updated from 2.1.220 to version 2.1.276' });
-      await Promise.resolve();
     },
     isAuthenticated: () => authenticated,
     login: async () => { authenticated = true; },
@@ -68,6 +66,103 @@ async function connect(coordinator: AgentBootstrapCoordinator, id: 'codex' | 'cl
   coordinator.connectIfInstalled(id, options);
   return coordinator.wait(id);
 }
+
+test('a concurrent Update cannot be acknowledged by an unrelated login', async () => {
+  let complete!: () => void;
+  let installs = 0;
+  const coordinator = new AgentBootstrapCoordinator(fakeDependencies({
+    resolveExecutable: () => '/old/codex',
+    resolveNativeExecutable: () => '/old/codex',
+    login: () => new Promise<void>((resolve) => { complete = resolve; }),
+    installRuntime: async () => { installs++; },
+  }).dependencies);
+  coordinator.login('codex');
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.throws(() => coordinator.update('codex'), /already.*signing in/i);
+  complete();
+  await coordinator.wait('codex');
+  coordinator.update('codex');
+  assert.equal((await coordinator.wait('codex')).phase, 'ready');
+  assert.equal(installs, 1);
+});
+
+test('a timed out installer is retired before Retry starts a new installation', async () => {
+  let installs = 0;
+  let retired = false;
+  const coordinator = new AgentBootstrapCoordinator(fakeDependencies({
+    resolveExecutable: () => '/native/claude',
+    resolveNativeExecutable: () => '/native/claude',
+    installRuntime: async (_id, _update, signal) => {
+      if (++installs > 1) { assert.equal(retired, true); return; }
+      await new Promise<void>((resolve) => signal.addEventListener('abort', () => resolve(), { once: true }));
+      retired = true;
+      signal.throwIfAborted();
+    },
+  }).dependencies, { installationTimeoutMs: 20 });
+  coordinator.update('claude');
+  const failed = await coordinator.wait('claude');
+  assert.match(failed.failure?.message ?? '', /timed out/i);
+  assert.equal(failed.failure?.retryAction, 'update');
+  coordinator.update('claude');
+  assert.equal((await coordinator.wait('claude')).phase, 'ready');
+  assert.equal(installs, 2);
+});
+
+test('Claude sign-in checks and browser login use the selected CLI and keep readiness gated',
+  { skip: process.platform === 'win32' }, async (t) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-claude-auth-'));
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    const executable = path.join(root, 'claude');
+    fs.writeFileSync(executable, `#!/bin/sh
+if [ "$1 $2" = 'auth status' ]; then
+  if [ -f '${root}/signed-in' ]; then echo '{"loggedIn":true}'; else echo '{"loggedIn":false}'; exit 1; fi
+elif [ "$1 $2" = 'auth login' ]; then touch '${root}/signed-in'
+else exit 42; fi
+`, { mode: 0o755 });
+    const coordinator = new AgentBootstrapCoordinator(fakeDependencies({
+      resolveExecutable: () => executable,
+      isAuthenticated: agentIsAuthenticated,
+      login: loginToAgent,
+    }).dependencies);
+    assert.equal((await prepare(coordinator, 'claude')).failure?.code, 'authentication-required');
+    coordinator.login('claude');
+    assert.equal((await coordinator.wait('claude')).phase, 'ready');
+  });
+
+test('installer failures retain stdout and network cause diagnostics', { skip: process.platform === 'win32' }, async (t) => {
+  for (const install of [installClaude, installCodex]) {
+    t.mock.method(globalThis, 'fetch', async () => new Response("echo 'EACCES: cannot write native launcher'\nexit 13\n"));
+    await assert.rejects(install(() => {}, new AbortController().signal), /EACCES.*native launcher/);
+    t.mock.restoreAll();
+    t.mock.method(globalThis, 'fetch', async () => {
+      throw new TypeError('fetch failed', { cause: Object.assign(new Error('getaddrinfo failed'), { code: 'ENOTFOUND' }) });
+    });
+    await assert.rejects(install(() => {}, new AbortController().signal), /Download.*(?:claude.ai|chatgpt.com).*ENOTFOUND/s);
+    t.mock.restoreAll();
+  }
+});
+
+test('the production installer process is killed on deadline before Retry', { skip: process.platform === 'win32' }, async (t) => {
+  let attempts = 0;
+  let pid = 0;
+  t.mock.method(globalThis, 'fetch', async () => new Response(++attempts === 1
+    ? 'echo $$\nwhile :; do sleep 1; done\n' : 'exit 0\n'));
+  const coordinator = new AgentBootstrapCoordinator(fakeDependencies({
+    resolveExecutable: () => '/native/codex',
+    resolveNativeExecutable: () => '/native/codex',
+    installRuntime: (_id, update, signal) => installCodex((next) => {
+      if (/^\d+$/.test(next.message ?? '')) pid = Number(next.message);
+      update(next);
+    }, signal, { resolveInstalledExecutable: () => '/native/codex', verifyExecutable: () => {} }),
+  }).dependencies, { installationTimeoutMs: 250 });
+  coordinator.update('codex');
+  assert.match((await coordinator.wait('codex')).failure?.message ?? '', /timed out/);
+  assert.ok(pid > 0);
+  assert.throws(() => process.kill(-pid, 0), { code: 'ESRCH' });
+  coordinator.update('codex');
+  assert.equal((await coordinator.wait('codex')).phase, 'ready');
+  assert.equal(attempts, 2);
+});
 
 test('missing runtime moves through install and MCP configuration to ready', async () => {
   const fake = fakeDependencies();
@@ -95,6 +190,154 @@ test('existing runtime skips download but still ensures MCP configuration', asyn
   assert.equal(installs, 0);
   assert.equal(configured, 1);
 });
+
+test('Update installs the native runtime over an npm or native selection and reconnects using that copy', async () => {
+  for (const id of ['claude', 'codex'] as const) {
+    for (const source of ['npm', 'native']) {
+      let executable = `/${source}/${id}`;
+      let installs = 0;
+      let configured = 0;
+      const coordinator = new AgentBootstrapCoordinator(fakeDependencies({
+        resolveExecutable: () => executable,
+        resolveNativeExecutable: () => executable.startsWith('/native/') ? executable : null,
+        installRuntime: async (installedId) => {
+          assert.equal(installedId, id);
+          installs++;
+          executable = `/native/${id}`;
+        },
+        isAuthenticated: (_id, selected) => { assert.equal(selected, `/native/${id}`); return true; },
+        configureMcp: () => { configured++; },
+      }).dependencies);
+      coordinator.update(id);
+      assert.equal((await coordinator.wait(id)).phase, 'ready');
+      assert.equal(installs, 1);
+      assert.equal(configured, 1);
+    }
+  }
+});
+
+test('a failed native update retries installation instead of silently reconnecting the old runtime', async () => {
+  let installs = 0;
+  const coordinator = new AgentBootstrapCoordinator(fakeDependencies({
+    resolveExecutable: () => '/npm/claude',
+    installRuntime: async () => { installs++; throw new Error('Download failed'); },
+  }).dependencies);
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    coordinator.update('claude');
+    const status = await coordinator.wait('claude');
+    assert.equal(status.failure?.retryAction, 'update');
+    assert.match(status.failure?.message ?? '', /Download failed/);
+    assert.equal(installs, attempt);
+  }
+});
+
+test('retrying a failed first install reruns verification even when a partial executable remains', async () => {
+  let executable: string | null = null;
+  let installs = 0;
+  let configured = 0;
+  const coordinator = new AgentBootstrapCoordinator(fakeDependencies({
+    resolveExecutable: () => executable,
+    resolveNativeExecutable: () => executable,
+    installRuntime: async () => {
+      executable = '/native/claude';
+      if (++installs === 1) throw new Error('Downloaded executable did not pass verification');
+    },
+    configureMcp: () => { configured++; },
+  }).dependencies);
+  coordinator.begin('claude');
+  assert.equal((await coordinator.wait('claude')).failure?.retryAction, 'bootstrap');
+  assert.equal(configured, 0);
+  coordinator.begin('claude');
+  assert.equal((await coordinator.wait('claude')).phase, 'ready');
+  assert.equal(installs, 2);
+  assert.equal(configured, 1);
+});
+
+test('native installation cannot report success while discovery still selects the npm copy', async () => {
+  let configured = 0;
+  const coordinator = new AgentBootstrapCoordinator(fakeDependencies({
+    resolveExecutable: () => '/npm/claude',
+    resolveNativeExecutable: () => '/native/claude',
+    installRuntime: async () => {},
+    configureMcp: () => { configured++; },
+  }).dependencies);
+  coordinator.update('claude');
+  const status = await coordinator.wait('claude');
+  assert.equal(status.phase, 'failed');
+  assert.equal(status.failure?.stage, 'installation');
+  assert.equal(status.failure?.retryAction, 'update');
+  assert.equal(configured, 0);
+});
+
+test('native update cancellation keeps the old runtime and prevents MCP configuration', async () => {
+  let entered!: () => void;
+  const started = new Promise<void>((resolve) => { entered = resolve; });
+  let configured = false;
+  const coordinator = new AgentBootstrapCoordinator(fakeDependencies({
+    resolveExecutable: () => '/npm/claude',
+    installRuntime: async (_id, _update, signal) => {
+      entered();
+      await new Promise<void>((resolve) => signal.addEventListener('abort', () => resolve(), { once: true }));
+    },
+    configureMcp: () => { configured = true; },
+  }).dependencies);
+  coordinator.update('claude');
+  await started;
+  assert.deepEqual(await coordinator.cancelAll(), ['claude']);
+  assert.equal(coordinator.status('claude').phase, 'failed');
+  assert.equal(configured, false);
+});
+
+test('the production update path runs official installer scripts, selects native output, and preserves npm copies',
+  { skip: process.platform === 'win32' }, async (t) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-native-update-'));
+    t.mock.method(os, 'homedir', () => root);
+    const keys = ['HOME', 'STASHBASE_LOCAL_DATA_ROOT', 'STASHBASE_CLAUDE_BIN', 'CLAUDE_CODE_BIN',
+      'STASHBASE_CODEX_BIN', 'CODEX_CLI_BIN', 'CODEX_CLI_PATH'];
+    const previous = new Map(keys.map((key) => [key, process.env[key]]));
+    for (const key of keys) delete process.env[key];
+    process.env.HOME = root;
+    process.env.STASHBASE_LOCAL_DATA_ROOT = path.join(root, 'app-data');
+    const requests: string[] = [];
+    t.mock.method(globalThis, 'fetch', async (url: string) => {
+      requests.push(url);
+      const id = url === 'https://claude.ai/install.sh' ? 'claude' : 'codex';
+      return new Response(`#!/bin/sh
+set -eu
+mkdir -p "$HOME/.local/bin"
+cat > "$HOME/.local/bin/${id}" <<'CLI'
+#!/bin/sh
+echo '9.9.9'
+CLI
+chmod +x "$HOME/.local/bin/${id}"
+`);
+    });
+    try {
+      for (const id of ['claude', 'codex'] as const) {
+        const old = path.join(root, '.npm-global', 'bin', id);
+        fs.mkdirSync(path.dirname(old), { recursive: true });
+        const original = '#!/bin/sh\necho "npm copy must not run during update" >&2\nexit 71\n';
+        fs.writeFileSync(old, original, { mode: 0o755 });
+        updateAgentBootstrap(id);
+        const status = await agentBootstrapCoordinator.wait(id);
+        assert.equal(status.phase, 'ready', JSON.stringify(status));
+        assert.equal(resolveAgentCli({ name: id, envNames: [], logLabel: id }), path.join(root, '.local/bin', id));
+        assert.equal(fs.readFileSync(old, 'utf8'), original);
+      }
+      assert.deepEqual(requests, ['https://claude.ai/install.sh', 'https://chatgpt.com/codex/install.sh']);
+      assert.match(fs.readFileSync(path.join(root, '.claude.json'), 'utf8'), /stashbase/);
+      assert.match(fs.readFileSync(path.join(root, '.codex/config.toml'), 'utf8'), /stashbase/);
+      process.env.STASHBASE_CLAUDE_BIN = path.join(root, '.npm-global/bin/claude');
+      assert.equal(agentSupportsInAppUpdate('claude'), false);
+      assert.throws(() => updateAgentBootstrap('claude'), /executable override/);
+      assert.equal(requests.length, 2, 'an explicit override is not silently bypassed by another installation');
+    } finally {
+      for (const [key, value] of previous) {
+        if (value === undefined) delete process.env[key]; else process.env[key] = value;
+      }
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
 
 test('installed Codex stops at a distinct authentication failure before MCP configuration', async () => {
   let configured = 0;
@@ -461,13 +704,13 @@ test('Claude verifier failures surface as the installation failure', async () =>
 
 test('Agent executable verification reports the native exit code and stderr', {
   skip: process.platform === 'win32',
-}, () => {
+}, async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-agent-verifier-test-'));
   const executable = path.join(root, 'agent');
   fs.writeFileSync(executable, '#!/bin/sh\nprintf "blocked by policy\\n" >&2\nexit 23\n');
   fs.chmodSync(executable, 0o755);
   try {
-    assert.throws(
+    await assert.rejects(
       () => verifyAgentExecutable(executable, 'Claude'),
       /Claude.*exited with code 23.*blocked by policy/i,
     );
@@ -478,13 +721,13 @@ test('Agent executable verification reports the native exit code and stderr', {
 
 test('Agent executable verification identifies a timeout', {
   skip: process.platform === 'win32',
-}, () => {
+}, async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-agent-verifier-timeout-test-'));
   const executable = path.join(root, 'agent');
   fs.writeFileSync(executable, '#!/bin/sh\nwhile :; do :; done\n');
   fs.chmodSync(executable, 0o755);
   try {
-    assert.throws(
+    await assert.rejects(
       () => verifyAgentExecutable(executable, 'Claude', process.env, 25),
       /Claude.*timed out after 25ms/i,
     );
@@ -872,7 +1115,7 @@ test('pending authentication keeps the event loop live, deduplicates checks, and
   assert.equal(coordinator.connectIfInstalled('codex').phase, 'configuring');
   await entered;
   await new Promise<void>((resolve) => setImmediate(resolve));
-  coordinator.begin('codex');
+  assert.throws(() => coordinator.begin('codex'), /already.*checking/);
   coordinator.connectIfInstalled('codex');
   assert.equal(checks, 1);
   assert.deepEqual(await coordinator.cancelAll(), ['codex']);
@@ -894,37 +1137,11 @@ test('CLI probes time out and cancel while unrelated event-loop work remains liv
   await cancelled;
 });
 
-test('update runs the installed runtime updater in place, then authentication and MCP configuration', async () => {
-  const updates: Array<{ id: string; executable: string }> = [];
-  const narrated: string[] = [];
-  let configured = 0;
-  const fake = fakeDependencies({
-    resolveExecutable: () => '/system/claude',
-    updateRuntime: async (id, executable, update) => {
-      updates.push({ id, executable });
-      update({ message: 'Installing update...' });
-    },
-    configureMcp: () => { configured += 1; },
-  });
-  const coordinator = new AgentBootstrapCoordinator(fake.dependencies);
-
-  const started = coordinator.update('claude');
-  assert.equal(started.phase, 'installing');
-  narrated.push(coordinator.status('claude').message ?? '');
-  const settled = await coordinator.wait('claude');
-
-  assert.equal(settled.phase, 'ready');
-  assert.deepEqual(updates, [{ id: 'claude', executable: '/system/claude' }]);
-  assert.equal(configured, 1, 'the updated runtime is reconnected to StashBase MCP like a fresh one');
-});
-
 test('update refuses a missing runtime without downloading or running anything', async () => {
   let installs = 0;
-  let updates = 0;
   const fake = fakeDependencies({
     resolveExecutable: () => null,
     installRuntime: async () => { installs += 1; },
-    updateRuntime: async () => { updates += 1; },
   });
   const coordinator = new AgentBootstrapCoordinator(fake.dependencies);
 
@@ -935,13 +1152,12 @@ test('update refuses a missing runtime without downloading or running anything',
   assert.equal(status.failure?.stage, 'discovery');
   assert.equal(status.failure?.code, 'runtime-unavailable');
   assert.equal(installs, 0);
-  assert.equal(updates, 0);
 });
 
 test('a failing updater surfaces as an installation failure with the manual install route', async () => {
   const fake = fakeDependencies({
     resolveExecutable: () => '/system/claude',
-    updateRuntime: async () => { throw new Error('npm global folder is not writable'); },
+    installRuntime: async () => { throw new Error('native installation folder is not writable'); },
   });
   const coordinator = new AgentBootstrapCoordinator(fake.dependencies);
 
@@ -953,45 +1169,4 @@ test('a failing updater surfaces as an installation failure with the manual inst
   assert.equal(status.failure?.code, 'operation-failed');
   assert.equal(status.failure?.manualRecovery, 'install-command');
   assert.match(status.failure?.message ?? '', /not writable/);
-});
-
-test('an in-place update runs the executable\'s own update command, narrates it, and verifies the result', async () => {
-  for (const [id, executable, narrated] of [
-    ['claude', '/system/claude', 'Successfully updated from 2.1.220 to version 2.1.276'],
-    ['codex', '/system/codex', 'Update ran successfully! Please restart Codex.'],
-  ] as const) {
-    const messages: string[] = [];
-    const calls: Array<{ command: string; args: string[] }> = [];
-    let verified: string | null = null;
-    await updateAgentInPlace(
-      id,
-      executable,
-      (next) => { if (next.message) messages.push(next.message); },
-      new AbortController().signal,
-      {
-        runCommand: async (command, args, _env, _signal, onLine) => {
-          calls.push({ command, args });
-          onLine('Checking for updates to latest version...');
-          onLine(narrated);
-        },
-        verifyExecutable: (candidate) => { verified = candidate; },
-      },
-    );
-    assert.deepEqual(calls, [{ command: executable, args: ['update'] }], id);
-    assert.equal(verified, executable, id);
-    assert.deepEqual(messages.slice(-2), [narrated, `${id === 'codex' ? 'Codex' : 'Claude'} is up to date.`], id);
-  }
-});
-
-test('runAgentUpdateCommand streams stdout lines and reports a failing exit through its own output',
-  { skip: process.platform === 'win32' }, async () => {
-  const lines: string[] = [];
-  await runAgentUpdateCommand('/bin/sh', ['-c', 'echo one; echo two'], process.env,
-    new AbortController().signal, (line) => lines.push(line));
-  assert.deepEqual(lines, ['one', 'two']);
-  await assert.rejects(
-    runAgentUpdateCommand('/bin/sh', ['-c', 'echo npm folder is not writable; exit 3'], process.env,
-      new AbortController().signal, () => undefined),
-    /not writable/,
-  );
 });

@@ -19,6 +19,7 @@ import {
   selectClaudeModel,
 } from '../agent.ts';
 import { agentPersonaLibrary } from '../agent-persona.ts';
+import { agentBootstrapStatus } from '../agent-runtime-installer.ts';
 import { clearCurrentFolder, runWithWindowId, openProjectFolder, registerProjectFolderAsync } from '../folder.ts';
 import { derivedNoteFor, registerDerivedSource } from '../derived-store.ts';
 import { claudeTranscriptEffort } from '../claude-history.ts';
@@ -1035,6 +1036,8 @@ test('Claude classified turn failures carry their failure kind', async (t) => {
 
   turn.releaseMessages();
   await settle();
+
+  assert.equal(agentBootstrapStatus('claude').failure?.code, 'authentication-required');
 
   assert.deepEqual(turn.turnEvents(), [
     { t: 'turn-start' },
