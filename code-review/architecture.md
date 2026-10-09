@@ -127,8 +127,15 @@ preview, content editing, and rename/delete are separate permissions.
 
 File uploads use disk staging and no-clobber publication. GitHub import accepts
 only the supported public HTTPS repository URL and a portable direct-child name;
-Git runs without ambient config, credentials, hooks, submodules, or LFS downloads.
-Inspection and cancellation happen before committing registration.
+Gallery and GitHub Import share anonymous HTTPS default-branch archive downloads,
+without Git execution or source `.git` metadata. Only the GitHub API and archive
+hosts may receive redirects. Download bytes, expanded bytes, entries and network
+idle time are bounded. Extraction validates portable paths and refuses collisions,
+hard links and special entries; regular files are written exclusively before any
+symbolic links. Links must resolve inside staging; dangling/cyclic links are
+refused. All extraction writes settle before cancellation cleans staging.
+Submodules and LFS declarations remain unsupported. Inspection and cancellation
+happen before committing registration.
 
 Publication and rollback track owned filesystem identities. Preserve concurrent
 edits, replacements, and unrelated additions; never recursively delete an

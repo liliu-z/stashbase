@@ -26,8 +26,13 @@ usable; Agent setup and indexing are independent.
 |---|---|
 | Open / Create | Select an existing directory, or create one in the system picker. An empty project is valid. |
 | Recent | Resolve a remembered directory; retain the record if it is unavailable. |
-| GitHub / Gallery | Make a local copy and register it before attempting window entry. |
+| GitHub / Gallery | Download a public repository’s default-branch file snapshot and register the local copy before attempting window entry. |
 | MCP-created project | Explicit authorized creation registers a folder. Opening it follows ordinary entry; existing conversations keep their project. |
+
+GitHub Import and Gallery Copy require neither a local Git installation nor a
+GitHub account. A copy contains project files without the source repository’s
+Git metadata or history; later upstream changes do not update it. Repositories
+using submodules or Git LFS remain unsupported.
 
 ## Failure and Recovery
 

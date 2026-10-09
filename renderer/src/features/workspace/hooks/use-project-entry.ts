@@ -43,7 +43,7 @@ type Draft = { url: string; name: string | null; path: string | null; unknown: b
 const emptyDraft: Draft = { url: '', name: null, path: null, unknown: false };
 
 /** One user operation per window, from acquisition through workspace readiness.
- * A retained path is a completed acquisition, so Retry cannot clone it again. */
+ * A retained path is a completed acquisition, so Retry cannot download it again. */
 export function useProjectEntry(
   picker: ProjectFolderPickerPort,
   lifecycle: ProjectLifecyclePort,

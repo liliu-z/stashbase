@@ -19,12 +19,13 @@ import {
 } from '@/protocols/http/github-import';
 
 const REFUSALS: Readonly<Record<GitHubImportErrorCode, string>> = {
-  CLONE_FAILED: 'That repository could not be downloaded. Check your connection and try again.',
+  DOWNLOAD_FAILED: 'That repository could not be downloaded. Check your connection and try again.',
   LOCAL_IMPORT_FAILED:
     'The local copy could not be saved or registered. Check destination permissions and disk space, then try again.',
   DESTINATION_EXISTS:
     'That destination already exists. Choose a different name, or open the existing folder. Its contents may be different from this repository.',
-  GIT_NOT_AVAILABLE: 'Importing needs Git installed and on your PATH.',
+  INVALID_ARCHIVE: 'That repository snapshot contains invalid or unsupported files.',
+  ARCHIVE_TOO_LARGE: 'That repository snapshot is too large to import.',
   IMPORT_CANCELLED: 'The import was cancelled. You can try again.',
   IMPORT_INCOMPLETE:
     'Some files were kept after the import failed. Inspect the retained folder, then choose a different name or remove it before retrying.',

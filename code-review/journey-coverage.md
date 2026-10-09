@@ -243,7 +243,9 @@ Host/services: `server/folder.ts`, `server/github-import.ts`, `server/project-fi
   a trailing-space project through reads, saves, and index status. Shared entry
   tests cover copy/entry retry separation, explicit folder conflicts, cancellation
   before late results, retained Recent records, receipt recovery, and workspace
-  readiness. Native tests cover Welcome reuse, self/peer focus, occupied-window
+  readiness. GitHub/Gallery acquisition now uses file snapshots; the J13 archive
+  tests own transport/extraction evidence. Native tests cover Welcome reuse,
+  self/peer focus, occupied-window
   isolation, serialized allocation, and stale acknowledgements.
 - **Driven Runtime Pass:** isolated macOS built app/server (2026-09-14): existing
   open, failed-open retention, alias focus, empty creation, duplicate rejection,
@@ -1415,14 +1417,19 @@ structure); they come from the request or the user's
 
 **Implementation:** Renderer: `renderer/src/app/composition/gallery/use-gallery-shop.tsx`, `renderer/src/features/workspace/hooks/use-project-entry.ts`.
 Personas: `renderer/src/features/gallery/ui/persona-page.tsx`, `renderer/src/features/gallery/domain/persona-snapshot.ts`, `renderer/src/app/shell.tsx` (add through `useAgentPersonaLibrary`).
-Host/services: `server/routes/gallery.ts`, `server/github-import.ts`, `electron/multi-window.cjs`, `server/agent-persona.ts`.
+Host/services: `server/routes/gallery.ts`, `server/github-import.ts`, `server/github-snapshot.ts`, `electron/multi-window.cjs`, `server/agent-persona.ts`.
 
 **Status:** Partial.
 
 - **Contract Test:** `pnpm test:protocols`, `pnpm test:renderer`, and
   `pnpm test:project-files` cover bounded whole-index
   parsing/fallback, image-host and redirect restrictions, cached browsing, copy
-  serialization, and shared GitHub acquisition/publication rollback. The Electron
+  serialization, and shared GitHub acquisition/publication rollback.
+  `github-snapshot.test.ts` covers anonymous default-branch archive redirects,
+  bounded streaming/extraction, path and symlink confinement, malformed archives,
+  cancellation and idle timeout. `__tests__/github-import.test.ts` exercises real
+  archive extraction with controlled HTTP bytes, Git unavailable, and publication,
+  registration and shutdown recovery. The Electron
   smoke also loads the built Gallery UI through `app://renderer`, decodes cover,
   and detail cover images using controlled
   proxy bytes with production CSP and native request authorization. See
@@ -1431,6 +1438,16 @@ Host/services: `server/routes/gallery.ts`, `server/github-import.ts`, `electron/
   fallback is `use-gallery.test.tsx`; a Gallery add landing in the picker's
   cache is `use-agent-persona.test.ts`; the two entrances never showing each
   other's shelf is `gallery-refresh.test.tsx`.
+- **Snapshot runtime pass (2026-10-09):** an isolated macOS Electron app with
+  the built renderer, native boundary and built Node service imported real
+  `octocat/Hello-World` through GitHub Import and Gallery Copy with no executables
+  on the service's PATH. GitHub Import reused Welcome; Gallery opened a second
+  project window while the source kept its project. Both copies contained the
+  same README and no `.git`; the copied README opened with its real content.
+  Repeating Gallery Copy showed the destination conflict without changing files.
+  Gallery index metadata was controlled; archive downloads used real GitHub.
+  Telemetry was unavailable in the isolated profile. This is source-runtime
+  evidence, not a packaged Windows/Linux or update-path result.
 - **Driven Runtime Pass:** clean-profile bundled browsing and detail
   inspection without account/runtime. A separate isolated built-app pass
   (2026-09-14) copies real `octocat/Hello-World` via a controlled Gallery index,

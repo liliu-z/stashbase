@@ -63,13 +63,18 @@ describe('GitHub import adapter', () => {
         'DESTINATION_EXISTS',
         'That destination already exists. Choose a different name, or open the existing folder. Its contents may be different from this repository.',
       ],
-      ['GIT_NOT_AVAILABLE', 'Importing needs Git installed and on your PATH.'],
+      [
+        'DOWNLOAD_FAILED',
+        'That repository could not be downloaded. Check your connection and try again.',
+      ],
+      ['INVALID_ARCHIVE', 'That repository snapshot contains invalid or unsupported files.'],
+      ['ARCHIVE_TOO_LARGE', 'That repository snapshot is too large to import.'],
     ] as const;
 
     for (const [code, message] of cases) {
       const request = vi.fn(async () => ({
         body: { code, error: 'raw server prose the reader never sees' },
-        status: code === 'GIT_NOT_AVAILABLE' ? 503 : 400,
+        status: 400,
       }));
       await expect(
         adapter({ request }).run('https://github.com/owner/repo', 'notes', signal()),
@@ -77,7 +82,7 @@ describe('GitHub import adapter', () => {
     }
   });
 
-  it('does not treat an unrecognized response as permission to clone again', async () => {
+  it('does not treat an unrecognized response as permission to download again', async () => {
     const request = vi.fn(async () => ({ body: { error: 'Something specific.' }, status: 400 }));
     await expect(
       adapter({ request }).run('https://github.com/owner/repo', 'notes', signal()),

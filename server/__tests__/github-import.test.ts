@@ -1,6 +1,6 @@
 /**
  * Contract tests for GitHub repository import: URL parsing & normalization,
- * folder name validation, Git availability check, shallow single-branch cloning,
+ * folder name validation, anonymous snapshot download and extraction,
  * rejection of submodules and Git LFS, no-clobber publication, cancellation,
  * and pristine ordinary folder entry.
  */
@@ -11,6 +11,7 @@ import path from 'node:path';
 import test from 'node:test';
 import childProcess from 'node:child_process';
 import { syncBuiltinESMExports } from 'node:module';
+import * as tar from 'tar';
 import { filesystemPath } from '../filesystem-path.ts';
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-github-import-'));
@@ -33,59 +34,38 @@ const express = (await import('express')).default;
 const { mount: mountProjectRoutes } = await import('../routes/project.ts');
 const { clearCurrentFolder, openProjectFolder } = await import('../folder.ts');
 
-interface FakeGitDepsLog {
-  gitCalls: Array<{ args: string[]; options: any }>;
+interface FakeDepsLog {
+  requests: Array<{ url: string; options: RequestInit | undefined }>;
   registered: string[];
 }
 
 function fakeDeps(options: {
   folderHome?: string;
-  gitAvailable?: boolean;
-  onClone?: (stagingDir: string) => void;
-  cloneExitCode?: number;
-  cloneStderr?: string;
-  cloneError?: Error;
-  runGit?: GitHubImportDeps['runGit'];
+  onSnapshot?: (source: string) => void;
+  status?: number;
+  fetch?: typeof fetch;
   publish?: GitHubImportDeps['publish'];
-}): { deps: GitHubImportDeps; log: FakeGitDepsLog; home: string } {
+}): { deps: GitHubImportDeps; log: FakeDepsLog; home: string } {
   const home = options.folderHome ?? fs.mkdtempSync(path.join(scratch, 'home-'));
-  const log: FakeGitDepsLog = {
-    gitCalls: [],
-    registered: [],
-  };
-
+  const log: FakeDepsLog = { requests: [], registered: [] };
   const deps: GitHubImportDeps = {
     folderHome: () => home,
-    isGitAvailable: async () => options.gitAvailable ?? true,
     register: async (target) => { log.registered.push(target); },
-    runGit: options.runGit ?? (async (args, gitOptions) => {
-      log.gitCalls.push({ args, options: gitOptions });
-      if (options.cloneError) throw options.cloneError;
-      if (gitOptions.signal?.aborted) {
-        const err = new Error('aborted');
-        (err as any).name = 'AbortError';
-        throw err;
-      }
-      // Staging path is the last argument of git clone
-      const stagingPath = args[args.length - 1];
-      if (options.cloneExitCode !== undefined && options.cloneExitCode !== 0) {
-        return {
-          exitCode: options.cloneExitCode,
-          stderr: options.cloneStderr ?? 'fatal: clone failed',
-        };
-      }
-      // Default successful clone creates dummy files in staging
-      fs.mkdirSync(stagingPath, { recursive: true });
-      fs.mkdirSync(path.join(stagingPath, '.git'));
-      fs.writeFileSync(path.join(stagingPath, 'README.md'), '# Test Repo\n', 'utf8');
-      if (options.onClone) {
-        options.onClone(stagingPath);
-      }
-      return { exitCode: 0, stderr: '' };
+    fetch: options.fetch ?? (async (url, init) => {
+      log.requests.push({ url: String(url), options: init });
+      if (options.status) return new Response('', { status: options.status });
+      const fixture = fs.mkdtempSync(path.join(scratch, 'snapshot-'));
+      const source = path.join(fixture, 'repo-commit');
+      fs.mkdirSync(source);
+      fs.writeFileSync(path.join(source, 'README.md'), '# Test Repo\n', 'utf8');
+      options.onSnapshot?.(source);
+      const chunks = [];
+      for await (const chunk of tar.c({ cwd: fixture, gzip: true }, ['repo-commit'])) chunks.push(chunk);
+      fs.rmSync(fixture, { recursive: true });
+      return new Response(Buffer.concat(chunks));
     }),
     publish: options.publish ?? publishStagedRepository,
   };
-
   return { deps, log, home };
 }
 
@@ -153,7 +133,7 @@ test('detectGitLfs identifies Git LFS declarations in .gitattributes', () => {
   assert.equal(detectGitLfs(''), false);
 });
 
-test('importPublicGitHubRepository rejects invalid folder names before clone', async () => {
+test('importPublicGitHubRepository rejects invalid folder names before download', async () => {
   const { deps, log } = fakeDeps({});
   for (const bad of ['', '   ', 'a/b', 'a\\b', '..', '.hidden', 'name.', 'na<me', 'x'.repeat(65)]) {
     await assert.rejects(
@@ -161,7 +141,7 @@ test('importPublicGitHubRepository rejects invalid folder names before clone', a
       (err: Error & { status?: number; code?: string }) => err.status === 400 && err.code === 'INVALID_FOLDER_NAME',
     );
   }
-  assert.equal(log.gitCalls.length, 0, 'No git process should spawn for invalid folder names');
+  assert.equal(log.requests.length, 0, 'No request should be sent for invalid folder names');
 });
 
 test('importPublicGitHubRepository rejects a destination already in the folder home', async () => {
@@ -174,48 +154,33 @@ test('importPublicGitHubRepository rejects a destination already in the folder h
     (err: Error & { status?: number; code?: string }) => err.status === 409 && err.code === 'DESTINATION_EXISTS',
   );
 
-  assert.equal(log.gitCalls.length, 0, 'No git process should spawn when destination exists');
+  assert.equal(log.requests.length, 0, 'No request should be sent when destination exists');
 });
 
-test('importPublicGitHubRepository rejects when Git is not available', async () => {
-  const { deps, log } = fakeDeps({ gitAvailable: false });
-
+test('importPublicGitHubRepository classifies private or not-found responses', async () => {
+  const { deps, home } = fakeDeps({ status: 404 });
   await assert.rejects(
-    () => importPublicGitHubRepository({ url: 'https://github.com/owner/repo' }, deps),
-    (err: Error & { status?: number; code?: string }) => err.status === 503 && err.code === 'GIT_NOT_AVAILABLE',
+    importPublicGitHubRepository({ url: 'https://github.com/owner/private-repo' }, deps),
+    { status: 404, code: 'PRIVATE_OR_NOT_FOUND' },
   );
-
-  assert.equal(log.gitCalls.length, 0);
+  assert.deepEqual(fs.readdirSync(home), []);
 });
 
-test('importPublicGitHubRepository classifies private or not-found errors', async () => {
-  const { deps } = fakeDeps({
-    cloneExitCode: 128,
-    cloneStderr: 'fatal: could not read Username for \'https://github.com\': terminal prompts disabled',
-  });
-
-  await assert.rejects(
-    () => importPublicGitHubRepository({ url: 'https://github.com/owner/private-repo' }, deps),
-    (err: Error & { status?: number; code?: string }) => err.status === 404 && err.code === 'PRIVATE_OR_NOT_FOUND',
-  );
-});
-
-test('importPublicGitHubRepository classifies general clone failures', async () => {
-  const { deps } = fakeDeps({
-    cloneExitCode: 1,
-    cloneStderr: 'fatal: unable to access network: Connection timed out',
-  });
-
-  await assert.rejects(
-    () => importPublicGitHubRepository({ url: 'https://github.com/owner/timeout-repo' }, deps),
-    (err: Error & { status?: number; code?: string }) => err.status === 500 && err.code === 'CLONE_FAILED',
-  );
+test('importPublicGitHubRepository classifies rate limits and service failures as download failures', async () => {
+  for (const status of [403, 429, 500]) {
+    const { deps, home } = fakeDeps({ status });
+    await assert.rejects(
+      importPublicGitHubRepository({ url: 'https://github.com/owner/repo' }, deps),
+      { status: 502, code: 'DOWNLOAD_FAILED' },
+    );
+    assert.deepEqual(fs.readdirSync(home), []);
+  }
 });
 
 test('importPublicGitHubRepository rejects repositories with submodules and cleans staging', async () => {
   let observedStagingDir = '';
   const { deps, home } = fakeDeps({
-    onClone: (stagingPath) => {
+    onSnapshot: (stagingPath) => {
       observedStagingDir = stagingPath;
       fs.writeFileSync(path.join(stagingPath, '.gitmodules'), '[submodule "dep"]\npath = dep\n', 'utf8');
     },
@@ -234,7 +199,7 @@ test('importPublicGitHubRepository rejects repositories with submodules and clea
 test('importPublicGitHubRepository rejects repositories with Git LFS and cleans staging', async () => {
   let observedStagingDir = '';
   const { deps, home } = fakeDeps({
-    onClone: (stagingPath) => {
+    onSnapshot: (stagingPath) => {
       observedStagingDir = stagingPath;
       fs.mkdirSync(path.join(stagingPath, 'assets'));
       fs.writeFileSync(path.join(stagingPath, 'assets', '.gitattributes'), '*.bin filter=lfs diff=lfs merge=lfs -text\n', 'utf8');
@@ -251,7 +216,7 @@ test('importPublicGitHubRepository rejects repositories with Git LFS and cleans 
   assert.equal(fs.existsSync(path.join(home, 'lfs-repo')), false);
 });
 
-test('importPublicGitHubRepository supports cancellation before clone and cleans staging', async () => {
+test('importPublicGitHubRepository supports cancellation before download and cleans staging', async () => {
   const ac = new AbortController();
   ac.abort();
 
@@ -265,59 +230,27 @@ test('importPublicGitHubRepository supports cancellation before clone and cleans
   assert.equal(fs.existsSync(path.join(home, 'cancel-repo')), false);
 });
 
-test('importPublicGitHubRepository aborts running Git work and cleans staging', async () => {
-  const ac = new AbortController();
-  let cloneStarted!: () => void;
-  const started = new Promise<void>((resolve) => { cloneStarted = resolve; });
-  let observedStaging = '';
-  const { deps, home } = fakeDeps({
-    runGit: async (args, options) => {
-      observedStaging = args.at(-1)!;
-      fs.mkdirSync(observedStaging, { recursive: true });
-      cloneStarted();
-      return await new Promise((resolve, reject) => {
-        options.signal?.addEventListener('abort', () => {
-          const err = new Error('aborted');
-          err.name = 'AbortError';
-          reject(err);
-        }, { once: true });
-      });
-    },
-  });
-
-  const importing = importPublicGitHubRepository({
-    url: 'https://github.com/owner/cancel-running',
-    signal: ac.signal,
-  }, deps);
-  await started;
-  ac.abort();
-  await assert.rejects(
-    importing,
-    (err: Error & { code?: string }) => err.code === 'IMPORT_CANCELLED',
-  );
-  assert.equal(fs.existsSync(observedStaging), false);
-  assert.equal(fs.existsSync(path.join(home, 'cancel-running')), false);
-});
-
-test('cancelAllGitHubImports aborts running work for application shutdown', async () => {
-  let cloneStarted!: () => void;
-  const started = new Promise<void>((resolve) => { cloneStarted = resolve; });
-  const { deps } = fakeDeps({
-    runGit: async (_args, options) => {
-      cloneStarted();
-      return await new Promise((resolve, reject) => {
-        options.signal?.addEventListener('abort', () => {
-          const err = new Error('aborted');
-          err.name = 'AbortError';
-          reject(err);
-        }, { once: true });
-      });
-    },
-  });
-  const importing = importPublicGitHubRepository({ url: 'https://github.com/owner/shutdown' }, deps);
-  await started;
-  assert.equal(await cancelAllGitHubImports(), 1);
-  await assert.rejects(importing, (err: Error & { code?: string }) => err.code === 'IMPORT_CANCELLED');
+test('cancellation and shutdown abort pending HTTP work and clean staging', async () => {
+  for (const shutdown of [false, true]) {
+    const controller = new AbortController();
+    let started!: () => void;
+    const ready = new Promise<void>((resolve) => { started = resolve; });
+    const { deps, home } = fakeDeps({
+      fetch: async (_url, options) => {
+        started();
+        return new Promise((_resolve, reject) => {
+          options?.signal?.addEventListener('abort', () => reject(options.signal?.reason), { once: true });
+        });
+      },
+    });
+    const importing = importPublicGitHubRepository({ url: 'https://github.com/owner/cancel', signal: controller.signal }, deps);
+    const refused = assert.rejects(importing, { code: 'IMPORT_CANCELLED' });
+    await ready;
+    if (shutdown) assert.equal(await cancelAllGitHubImports(), 1);
+    else controller.abort();
+    await refused;
+    assert.deepEqual(fs.readdirSync(home), []);
+  }
 });
 
 test('concurrently created destinations remain untouched at publication', async () => {
@@ -337,42 +270,27 @@ test('concurrently created destinations remain untouched at publication', async 
   assert.equal(fs.existsSync(path.join(home, 'raced', 'README.md')), false);
 });
 
-test('importPublicGitHubRepository clones in an isolated public-only Git environment and publishes', async () => {
+test('snapshot import publishes ordinary files without invoking Git or retaining metadata', async (t) => {
+  const mock = t.mock.method(childProcess, 'spawn', () => { throw new Error('Git is not installed'); });
+  syncBuiltinESMExports();
+  t.after(() => { mock.mock.restore(); syncBuiltinESMExports(); });
   const { deps, log, home } = fakeDeps({});
   const result = await importPublicGitHubRepository({
     url: 'https://github.com/Priyansh19077/CP-Templates.git',
     folderName: 'CP-Templates-Imported',
   }, deps);
-
   const target = path.join(home, 'CP-Templates-Imported');
   assert.equal(result.path, target);
-  assert.equal(fs.existsSync(target), true);
-  assert.equal(fs.existsSync(path.join(target, 'README.md')), true);
-  assert.equal(fs.existsSync(path.join(target, '.git')), true);
-
-  // Import itself never seeds instruction files.
+  assert.equal(fs.readFileSync(path.join(target, 'README.md'), 'utf8'), '# Test Repo\n');
+  assert.equal(fs.existsSync(path.join(target, '.git')), false);
   assert.equal(fs.existsSync(path.join(target, 'AGENTS.md')), false);
   assert.equal(fs.existsSync(path.join(target, 'CLAUDE.md')), false);
-
-  assert.equal(log.gitCalls.length, 1);
-  const { args, options } = log.gitCalls[0];
-  assert.equal(args[0], '-c');
-  assert.match(args[1], /^core\.hooksPath=/);
-  assert.equal(args[2], 'clone');
-  assert.ok(args.includes('--depth'));
-  assert.ok(args.includes('--single-branch'));
-  assert.ok(args.includes('--no-tags'));
-  assert.ok(args.includes('--no-recurse-submodules'));
-  assert.ok(args.some((arg) => arg.startsWith('--template=')));
-  assert.equal(args.at(-2), 'https://github.com/Priyansh19077/CP-Templates');
-  assert.equal(options.env.GIT_CONFIG_NOSYSTEM, '1');
-  assert.equal(options.env.GIT_LFS_SKIP_SMUDGE, '1');
-  assert.equal(options.env.GCM_INTERACTIVE, 'Never');
-  assert.match(options.env.GIT_CONFIG_GLOBAL, /gitconfig$/);
-  assert.deepEqual(
-    fs.readdirSync(home).filter((entry) => entry.startsWith('.import-staging-')),
-    [],
-  );
+  assert.equal(mock.mock.callCount(), 0);
+  assert.equal(log.requests.length, 1);
+  assert.equal(log.requests[0].url, 'https://api.github.com/repos/Priyansh19077/CP-Templates/tarball');
+  assert.equal(log.requests[0].options?.credentials, 'omit');
+  assert.deepEqual(log.registered, [target]);
+  assert.deepEqual(fs.readdirSync(home), ['CP-Templates-Imported']);
 });
 
 test('ordinary folder entry does not seed instructions into a foreign working tree', async (t) => {
@@ -491,59 +409,6 @@ test('publication uses exclusive copies on filesystems without hard links', asyn
   const second = `${target}-second`;
   await assert.rejects(publishStagedRepository(staged, second, new AbortController().signal), { code: 'IMPORT_INCOMPLETE' });
   assert.equal(fs.readFileSync(path.join(second, 'notes.txt'), 'utf8'), 'concurrent');
-});
-
-test('Git availability probing participates in cancellation and shutdown', async (t) => {
-  for (const shutdown of [false, true]) {
-    const controller = new AbortController();
-    let spawned!: () => void;
-    const started = new Promise<void>((resolve) => { spawned = resolve; });
-    const spawn = childProcess.spawn;
-    let proc: childProcess.ChildProcess | undefined;
-    const mock = t.mock.method(childProcess, 'spawn', (command: string, args: string[], options: childProcess.SpawnOptions) => {
-      // Keep Windows taskkill real so cancellation can retire the probe.
-      if (command !== 'git') return spawn(command, args, options);
-      proc = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], options);
-      spawned();
-      return proc;
-    });
-    syncBuiltinESMExports();
-    try {
-      const { deps, home } = fakeDeps({});
-      deps.isGitAvailable = productionGitHubImportDeps.isGitAvailable;
-      const importing = importPublicGitHubRepository({ url: 'https://github.com/owner/probe', signal: controller.signal }, deps);
-      const refused = assert.rejects(importing, { code: 'IMPORT_CANCELLED' });
-      await started;
-      if (shutdown) assert.equal(await cancelAllGitHubImports(), 1);
-      else controller.abort();
-      await refused;
-      assert.ok(proc?.exitCode != null || proc?.signalCode != null);
-      assert.deepEqual(fs.readdirSync(home), []);
-    } finally {
-      proc?.kill();
-      mock.mock.restore();
-      syncBuiltinESMExports();
-    }
-  }
-});
-
-test('Git availability probe timeout terminates the child and reports unavailable', async (t) => {
-  const spawn = childProcess.spawn;
-  let proc: childProcess.ChildProcess | undefined;
-  const mock = t.mock.method(childProcess, 'spawn', (command: string, args: string[], options: childProcess.SpawnOptions) => {
-    if (command !== 'git') return spawn(command, args, options);
-    proc = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], options);
-    return proc;
-  });
-  syncBuiltinESMExports();
-  try {
-    assert.equal(await productionGitHubImportDeps.isGitAvailable(new AbortController().signal), false);
-    assert.ok(proc?.exitCode != null || proc?.signalCode != null);
-  } finally {
-    proc?.kill();
-    mock.mock.restore();
-    syncBuiltinESMExports();
-  }
 });
 
 test('publication retains nested files, executable modes, and symbolic links', async (t) => {
