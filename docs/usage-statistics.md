@@ -1,147 +1,193 @@
 # Usage statistics
 
-Official desktop builds share basic usage statistics and redacted error diagnostics
-with PostHog by default. Automatic diagnostics are a temporary early-access
-support strategy for failures that users cannot report directly.
-The collection explanation and controls are in Settings. Turn collection off at any time in
-**Settings → General → Privacy → Share basic usage statistics**. Local editing,
-Agent access, and every other feature work regardless of this choice.
-Development builds and builds without a configured destination do not send.
+Official desktop builds send product activity and redacted error diagnostics to
+PostHog by default. **Settings → General → Privacy → Share usage statistics**
+controls both. All features remain available when collection is off. Development
+builds and builds without a destination do not send. Website activity is outside
+this desktop collection.
 
-## What is sent
+## Identity and sign-in
 
-Each event carries a random installation ID, app version, operating system,
-schema version, and event time. The ID is unrelated to your account or hardware;
-it can link usage from this installation across launches. It is not a claim of
-complete anonymity. No person profiles are created.
+The desktop creates a random installation ID and a separate anonymous ID. Neither
+comes from hardware. Both survive launches. When you sign in, the host links the
+current anonymous history to your stable StashBase account ID. Signing in to that
+account on another installation links its activity to the same person, while the
+installation property keeps their origins distinguishable. Your email, name,
+avatar, tokens and provider account identities are not sent.
 
-| Event | Trigger | Additional fields |
+Signing out or changing accounts creates a new anonymous identity. An installation
+is a property, never an alias used to merge all accounts on that computer.
+Anonymous activity is attributed to the next verified sign-in in that anonymous
+period; this is an attribution convention, not proof that a shared computer had
+only one human operator. Unidentified installations cannot be reliably combined
+into a person. Reinstalling or clearing application settings can create a new
+installation identity.
+
+## Events and interpretation
+
+Schema version 3 carries an event UUID, occurrence time, app version, OS,
+installation ID, anonymous ID, installation first-observed time, and, when signed
+in, the account ID. Active work also establishes a session ID shared across
+windows; 30 minutes without reported activity starts another session. The first
+observed time means entry into this measurement, not a proven download/install
+date. Older builds do not supply the same activity or identity evidence.
+
+| Event | Meaning | Additional fields |
 |---|---|---|
-| `app_opened` | Workspace shell mounts; once per shared server lifetime across windows | None |
-| `project_entry_result` | A project-open operation settles in the host | `outcome` |
-| `agent_turn_started` | A non-empty user submission begins context/preparation checks, or a manual retry begins | `runtime` |
-| `agent_turn_finished` | Submission is blocked, completes, fails, or is stopped/retired | `runtime`, `outcome`, duration bucket |
-| `document_write_result` | Editor versioned save succeeds, fails, or conflicts | `outcome` |
-| `agent_setup_result` | Native installation, update, login, or connection fails; explicit setup settles; OpenQuill login completes/fails | `runtime`, `stage`, `outcome`, optional `failure_stage` and `diagnostic` |
-| `application_error` | Agent runtime/connection failure, failed local API operation, background warning/error, or renderer exception | `source`, fixed `operation`, optional `runtime`, redacted `diagnostic` |
-| `telemetry_disabled` | User turns collection off | None |
+| `app_opened` | Workspace mounts, once per host lifetime | None |
+| `app_active` | Trusted pointer, keyboard or wheel input in a visible, focused app window | `mode`: welcome / documents / chat |
+| `document_engaged` | Interaction inside the active document surface, or an actual editor change | `activity`: read / edit; allowlisted `format` |
+| `project_entry_result` | Host project-open operation settles | `outcome` |
+| `agent_turn_started` | User submission or manual retry begins preparation | `runtime`, random `turn_id` |
+| `agent_turn_finished` | Submission completes, fails, is blocked or cancelled | `runtime`, `turn_id`, `outcome`, duration bucket |
+| `document_write_result` | Versioned editor save settles | `outcome`; success includes `changed` |
+| `account_login_started` | A browser sign-in flow starts | None |
+| `account_login_result` | Sign-in completes or fails | `outcome` |
+| `account_signed_out` | Local account is signed out | None |
+| `$identify` | Verified account links its preceding anonymous identity | `$anon_distinct_id` |
+| `billing_checkout_result` | Host obtains a verified Checkout page or fails | `outcome` |
+| `billing_portal_result` | Host obtains a verified management page or fails | `outcome` |
+| `subscription_observed` | Hosted API confirms subscription rights; unchanged polling is suppressed | bounded `plan`, `paid`, `cancel_at_period_end` |
+| `agent_setup_result` | Agent setup settles or connection fails | `runtime`, `stage`, `outcome`, optional failure stage and diagnostic |
+| `application_error` | Host, renderer or Agent failure | `source`, controlled `operation`, optional `runtime`, redacted `diagnostic` |
 
-Runtime values are `stashbase` (OpenQuill), `claude`, and `codex`. Outcomes are
-bounded categories (`success`, `failed`, `cancelled`, `blocked`; document saves
-use `conflict`). Setup stages are `prepare`, `login`, `update`, and `connect`. Durations are under 10
-seconds, 10–60 seconds, 1–5 minutes, or over 5 minutes. No exact model names or
-request durations are sent. Schema version 2 adds bounded error diagnostics:
-a controlled error summary, up to 12 stack line/column locations, an allowlisted
-error name/code, HTTP status, or process exit code when known. Node classifies
-raw sentences locally and emits only fixed summaries, so unquoted file/project
-names cannot escape through free text. Source paths, function names, arbitrary
-objects, request bodies, and raw error sentences are excluded. The original
-error remains available locally in the relevant failure UI.
+`app_active` and each document activity/format category are limited to once per UTC
+minute across windows. They are not heartbeats. Idle background processes,
+restored tabs, automatic source refresh, and streamed Agent output alone do not
+create active days. Read engagement is a surface-interaction proxy: it cannot
+prove comprehension, and silent reading without interaction is not counted.
+Editing events contain no text or keystrokes. Unchanged saves report
+`changed: false`; changed saves and completed turns are measurable results, not
+proof of writing quality or user satisfaction. Agent file writes are not inferred
+from generated replies. Project entry excludes picker cancellations and acquisitions
+that never reach the open operation.
 
-There is one privacy choice for both usage and diagnostics: the existing switch
-enables both or disables both. No separate diagnostic permission or switch exists.
-Repeated identical errors are suppressed for one minute; the collector retains
-at most 100 suppression entries and applies the existing outbound rate and
-concurrency limits. Renderer transport, invalid protocol, React render, and global
-exception/rejection failures reach the same Node owner through the local error
-sink. Agent tool inputs/results and conversation content are excluded from runtime
-error collection. Background warnings/errors are classified locally; log text is never uploaded.
-Caught native picker/update, workspace persistence, project windows,
-attachment/upload, PDF/DOCX preview, and media-resource failures also
-reach the same owner. Normal user cancellation is excluded.
-Offline delivery and a process that exits before delivery can lose diagnostics;
-this is best-effort reporting, not a complete crash recorder or durable log upload.
+Runtime values are stashbase, claude and codex. Outcomes are success, failed,
+cancelled or blocked; saves use conflict. Durations are under 10 seconds,
+10–60 seconds, 1–5 minutes, or over 5 minutes. No model names or exact request
+durations are sent. Diagnostics contain controlled summaries, known error codes,
+HTTP/exit status and bounded stack line/column locations. Raw messages are
+classified locally. Identical diagnostics are suppressed for one minute.
 
-Editor saves are limited to one event per outcome per installation per UTC day,
-including across restarts. No-change HTTP saves can count; this is evidence of
-an editor save operation, not a measure of writing quality or word count. Native
-Agent file writes are not inferred from generated replies. Background setup
-checks, polling, tool calls, token streaming, and automatic retries do not create
-separate usage events; failures at these boundaries can create deduplicated error
-diagnostics. Project entry counts host open results, not native picker
-cancellations or import acquisitions that never reach the open operation.
+Save, project-open and billing operations retain their initiating identity across
+an asynchronous account switch. A turn's random correlation ID retains its
+initiating identity and session until its one terminal result in the same host
+process. A terminal result with no retained start is not inferred after a host
+restart or opt-out. There is no conversation ID or source identity in these events.
+
+Checkout success means a page was obtained, not that payment succeeded.
+`subscription_observed` means confirmed rights, not a new charge: the same account
+can be observed on multiple devices or after signing back in. Revenue, invoices,
+refunds and a complete purchase ledger require the hosted billing service and are
+not measured by desktop events.
+
+## Delivery and turning collection off
+
+The host atomically saves bounded, validated event envelopes in the owner-only
+application configuration before sending. The queue holds at most 500 events for
+seven days. Network failures, timeouts, rate limiting and service failures retry
+with bounded backoff; permanent request refusals are dropped. UUIDs, event times,
+identities and app versions stay fixed during retry and across process restarts.
+PostHog receives the stable event UUID for deduplication. Admission is limited to
+120 events per minute. A full queue refuses new events rather than evicting an
+identity link and silently accepting its dependent events.
+
+Collection never waits on network delivery to complete a writing operation or
+shutdown. The host re-reads current configuration after each outbound request so
+an acknowledgement cannot overwrite newer preferences or newly queued work.
+Queue expiry, saturation, unavailable local storage, ingestion rejection and
+uninstall can still lose events. HTTP acceptance alone does not establish that a
+provider's identity merge or dashboard query has completed.
+
+Turning collection off cancels pending requests and removes the queue, all local
+analytics identities and suppression markers. There is no final opt-out network
+notification. A persistence failure still stops this process and shows failure;
+relaunch suppression is guaranteed only once the choice is saved successfully.
+Already transmitted events cannot be recalled or deleted by this switch.
+Re-enabling starts fresh local IDs and never backfills disabled activity. If still
+signed in, new activity is again associated with that account, including its
+existing PostHog person history.
 
 ## What is never sent
 
-Documents, prompts, replies, search terms, file names or paths, project names,
-repository URLs, account identity, API credentials, hardware fingerprints,
-screenshots, clipboard contents, raw errors, logs, or hashes of private content.
-There is no automatic click collection, pageview tracking, session replay,
-heartbeat, or AI conversation tracing. Outbound payloads request no person
-profile, no IP property, and no GeoIP enrichment. The receiving network service
-still sees the connection IP; operators must also disable IP retention in PostHog.
+Document/chat contents, prompts, replies, search terms, file/project names or
+paths, repository URLs, email addresses, credentials, hardware fingerprints,
+screenshots, clipboard contents, raw logs or hashes of private content. There is
+no DOM click payload capture, session replay, pageview tracking or AI tracing.
+Authenticated activity creates person profiles using the stable account ID;
+unidentified events request no profile. IP and GeoIP enrichment are disabled in
+payloads. The receiving service still sees the connection IP; operators must
+also disable IP retention in PostHog.
 
-## Turning collection off
+## Retention views
 
-The app saves the disabled preference locally before attempting one final
-`telemetry_disabled` notification with the previous installation ID. Pending
-usage and diagnostic requests are cancelled; already transmitted requests cannot be recalled.
-The final notification has a two-second timeout, no retry, and no disk queue.
-Network failure never prevents disabling collection. A settings-write failure
-is shown and stops collection in the current process, but cannot guarantee that
-the preference survives relaunch until it is successfully saved.
+Use schema version 3 and later, one fixed UTC calendar, event occurrence time,
+and only cohorts whose observation window has elapsed. Keep installation and
+person views separate. In person views, use PostHog's resolved person identity
+so linked anonymous and authenticated histories count once; do not simply
+coalesce each row's user ID with its installation ID. Later identity merges can
+change historical cohort membership. Never filter the initial population to
+signed-in people only.
 
-Disabling removes the local installation ID and daily save markers. Re-enabling
-creates a new ID on the next eligible event and never sends historical activity.
-This does not delete events already received by PostHog.
+Recommended saved views:
 
-A disabled notification means collection was turned off at that moment, not
-that the app remains in use. Missing events can also mean offline use, blocked
-network access, uninstall, or abandonment. Dashboards must distinguish observed
-activity, explicitly disabled reporting, and unknown inactivity. They describe
-reporting installations, not all users.
+- **Observed return retention:** first `app_active` → later `app_active`.
+- **Core-use retention:** first `document_engaged` or `agent_turn_started` →
+  another event from that same union. Include blocked attempts here, then inspect
+  success/failure separately.
+- **After first result:** first successful `agent_turn_finished` or successful
+  `document_write_result` with `changed = true` → subsequent core use. This
+  measures retention after a result, not only among people who log in.
+- **Activation funnel:** first active use → successful project entry → core
+  attempt → first result. Login is an optional branch, not a universal prerequisite.
+- **Account funnel:** login started → login success → subsequent core use.
+- **Desktop subscription funnel:** Checkout page obtained → confirmed paid rights.
+  Deduplicate by person and label it observed conversion, not payment revenue.
+
+D1, D7 and D30 mean return on exactly that calendar day after cohort entry. W1
+means at least one return on days 7–13; W4 means days 28–34. Divide returning
+identities by eligible identities in that entry cohort, not all current users.
+Use unique installations for installation retention and resolved persons for
+person retention. Break down event-time OS, version, mode and Agent runtime;
+do not substitute mutable current profile properties for cohort-entry attributes.
+
+These views describe reporting activity, not all users. Missing events can mean
+offline use, blocked transport, opt-out, reinstall or abandonment. Do not label
+all missing activity as confirmed churn. Historical schema-2 installation counts
+are not directly comparable with schema-3 person or foreground retention.
 
 ## Implementation and operator setup
 
-[`server/telemetry.ts`](../server/telemetry.ts) owns collection, strict Settings
-persistence, suppression, and direct PostHog Capture API requests. The event
-allowlist is [`shared/protocols/http/telemetry.ts`](../shared/protocols/http/telemetry.ts).
-There is no analytics SDK or durable event queue. Delivery is best-effort with
-bounded concurrency and rate limiting; it never blocks writing or shutdown.
+`server/telemetry.ts` owns identity, admission, session attribution, opt-out and
+transport. `server/telemetry-state.ts` validates persisted envelopes and maps them
+to the Capture API. The event allowlist is
+`shared/protocols/http/telemetry.ts`; renderer intake accepts only renderer-owned
+facts. Authentication and billing facts cannot be supplied by renderer event
+requests. No analytics SDK or remote configuration runs.
 
-[`server/telemetry-destination.json`](../server/telemetry-destination.json) contains
-the public PostHog project ingestion token and host for the distributor. This is
-not a user credential or Personal API key. Forks should clear or replace it.
-Never embed a PostHog Personal API key or project secret key. No end-user setup
-or environment credential is required.
+`server/telemetry-destination.json` contains the public PostHog ingestion token
+and host, never a Personal API key or secret. Forks should clear or replace it.
+Disable IP retention in the receiving project and choose its event retention
+period independently from the seven-day local delivery limit.
 
 ### Testing packaged builds
 
-Set `STASHBASE_TELEMETRY_DISABLED=1` in the launch environment before starting a
-test app or server. It suppresses all outbound usage events, including
-`app_opened` and `telemetry_disabled`, even in an official packaged build. The
-override does not change the saved preference, installation ID, or daily markers;
-capture does not create them either. Settings changes cannot enable collection
-for that process. `/api/telemetry` reports `available: false` while still exposing
-the saved `enabled` preference. A later launch without the override follows the
-saved preference normally.
-
-The Electron smoke runner and packaged-server smoke set this override themselves.
-For manual packaged UI checks, quit existing test instances first and pass the
-variable to the new app process; changing the environment of an already-running
-app has no effect. For example, on macOS:
+Set `STASHBASE_TELEMETRY_DISABLED=1` before starting an app/server test process.
+It suppresses all collection and queue delivery, including identity links,
+without changing saved preferences or analytics state. Settings cannot override
+it. Verify `/api/telemetry` reports `available: false` before exercising flows.
+Smoke launchers set it themselves. For example:
 
 ```bash
 env -u ELECTRON_RUN_AS_NODE STASHBASE_TELEMETRY_DISABLED=1 \
   /Applications/StashBase.app/Contents/MacOS/StashBase
 ```
 
-On Windows PowerShell, set `$env:STASHBASE_TELEMETRY_DISABLED = '1'` before starting
-the test executable. On Linux, launch the AppImage or installed executable with
-`STASHBASE_TELEMETRY_DISABLED=1` in its environment. Use an isolated test profile
-for preference-editing checks. The override itself never persists a user opt-out.
-For older versions without this override, disable telemetry in the disposable
-test configuration before the first launch.
+Windows PowerShell uses `$env:STASHBASE_TELEMETRY_DISABLED = '1'`; Linux sets it
+before the AppImage launch. Reapply it for each process, including updater tests.
+Use isolated test profiles. Tests of collection replace the transport with a
+local sink and never send test events to production PostHog.
 
-Tests of telemetry delivery must replace the outbound transport with a fake or
-local capture sink. They must not send test-marked events to production PostHog.
-
-Before enabling a production destination, disable IP capture in that PostHog
-project and choose a retention period appropriate for basic product statistics.
-The application does not alter PostHog administration settings. Suggested initial
-views: reporting-installation return activity; project entry to discussion or
-editor save; setup/turn/save outcomes. A completed turn is a technical outcome,
-not evidence that the response was useful. Missing terminal events remain unknown.
-
-Protocol references: [PostHog Capture API](https://posthog.com/docs/api/capture),
-[PostHog collection controls](https://posthog.com/docs/privacy/data-collection).
+Protocol references: [Capture API](https://posthog.com/docs/api/capture),
+[identity linking](https://posthog.com/docs/product-analytics/identify),
+[anonymous and identified events](https://posthog.com/docs/data/anonymous-vs-identified-events).

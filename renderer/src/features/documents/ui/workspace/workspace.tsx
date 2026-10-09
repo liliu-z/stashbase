@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useStore } from 'zustand';
 
 import { Button } from '@/components/ui/button';
+import type { DocumentUsageEvent } from '@/features/documents/application/document-runtime-contract';
 import { SEARCH_NOTICES } from '@/features/documents/application/navigation-runtime';
 import type {
   DocumentAssetPort,
@@ -37,6 +38,7 @@ const ignoreNavigation = () => undefined;
 const rejectExternalNavigation = async () => false;
 
 export interface DocumentWorkspaceProps {
+  recordUsage?: ((event: DocumentUsageEvent) => void) | undefined;
   assetApi: DocumentAssetPort;
   docxPreviewApi: DocxPreviewPort;
   genericPreviewApi: GenericFilePreviewPort;
@@ -72,6 +74,7 @@ export function DocumentWorkspace({
   renderPreparation,
   renderReadingControl,
   revealLabel,
+  recordUsage,
   runtime,
   sourceApi,
   viewers,
@@ -128,7 +131,18 @@ export function DocumentWorkspace({
         key={tab.id}
         role="region"
       >
-        <DocumentReadingSurface runtime={document} history={runtime.history} active={!hidden}>
+        <DocumentReadingSurface
+          runtime={document}
+          history={runtime.history}
+          active={!hidden}
+          onRead={() =>
+            recordUsage?.({
+              event: 'document_engaged',
+              activity: 'read',
+              format: documentViewerFormat(tab.source.path),
+            })
+          }
+        >
           <DocumentSource
             active={!hidden}
             assetApi={assetApi}

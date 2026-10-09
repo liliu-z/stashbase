@@ -59,6 +59,7 @@ import { WorkspacePanes } from './composition/layout/workspace-panes';
 import { WorkspaceSidebar } from './composition/layout/workspace-sidebar';
 import { WorkspaceTitlebar } from './composition/layout/workspace-titlebar';
 import { useAppearanceSurface } from './composition/use-appearance-surface';
+import { useDesktopUsage } from './composition/use-desktop-usage';
 import type { AppDependencies } from './dependencies';
 import { ShellBoundary } from './shell-boundary';
 
@@ -86,7 +87,6 @@ function WorkspaceWindow() {
   // Two adapter records this function hands on more than once.
   const { documents: docs, workspace: workspaceDeps } = dependencies;
   useAppearanceSurface(dependencies.settings.appearanceApi, dependencies.settings.setAppearance);
-  useEffect(() => dependencies.recordUsage({ event: 'app_opened' }), [dependencies]);
   const session = useWorkspaceSession(
     workspaceDeps.adapters.project,
     workspaceDeps.adapters.session,
@@ -99,6 +99,7 @@ function WorkspaceWindow() {
     docs.adapters.source,
     docs.createId,
     docs.adapters,
+    dependencies.recordUsage,
   );
   useDocumentSaveBarrier(documents, docs.adapters.windowLifecycle);
   const newTab = useNewTab(documents);
@@ -161,6 +162,11 @@ function WorkspaceWindow() {
     session,
     workspace,
   });
+
+  useDesktopUsage(
+    dependencies.recordUsage,
+    activeFolder ? (chrome.navigator.mode === 'documents' ? 'documents' : 'chat') : 'welcome',
+  );
 
   const agent = useAgentEnvironment(
     listing,

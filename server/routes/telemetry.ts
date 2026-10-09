@@ -1,5 +1,5 @@
 import type express from 'express';
-import { telemetryEventSchema, telemetryPreferencesRequestSchema } from '../../shared/protocols/http/telemetry.ts';
+import { rendererTelemetryEventSchema, telemetryPreferencesRequestSchema } from '../../shared/protocols/http/telemetry.ts';
 import { telemetry } from '../telemetry.ts';
 import { sendError } from '../http.ts';
 
@@ -13,7 +13,7 @@ export function mount(app: express.Express, service = telemetry): void {
     try { res.json(service.update(parsed.data)); } catch (error) { sendError(res, error); }
   });
   app.post('/api/telemetry/events', (req, res) => {
-    const parsed = telemetryEventSchema.safeParse(req.body);
+    const parsed = rendererTelemetryEventSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'invalid telemetry event' });
     service.capture(parsed.data);
     res.status(204).end();

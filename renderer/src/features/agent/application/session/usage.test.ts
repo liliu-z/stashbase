@@ -14,7 +14,9 @@ describe('Agent usage outcomes', () => {
     usage.start();
     usage.action({ kind: 'fail', message: '/private authentication details' });
     usage.action({ kind: 'close', message: 'private details' });
-    expect(events).toEqual([
+    expect(events[0]?.turn_id).toBeTruthy();
+    expect(events[1]?.turn_id).toBe(events[0]?.turn_id);
+    expect(events.map(({ turn_id: _id, ...event }) => event)).toEqual([
       { event: 'agent_turn_started', runtime: 'codex' },
       { event: 'agent_turn_finished', runtime: 'codex', outcome: 'failed', duration: 'under_10s' },
     ]);
@@ -37,7 +39,11 @@ describe('Agent usage outcomes', () => {
     usage.start();
     now = 500000;
     usage.action({ kind: 'dispose' });
-    expect(events.filter((event) => event.event === 'agent_turn_finished')).toEqual([
+    expect(
+      events
+        .filter((event) => event.event === 'agent_turn_finished')
+        .map(({ turn_id: _id, ...event }) => event),
+    ).toEqual([
       {
         event: 'agent_turn_finished',
         runtime: 'claude',

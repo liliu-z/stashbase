@@ -49,6 +49,7 @@ export function createDocumentTabsRuntime({
   folderPath,
   generation,
   restored = null,
+  recordUsage,
 }: DocumentTabsRuntimeOptions): DocumentTabsRuntime {
   if (!Number.isSafeInteger(generation) || generation < 1) {
     throw new Error('Document tabs generation must be a positive safe integer.');
@@ -119,6 +120,7 @@ export function createDocumentTabsRuntime({
       generation: childGeneration,
       id,
       queries: createQueries(childScope),
+      recordUsage,
       source,
     });
     documents.set(id, runtime);

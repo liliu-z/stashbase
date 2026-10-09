@@ -6,6 +6,7 @@ import {
   prepareDocument,
   createDocumentTabsRuntime,
   type DocumentAdapters,
+  type DocumentUsageEvent,
   type DocumentTabsRuntime,
 } from '@/features/documents/public';
 import type { WorkspaceRuntime, WorkspaceSessionController } from '@/features/workspace/public';
@@ -17,6 +18,7 @@ export function useDocumentWorkspace(
   sourceApi: DocumentAdapters['source'],
   createId: () => string,
   previewAdapters?: Pick<DocumentAdapters, 'asset' | 'genericPreview'>,
+  recordUsage?: (event: DocumentUsageEvent) => void,
 ): DocumentTabsRuntime | null {
   const queryClient = useQueryClient();
   // Only a settled session names a folder to restore tabs from.
@@ -35,6 +37,7 @@ export function useDocumentWorkspace(
     const restoredFolder = restoredRef.current?.folderPath === path ? restoredRef.current : null;
     return createDocumentTabsRuntime({
       api: sourceApi,
+      recordUsage,
       ...(previewAdapters
         ? {
             prepare: (scope) =>
@@ -55,7 +58,7 @@ export function useDocumentWorkspace(
           }
         : null,
     });
-  }, [createId, folderPath, generation, previewAdapters, queryClient, sourceApi]);
+  }, [createId, folderPath, generation, previewAdapters, queryClient, recordUsage, sourceApi]);
 
   const runtime =
     useScopedRuntime(

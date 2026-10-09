@@ -66,7 +66,7 @@ export async function saveFileContent(
   name: string,
   content: string,
   opts: { baseVersion?: string } = {},
-): Promise<{ content: string; indexWarning?: string; version?: string }> {
+): Promise<{ content: string; indexWarning?: string; version?: string; changed: boolean }> {
   validateEditableFileWrite(name);
   return withTextFileTransaction(name, async () => {
     const previous = await readTextSnapshotAsync(name);
@@ -76,7 +76,7 @@ export async function saveFileContent(
       : content;
     // A byte-identical retry succeeds even if its original baseline is stale.
     if (previous?.content === savedContent) {
-      return { ...previous, indexWarning: await upsertSavedFile(name, savedContent) };
+      return { ...previous, changed: false, indexWarning: await upsertSavedFile(name, savedContent) };
     }
     if (opts.baseVersion !== undefined && previous?.version !== opts.baseVersion) {
       throw fileChanged(previous?.version ?? null);
@@ -84,6 +84,6 @@ export async function saveFileContent(
     const saved = await replaceTextSnapshotAsync(name, savedContent, previous?.version ?? null);
     noteTreeChanged();
     const indexWarning = await upsertSavedFile(name, saved.content);
-    return { ...saved, indexWarning };
+    return { ...saved, changed: true, indexWarning };
   });
 }

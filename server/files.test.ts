@@ -139,6 +139,7 @@ test('byte-identical and already-reconciled saves retain the authoritative versi
         baseVersion: firstVersion ?? undefined,
       });
       assert.equal(unchanged.version, firstVersion);
+      assert.equal(unchanged.changed, false);
       assert.equal(await readTextAsync('notes.txt'), 'one\r\n');
 
       fs.writeFileSync(path.join(root, 'notes.txt'), 'external\r\n', 'utf8');
@@ -147,6 +148,7 @@ test('byte-identical and already-reconciled saves retain the authoritative versi
         baseVersion: firstVersion ?? undefined,
       });
       assert.equal(reconciled.version, externalVersion);
+      assert.equal(reconciled.changed, false);
       assert.equal(await readTextAsync('notes.txt'), 'external\r\n');
     });
   } finally {

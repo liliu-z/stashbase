@@ -475,39 +475,50 @@ data migration is not required by [maintenance policy](../MAINTENANCE.md#previou
 
 ## Usage Statistics
 
-- Node owns telemetry preferences and random installation identity in the strict
-  app-config store. Missing preferences default on; malformed/unreadable state
-  fails closed. No account, project, document, or machine identity is reused.
-  Settings General owns disclosure and opt-out; there is no startup notice or
-  persisted notice-dismissal state.
-- Only the fixed event schema may leave the process. Direct Capture API requests
-  add no browser metadata; no SDK, replay, raw log upload, or AI tracing runs.
-  Temporary automatic error diagnostics use the same preference and suppression
-  override as usage. Node classifies messages into fixed summaries and retains only known codes and
-  stack line/column locations before delivery,
-  suppresses repeats, and never serializes request bodies or arbitrary objects.
-  HTTP failures, Agent setup/runtime failures, background warnings/errors, and
-  renderer errors converge on this owner. Reporting cannot throw into operations,
-  recurse on its own transport failures, or become a second privacy setting.
-  The distributor's public ingestion token is build configuration, not a user
-  credential. Unpackaged builds never send to the production destination.
-- `STASHBASE_TELEMETRY_DISABLED=1` is a launch-only override owned by the Node
-  collector. It makes collection unavailable even in packaged builds, including
-  the final disabled notification, without rewriting Settings or creating an ID.
-  Electron inherits it into the server. Smoke launchers set it explicitly; manual
-  packaged checks must set it before starting a new process. Preference changes
-  cannot override it, and removing it on a later launch restores the saved choice.
-- Disabling persists first, cancels outstanding usage requests, and attempts one
-  disclosed final notification without retry. It removes the ID and daily save
-  markers. Re-enabling cannot upload prior activity or reuse the old ID. Already
-  transmitted requests cannot be recalled. Failed persistence stops current-process
-  collection and reports failure instead of claiming durable success.
-- Bounded best-effort delivery never blocks writing or shutdown. One shared owner
-  suppresses duplicate app-open events across windows and editor saves across
-  launches. Terminal Agent signals settle once; background setup is not activation.
-- Operator IP retention settings and interpretation limits are documented in
-  [Usage statistics](../docs/usage-statistics.md). An absent event proves neither
-  abandonment nor continued use after opt-out.
+- Node owns analytics identity, preferences, sessions and a bounded durable queue
+  in the strict owner-only app-config store. Missing preferences default on;
+  malformed/unreadable state fails closed. Configuration writes remain synchronous
+  and atomic; no network response may replace a captured stale config snapshot.
+- Installation IDs are random properties, never hardware IDs or aliases between
+  people. Separate anonymous IDs link to a verified host account through PostHog
+  identify. Logout, confirmed invalidation and direct account switches retire the
+  anonymous identity and session before later capture. Renderer input has no
+  authority to choose an identity or report authentication/billing outcomes.
+- The fixed event schema and persisted-envelope validator are the outbound
+  boundary. Only versioned typed facts are queued; transport constructs metadata
+  explicitly and re-redacts diagnostics. No source identities, input contents,
+  arbitrary event properties, credentials, raw logs or replay enter the queue.
+  The public ingestion token is build configuration, not a user credential.
+- Queue envelopes preserve UUID, occurrence time, installation, anonymous/account
+  identity and source version through retry/restart. Identity links share durable
+  admission with their events. Full queues refuse later work; expiry and permanent
+  ingestion refusal remain observable-data limitations. One serial drain re-reads
+  current preferences/queue after every await and removes only acknowledged UUIDs.
+  Bounded retry never waits in the user's writing operation or shutdown.
+- Foreground input and document/Agent engagement establish activity, not timers,
+  background work or streamed output. All windows share category suppression and
+  sessions. Save/project/billing work captures initiating identity before await;
+  turn correlation retains identity/session through terminal signals. Unknown
+  terminal turns after restart or opt-out cannot manufacture completion.
+- Settings General discloses account linking and controls both usage and errors.
+  Opt-out stops this process even if saving fails, cancels transport, and on a
+  successful save removes the queue and all local analytics state. There is no
+  final network notification. Re-enable creates new local IDs without backfill;
+  a still-signed-in account may link again. Already received provider events are
+  not deleted by this switch.
+- `STASHBASE_TELEMETRY_DISABLED=1` suppresses collection and queue delivery before
+  startup without changing saved preferences/identity. Electron passes it to Node;
+  Settings cannot override it. Unpackaged builds never collect. Automated and
+  manual packaged tests use the override; collection tests replace transport and
+  never send to production PostHog.
+- Automatic diagnostics use this same owner, suppression and opt-out. Node emits
+  controlled summaries, known codes and stack line/column locations. HTTP, Agent,
+  background and renderer failures converge here without throwing into operations,
+  recursively reporting analytics failures, or creating another privacy setting.
+- [Usage statistics](../docs/usage-statistics.md) owns event interpretation,
+  retention definitions, IP-retention setup and delivery limits. An absent event
+  proves neither abandonment nor continued use after opt-out; subscription rights
+  observed by a desktop are not a hosted payment ledger.
 
 ## Renderer Boundaries
 

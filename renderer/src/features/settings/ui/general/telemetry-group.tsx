@@ -20,12 +20,12 @@ export function TelemetryGroup({
     <SettingsGroup title="Privacy">
       <SettingsList>
         <SettingsRow
-          title="Share basic usage statistics"
+          title="Share usage statistics"
           detail={
             <>
               {model.preferences?.available === false
                 ? 'This build does not send usage statistics or error diagnostics.'
-                : 'Share usage statistics and redacted error diagnostics to help improve StashBase.'}{' '}
+                : 'Share activity and redacted errors. Signing in links activity before and after sign-in to your account. Document and chat content is never sent.'}{' '}
               <Button
                 size="compact"
                 variant="ghost"
@@ -39,7 +39,7 @@ export function TelemetryGroup({
             <Switch
               checked={model.preferences?.enabled ?? false}
               disabled={model.busy || !model.preferences}
-              label="Share basic usage statistics"
+              label="Share usage statistics"
               labelHidden
               onToggle={() => model.change({ enabled: !model.preferences?.enabled })}
             />

@@ -135,15 +135,16 @@ async function handleWriteFile(req: express.Request, res: express.Response): Pro
       });
       return;
     }
+    const record = telemetry.scoped();
     try {
-      const saved = await runWithFolderRoot(current, () =>
+      const { changed: contentChanged, ...saved } = await runWithFolderRoot(current, () =>
         saveFileContent(request.data.path, request.data.content, {
           ...('baseVersion' in request.data
             ? { baseVersion: request.data.baseVersion }
             : {}),
         }),
       );
-      telemetry.capture({ event: 'document_write_result', outcome: 'success' });
+      record({ event: 'document_write_result', outcome: 'success', changed: contentChanged });
       res.json(
         documentTextSaveResponseSchema.parse({
           ...saved,
@@ -152,7 +153,7 @@ async function handleWriteFile(req: express.Request, res: express.Response): Pro
         }),
       );
     } catch (err: unknown) {
-      telemetry.capture({ event: 'document_write_result', outcome: (err as { status?: number }).status === 409 ? 'conflict' : 'failed' });
+      record({ event: 'document_write_result', outcome: (err as { status?: number }).status === 409 ? 'conflict' : 'failed' });
       sendError(res, err);
     }
     return;
@@ -163,7 +164,8 @@ async function handleWriteFile(req: express.Request, res: express.Response): Pro
     return;
   }
   try {
-    res.json(await saveFileContent(name, content, { baseVersion }));
+    const { changed: _changed, ...saved } = await saveFileContent(name, content, { baseVersion });
+    res.json(saved);
   } catch (err: unknown) {
     sendError(res, err);
   }

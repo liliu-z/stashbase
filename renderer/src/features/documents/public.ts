@@ -37,3 +37,5 @@ export { passageSearchTarget } from './domain/location';
 export type { DocumentSelection } from './domain/selection';
 
 export { prepareDocument } from './application/prepare-document';
+
+export type { DocumentUsageEvent } from './application/document-runtime-contract';

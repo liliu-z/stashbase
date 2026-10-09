@@ -85,54 +85,48 @@ Embedding key changes retire older validations and serialize runtime changes.
 The catalog and embedder route tests exercise malformed storage and a delayed
 PUT overtaken by DELETE with isolated configuration and controlled validation.
 
-**Usage statistics:** `server/telemetry.ts` and `server/routes/telemetry.ts` own
-manual collection and Settings persistence; Settings General exposes default-on
-disclosure and opt-out. Test launches set `STASHBASE_TELEMETRY_DISABLED=1` to
-suppress packaged collection independently of Settings. A subprocess regression
-uses the production telemetry owner and Electron's server environment builder
-with an intercepted transport: packaged test events and the opt-out notification
-are suppressed, capture preserves stored preferences/identity, and normal packaged
-collection still works. Smoke launchers set the override, and packaged-server
-smoke checks `available: false` before user flows. A built-service pass in packaged
-mode exercised real HTTP capture and preference changes with isolated config and
-an intercepted outbound transport: no fetch was attempted, the saved preference
-survived capture, and no identity was created. Configuration tests (58), package
-contracts (16), host types, service build, Electron smoke, and docs validation
-passed. Signed-package verification of this override remains pending the next release.
-The workspace has no first-launch statistics banner. `server/telemetry.test.ts` covers
-field rejection, opt-out/restart/ID rotation, offline delivery, corrupt config,
-and daily editor-save suppression. Renderer usage tests cover terminal event
-coalescing and Settings choice/failure UI. A 2026-09-15 built-service pass with
-isolated config, real Python/MFS, and a local capture sink exercised project open,
-versioned editor save, opt-out, ID removal, and suppression of later events.
-Before removal of the startup banner, built Storybook privacy controls and the
-then-present disclosure were driven and reviewed visually;
-Electron boundary/authorization smoke passed. A separate real PostHog Capture
-API pass received HTTP 200 for `app_opened` and `telemetry_disabled`, both visible
-in project 384555 with version `2.7.0-telemetry-verification`. IP discard was
-confirmed enabled there. Signed packaged multi-window privacy settings and real-provider
-Agent telemetry remain unproven; desktop accessibility selected a pre-existing
-app instance rather than the isolated verification window.
-Automatic error diagnostics added on 2026-10-09 share that same preference and
-test suppression. `server/error-diagnostics.ts` owns controlled summaries and code/location filtering; telemetry tests
-exercise cause/exit-code retention, exclusion of unquoted private names, opt-out, deduplication,
-and an actual failed HTTP response without collecting its request body.
-`server/error-reporting.ts` connects host API, background, and Agent runtime
-errors; the setup coordinator adds the failing phase to its terminal event.
-`renderer/src/platform/error-reporting.ts` and HTTP/session adapters report
-renderer exceptions and transport failures through the local host. Renderer
-tests cover listener disposal, bounded fields, cancellation, and failed delivery.
-Real-user delivery, offline loss, and fatal-process shutdown remain limitations;
-tests never send diagnostics to production PostHog.
-The built source desktop was driven with an isolated profile and intercepted
-outbound transport: a native picker failure reached the local capture sink;
-Settings exposed one shared switch; disabling held the sink at 12 events after
-both an error and a usage submission; re-enabling delivered both event kinds
-with a new installation ID and no private-name marker. The full renderer gate,
-host types/config/Agent suites, Electron contracts and built smoke passed.
-The same owner covers non-JSON/asset HTTP failures, caught workspace native
-operations, PDF parsing, and captured media-resource errors. This controlled
-source run does not establish signed packaged or real-user delivery.
+**Desktop analytics:** `server/telemetry.ts` owns admission, identity, sessions,
+opt-out and durable delivery; `server/telemetry-state.ts` validates envelopes and
+maps PostHog payloads. `server/routes/telemetry.ts` restricts renderer intake to
+renderer-owned activity. `server/hosted-account.ts` supplies verified sign-in,
+sign-out and hosted subscription facts. File/project routes capture identity
+before work; `file-save.ts` distinguishes unchanged saves. Renderer foreground
+input is observed by `platform/telemetry.ts` through `app/composition/use-desktop-usage.ts`.
+Document runtime changes and active reading-surface interaction report content-free
+engagement; Agent usage correlates start/terminal results with a random turn ID.
+Settings General discloses account linking and the shared usage/error opt-out.
+
+`server/telemetry.test.ts` covers anonymous-to-account links, restart continuity,
+logout/direct account switching, delayed outcomes, offline queue replay, stable
+UUID/time/version, retryable/permanent refusals, capacity/expiry, corrupt config,
+opt-out cancellation, active days without restart, session expiry and subscription
+poll suppression. Its subprocess replaces outbound transport before importing the
+production owner and exercises Electron's packaged test-suppression environment.
+Renderer telemetry tests exercise trusted foreground input, quiet background days,
+listener disposal, bounded edit reporting and refusal of host-only facts.
+Document lifecycle tests distinguish editing from reconciliation/no-change callbacks;
+Agent usage tests cover correlation and terminal coalescing. All collection tests
+use isolated configuration and fake/local transport, never production PostHog.
+
+Error classification remains in `server/error-diagnostics.ts`; host/renderer error
+adapters feed the same collector. Tests cover bounded causes/codes, unquoted private
+names, stack paths, non-JSON asset failures and HTTP response failures without
+request payloads. Known gaps: real PostHog person-merge/deduplication behavior has
+not been exercised with this schema, signed multi-window account changes remain a
+packaged check, and bounded delivery cannot prove all real-user activity. Silent
+reading is unobserved; completed turns do not establish usefulness; subscription
+observations do not establish new payment revenue.
+
+A 2026-10-09 built-source desktop pass used an isolated application/profile,
+temporary project and intercepted outbound transport. Native document editing
+and saving emitted foreground, engagement and changed-save events. Settings
+showed the account-linking disclosure and one shared switch. After disabling it,
+another edit saved successfully while capture count stayed fixed; persisted
+analytics state contained only `enabled: false`. Captures contained neither the
+fixture text nor its path. The complete renderer gate, host boundary suites,
+types, services build and real Electron smoke passed. This local sink establishes
+desktop wiring, not provider ingestion or signed-package identity merging.
+
 A later 2026-09-15 source-desktop startup pass used an empty temporary HOME and
 isolated profile, with any application access to Electron safeStorage made fatal.
 It reached the real welcome screen, showed no statistics banner, and exited

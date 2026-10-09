@@ -159,3 +159,21 @@ it('compares a source that came back instead of overwriting it on restore', asyn
   expect(api.overwrite).not.toHaveBeenCalled();
   expect(document.store.getState().editor?.save.kind).toBe('conflict');
 });
+
+it('records an actual edit without source content, while reconciliation and no-change callbacks stay silent', async () => {
+  const recordUsage = vi.fn();
+  const runtime = createDocumentTabsRuntime({ ...documentTabsRuntimeOptions(), recordUsage });
+  disposers.push(() => runtime.dispose());
+  const document = await runtime.open({ folderPath: '/project/notes', path: 'private.md' });
+  if (!document) throw new Error('Document did not open.');
+  document.reconcile(textSource({ content: 'private content' }));
+  document.change('private content');
+  expect(recordUsage).not.toHaveBeenCalled();
+  document.change('changed private content');
+  expect(recordUsage.mock.calls).toEqual([
+    [{ event: 'document_engaged', activity: 'edit', format: 'md' }],
+  ]);
+  document.dispose();
+  document.change('after disposal');
+  expect(recordUsage).toHaveBeenCalledTimes(1);
+});

@@ -129,6 +129,7 @@ export function mount(app: express.Express): void {
     const controller = new AbortController();
     const closed = () => { if (!res.writableEnded) controller.abort(); };
     res.once('close', closed);
+    const record = telemetry.scoped();
     try {
       const { changed, snapshot } = await openProjectFolder(request.data.path, controller.signal);
       const folderRoot = snapshot.current!.path;
@@ -136,11 +137,11 @@ export function mount(app: express.Express): void {
       if (changed) {
         res.once('finish', () => notifyFolderSwitch(folderRoot, windowId));
       }
-      telemetry.capture({ event: 'project_entry_result', outcome: 'success' });
+      record({ event: 'project_entry_result', outcome: 'success' });
       res.json(snapshot);
     } catch (err: unknown) {
       if (controller.signal.aborted || res.destroyed) return;
-      telemetry.capture({ event: 'project_entry_result', outcome: 'failed' });
+      record({ event: 'project_entry_result', outcome: 'failed' });
       if ((err as { code?: string })?.code === 'WINDOW_CLOSED') {
         res.status(410).json({ error: 'window is closed', code: 'WINDOW_CLOSED' });
         return;

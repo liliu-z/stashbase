@@ -107,15 +107,20 @@ simulators use a separate development-only entry. Neither belongs in normal Sett
 - Update installation is explicit and waits for affected document saves. Failure
   leaves the current application and downloaded update recoverable. Development
   notification previews have no authority to invoke the updater.
-- Official builds disclose default-on usage statistics and redacted error
-  diagnostics under one shared opt-out. During early access, automatic diagnostic
-  messages help investigate failures without requiring direct contact with users.
-  Collection excludes document/chat payloads, paths, account identity, and raw logs;
-  the host emits controlled summaries, known codes, and stack line/column locations.
-  Opt-out stops pending collection; re-enabling starts a fresh identity without
-  backfilling activity. [Usage statistics](../../docs/usage-statistics.md) owns details.
+- Official desktop builds disclose default-on usage statistics and redacted error
+  diagnostics under one opt-out. Signing in associates the preceding anonymous
+  activity with the stable StashBase account, across installations. Installation
+  and person identities remain separate; signing out or switching accounts retires
+  the prior anonymous identity. No hardware fingerprint or document/chat content
+  participates. Local activity remains usable without signing in.
+  Collection excludes private content, paths, email, credentials and raw logs.
+  Bounded offline delivery preserves occurrence time and identity. Opt-out stops
+  pending delivery and erases queued work; re-enabling never backfills disabled
+  activity. A signed-in account can be associated again after re-enabling.
+  [Usage statistics](../../docs/usage-statistics.md) owns the event definitions,
+  identity conventions, measurement limits and operator retention views.
   Test launches of official builds suppress collection before startup without
-  changing the user's saved preference or installation identity.
+  changing the user's saved preference or analytics state.
 - Bug reporting is a separate explicit review and local handoff. The approved
   snapshot cannot change during preparation; StashBase does not submit the report.
 

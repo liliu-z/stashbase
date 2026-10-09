@@ -21,13 +21,23 @@ export interface ErrorContext {
  * diagnostic; schema validation alone is not a privacy boundary. */
 export const telemetryEventSchema = z.discriminatedUnion('event', [
   z.object({ event: z.literal('app_opened') }).strict(),
+  z.object({ event: z.literal('app_active'), mode: z.enum(['welcome', 'documents', 'chat']) }).strict(),
+  z.object({ event: z.literal('document_engaged'), activity: z.enum(['read', 'edit']),
+    format: z.enum(['md', 'txt', 'json', 'html', 'pdf', 'docx', 'image', 'audio', 'generic']) }).strict(),
+  z.object({ event: z.literal('account_login_started') }).strict(),
+  z.object({ event: z.literal('account_login_result'), outcome }).strict(),
+  z.object({ event: z.literal('account_signed_out') }).strict(),
+  z.object({ event: z.literal('billing_checkout_result'), outcome: z.enum(['success', 'failed']) }).strict(),
+  z.object({ event: z.literal('billing_portal_result'), outcome: z.enum(['success', 'failed']) }).strict(),
+  z.object({ event: z.literal('subscription_observed'), plan: z.enum(['free', 'plus', 'pro', 'other']),
+    paid: z.boolean(), cancel_at_period_end: z.boolean() }).strict(),
   z.object({ event: z.literal('project_entry_result'), outcome }).strict(),
-  z.object({ event: z.literal('agent_turn_started'), runtime }).strict(),
+  z.object({ event: z.literal('agent_turn_started'), runtime, turn_id: z.string().uuid().optional() }).strict(),
   z.object({
-    event: z.literal('agent_turn_finished'), runtime, outcome,
+    event: z.literal('agent_turn_finished'), runtime, outcome, turn_id: z.string().uuid().optional(),
     duration: z.enum(['under_10s', '10s_to_60s', '1m_to_5m', 'over_5m']),
   }).strict(),
-  z.object({ event: z.literal('document_write_result'), outcome: z.enum(['success', 'failed', 'conflict']) }).strict(),
+  z.object({ event: z.literal('document_write_result'), outcome: z.enum(['success', 'failed', 'conflict']), changed: z.boolean().optional() }).strict(),
   z.object({ event: z.literal('agent_setup_result'), runtime,
     stage: z.enum(['prepare', 'login', 'update', 'connect']), outcome,
     failure_stage: z.enum(['discovery', 'installation', 'authentication', 'mcp']).optional(),
@@ -39,6 +49,10 @@ export const telemetryEventSchema = z.discriminatedUnion('event', [
   }).strict(),
 ]);
 export type TelemetryEvent = z.infer<typeof telemetryEventSchema>;
+/** Authentication, billing and persisted writes are host facts. Renderers
+ * cannot manufacture identity links or account/conversion outcomes. */
+export const rendererTelemetryEventSchema = telemetryEventSchema.refine((value) =>
+  ['app_opened', 'app_active', 'document_engaged', 'agent_turn_started', 'agent_turn_finished'].includes(value.event));
 export const telemetryPreferencesSchema = z.object({
   enabled: z.boolean(), available: z.boolean(),
 }).strip();

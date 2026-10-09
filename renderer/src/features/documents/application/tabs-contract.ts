@@ -7,6 +7,7 @@
 import type { StoreApi } from 'zustand/vanilla';
 
 import type { DocumentRuntime } from '@/features/documents/application/document-runtime';
+import type { DocumentUsageEvent } from '@/features/documents/application/document-runtime-contract';
 import type { DocumentScope } from '@/features/documents/domain/document';
 import type { DocumentLocation } from '@/features/documents/domain/location';
 import type { DocumentTabsState, RestoredDocumentTabs } from '@/features/documents/domain/tabs';
@@ -94,6 +95,7 @@ export interface DocumentTabsRuntime {
 }
 
 export interface DocumentTabsRuntimeOptions {
+  recordUsage?: ((event: DocumentUsageEvent) => void) | undefined;
   prepare?: (scope: DocumentScope) => Promise<string | null>;
   api: DocumentSourcePort;
   createId: () => string;

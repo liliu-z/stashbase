@@ -59,7 +59,7 @@ test('test launches suppress every event without changing saved preferences, inc
       await tick();
       assert.deepEqual(sent, available ? [
         'app_opened', 'agent_turn_started', 'document_write_result',
-        'telemetry_disabled', 'project_entry_result',
+        'project_entry_result',
       ] : []);
       if (!available) assert.deepEqual(readAppConfigStrict(), { telemetry: { enabled: true } });
       telemetry.close();
@@ -94,6 +94,7 @@ function fixture(available = true) {
     readFails: () => { readFails = true; },
     writeFails: () => { writeFails = true; },
     nextDay: () => { now += 86400000; },
+    advance: (ms: number) => { now += ms; },
   };
 }
 
@@ -105,14 +106,17 @@ test('default-on manual collection has only allowed fields and no source or acco
   f.service.capture({ event: 'project_entry_result', outcome: 'success', path: '/private' } as any);
   await tick();
   assert.equal(f.sent.length, 1);
-  assert.deepEqual(f.sent[0].body.properties, { app_version: '2.7.0', os: 'linux', schema_version: 2,
-    $process_person_profile: false, $geoip_disable: true, $ip: null });
-  assert.equal(f.sent[0].body.distinct_id, f.config().telemetry?.installationId);
+  assert.equal(f.sent[0].body.properties.schema_version, 3);
+  assert.equal(f.sent[0].body.properties.$process_person_profile, false);
+  assert.equal(f.sent[0].body.properties.$geoip_disable, true);
+  assert.equal(f.sent[0].body.properties.$ip, null);
+  assert.equal(f.sent[0].body.distinct_id, f.config().telemetry?.anonymousId);
+  assert.equal(f.sent[0].body.properties.installation_id, f.config().telemetry?.installationId);
   assert.deepEqual(f.config().updates, { autoCheck: false });
   f.service.close();
 });
 
-test('opt-out persists first, discards pending events, sends one final signal, and rotates on re-enable', async () => {
+test('opt-out discards pending events without a final request and rotates on re-enable', async () => {
   const f = fixture();
   f.service.capture({ event: 'app_opened' });
   await tick();
@@ -122,16 +126,15 @@ test('opt-out persists first, discards pending events, sends one final signal, a
   assert.equal(f.config().telemetry?.installationId, undefined);
   f.service.capture({ event: 'agent_turn_started', runtime: 'codex' });
   await tick();
-  assert.deepEqual(f.sent.map((entry) => entry.body.event), ['app_opened', 'telemetry_disabled']);
-  assert.equal(f.sent[1].body.distinct_id, oldId);
+  assert.deepEqual(f.sent.map((entry) => entry.body.event), ['app_opened']);
   const restarted = createTelemetry(f.options);
   restarted.capture({ event: 'app_opened' });
   await tick();
-  assert.equal(f.sent.length, 2);
+  assert.equal(f.sent.length, 1);
   restarted.update({ enabled: true });
   restarted.capture({ event: 'app_opened' });
   await tick();
-  assert.notEqual(f.sent[2].body.distinct_id, oldId);
+  assert.notEqual(f.sent[1].body.distinct_id, oldId);
   f.service.close(); restarted.close();
 });
 
@@ -151,34 +154,15 @@ test('read errors, malformed preferences, development builds, and failed disable
   }
 });
 
-test('document saves are coalesced across process restarts and reset on the next UTC day', async () => {
+test('saves preserve outcomes and actual-change evidence instead of suppressing the day', async () => {
   const f = fixture();
-  for (let i = 0; i < 50; i++) f.service.capture({ event: 'document_write_result', outcome: 'success' });
+  f.service.capture({ event: 'document_write_result', outcome: 'success', changed: false });
+  f.service.capture({ event: 'document_write_result', outcome: 'success', changed: true });
   f.service.capture({ event: 'document_write_result', outcome: 'conflict' });
-  await tick();
-  assert.equal(f.sent.length, 2);
-  const restarted = createTelemetry(f.options);
-  restarted.capture({ event: 'document_write_result', outcome: 'success' });
-  await tick();
-  assert.equal(f.sent.length, 2);
-  f.nextDay();
-  restarted.capture({ event: 'document_write_result', outcome: 'success' });
-  await tick();
-  assert.equal(f.sent.length, 3);
-  restarted.close(); f.service.close();
-});
-
-test('offline final notifications are attempted once without blocking preferences or retrying', async () => {
-  const f = fixture();
-  let calls = 0;
-  const service = createTelemetry({ ...f.options, fetch: (async () => { calls++; throw new Error('offline'); }) as typeof fetch });
-  service.capture({ event: 'app_opened' });
-  await tick();
-  service.update({ enabled: false });
-  await tick(); await tick();
-  assert.equal(calls, 2);
-  assert.equal(service.preferences().enabled, false);
-  service.close();
+  await f.service.flush();
+  assert.deepEqual(f.sent.map(({ body }) => [body.properties.outcome, body.properties.changed]),
+    [['success', false], ['success', true], ['conflict', undefined]]);
+  f.service.close();
 });
 
 test('HTTP boundary refuses arbitrary fields and never exposes the installation ID', async () => {
@@ -219,7 +203,7 @@ test('error diagnostics share opt-out, redact causes, and suppress repeated fail
   f.service.update({ enabled: false });
   f.service.captureError(new Error('another failure'), { source: 'server', operation: 'sync' });
   await tick();
-  assert.deepEqual(f.sent.map((entry) => entry.body.event), ['application_error', 'telemetry_disabled']);
+  assert.deepEqual(f.sent.map((entry) => entry.body.event), ['application_error']);
   f.service.close();
 });
 
@@ -295,4 +279,201 @@ test('non-JSON asset failures report status without reading private response con
     assert.equal(f.sent[0].body.properties.diagnostic.http_status, 404);
     assert.equal(JSON.stringify(f.sent).includes('Private'), false);
   } finally { f.service.close(); server.closeAllConnections(); server.close(); }
+});
+
+function account(f: ReturnType<typeof fixture>, userId?: string) {
+  const config = f.config();
+  config.account = userId ? { session: { userId, email: 'private@example.com', accessToken: 'secret-access',
+    refreshToken: 'secret-refresh', expiresAt: 9999999999 } } : {};
+  f.setConfig(config);
+  f.service.identityChanged();
+}
+
+test('login links the preceding anonymous history and restores the same account across restarts', async () => {
+  const f = fixture();
+  f.service.capture({ event: 'app_active', mode: 'welcome' });
+  await f.service.flush();
+  const anonymous = f.sent[0].body.distinct_id;
+  account(f, 'user-A');
+  f.service.capture({ event: 'account_login_result', outcome: 'success' });
+  await f.service.flush();
+  const link = f.sent.find(({ body }) => body.event === '$identify')!.body;
+  assert.equal(link.distinct_id, 'user:user-A');
+  assert.equal(link.properties.$anon_distinct_id, anonymous);
+  assert.equal(link.properties.$process_person_profile, true);
+  f.service.close();
+  const restarted = createTelemetry(f.options);
+  restarted.capture({ event: 'app_opened' });
+  await restarted.flush();
+  assert.equal(f.sent.at(-1)!.body.distinct_id, 'user:user-A');
+  assert.equal(f.sent.filter(({ body }) => body.event === '$identify').length, 1);
+  for (const value of ['private@example.com', 'secret-access', 'secret-refresh']) assert.equal(JSON.stringify(f.sent).includes(value), false);
+  restarted.close();
+});
+
+test('logout and direct account switches never merge two accounts on the same installation', async () => {
+  const f = fixture();
+  account(f, 'A');
+  f.service.capture({ event: 'app_active', mode: 'documents' });
+  await f.service.flush();
+  const installation = f.config().telemetry!.installationId;
+  const firstAnonymous = f.config().telemetry!.anonymousId;
+  account(f);
+  f.service.capture({ event: 'app_active', mode: 'documents' });
+  const secondAnonymous = f.config().telemetry!.anonymousId;
+  assert.notEqual(secondAnonymous, firstAnonymous);
+  account(f, 'B');
+  await f.service.flush();
+  const links = f.sent.filter(({ body }) => body.event === '$identify').map(({ body }) => body);
+  assert.deepEqual(links.map((body) => [body.distinct_id, body.properties.$anon_distinct_id]),
+    [['user:A', firstAnonymous], ['user:B', secondAnonymous]]);
+  assert.equal(f.config().telemetry!.installationId, installation);
+  account(f, 'C');
+  await f.service.flush();
+  assert.notEqual(f.sent.at(-1)!.body.properties.$anon_distinct_id, secondAnonymous);
+  f.service.close();
+});
+
+test('offline queue survives restart and keeps occurrence identity, time, version and UUID', async () => {
+  const f = fixture();
+  const offline = createTelemetry({ ...f.options, fetch: async () => { throw new Error('offline'); } });
+  offline.capture({ event: 'document_engaged', activity: 'edit', format: 'md' });
+  await offline.flush();
+  const queued = structuredClone(f.config().telemetry!.queue![0]);
+  offline.close();
+  f.nextDay();
+  account(f, 'A');
+  await f.service.flush();
+  const delivered = f.sent.find(({ body }) => body.event === 'document_engaged')!.body;
+  assert.equal(delivered.timestamp, queued.timestamp);
+  assert.equal(delivered.uuid, queued.uuid);
+  assert.equal(delivered.distinct_id, queued.anonymousId);
+  assert.equal(delivered.properties.app_version, queued.version);
+  assert.equal(f.config().telemetry!.queue!.length, 0);
+  f.service.close();
+});
+
+test('rate limiting retains failed deliveries while permanent refusals do not block the queue', async () => {
+  const f = fixture();
+  let status = 429;
+  const service = createTelemetry({ ...f.options, fetch: async () => new Response(null, { status }) });
+  service.capture({ event: 'app_opened' });
+  await service.flush();
+  assert.equal(f.config().telemetry!.queue!.length, 1);
+  status = 503;
+  await service.flush();
+  assert.equal(f.config().telemetry!.queue!.length, 1);
+  status = 400;
+  await service.flush();
+  assert.equal(f.config().telemetry!.queue!.length, 0);
+  service.close(); f.service.close();
+});
+
+test('queued events expire, queue capacity is bounded, and malformed disk payloads never leave', async () => {
+  const f = fixture();
+  const offline = createTelemetry({ ...f.options, fetch: async () => { throw new Error('offline'); } });
+  for (let minute = 0; minute < 8; minute++) {
+    for (let index = 0; index < 120; index++) offline.capture({ event: 'agent_turn_started', runtime: 'codex' });
+    f.advance(60_000);
+  }
+  await offline.flush();
+  assert.ok(f.config().telemetry!.queue!.length <= 500);
+  const valid = f.config().telemetry!.queue![0];
+  f.config().telemetry!.queue!.push({ ...valid, event: { event: 'app_opened', secret: 'private-content' } } as any);
+  offline.close();
+  for (let day = 0; day < 8; day++) f.nextDay();
+  await f.service.flush();
+  assert.equal(f.sent.length, 0);
+  assert.equal(f.config().telemetry!.queue!.length, 0);
+  f.service.close();
+});
+
+test('opt-out cancels an in-flight delivery, erases the queue and cannot replay it on re-enable', async () => {
+  const f = fixture();
+  let complete!: (value: Response) => void;
+  let signal: AbortSignal | undefined;
+  const service = createTelemetry({ ...f.options, fetch: async (_url, init) => {
+    signal = init?.signal ?? undefined;
+    return new Promise<Response>((resolve) => { complete = resolve; });
+  } });
+  service.capture({ event: 'app_opened' });
+  await tick();
+  const old = f.config().telemetry!.installationId;
+  const late = service.scoped();
+  service.update({ enabled: false });
+  assert.equal(signal?.aborted, true);
+  assert.deepEqual(f.config().telemetry, { enabled: false });
+  service.update({ enabled: true });
+  late({ event: 'document_write_result', outcome: 'success', changed: true });
+  complete(new Response(null, { status: 200 }));
+  await tick();
+  assert.equal(f.config().telemetry!.queue?.length ?? 0, 0);
+  service.close();
+  f.service.capture({ event: 'app_active', mode: 'documents' });
+  await f.service.flush();
+  assert.notEqual(f.config().telemetry!.installationId, old);
+  assert.deepEqual(f.sent.map(({ body }) => body.event), ['app_active']);
+  f.service.close();
+});
+
+test('host work finishes against its captured account without reverting a newer account or settings', async () => {
+  const f = fixture();
+  account(f, 'A');
+  const finish = f.service.scoped();
+  account(f, 'B');
+  finish({ event: 'document_write_result', outcome: 'success', changed: true });
+  await f.service.flush();
+  assert.equal(f.sent.at(-1)!.body.distinct_id, 'user:A');
+  assert.equal(f.config().telemetry!.userId, 'B');
+  assert.equal(f.config().account!.session!.userId, 'B');
+  assert.deepEqual(f.config().updates, { autoCheck: false });
+  f.service.close();
+});
+
+test('active days continue without restarting; background diagnostics do not extend sessions', async () => {
+  const f = fixture();
+  const active = () => f.service.capture({ event: 'app_active', mode: 'documents' });
+  active(); active();
+  await f.service.flush();
+  assert.equal(f.sent.length, 1);
+  const firstSession = f.sent[0].body.properties.$session_id;
+  f.advance(20 * 60_000);
+  f.service.captureError(new Error('offline'), { source: 'server', operation: 'sync' });
+  f.advance(11 * 60_000);
+  active();
+  await f.service.flush();
+  assert.notEqual(f.sent.at(-1)!.body.properties.$session_id, firstSession);
+  f.nextDay(); active();
+  await f.service.flush();
+  assert.equal(f.sent.filter(({ body }) => body.event === 'app_active').length, 3);
+  f.service.close();
+});
+
+test('subscription polling reports state transitions, not repeated purchases', async () => {
+  const f = fixture();
+  account(f, 'A');
+  const paid = { event: 'subscription_observed', plan: 'plus', paid: true, cancel_at_period_end: false } as const;
+  f.service.capture(paid); f.service.capture(paid);
+  await f.service.flush();
+  assert.equal(f.sent.filter(({ body }) => body.event === 'subscription_observed').length, 1);
+  f.service.capture({ ...paid, cancel_at_period_end: true });
+  await f.service.flush();
+  assert.equal(f.sent.filter(({ body }) => body.event === 'subscription_observed').length, 2);
+  f.service.close();
+});
+
+test('a long Agent turn retains its initiating identity and session across account changes', async () => {
+  const f = fixture();
+  account(f, 'A');
+  const turn_id = '11111111-1111-4111-8111-111111111111';
+  f.service.capture({ event: 'agent_turn_started', runtime: 'codex', turn_id });
+  account(f, 'B');
+  f.service.capture({ event: 'agent_turn_finished', runtime: 'codex', turn_id, outcome: 'success', duration: '1m_to_5m' });
+  await f.service.flush();
+  const events = f.sent.filter(({ body }) => body.properties.turn_id === turn_id).map(({ body }) => body);
+  assert.equal(events.length, 2);
+  assert.equal(events[0].distinct_id, 'user:A');
+  assert.equal(events[1].distinct_id, 'user:A');
+  assert.equal(events[0].properties.$session_id, events[1].properties.$session_id);
+  f.service.close();
 });

@@ -23,7 +23,7 @@ function fixture() {
 it('persists opt-out from Settings without another confirmation', async () => {
   const port = fixture();
   withQueryClient(<TelemetryGroup port={port} onOpenExternal={() => undefined} />);
-  const toggle = await screen.findByRole('switch', { name: 'Share basic usage statistics' });
+  const toggle = await screen.findByRole('switch', { name: 'Share usage statistics' });
   await waitFor(() => expect(toggle.getAttribute('aria-checked')).toBe('true'));
   await userEvent.click(toggle);
   await waitFor(() => expect(toggle.getAttribute('aria-checked')).toBe('false'));
@@ -35,7 +35,7 @@ it('keeps the confirmed choice and explains a failed write', async () => {
     throw new Error('Could not save');
   };
   withQueryClient(<TelemetryGroup port={port} onOpenExternal={() => undefined} />);
-  const toggle = await screen.findByRole('switch', { name: 'Share basic usage statistics' });
+  const toggle = await screen.findByRole('switch', { name: 'Share usage statistics' });
   await waitFor(() => expect(toggle.getAttribute('aria-checked')).toBe('true'));
   await userEvent.click(toggle);
   await waitFor(() => expect(screen.getByRole('status')).toBeTruthy());
@@ -53,7 +53,7 @@ it('opens the event documentation without changing collection', async () => {
 it('refreshes the durable choice when returning from another window', async () => {
   const port = fixture();
   withQueryClient(<TelemetryGroup port={port} onOpenExternal={() => undefined} />);
-  const toggle = await screen.findByRole('switch', { name: 'Share basic usage statistics' });
+  const toggle = await screen.findByRole('switch', { name: 'Share usage statistics' });
   await waitFor(() => expect(toggle.getAttribute('aria-checked')).toBe('true'));
   act(() => focusManager.setFocused(false));
   await port.update({ enabled: false }, new AbortController().signal);

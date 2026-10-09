@@ -51,6 +51,7 @@ export function createDocumentRuntime({
   id,
   queries,
   source,
+  recordUsage,
 }: DocumentRuntimeOptions): DocumentRuntime {
   if (!Number.isSafeInteger(generation) || generation < 1) {
     throw new Error('Document runtime generation must be a positive safe integer.');
@@ -215,7 +216,13 @@ export function createDocumentRuntime({
     capture,
     change(value) {
       if (disposed) return;
+      const before = store.getState();
       store.setState((state) => changeDocumentText(state, value));
+      const after = store.getState();
+      const format = documentTextFormat(scope.source.path);
+      if (format && after.editor?.revision !== before.editor?.revision) {
+        recordUsage?.({ event: 'document_engaged', activity: 'edit', format });
+      }
     },
     publishRevisionCount(reviewId, pending) {
       if (disposed) return;

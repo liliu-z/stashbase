@@ -14,10 +14,12 @@ export function DocumentReadingSurface({
   history,
   active,
   children,
+  onRead,
 }: {
   runtime: DocumentRuntime;
   history: DocumentHistoryRuntime;
   active: boolean;
+  onRead?: (() => void) | undefined;
   children: ReactNode;
 }) {
   const request = useStore(runtime.store, (state) => state.readingRequest);
@@ -47,8 +49,14 @@ export function DocumentReadingSurface({
       runtime.readingPosition = { top: scroller.scrollTop, left: scroller.scrollLeft };
       history.remember(runtime.scope.source, runtime.readingPosition);
     };
-    const interact = () => {
+    const interact = (event: Event) => {
       desired = null;
+      if (
+        event.isTrusted &&
+        host.ownerDocument.visibilityState === 'visible' &&
+        host.ownerDocument.hasFocus()
+      )
+        onRead?.();
     };
     const observer = new MutationObserver(restore);
     const resize = new ResizeObserver(restore);
@@ -57,6 +65,7 @@ export function DocumentReadingSurface({
     host.addEventListener('scroll', remember, true);
     host.addEventListener('wheel', interact, { passive: true });
     host.addEventListener('pointerdown', interact);
+    host.addEventListener('keydown', interact);
     restore();
     return () => {
       observer.disconnect();
@@ -64,8 +73,9 @@ export function DocumentReadingSurface({
       host.removeEventListener('scroll', remember, true);
       host.removeEventListener('wheel', interact);
       host.removeEventListener('pointerdown', interact);
+      host.removeEventListener('keydown', interact);
     };
-  }, [active, history, request, runtime]);
+  }, [active, history, onRead, request, runtime]);
   return (
     <div className="flex min-h-0 flex-1 flex-col" ref={root}>
       {children}

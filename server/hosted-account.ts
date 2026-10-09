@@ -219,6 +219,7 @@ export function beginHostedOAuth(
   authorize.searchParams.set('redirect_to', callback.toString());
   authorize.searchParams.set('code_challenge', challenge);
   authorize.searchParams.set('code_challenge_method', 's256');
+  telemetry.capture({ event: 'account_login_started' });
   return { flowId, provider, purpose, url: authorize.toString() };
 }
 
@@ -244,6 +245,7 @@ export async function exchangeHostedOAuthCode(flowId: string, authCode: string):
     }
     const session = sessionFrom(payload);
     setHostedAccountSession(session);
+    telemetry.identityChanged();
     // A completed sign-in answers the sign-in banner for good.
     markAccountOfferSeen('sign-in');
     flow.state = 'exchanged';
@@ -258,6 +260,7 @@ export function finishHostedOAuth(flowId: string): void {
   const flow = pendingOAuthFlows.get(flowId);
   if (flow?.state === 'exchanged') {
     flow.state = 'complete';
+    telemetry.capture({ event: 'account_login_result', outcome: 'success' });
     telemetry.capture({ event: 'agent_setup_result', runtime: 'stashbase', stage: 'login', outcome: 'success' });
   }
 }
@@ -316,6 +319,7 @@ export function failHostedOAuth(flowId: string, message: string): void {
   const flow = pendingOAuthFlows.get(flowId);
   if (!flow || flow.state === 'complete') return;
   if (flow.state !== 'error') {
+    telemetry.capture({ event: 'account_login_result', outcome: 'failed' });
     telemetry.capture({ event: 'agent_setup_result', runtime: 'stashbase', stage: 'login', outcome: 'failed',
       diagnostic: errorDiagnostic(message) });
   }
@@ -361,6 +365,7 @@ export async function hostedAccessToken(options: { forceRefresh?: boolean } = {}
       if (error instanceof HostedAuthError && error.invalidSession
         && current && `${current.userId}\0${current.refreshToken}\0${current.accessToken}` === sessionKey) {
         setHostedAccountSession(undefined);
+        telemetry.identityChanged();
       }
       throw error;
     }
@@ -375,7 +380,10 @@ export async function hostedAccessToken(options: { forceRefresh?: boolean } = {}
 
 export async function signOutHostedAccount(): Promise<void> {
   const session = getHostedAccountSession();
+  const record = telemetry.scoped();
   setHostedAccountSession(undefined);
+  telemetry.identityChanged();
+  if (session) record({ event: 'account_signed_out' });
   retireOAuthFlows('You signed out. Start a new sign-in from StashBase.');
   avatarCache = null;
   profileHydration = null;
@@ -533,18 +541,42 @@ export async function fetchHostedBillingPlans(): Promise<HostedBillingPlan[]> {
   return payload.plans;
 }
 
-export function fetchHostedBillingStatus(): Promise<HostedBillingStatus> {
-  return hostedBillingRequest('/v1/billing/status', { method: 'GET' });
+export async function fetchHostedBillingStatus(): Promise<HostedBillingStatus> {
+  const record = telemetry.scoped();
+  const status = await hostedBillingRequest<HostedBillingStatus>('/v1/billing/status', { method: 'GET' });
+  const key = status.plan?.planKey;
+  record({ event: 'subscription_observed',
+    plan: key === 'plus' || key === 'pro' ? key : status.plan ? 'other' : 'free',
+    paid: Boolean(status.paidThrough && Date.parse(status.paidThrough) > Date.now()
+      && ['active', 'past_due'].includes(status.status)),
+    cancel_at_period_end: status.cancelAtPeriodEnd === true });
+  return status;
 }
 
 export async function createHostedCheckout(priceId: string): Promise<HostedBillingRedirect> {
-  const answer = await hostedBillingRequest<{ url?: unknown }>('/v1/billing/checkout', { method: 'POST', body: { priceId } });
-  return { url: stripeBillingUrl(answer.url) };
+  const record = telemetry.scoped();
+  try {
+    const answer = await hostedBillingRequest<{ url?: unknown }>('/v1/billing/checkout', { method: 'POST', body: { priceId } });
+    const url = stripeBillingUrl(answer.url);
+    record({ event: 'billing_checkout_result', outcome: 'success' });
+    return { url };
+  } catch (error) {
+    record({ event: 'billing_checkout_result', outcome: 'failed' });
+    throw error;
+  }
 }
 
 export async function createHostedBillingPortal(): Promise<HostedBillingRedirect> {
-  const answer = await hostedBillingRequest<{ url?: unknown }>('/v1/billing/portal', { method: 'POST' });
-  return { url: stripeBillingUrl(answer.url) };
+  const record = telemetry.scoped();
+  try {
+    const answer = await hostedBillingRequest<{ url?: unknown }>('/v1/billing/portal', { method: 'POST' });
+    const url = stripeBillingUrl(answer.url);
+    record({ event: 'billing_portal_result', outcome: 'success' });
+    return { url };
+  } catch (error) {
+    record({ event: 'billing_portal_result', outcome: 'failed' });
+    throw error;
+  }
 }
 
 export async function hostedAccountState(_refresh = false): Promise<HostedAccountState> {

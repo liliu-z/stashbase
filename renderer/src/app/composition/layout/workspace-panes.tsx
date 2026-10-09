@@ -121,6 +121,7 @@ export function WorkspacePanes({
                 assetApi={dependencies.documents.adapters.asset}
                 docxPreviewApi={dependencies.documents.adapters.docxPreview}
                 genericPreviewApi={dependencies.documents.adapters.genericPreview}
+                recordUsage={dependencies.recordUsage}
                 onAskAgent={onAskAgent}
                 onNavigate={sources.navigate}
                 onOpenExternal={dependencies.documents.openExternal}

@@ -1,9 +1,10 @@
 import type { AgentId, AgentSessionAction } from '@/features/agent/domain/session';
 
 export type AgentUsageEvent =
-  | { event: 'agent_turn_started'; runtime: AgentId }
+  | { event: 'agent_turn_started'; runtime: AgentId; turn_id?: string }
   | {
       event: 'agent_turn_finished';
+      turn_id?: string;
       runtime: AgentId;
       outcome: 'success' | 'failed' | 'cancelled' | 'blocked';
       duration: 'under_10s' | '10s_to_60s' | '1m_to_5m' | 'over_5m';
@@ -18,13 +19,16 @@ export function createAgentUsage(
 ) {
   let startedAt: number | null = null;
   let interrupted = false;
+  let turnId = '';
+  let turnRuntime: AgentId | null = null;
   const finish = (outcome: 'success' | 'failed' | 'cancelled' | 'blocked') => {
-    if (startedAt === null) return;
+    if (startedAt === null || turnRuntime === null) return;
     const elapsed = now() - startedAt;
     startedAt = null;
     record?.({
       event: 'agent_turn_finished',
-      runtime: typeof runtime === 'function' ? runtime() : runtime,
+      runtime: turnRuntime,
+      turn_id: turnId,
       outcome,
       duration:
         elapsed < 10000
@@ -41,9 +45,12 @@ export function createAgentUsage(
       if (startedAt !== null) return;
       interrupted = false;
       startedAt = now();
+      turnId = crypto.randomUUID();
+      turnRuntime = typeof runtime === 'function' ? runtime() : runtime;
       record?.({
         event: 'agent_turn_started',
-        runtime: typeof runtime === 'function' ? runtime() : runtime,
+        runtime: turnRuntime,
+        turn_id: turnId,
       });
     },
     interrupt() {
