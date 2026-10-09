@@ -113,6 +113,26 @@ in project 384555 with version `2.7.0-telemetry-verification`. IP discard was
 confirmed enabled there. Signed packaged multi-window privacy settings and real-provider
 Agent telemetry remain unproven; desktop accessibility selected a pre-existing
 app instance rather than the isolated verification window.
+Automatic error diagnostics added on 2026-10-09 share that same preference and
+test suppression. `server/error-diagnostics.ts` owns controlled summaries and code/location filtering; telemetry tests
+exercise cause/exit-code retention, exclusion of unquoted private names, opt-out, deduplication,
+and an actual failed HTTP response without collecting its request body.
+`server/error-reporting.ts` connects host API, background, and Agent runtime
+errors; the setup coordinator adds the failing phase to its terminal event.
+`renderer/src/platform/error-reporting.ts` and HTTP/session adapters report
+renderer exceptions and transport failures through the local host. Renderer
+tests cover listener disposal, bounded fields, cancellation, and failed delivery.
+Real-user delivery, offline loss, and fatal-process shutdown remain limitations;
+tests never send diagnostics to production PostHog.
+The built source desktop was driven with an isolated profile and intercepted
+outbound transport: a native picker failure reached the local capture sink;
+Settings exposed one shared switch; disabling held the sink at 12 events after
+both an error and a usage submission; re-enabling delivered both event kinds
+with a new installation ID and no private-name marker. The full renderer gate,
+host types/config/Agent suites, Electron contracts and built smoke passed.
+The same owner covers non-JSON/asset HTTP failures, caught workspace native
+operations, PDF parsing, and captured media-resource errors. This controlled
+source run does not establish signed packaged or real-user delivery.
 A later 2026-09-15 source-desktop startup pass used an empty temporary HOME and
 isolated profile, with any application access to Electron safeStorage made fatal.
 It reached the real welcome screen, showed no statistics banner, and exited

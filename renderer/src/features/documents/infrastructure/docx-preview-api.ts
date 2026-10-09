@@ -1,5 +1,6 @@
 import { DOCX_PREVIEW_MESSAGES } from '@/features/documents/application/failure-messages';
 import { DocxPreviewError, type DocxPreviewPort } from '@/features/documents/application/ports';
+import type { ErrorReporter } from '@/platform/error-reporting';
 
 const DIRECT_PREVIEW_TIMEOUT_MS = 20_000;
 
@@ -15,6 +16,7 @@ interface DocxWorkerClient {
 type FetchRequest = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
 interface DocxPreviewApiOptions {
+  reportError?: ErrorReporter | undefined;
   createWorker?: () => DocxWorkerClient | Promise<DocxWorkerClient>;
   fetchRequest?: FetchRequest;
   timeoutMs?: number;
@@ -95,6 +97,7 @@ export function createDocxPreviewAdapter({
   createWorker = createDocxWorker,
   fetchRequest = fetch,
   timeoutMs = DIRECT_PREVIEW_TIMEOUT_MS,
+  reportError,
 }: DocxPreviewApiOptions = {}): DocxPreviewPort {
   return {
     async load(resource, signal) {
@@ -125,6 +128,7 @@ export function createDocxPreviewAdapter({
         return { html };
       } catch (error) {
         if (signal.aborted) throw signal.reason ?? error;
+        reportError?.(error, 'docx-preview');
         if (timedOut) {
           throw new DocxPreviewError(
             'timeout',

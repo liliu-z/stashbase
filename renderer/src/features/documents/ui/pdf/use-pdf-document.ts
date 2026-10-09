@@ -1,6 +1,8 @@
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { useEffect, useState } from 'react';
 
+import { useErrorReporter } from '@/shared/runtime/error-reporting';
+
 export interface PdfLoadTask {
   destroy(): Promise<void>;
   promise: Promise<PDFDocumentProxy>;
@@ -16,6 +18,7 @@ export interface PdfDocumentState {
 }
 
 export function usePdfDocument(url: string, load: PdfLoader): PdfDocumentState {
+  const reportError = useErrorReporter();
   const [state, setState] = useState<PdfDocumentState>({
     document: null,
     error: null,
@@ -43,8 +46,9 @@ export function usePdfDocument(url: string, load: PdfLoader): PdfDocumentState {
         }
         if (!cancelled) setState({ document, error: null, loading: false, pageSize });
       },
-      () => {
+      (error: unknown) => {
         if (cancelled) return;
+        reportError?.(error, 'pdf-preview');
         // PDF.js says why in developer terms; the reader gets one sentence.
         setState({
           document: null,
@@ -58,6 +62,6 @@ export function usePdfDocument(url: string, load: PdfLoader): PdfDocumentState {
       cancelled = true;
       void task.destroy();
     };
-  }, [load, url]);
+  }, [load, url, reportError]);
   return state;
 }

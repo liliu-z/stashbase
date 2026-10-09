@@ -1,3 +1,4 @@
+import { reportAgentRuntimeError } from './error-reporting.ts';
 /** OpenCode implementation of StashBase's Shared Agent Contract. */
 import { randomUUID } from 'node:crypto';
 import type { EventPermissionAsked } from '@opencode-ai/sdk/v2/types';
@@ -60,6 +61,7 @@ export function normalizeOpenCodeToolName(name: string): string {
 }
 
 function send(ws: WebSocket, event: AgentServerEvent): void {
+  reportAgentRuntimeError('stashbase', event);
   if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(event));
 }
 

@@ -1,5 +1,8 @@
 import { cleanup, renderHook, waitFor } from '@testing-library/react';
+import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
+
+import { ErrorReportingProvider } from '@/shared/runtime/error-reporting';
 
 import { usePdfDocument, type PdfLoadTask } from './use-pdf-document';
 
@@ -40,4 +43,18 @@ describe('PDF document lifecycle', () => {
 
     await waitFor(() => expect(document.destroy).toHaveBeenCalledOnce());
   });
+});
+
+it('reports PDF parser rejection while preserving its local failure surface', async () => {
+  const failure = new Error('Invalid PDF structure');
+  const load = vi.fn(() => ({
+    destroy: vi.fn(async () => undefined),
+    promise: Promise.reject(failure),
+  }));
+  const report = vi.fn();
+  const hook = renderHook(() => usePdfDocument('http://127.0.0.1/private.pdf', load), {
+    wrapper: ({ children }) => createElement(ErrorReportingProvider, { report }, children),
+  });
+  await waitFor(() => expect(hook.result.current.error).toBe('The PDF could not be opened.'));
+  expect(report).toHaveBeenCalledWith(failure, 'pdf-preview');
 });

@@ -53,6 +53,7 @@ import { mount as mountGalleryRoutes } from './routes/gallery.ts';
 import { mount as mountEmbedderRoutes } from './routes/embedder.ts';
 import { mount as mountTelemetryRoutes } from './routes/telemetry.ts';
 import { telemetry } from './telemetry.ts';
+import { httpErrorReporting, installHostErrorReporting, unhandledHttpError } from './error-reporting.ts';
 import { mount as mountAppearanceRoutes } from './routes/appearance.ts';
 import { mount as mountWorkspacePreferenceRoutes } from './routes/workspace-preferences.ts';
 import { mount as mountUpdateRoutes } from './routes/updates.ts';
@@ -85,6 +86,7 @@ import { stopOpenCodeRuntime } from './opencode-runtime.ts';
 import { cancelAllGitHubImports } from './github-import.ts';
 
 const log = logger('server');
+installHostErrorReporting();
 
 
 // Compatibility adapters preserve the established Claude SDK and Codex
@@ -147,6 +149,7 @@ const app = express();
 const mcpHttpService = createMcpHttpService({ webPort: PORT });
 app.use(express.json({ limit: '10mb' }));
 app.use(withWindowContext);
+app.use(httpErrorReporting());
 
 // ----- security middleware ------------------------------------------------
 //
@@ -329,7 +332,7 @@ mountAgentPreferencesRoutes(app); // global + explicit member-folder Chat guidan
 // exceptions here so they appear in the same server log developers
 // already monitor (next to fs / sync warnings) — no need to open
 // devtools to see why the user's session blanked.
-const clientErrLog = log;
+const clientErrLog = logger('renderer');
 app.post('/api/log/client-error', createClientErrorHandler(clientErrLog));
 
 // Dev-only fallthrough: any request that didn't match an `/api/*` or
@@ -346,6 +349,7 @@ const viteProxy = DEV_VITE
     })
   : null;
 if (viteProxy) app.use(viteProxy);
+app.use(unhandledHttpError);
 
 const server = app.listen(PORT, '127.0.0.1', () => {
   try { ensureMcpLauncher(); }

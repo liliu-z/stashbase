@@ -1170,3 +1170,20 @@ test('a failing updater surfaces as an installation failure with the manual inst
   assert.equal(status.failure?.manualRecovery, 'install-command');
   assert.match(status.failure?.message ?? '', /not writable/);
 });
+
+test('failed setup reports native error causes once with its action and failing phase', async (t) => {
+  const { telemetry } = await import('../telemetry.ts');
+  const events: any[] = [];
+  t.mock.method(telemetry, 'capture', (event: unknown) => events.push(event));
+  const error = new TypeError('fetch failed', { cause: Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' }) });
+  const coordinator = new AgentBootstrapCoordinator(fakeDependencies({ installRuntime: async () => { throw error; } }).dependencies);
+  coordinator.begin('codex');
+  coordinator.begin('codex');
+  await coordinator.wait('codex');
+  assert.equal(events.length, 1);
+  assert.equal(events[0].stage, 'prepare');
+  assert.equal(events[0].failure_stage, 'installation');
+  assert.equal(events[0].outcome, 'failed');
+  assert.equal(events[0].diagnostic.code, 'ECONNREFUSED');
+  assert.match(events[0].diagnostic.message, /Network request failed/);
+});

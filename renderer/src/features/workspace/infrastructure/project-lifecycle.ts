@@ -1,5 +1,6 @@
 import { ProjectError, type ProjectLifecyclePort } from '@/features/workspace/application/ports';
 import type { ProjectLifecycleBridge } from '@/platform/electron/project-lifecycle';
+import { reportFailure, type ErrorReporter } from '@/platform/error-reporting';
 import type { ProjectLifecycleResponse } from '@/protocols/electron/project';
 
 function lifecycleFailure(
@@ -18,22 +19,29 @@ function accept(response: ProjectLifecycleResponse): void {
 
 export function createProjectLifecycleAdapter(
   bridge: ProjectLifecycleBridge,
+  reportError?: ErrorReporter,
 ): ProjectLifecyclePort {
   return {
-    async enterFolder(path, signal) {
-      signal.throwIfAborted();
-      const id = crypto.randomUUID();
-      const cancel = () => {
-        void bridge.cancelEntry(id).catch(() => {});
-      };
-      signal.addEventListener('abort', cancel, { once: true });
-      try {
-        const response = await bridge.openFolderWindow(path, id);
-        if (!response.ok) throw lifecycleFailure(response);
-      } finally {
-        signal.removeEventListener('abort', cancel);
-      }
-    },
+    enterFolder: (path, signal) =>
+      reportFailure(
+        async () => {
+          signal.throwIfAborted();
+          const id = crypto.randomUUID();
+          const cancel = () => {
+            void bridge.cancelEntry(id).catch(() => {});
+          };
+          signal.addEventListener('abort', cancel, { once: true });
+          try {
+            const response = await bridge.openFolderWindow(path, id);
+            if (!response.ok) throw lifecycleFailure(response);
+          } finally {
+            signal.removeEventListener('abort', cancel);
+          }
+        },
+        reportError,
+        'project-lifecycle',
+        signal,
+      ),
     onEnterFolder(handler) {
       const pending = new Map<string, AbortController>();
       const unsubscribeCancellation = bridge.onEntryCancelled((id) => pending.get(id)?.abort());
@@ -52,18 +60,33 @@ export function createProjectLifecycleAdapter(
         for (const controller of pending.values()) controller.abort();
       };
     },
-    async notifyFolderRemoved(folderPath) {
-      accept(await bridge.notifyFolderRemoved(folderPath));
-    },
+    notifyFolderRemoved: (folderPath) =>
+      reportFailure(
+        async () => {
+          accept(await bridge.notifyFolderRemoved(folderPath));
+        },
+        reportError,
+        'project-lifecycle',
+      ),
     onFolderRemoved: (handler) => bridge.onFolderRemoved(handler),
     onPrepareFolderRemoval: (handler) => bridge.onPrepareFolderRemoval(handler),
-    async prepareFolderRemoval(folderPath) {
-      const response = await bridge.prepareFolderRemoval(folderPath);
-      if (!response.ok) throw lifecycleFailure(response);
-      return response.ready;
-    },
-    async setActiveFolder(folderPath) {
-      accept(await bridge.setActiveFolder(folderPath));
-    },
+    prepareFolderRemoval: (folderPath) =>
+      reportFailure(
+        async () => {
+          const response = await bridge.prepareFolderRemoval(folderPath);
+          if (!response.ok) throw lifecycleFailure(response);
+          return response.ready;
+        },
+        reportError,
+        'project-lifecycle',
+      ),
+    setActiveFolder: (folderPath) =>
+      reportFailure(
+        async () => {
+          accept(await bridge.setActiveFolder(folderPath));
+        },
+        reportError,
+        'project-lifecycle',
+      ),
   };
 }

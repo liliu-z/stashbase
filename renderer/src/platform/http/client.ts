@@ -13,13 +13,19 @@ export interface HttpResponse {
 
 export interface HttpClient {
   request(request: HttpRequest): Promise<HttpResponse>;
+  reportError?: ((error: unknown, operation: string) => void) | undefined;
 }
 
 type Fetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
-export function createHttpClient(serverOrigin: string, fetchRequest: Fetch = fetch): HttpClient {
+export function createHttpClient(
+  serverOrigin: string,
+  fetchRequest: Fetch = fetch,
+  reportError?: (error: unknown, operation: string) => void,
+): HttpClient {
   const baseUrl = new URL(serverOrigin);
   return {
+    ...(reportError ? { reportError } : {}),
     async request({ body, method = 'GET', path, signal }) {
       const headers = new Headers({ accept: 'application/json' });
       const init: RequestInit = { headers, method, ...(signal ? { signal } : {}) };
@@ -27,7 +33,14 @@ export function createHttpClient(serverOrigin: string, fetchRequest: Fetch = fet
         headers.set('content-type', 'application/json');
         init.body = JSON.stringify(body);
       }
-      const response = await fetchRequest(new URL(path, baseUrl), init);
+      let response: Response;
+      try {
+        response = await fetchRequest(new URL(path, baseUrl), init);
+      } catch (error) {
+        if (!signal?.aborted || signal.reason?.name === 'TimeoutError')
+          reportError?.(error, 'http-transport');
+        throw error;
+      }
       let responseBody: unknown = null;
       try {
         responseBody = await response.json();

@@ -3,6 +3,7 @@ import {
   type UploadPort,
   type UploadResult,
 } from '@/features/workspace/application/ports';
+import type { ErrorReporter } from '@/platform/error-reporting';
 import { classifyResponse } from '@/platform/http/classify';
 
 type Fetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -32,7 +33,11 @@ function settledPaths(body: UploadResponseBody | null, count: number): UploadRes
 
 /** Multipart import through `POST /api/upload`. The JSON HTTP client cannot
  *  carry file bodies, so this adapter speaks to the server origin directly. */
-export function createUploadAdapter(serverOrigin: string, fetchRequest: Fetch = fetch): UploadPort {
+export function createUploadAdapter(
+  serverOrigin: string,
+  fetchRequest: Fetch = fetch,
+  reportError?: ErrorReporter,
+): UploadPort {
   const target = new URL('/api/upload', serverOrigin);
   return {
     async upload(folderPath, files, signal) {
@@ -47,6 +52,7 @@ export function createUploadAdapter(serverOrigin: string, fetchRequest: Fetch = 
         response = await fetchRequest(target, { body: form, method: 'POST', signal });
       } catch (error) {
         if (signal.aborted) throw error;
+        reportError?.(error, 'upload');
         throw new FilesError('outcome-unknown', 'The upload could not reach StashBase.', {
           cause: error,
         });
@@ -66,7 +72,12 @@ export function createUploadAdapter(serverOrigin: string, fetchRequest: Fetch = 
           typeof body?.error === 'string' ? body.error : 'The upload failed.',
         );
       }
-      return settledPaths(body, files.length);
+      try {
+        return settledPaths(body, files.length);
+      } catch (error) {
+        reportError?.(error, 'upload');
+        throw error;
+      }
     },
   };
 }

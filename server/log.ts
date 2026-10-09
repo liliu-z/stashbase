@@ -15,6 +15,11 @@ const LEVELS = { debug: 10, info: 20, warn: 30, error: 40 } as const;
 type Level = keyof typeof LEVELS;
 
 const threshold: number = LEVELS[(process.env.STASHBASE_LOG as Level) ?? 'info'] ?? LEVELS.info;
+let errorReporter: ((scope: string, args: unknown[]) => void) | undefined;
+
+export function setLogErrorReporter(report: (scope: string, args: unknown[]) => void): void {
+  errorReporter = report;
+}
 
 function emit(level: Level, scope: string, ...args: unknown[]): void {
   if (LEVELS[level] < threshold) return;
@@ -24,6 +29,9 @@ function emit(level: Level, scope: string, ...args: unknown[]): void {
   // protocol stream ("Unexpected non-whitespace character after JSON").
   // Web server logs are unaffected (terminals interleave stdout+stderr).
   console.error(`${ts} ${level.padEnd(5)} [${scope}]`, ...args);
+  if (level === 'warn' || level === 'error') {
+    try { errorReporter?.(scope, args); } catch { /* Logging never depends on reporting. */ }
+  }
 }
 
 export function logger(scope: string) {

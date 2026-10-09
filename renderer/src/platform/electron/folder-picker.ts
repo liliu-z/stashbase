@@ -1,3 +1,4 @@
+import type { ErrorReporter } from '@/platform/error-reporting';
 import {
   type ProjectFolderDialogFailure,
   type ProjectFolderDialogRequest,
@@ -25,10 +26,21 @@ export function mapFolderSelection(
   return { status: 'selected', folderPath: response.folderPath };
 }
 
-export function createFolderPicker(bridge: ProjectBridge): ProjectFolderPickerPort {
+export function createFolderPicker(
+  bridge: ProjectBridge,
+  reportError?: ErrorReporter,
+): ProjectFolderPickerPort {
   return {
     async chooseFolder(request) {
-      return mapFolderSelection(await bridge.chooseFolder(request));
+      try {
+        const result = mapFolderSelection(await bridge.chooseFolder(request));
+        if (result.status === 'failed')
+          reportError?.(new Error(`Folder picker failed: ${result.failure.kind}`), 'folder-picker');
+        return result;
+      } catch (error) {
+        reportError?.(error, 'folder-picker');
+        throw error;
+      }
     },
   };
 }

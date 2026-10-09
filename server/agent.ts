@@ -1,3 +1,4 @@
+import { reportAgentRuntimeError } from './error-reporting.ts';
 /**
  * Structured-agent sidecar. Where `terminal.ts` bridges a raw PTY to an
  * xterm, this bridges the **Claude Agent SDK** to a WebSocket as a
@@ -877,6 +878,7 @@ export class AgentSession implements AttributedAgentSession {
   }
 
   private send(obj: AgentServerEvent): void {
+    reportAgentRuntimeError('claude', obj);
     if (this.ws.readyState !== 1 /* OPEN */) return;
     try { this.ws.send(JSON.stringify(obj)); } catch { /* ws gone */ }
   }

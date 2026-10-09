@@ -137,3 +137,19 @@ describe('updates adapter', () => {
     );
   });
 });
+
+it('reports caught update failures and pushed errors without changing recovery state', async () => {
+  const report = vi.fn();
+  const onSnapshot = vi.fn<UpdatesBridge['onSnapshot']>(() => STOP);
+  const updates = createUpdatesAdapter(
+    bridge({ failure: { kind: 'failed' }, ok: false }, { onSnapshot }),
+    report,
+  );
+  expect(await updates.check()).toEqual(UNAVAILABLE);
+  expect(report).toHaveBeenCalledTimes(1);
+  const onState = vi.fn();
+  updates.subscribe(onState);
+  onSnapshot.mock.calls[0]?.[0]({ ...BUILD, phase: 'error' });
+  expect(onState).toHaveBeenCalledWith(state({ phase: 'error' }));
+  expect(report).toHaveBeenCalledTimes(2);
+});

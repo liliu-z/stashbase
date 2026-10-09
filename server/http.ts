@@ -20,6 +20,7 @@ const log = logger('http');
  *  thrown `requireCurrentFolder` failure from the files layer into the
  *  conventional 412 the client expects. */
 export function sendError(res: express.Response, err: unknown): void {
+  if (res.locals) res.locals.diagnosticError = err;
   if (errorCode(err) === 'NO_FOLDER') {
     res.status(412).json({ error: 'no folder open', code: 'NO_FOLDER' });
     return;

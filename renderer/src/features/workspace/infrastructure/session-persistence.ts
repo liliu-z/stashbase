@@ -4,6 +4,7 @@ import {
   type WorkspaceSessionPort,
 } from '@/features/workspace/application/ports';
 import type { WorkspaceSessionSnapshot } from '@/features/workspace/domain/session';
+import { reportFailure, type ErrorReporter } from '@/platform/error-reporting';
 import {
   workspaceSessionReadResponseSchema,
   workspaceSessionSnapshotSchema,
@@ -45,18 +46,29 @@ function sessionRefusal(operation: 'load' | 'save', serverMessage: string): Work
 
 export function createWorkspaceSessionAdapter(
   bridge: WorkspaceSessionBridge,
+  reportError?: ErrorReporter,
 ): WorkspaceSessionPort {
   return {
-    async load() {
-      const response = workspaceSessionReadResponseSchema.parse(await bridge.read());
-      if (!response.ok) throw sessionRefusal('load', response.failure.message);
-      return response.session ? toDomain(response.session) : null;
-    },
-    async save(snapshot) {
-      const response = workspaceSessionWriteResponseSchema.parse(
-        await bridge.write(toWire(snapshot)),
-      );
-      if (!response.ok) throw sessionRefusal('save', response.failure.message);
-    },
+    load: () =>
+      reportFailure(
+        async () => {
+          const response = workspaceSessionReadResponseSchema.parse(await bridge.read());
+          if (!response.ok) throw sessionRefusal('load', response.failure.message);
+          return response.session ? toDomain(response.session) : null;
+        },
+        reportError,
+        'workspace-session',
+      ),
+    save: (snapshot) =>
+      reportFailure(
+        async () => {
+          const response = workspaceSessionWriteResponseSchema.parse(
+            await bridge.write(toWire(snapshot)),
+          );
+          if (!response.ok) throw sessionRefusal('save', response.failure.message);
+        },
+        reportError,
+        'workspace-session',
+      ),
   };
 }

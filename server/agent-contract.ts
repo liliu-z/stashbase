@@ -1,3 +1,4 @@
+import { telemetry } from './telemetry.ts';
 /**
  * Compatibility-first contract for the Agent Panel.
  *
@@ -310,11 +311,13 @@ export function attachAgentRuntime(id: string, ws: WebSocket, options: AgentConn
   const runtime = runtimeDescriptorFor(adapter);
   if (!runtime.installed || runtime.state !== 'available') {
     const message = runtime.error ?? `${adapter.label} is not ready.`;
+    telemetry.captureError(message, { source: 'agent', operation: 'connection', runtime: adapter.id });
     ws.send(JSON.stringify({ t: 'error', message }));
     ws.close();
     return;
   }
   if (adapter.id !== 'stashbase' && !agentExecutableFor(adapter.id)) {
+    telemetry.captureError(`${adapter.label} CLI is not available.`, { source: 'agent', operation: 'connection', runtime: adapter.id });
     ws.send(JSON.stringify({ t: 'error', message: `${adapter.label} CLI is not available.` }));
     ws.close();
     return;
@@ -323,6 +326,7 @@ export function attachAgentRuntime(id: string, ws: WebSocket, options: AgentConn
     if (adapter.id !== 'stashbase') ensureAgentMcp(adapter.id);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    telemetry.captureError(error, { source: 'agent', operation: 'mcp-connection', runtime: adapter.id });
     ws.send(JSON.stringify({ t: 'error', message: `Could not connect StashBase MCP: ${message}` }));
     ws.close();
     return;

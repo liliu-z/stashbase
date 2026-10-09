@@ -24,8 +24,8 @@ export function TelemetryGroup({
           detail={
             <>
               {model.preferences?.available === false
-                ? 'This build does not send usage statistics.'
-                : 'Help improve StashBase without sharing your content.'}{' '}
+                ? 'This build does not send usage statistics or error diagnostics.'
+                : 'Share usage statistics and redacted error diagnostics to help improve StashBase.'}{' '}
               <Button
                 size="compact"
                 variant="ghost"

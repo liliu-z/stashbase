@@ -474,7 +474,14 @@ data migration is not required by [maintenance policy](../MAINTENANCE.md#previou
   Settings General owns disclosure and opt-out; there is no startup notice or
   persisted notice-dismissal state.
 - Only the fixed event schema may leave the process. Direct Capture API requests
-  add no browser metadata; no SDK, replay, raw error capture, or AI tracing runs.
+  add no browser metadata; no SDK, replay, raw log upload, or AI tracing runs.
+  Temporary automatic error diagnostics use the same preference and suppression
+  override as usage. Node classifies messages into fixed summaries and retains only known codes and
+  stack line/column locations before delivery,
+  suppresses repeats, and never serializes request bodies or arbitrary objects.
+  HTTP failures, Agent setup/runtime failures, background warnings/errors, and
+  renderer errors converge on this owner. Reporting cannot throw into operations,
+  recurse on its own transport failures, or become a second privacy setting.
   The distributor's public ingestion token is build configuration, not a user
   credential. Unpackaged builds never send to the production destination.
 - `STASHBASE_TELEMETRY_DISABLED=1` is a launch-only override owned by the Node

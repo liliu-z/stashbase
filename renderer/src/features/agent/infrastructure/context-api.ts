@@ -59,6 +59,7 @@ export function createAgentContextAdapter(
         response = await fetchRequest(attachTarget, { body: form, method: 'POST', signal });
       } catch (error) {
         if (signal.aborted) throw error;
+        client.reportError?.(error, 'attachment');
         throw new AgentContextError('unavailable', 'The attachment could not be uploaded.', {
           cause: error,
         });
@@ -80,6 +81,7 @@ export function createAgentContextAdapter(
       }
       const parsed = agentAttachResponseSchema.safeParse(body);
       if (!parsed.success) {
+        client.reportError?.(new Error('Invalid attachment upload response'), 'attachment');
         throw new AgentContextError('invalid-response', 'The upload returned an invalid response.');
       }
       return parsed.data.files;

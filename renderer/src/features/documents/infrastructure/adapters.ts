@@ -48,7 +48,7 @@ export function createDocumentAdapters({
 }: DocumentAdapterOptions): DocumentAdapters {
   return {
     asset: createDocumentAssetAdapter(http, serverOrigin),
-    docxPreview: createDocxPreviewAdapter(),
+    docxPreview: createDocxPreviewAdapter({ reportError: http.reportError }),
     genericPreview: createGenericFilePreviewAdapter(http),
     source: createDocumentSourceAdapter(http),
     turnChanges: createDocumentTurnChangesAdapter(http),

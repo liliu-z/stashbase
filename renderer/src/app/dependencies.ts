@@ -67,6 +67,7 @@ import { createExternalNavigation } from '@/platform/electron/external-navigatio
 import { fileManagerLabel } from '@/platform/electron/file-manager';
 import { createFolderPicker } from '@/platform/electron/folder-picker';
 import type { WindowLifecycleBridge } from '@/platform/electron/window-lifecycle';
+import { createErrorReporter, type ErrorReporter } from '@/platform/error-reporting';
 import { createHttpClient } from '@/platform/http/client';
 import { createUsageRecorder } from '@/platform/telemetry';
 import type { AppearanceSurface } from '@/shared/domain/appearance';
@@ -78,6 +79,7 @@ type ProjectChrome = Pick<ComponentProps<typeof ProjectWelcome>, 'api' | 'lifecy
 };
 
 export interface AppDependencies {
+  reportError?: ErrorReporter | undefined;
   /** The appearance the desktop remembered for this window's first paint;
    *  null on a first launch. */
   initialAppearance: AppearanceSurface | null;
@@ -133,7 +135,8 @@ export interface AppDependencies {
 
 export function createDependencies(): AppDependencies {
   const bridge = readBridge();
-  const http = createHttpClient(bridge.runtime.serverOrigin);
+  const reportError = createErrorReporter(createHttpClient(bridge.runtime.serverOrigin));
+  const http = createHttpClient(bridge.runtime.serverOrigin, fetch, reportError);
   const externalNavigation = createExternalNavigation(bridge.externalNavigation);
   const workspace = createWorkspaceAdapters({
     http,
@@ -142,6 +145,7 @@ export function createDependencies(): AppDependencies {
     workspaceSession: bridge.workspaceSession,
   });
   return {
+    reportError,
     initialAppearance: bridge.runtime.appearance ?? null,
     recordUsage: createUsageRecorder(http),
     agent: {
@@ -163,7 +167,7 @@ export function createDependencies(): AppDependencies {
     gallery: createGalleryIndexAdapter(http, bridge.runtime.serverOrigin),
     project: {
       api: workspace.project,
-      folderPicker: createFolderPicker(bridge.project),
+      folderPicker: createFolderPicker(bridge.project, reportError),
       lifecycle: workspace.lifecycle,
     },
     preparation: {
@@ -186,7 +190,7 @@ export function createDependencies(): AppDependencies {
       mcpAccessApi: createMcpAccessAdapter(http),
       localComponentApi: createLocalComponentAdapter(http),
     },
-    updates: bridge.updates ? createUpdatesAdapter(bridge.updates) : null,
+    updates: bridge.updates ? createUpdatesAdapter(bridge.updates, reportError) : null,
     workspace: { adapters: workspace, revealLabel: fileManagerLabel() },
   };
 }

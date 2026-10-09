@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vite-plus/test';
+import { describe, expect, it, vi } from 'vite-plus/test';
 
-import { mapFolderSelection } from './folder-picker';
+import { createFolderPicker, mapFolderSelection } from './folder-picker';
 
 describe('project folder picker adapter', () => {
   it('maps selected, cancelled, and classified failure responses', () => {
@@ -21,4 +21,23 @@ describe('project folder picker adapter', () => {
       failure: { kind: 'unavailable', message: 'Folder picker unavailable.' },
     });
   });
+});
+
+it('reports native failures while preserving cancellation and the original result', async () => {
+  const report = vi.fn();
+  const chooseFolder = vi
+    .fn()
+    .mockResolvedValueOnce({ ok: true, folderPath: null })
+    .mockResolvedValueOnce({
+      ok: false,
+      failure: { kind: 'unavailable', message: 'Private project failed' },
+    })
+    .mockRejectedValueOnce(new Error('IPC failed'));
+  const picker = createFolderPicker({ chooseFolder }, report);
+  expect(await picker.chooseFolder()).toEqual({ status: 'cancelled' });
+  expect(report).not.toHaveBeenCalled();
+  expect(await picker.chooseFolder()).toMatchObject({ status: 'failed' });
+  expect(report.mock.calls[0]?.[0].message).not.toContain('Private project');
+  await expect(picker.chooseFolder()).rejects.toThrow('IPC failed');
+  expect(report).toHaveBeenCalledTimes(2);
 });

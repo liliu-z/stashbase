@@ -107,8 +107,11 @@ simulators use a separate development-only entry. Neither belongs in normal Sett
 - Update installation is explicit and waits for affected document saves. Failure
   leaves the current application and downloaded update recoverable. Development
   notification previews have no authority to invoke the updater.
-- Official builds disclose default-on basic usage statistics and offer opt-out.
-  Collection excludes content, paths, account identity, and raw diagnostics.
+- Official builds disclose default-on usage statistics and redacted error
+  diagnostics under one shared opt-out. During early access, automatic diagnostic
+  messages help investigate failures without requiring direct contact with users.
+  Collection excludes document/chat payloads, paths, account identity, and raw logs;
+  the host emits controlled summaries, known codes, and stack line/column locations.
   Opt-out stops pending collection; re-enabling starts a fresh identity without
   backfilling activity. [Usage statistics](../../docs/usage-statistics.md) owns details.
   Test launches of official builds suppress collection before startup without

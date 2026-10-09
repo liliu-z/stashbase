@@ -80,3 +80,22 @@ describe('HTTP client', () => {
     );
   });
 });
+
+it('reports transport failures without capturing the request and ignores requested cancellation', async () => {
+  const error = new TypeError('Failed to fetch');
+  const report = vi.fn();
+  const client = createHttpClient(
+    'http://127.0.0.1:8090',
+    vi.fn(async () => {
+      throw error;
+    }),
+    report,
+  );
+  await expect(
+    client.request({ path: '/api/files/private.md?folder=private', body: { content: 'private' } }),
+  ).rejects.toBe(error);
+  expect(report).toHaveBeenCalledExactlyOnceWith(error, 'http-transport');
+  const signal = AbortSignal.abort();
+  await expect(client.request({ path: '/api/files/private.md', signal })).rejects.toBe(error);
+  expect(report).toHaveBeenCalledTimes(1);
+});

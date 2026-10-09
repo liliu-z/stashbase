@@ -1,4 +1,6 @@
 import { telemetry } from './telemetry.ts';
+import { errorDiagnostic } from './error-diagnostics.ts';
+import type { ErrorDiagnostic } from '../shared/protocols/http/telemetry.ts';
 /**
  * On-demand installation coordinator for application-scoped Agent runtimes.
  *
@@ -69,6 +71,7 @@ export class AgentBootstrapCoordinator {
   private readonly controllers = new Map<NativeAgentId, AbortController>();
   private readonly runs = new Map<NativeAgentId, Promise<void>>();
   private readonly actions = new Map<NativeAgentId, AgentBootstrapAction | 'connect'>();
+  private readonly diagnostics = new Map<NativeAgentId, ErrorDiagnostic>();
 
   constructor(
     private readonly dependencies: AgentBootstrapDependencies,
@@ -122,6 +125,7 @@ export class AgentBootstrapCoordinator {
     const controller = new AbortController();
     const { signal } = controller;
     this.controllers.set(id, controller);
+    this.diagnostics.delete(id);
     this.actions.set(id, action);
     this.statuses.set(id, {
       phase: action === 'login' ? 'authenticating' : action === 'update' ? 'installing' : 'configuring',
@@ -186,9 +190,13 @@ export class AgentBootstrapCoordinator {
         this.fail(id, action, stage, 'operation-failed', signal.aborted ? signal.reason : error, stage === 'installation' ? 'install-command' : undefined);
       }
     }).finally(() => {
-      if (action !== 'connect') telemetry.capture({ event: 'agent_setup_result', runtime: id,
-        stage: action === 'login' ? 'login' : action === 'update' ? 'update' : 'prepare',
-        outcome: signal.aborted ? 'cancelled' : this.status(id).phase === 'ready' ? 'success' : 'failed' });
+      const status = this.status(id);
+      if (action !== 'connect' || status.phase === 'failed') telemetry.capture({ event: 'agent_setup_result', runtime: id,
+        stage: action === 'login' ? 'login' : action === 'update' ? 'update' : action === 'connect' ? 'connect' : 'prepare',
+        outcome: signal.aborted && signal.reason?.name === 'AbortError' ? 'cancelled' : status.phase === 'ready' ? 'success' : 'failed',
+        ...(status.failure ? { failure_stage: status.failure.stage, diagnostic: this.diagnostics.get(id) } : {}),
+      });
+      this.diagnostics.delete(id);
       this.controllers.delete(id);
       this.actions.delete(id);
       this.runs.delete(id);
@@ -250,6 +258,8 @@ export class AgentBootstrapCoordinator {
     manualRecovery?: AgentBootstrapManualRecovery,
   ): void {
     const message = agentSetupDiagnostic(error);
+    const diagnostic = errorDiagnostic(error);
+    this.diagnostics.set(id, { ...diagnostic, code: diagnostic.code ?? code });
     this.statuses.set(id, {
       phase: 'failed',
       failure: {
@@ -346,7 +356,7 @@ export async function loginToAgent(
       if (signal.aborted) finish(new Error(`${label} sign-in was cancelled.`));
       else if (code === 0) finish();
       else if (timedOut) finish(new Error(`${label} sign-in timed out after 10 minutes. Retry to open sign-in again.`));
-      else finish(new Error(detail || `${label} sign-in exited with code ${code ?? 'unknown'}.`));
+      else finish(Object.assign(new Error(detail || `${label} sign-in exited with code ${code ?? 'unknown'}.`), { exitCode: code }));
     }, (error) => finish(error));
   });
 }
@@ -699,7 +709,7 @@ async function fetchBoundedText(url: string, signal: AbortSignal, maxBytes: numb
   const bounded = AbortSignal.any([signal, AbortSignal.timeout(60_000)]);
   try {
     const response = await fetch(url, { signal: bounded, redirect: 'follow' });
-    if (!response.ok || !response.body) throw new Error(`HTTP ${response.status}`);
+    if (!response.ok || !response.body) throw Object.assign(new Error(`HTTP ${response.status}`), { status: response.status });
     const reader = response.body.getReader();
     const chunks: Uint8Array[] = [];
     let total = 0;
@@ -789,7 +799,7 @@ async function runInstallerScript(
         if (buffered.trim()) onLine(agentSetupDiagnostic(buffered));
         if (signal.aborted) reject(new Error('Agent installation was cancelled.'));
         else if (code === 0) resolve();
-        else reject(new Error(`Official Agent installer exited with code ${code ?? 'unknown'}.\n${output.trim()}`));
+        else reject(Object.assign(new Error(`Official Agent installer exited with code ${code ?? 'unknown'}.\n${output.trim()}`), { exitCode: code }));
       }, (error) => {
         signal.removeEventListener('abort', abort);
         reject(error);

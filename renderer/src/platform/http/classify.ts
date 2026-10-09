@@ -170,11 +170,13 @@ export async function request<T, Extra extends string = never>(
   const response = await send(client, options);
   const parsed = options.schema.safeParse(response.body);
   if (!parsed.success) {
-    throw new options.error(
+    const error = new options.error(
       'invalid-response',
       messageFor(options.messages, 'invalid-response'),
       undefined,
     );
+    client.reportError?.(error, 'http-response');
+    throw error;
   }
   return parsed.data;
 }

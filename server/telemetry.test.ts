@@ -105,7 +105,7 @@ test('default-on manual collection has only allowed fields and no source or acco
   f.service.capture({ event: 'project_entry_result', outcome: 'success', path: '/private' } as any);
   await tick();
   assert.equal(f.sent.length, 1);
-  assert.deepEqual(f.sent[0].body.properties, { app_version: '2.7.0', os: 'linux', schema_version: 1,
+  assert.deepEqual(f.sent[0].body.properties, { app_version: '2.7.0', os: 'linux', schema_version: 2,
     $process_person_profile: false, $geoip_disable: true, $ip: null });
   assert.equal(f.sent[0].body.distinct_id, f.config().telemetry?.installationId);
   assert.deepEqual(f.config().updates, { autoCheck: false });
@@ -197,5 +197,102 @@ test('HTTP boundary refuses arbitrary fields and never exposes the installation 
     assert.deepEqual(await (await fetch(url)).json(), { enabled: true, available: true });
     assert.equal((await post('', { enabled: false }, 'PUT')).status, 200);
     assert.equal(f.config().telemetry?.enabled, false);
+  } finally { f.service.close(); server.closeAllConnections(); server.close(); }
+});
+
+test('error diagnostics share opt-out, redact causes, and suppress repeated failures', async () => {
+  const f = fixture();
+  const cause = Object.assign(new Error('connect ECONNREFUSED https://private.example/path?token=hidden-token'), { code: 'ECONNREFUSED' });
+  const error = Object.assign(new Error('Installer failed for "private project" at C:\\Users\\Jane Doe\\secret.txt\nBearer secret-token-value-123456789\nuser@example.com', { cause }), { exitCode: 13 });
+  error.stack = 'Error: private message\n    at install (C:\\Users\\Jane Doe\\project\\installer.ts:10:4)';
+  f.service.captureError(error, { source: 'agent', operation: 'install', runtime: 'codex' });
+  f.service.captureError(error, { source: 'agent', operation: 'install', runtime: 'codex' });
+  await tick();
+  assert.equal(f.sent.length, 1);
+  const diagnostic = f.sent[0].body.properties.diagnostic;
+  assert.equal(diagnostic.code, 'ECONNREFUSED');
+  assert.equal(diagnostic.exit_code, 13);
+  assert.match(diagnostic.message, /Installer failed/);
+  assert.match(diagnostic.stack, /\[frame\]:10:4/);
+  const payload = JSON.stringify(f.sent[0].body);
+  for (const value of ['Jane Doe', 'secret.txt', 'private project', 'private.example', 'hidden-token', 'secret-token-value', 'user@example.com']) assert.equal(payload.includes(value), false, value);
+  f.service.update({ enabled: false });
+  f.service.captureError(new Error('another failure'), { source: 'server', operation: 'sync' });
+  await tick();
+  assert.deepEqual(f.sent.map((entry) => entry.body.event), ['application_error', 'telemetry_disabled']);
+  f.service.close();
+});
+
+test('setup diagnostics are redacted at collection even when the caller supplies raw text', async () => {
+  const f = fixture();
+  f.service.capture({ event: 'agent_setup_result', runtime: 'claude', stage: 'update', outcome: 'failed',
+    failure_stage: 'installation', diagnostic: { message: 'EACCES token=must-not-leak /Users/private/project', exit_code: 7 } });
+  await tick();
+  assert.equal(f.sent.length, 1);
+  assert.equal(f.sent[0].body.properties.failure_stage, 'installation');
+  assert.equal(f.sent[0].body.properties.diagnostic.exit_code, 7);
+  assert.equal(JSON.stringify(f.sent).includes('must-not-leak'), false);
+  assert.equal(JSON.stringify(f.sent).includes('/Users/private'), false);
+  f.service.close();
+});
+
+test('HTTP failures report their operation without request bodies, paths, or a second event', async () => {
+  const { httpErrorReporting } = await import('./error-reporting.ts');
+  const { sendError } = await import('./http.ts');
+  const f = fixture();
+  const app = express(); app.use(express.json()); app.use(httpErrorReporting(f.service));
+  app.post('/api/files/*', (_req, res) => sendError(res, Object.assign(new Error('Cannot write /private/customer.md'), { code: 'EACCES' })));
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise<void>((resolve) => server.once('listening', resolve));
+  const address = server.address(); assert.ok(address && typeof address === 'object');
+  try {
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/files/customer.md?folder=private-project`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ content: 'private document content' }),
+    });
+    assert.equal(response.status, 500);
+    await tick();
+    assert.equal(f.sent.length, 1);
+    assert.equal(f.sent[0].body.properties.operation, 'http.files');
+    assert.equal(f.sent[0].body.properties.diagnostic.http_status, 500);
+    assert.equal(f.sent[0].body.properties.diagnostic.code, 'EACCES');
+    for (const value of ['customer.md', 'private-project', 'private document content']) assert.equal(JSON.stringify(f.sent).includes(value), false);
+  } finally { f.service.close(); server.closeAllConnections(); server.close(); }
+});
+
+
+test('automatic diagnostics never retain unquoted names or relative paths', async () => {
+  const f = fixture();
+  for (const message of [
+    'rename_folder: conversion rediscovery failed for Acquisition Target Orion: database is locked',
+    'failed to update links in Acquisition Plan.md',
+    'save: index update failed for Acme Merger Plan.md: provider failed',
+    'attach: write Private Acquisition.odt failed: EACCES',
+    'SecretProject/subdir',
+  ]) f.service.captureError({ message, code: 'CustomerSecret', name: 'CustomerSecret' }, { source: 'server', operation: 'AcquisitionSecret' });
+  await tick();
+  assert.ok(f.sent.length > 0);
+  const payload = JSON.stringify(f.sent);
+  for (const value of ['Acquisition', 'Orion', 'Acme', 'Merger', 'Private', 'SecretProject', 'CustomerSecret']) assert.equal(payload.includes(value), false, value);
+  assert.match(payload, /Database is locked/);
+  assert.match(payload, /EACCES/);
+  f.service.close();
+});
+
+
+test('non-JSON asset failures report status without reading private response content', async () => {
+  const { httpErrorReporting } = await import('./error-reporting.ts');
+  const f = fixture();
+  const app = express(); app.use(httpErrorReporting(f.service));
+  app.get('/asset/private-document.pdf', (_req, res) => res.status(404).end('Private Document.pdf'));
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise<void>((resolve) => server.once('listening', resolve));
+  const address = server.address(); assert.ok(address && typeof address === 'object');
+  try {
+    const response = await fetch(`http://127.0.0.1:${address.port}/asset/private-document.pdf`);
+    assert.equal(await response.text(), 'Private Document.pdf');
+    await tick();
+    assert.equal(f.sent.length, 1);
+    assert.equal(f.sent[0].body.properties.diagnostic.http_status, 404);
+    assert.equal(JSON.stringify(f.sent).includes('Private'), false);
   } finally { f.service.close(); server.closeAllConnections(); server.close(); }
 });

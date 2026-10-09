@@ -1,6 +1,8 @@
 import { TextLayer, type PDFDocumentProxy, type PDFPageProxy } from 'pdfjs-dist';
 import { useEffect, useRef, useState } from 'react';
 
+import { useErrorReporter } from '@/shared/runtime/error-reporting';
+
 export function PdfPage({
   document: pdf,
   pageNumber,
@@ -12,6 +14,7 @@ export function PdfPage({
   placeholder: { height: number; width: number };
   scale: number;
 }) {
+  const reportError = useErrorReporter();
   const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
@@ -99,6 +102,7 @@ export function PdfPage({
       })
       .catch((error: unknown) => {
         if (!cancelled && (error as { name?: string })?.name !== 'RenderingCancelledException') {
+          reportError?.(error, 'pdf-preview');
           setFailed(true);
         }
       });
@@ -108,7 +112,7 @@ export function PdfPage({
       textLayer?.cancel();
       page?.cleanup();
     };
-  }, [nearViewport, pageNumber, pdf, scale]);
+  }, [nearViewport, pageNumber, pdf, scale, reportError]);
 
   return (
     <div

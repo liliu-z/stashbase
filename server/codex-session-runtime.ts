@@ -1,3 +1,4 @@
+import { reportAgentRuntimeError } from './error-reporting.ts';
 import { isStashbaseWorkspaceEdit, isWorkspaceFileChange } from './agent-file-permissions.ts';
 import { retireAgentProcess } from './agent-process.ts';
 /**
@@ -955,6 +956,7 @@ export class CodexSession implements AttributedAgentSession {
   }
 
   private send(obj: AgentServerEvent): void {
+    reportAgentRuntimeError('codex', obj);
     if (this.ws.readyState !== 1 /* OPEN */) return;
     try { this.ws.send(JSON.stringify(obj)); } catch { /* ws gone */ }
   }

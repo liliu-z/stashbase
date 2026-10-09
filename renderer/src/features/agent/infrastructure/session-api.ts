@@ -53,11 +53,6 @@ type SocketFactory = (url: string) => SocketLike;
 
 const SOCKET_OPEN = 1;
 
-/** The browser socket, read through the narrow surface this adapter uses. */
-function browserSocket(url: string): SocketLike {
-  return new WebSocket(url);
-}
-
 function scopeQuery(scope: AgentScope): URLSearchParams {
   const query = new URLSearchParams();
   query.set('folder', scope.path);
@@ -285,20 +280,27 @@ function socketUrl(serverOrigin: string, request: AgentConnectRequest): string {
 export function createAgentSessionAdapter(
   client: HttpClient,
   serverOrigin: string,
-  createSocket: SocketFactory = browserSocket,
+  createSocket: SocketFactory = (url) => new WebSocket(url),
 ): AgentSessionPort {
   return {
     connect(request, listener: AgentConnectionListener) {
+      const connectionError = (message: string) =>
+        client.reportError?.(new Error(message), 'agent-connection');
       const socket = createSocket(socketUrl(serverOrigin, request));
+      let settledByServer = false;
       const onMessage = (message: { data: unknown }) => {
         if (typeof message.data !== 'string') {
+          connectionError('Agent returned a non-text frame.');
           listener.onInvalidResponse();
           return;
         }
         let event: AgentSessionEvent | null;
         try {
-          event = sessionEvent(agentServerEventSchema.parse(JSON.parse(message.data)));
+          const wire = agentServerEventSchema.parse(JSON.parse(message.data));
+          if (wire.t === 'exit' || wire.t === 'error') settledByServer = true;
+          event = sessionEvent(wire);
         } catch {
+          connectionError('Agent returned an invalid frame.');
           listener.onInvalidResponse();
           return;
         }
@@ -306,7 +308,10 @@ export function createAgentSessionAdapter(
         // error surface without closing a valid native stream as a wire failure.
         if (event) listener.onEvent(event);
       };
-      const onClose = () => listener.onClose();
+      const onClose = () => {
+        if (!settledByServer) connectionError('Agent connection closed unexpectedly.');
+        listener.onClose();
+      };
       socket.addEventListener('message', onMessage);
       socket.addEventListener('close', onClose);
       return {
@@ -316,8 +321,7 @@ export function createAgentSessionAdapter(
             socket.send(JSON.stringify(agentClientEventSchema.parse(clientEvent(command))));
             return true;
           } catch {
-            // swallowed: a socket that refuses the frame is already closing.
-            // Answering false is what tells the runtime to reconnect and
+            // A refused frame tells the runtime to reconnect and
             // resend, which is a better recovery than any sentence here.
             return false;
           }

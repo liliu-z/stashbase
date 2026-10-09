@@ -37,7 +37,8 @@ describe('project lifecycle adapter', () => {
     expect(native.onFolderRemoved).toHaveBeenCalledWith(removed);
   });
 
-  it('retains classified lifecycle failure', async () => {
+  it('retains and reports classified lifecycle failure', async () => {
+    const report = vi.fn();
     const lifecycle = createProjectLifecycleAdapter(
       bridge({
         prepareFolderRemoval: vi.fn(async () => ({
@@ -45,10 +46,12 @@ describe('project lifecycle adapter', () => {
           ok: false as const,
         })),
       }),
+      report,
     );
 
     await expect(lifecycle.prepareFolderRemoval('/project/notes')).rejects.toEqual(
       new ProjectError('unauthorized', 'Window retired.'),
     );
+    expect(report).toHaveBeenCalledWith(expect.any(ProjectError), 'project-lifecycle');
   });
 });

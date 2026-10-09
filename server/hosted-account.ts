@@ -1,4 +1,5 @@
 import { telemetry } from './telemetry.ts';
+import { errorDiagnostic } from './error-diagnostics.ts';
 import packageJson from '../package.json' with { type: 'json' };
 import crypto from 'node:crypto';
 import type { HostedAccountState, HostedAgentAllowance, HostedBillingPlan, HostedBillingRedirect, HostedBillingStatus, HostedOAuthProvider, HostedOAuthPurpose, HostedOAuthStart, HostedOAuthStatus } from '../shared/account.ts';
@@ -315,7 +316,8 @@ export function failHostedOAuth(flowId: string, message: string): void {
   const flow = pendingOAuthFlows.get(flowId);
   if (!flow || flow.state === 'complete') return;
   if (flow.state !== 'error') {
-    telemetry.capture({ event: 'agent_setup_result', runtime: 'stashbase', stage: 'login', outcome: 'failed' });
+    telemetry.capture({ event: 'agent_setup_result', runtime: 'stashbase', stage: 'login', outcome: 'failed',
+      diagnostic: errorDiagnostic(message) });
   }
   flow.state = 'error';
   flow.error = message;

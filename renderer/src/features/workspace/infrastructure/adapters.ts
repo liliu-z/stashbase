@@ -50,8 +50,8 @@ export function createWorkspaceAdapters({
     githubImport: createGitHubImportAdapter(http),
     project: createProjectRegistryAdapter(http),
     preferences: createWorkspacePreferencesAdapter(http),
-    lifecycle: createProjectLifecycleAdapter(project),
-    session: createWorkspaceSessionAdapter(workspaceSession),
-    upload: createUploadAdapter(serverOrigin),
+    lifecycle: createProjectLifecycleAdapter(project, http.reportError),
+    session: createWorkspaceSessionAdapter(workspaceSession, http.reportError),
+    upload: createUploadAdapter(serverOrigin, fetch, http.reportError),
   };
 }
