@@ -20,8 +20,9 @@ export interface PreparationCommands {
   /** Restarts preparation for one source. Never rejects; resolves once the
    *  call has settled, so the caller can refresh what it shows. */
   reprocess(source: SourceReference): Promise<void>;
-  /** Reconciles one folder with its disk. Never rejects. */
-  sync(folderPath: string): Promise<void>;
+  /** Reconciles one folder with its disk. Never rejects. An optional lifetime
+   *  signal retires the request and its failure when its caller leaves scope. */
+  sync(folderPath: string, lifetime?: AbortSignal): Promise<void>;
 }
 
 /**
@@ -64,8 +65,9 @@ export function usePreparationCommands(controlApi: PreparationControlPort): Prep
   );
 
   const sync = useCallback(
-    async (folderPath: string) => {
-      const signal = openSignal(`sync:${folderPath}`);
+    async (folderPath: string, lifetime?: AbortSignal) => {
+      const request = openSignal(`sync:${folderPath}`);
+      const signal = lifetime ? AbortSignal.any([request, lifetime]) : request;
       try {
         await controlApi.sync(folderPath, signal);
       } catch (error: unknown) {

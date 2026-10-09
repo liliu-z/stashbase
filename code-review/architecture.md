@@ -520,6 +520,12 @@ registered host boundaries; renderer shared types are a different layer.
 - Refresh keeps usable content. Clean editors may adopt newer source; dirty ones
   retain drafts for conflict. Optimistic metadata rollback uses the last confirmed
   value and ignores superseded failures. Network failure is not scope retirement.
+  Window focus refreshes the current folder listing immediately and requests
+  folder-explicit reconciliation through preparation commands. Focus passes are
+  throttled and do not overlap; folder switches and closure retire their refresh
+  completions and failure notices through a scope lifetime signal. Browsing does
+  not depend on reconciliation succeeding. Host tree
+  revisions signal app writes and reconciliation, not filesystem events.
 - Viewers declare services/capabilities in one registry. Active-owner claims govern
   Find/outline; old cleanup cannot clear new claims. CodeMirror sessions preserve
   serialized history and selection across viewer disposal. Each activated open

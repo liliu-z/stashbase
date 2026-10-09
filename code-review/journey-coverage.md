@@ -259,6 +259,28 @@ Host/services: `server/folder.ts`, `server/github-import.ts`, `server/project-fi
   behavior for large mixed-format folders or with an embedding provider.
 - **AI Eval:** not required.
 - **Release Check:** real OS folder picker, file drop, and packaged public Git import.
+- **External tree refresh (2026-10-08):**
+  `renderer/src/app/composition/folder/use-folder-refresh.ts` refreshes the active
+  listing and reconciles the explicit folder on window focus, even without a
+  visibility or tree-version change. `use-folder-focus-refresh.test.tsx` covers
+  external additions/renames/deletions, throttling, overlapping focus, sync failure,
+  project switch/closure, late success/failure completion, and listener cleanup.
+  Scope retirement aborts the focus request so a retired project's failure cannot
+  replace the current project's notice. The regression was
+  reproduced in the running macOS app: `li-kb/journal` existed on disk and in
+  the host listing, but the Files tree retained its earlier three entries.
+  A built macOS runtime pass opened a temporary project and kept its Markdown
+  document open. After external additions and native window switching, the host
+  logged reconciliation of the new source; both the accessibility tree and a
+  screenshot confirmed the new directory, empty directory, and binary in Files
+  with the original document still open. Rename/deletion coverage is automated;
+  real-provider indexing quality and large-project reconciliation cost remain unproven.
+  A 2026-10-09 integrated built-app pass repeated external directory/source and
+  empty-directory additions with a Markdown document open. Hiding and returning
+  to the isolated macOS window refreshed Files and retained the open document.
+  The 20 focused refresh/preparation tests, all 12 renderer gates, host types,
+  Electron contracts, and documentation validation passed after adding failure
+  retirement on project switch and closure.
 - **File import (2026-09-16):** Files exposes `FileImport` through
   `useFileImport` and `createUploadAdapter`. The file tree's empty-space context
   menu offers Import files; no idle import row precedes the file list.

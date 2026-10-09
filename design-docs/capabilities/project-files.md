@@ -48,6 +48,9 @@ defines those distinctions; [Project Context](project-context.md) owns preparati
 - Agent writes follow runtime permissions and produce ordinary files, whether
   made through a file tool, a shell command, or a subagent. File refreshes do
   not steal focus or imply a universal accept/reject gate.
+- Returning focus to StashBase refreshes the open project's Files tree and
+  reconciles external additions, renames, and deletions. Browsing those changes
+  does not wait for search indexing, and the refresh preserves open documents.
 
 ## Saving and Release
 
