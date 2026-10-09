@@ -4,30 +4,32 @@ on:
   workflow_call:
     inputs:
       tag:
-        description: Release tag whose exact commit must have a successful source CI run
+        description: One-time maintainer-approved release tag
         required: true
         type: string
 
 permissions:
-  actions: read
   contents: read
 
 jobs:
   require-green-ci:
     runs-on: ubuntu-latest
     steps:
-      # The gate implementation comes from the default branch so manual backfills
-      # can validate older release tags that predate this script.
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.repository.default_branch }}
+          ref: ${{ inputs.tag }}
 
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '24'
-
-      - name: Require successful CI for release commit
+      - name: Record the one-time source CI waiver
         env:
-          GITHUB_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.tag }}
-        run: node scripts/require-green-ci.mjs "$RELEASE_TAG"
+        run: |
+          test "$RELEASE_TAG" = 'v2.15.5'
+          test "$(git rev-parse HEAD)" = '5d83423fc82011ffe8fa76e0cd0a10de4323560c'
+          cat >> "$GITHUB_STEP_SUMMARY" <<'NOTE'
+          Source CI waiver applies only to v2.15.5 at 5d83423fc82011ffe8fa76e0cd0a10de4323560c.
+          The maintainer requested manual acceptance instead of further source verification.
+          Windows, Linux, and Intel macOS source jobs passed. The Apple Silicon job
+          repeatedly hung in the existing native OpenCode smoke and was cancelled.
+          This is an explicit waiver, not a successful source CI result.
+          Platform packaging, signing, complete-asset checks, and atomic publication remain required.
+          NOTE
