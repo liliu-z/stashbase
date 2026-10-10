@@ -564,8 +564,10 @@ registered host boundaries; renderer shared types are a different layer.
   a lost HTTP response. Receipts are bounded process-lifetime records; missing
   receipts after eviction/restart do not establish failure or permission to retry.
 - Milkdown serialization preserves frontmatter outside the body. Find/outline use
-  the live document without mutating editor DOM during change callbacks. The sole
-  double-cast exemption is its Find controller's structural DOM corpus and guarded
+  the live document without mutating editor DOM. The outline adapter owns heading
+  anchors through ProseMirror decorations, replacing Milkdown's heading-id state
+  synchronizer; anchor updates must not reparse prose or interrupt IME composition.
+  The sole double-cast exemption is its Find controller's structural DOM corpus and guarded
   CSS Highlight probe; other exceptions need their code-owned rationale.
 - Markdown's `math.ts` owns the double-dollar math rule and code-block preview.
   Single-dollar prices remain prose; math serialization retains double-dollar

@@ -66,6 +66,7 @@ vi.mock('@milkdown/crepe/builder', () => ({
     editor: {
       action: (payload: unknown) => unknown;
       config: () => unknown;
+      remove: () => Promise<unknown>;
       status: string;
       use: () => unknown;
     };
@@ -87,6 +88,7 @@ vi.mock('@milkdown/crepe/builder', () => ({
           return null;
         },
         config: () => this.editor,
+        remove: async () => this.editor,
         get status() {
           return instance.status;
         },

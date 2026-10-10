@@ -41,7 +41,7 @@ import '@milkdown/crepe/theme/frame.css';
 import './document.css';
 import {
   activeHeadingId,
-  applyHeadingIds,
+  attachHeadingAnchors,
   currentEditorView,
   documentScroller,
   extractDocumentHeadings,
@@ -172,6 +172,7 @@ export function MarkdownDocument({
       .addFeature(table)
       .addFeature(codeMirror, { copyText: 'Copy code', languages })
       .addFeature(math);
+    attachHeadingAnchors(editor);
     const releaseReview = attachReview(editor);
     const updateHeadings = () => {
       const view = currentEditorView(editor);
@@ -266,13 +267,6 @@ export function MarkdownDocument({
     host.addEventListener('click', routeLink);
     return () => host.removeEventListener('click', routeLink);
   }, []);
-
-  useEffect(() => {
-    const host = hostRef.current;
-    if (!host) return;
-    const frame = requestAnimationFrame(() => applyHeadingIds(host, headings));
-    return () => cancelAnimationFrame(frame);
-  }, [headings]);
 
   useEffect(() => {
     if (!active || creationState !== 'ready') return;

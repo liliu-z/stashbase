@@ -324,6 +324,22 @@ Host/services: `server/folder.ts`, `server/github-import.ts`, `server/project-fi
 
 ## J03: Documents
 
+**Chinese IME composition (2026-10-11):** `ui/markdown/outline-adapter.ts`
+renders heading anchors through ProseMirror decorations and removes Milkdown's
+competing heading-id synchronizer. Direct heading DOM writes previously made
+the editor reparse nearby composing text and lose Chromium's IME replacement
+range. A temporary Electron probe reproduced `c初始` after composing `初始` in
+a paragraph between headings; disabling those writes removed the residue.
+`document-input.test.tsx` checks unique outline-compatible Chinese anchors and
+that rendering them publishes no document edit. The built Markdown surface was
+driven in Electron with native Chromium composition updates from `c` through
+`chu'shi`, followed by committing `初始`, in both a paragraph and a heading.
+Rendered text and the live Markdown buffer contained only the committed word;
+one Undo removed it, and updated heading anchors matched the outline's slugs.
+The rendered surface was reviewed by eye. This isolated source-runtime probe
+does not establish Sogou-specific candidate-window behavior, disk saves, or
+packaged delivery.
+
 **Currency and math (2026-10-08):** `ui/markdown/math.ts` replaces Crepe's
 single-dollar math interpretation. `math.test.ts` runs the real Milkdown editor
 and verifies price rendering/save preservation, inline double-dollar math, and

@@ -25,6 +25,7 @@ vi.mock('@milkdown/crepe/builder', () => ({
     editor = {
       action: this.instance.action,
       config: () => this.editor,
+      remove: async () => this.editor,
       use: () => this.editor,
       get status() {
         return editorHarness.instances.at(-1)?.status ?? 'OnCreate';

@@ -1,5 +1,11 @@
+/** Live-document headings, editor-owned anchors, and outline navigation. */
 import type { CrepeBuilder } from '@milkdown/crepe/builder';
 import { editorViewCtx } from '@milkdown/kit/core';
+import { syncHeadingIdPlugin } from '@milkdown/kit/preset/commonmark';
+import type { Node as ProseMirrorNode } from '@milkdown/kit/prose/model';
+import { Plugin } from '@milkdown/kit/prose/state';
+import { Decoration, DecorationSet } from '@milkdown/kit/prose/view';
+import { $prose } from '@milkdown/kit/utils';
 
 import { headingSlug, type DocumentHeading } from '@/features/documents/domain/outline';
 
@@ -117,13 +123,40 @@ export function activeHeadingId(
   return active;
 }
 
-export function applyHeadingIds(host: HTMLElement, entries: DocumentHeading[]): void {
-  for (const [index, element] of Array.from(
-    host.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6'),
-  ).entries()) {
-    const heading = entries[index];
-    if (heading) element.id = heading.id;
-  }
+function headingAnchors(doc: ProseMirrorNode): DecorationSet {
+  return DecorationSet.create(
+    doc,
+    extractDocumentHeadings(doc).flatMap(({ id, position }) => {
+      const node = doc.nodeAt(position);
+      return node ? [Decoration.node(position, position + node.nodeSize, { id })] : [];
+    }),
+  );
+}
+
+/** Anchors are presentation, owned by ProseMirror's rendering. Writing ids
+ * directly to heading DOM makes its observer reparse the surrounding prose
+ * and can cancel Chromium's IME replacement range, leaving pinyin in the text.
+ * Replace Milkdown's separate id synchronizer so it cannot compete with the
+ * outline's slug and duplicate-heading rules or turn anchors into model edits. */
+export function attachHeadingAnchors(editor: CrepeBuilder): void {
+  void editor.editor.remove(syncHeadingIdPlugin);
+  editor.editor.use(
+    $prose(
+      () =>
+        new Plugin<DecorationSet>({
+          state: {
+            init: (_, state) => headingAnchors(state.doc),
+            apply: (transaction, previous) =>
+              transaction.docChanged ? headingAnchors(transaction.doc) : previous,
+          },
+          props: {
+            decorations(state) {
+              return this.getState(state) ?? DecorationSet.empty;
+            },
+          },
+        }),
+    ),
+  );
 }
 
 /** The live editor view, narrowed to what reading headings out of it needs. */
