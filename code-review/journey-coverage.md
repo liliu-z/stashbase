@@ -666,6 +666,26 @@ Host/services: `server/retrieval/index.ts`, `server/indexer.mfs.ts`, `python/sta
 
 ## J06: Agent
 
+**Default empty completion (2026-10-11):** the reported local transcript records
+successful reads followed by an assistant message with zero output tokens,
+no text/tools, and `finish: unknown`; the adapter previously reported success.
+A sanitized panel replay failed before the fix. `hosted-agent-broker.ts` now
+retries only an empty model call once, preserving tool results and turn identity;
+it never replays output or executed tools. `opencode-agent.ts` fails unknown
+completion and retains error/turn attribution through native cleanup. The pinned
+OpenCode smoke drives a real MCP write, an empty continuation, and successful
+recovery with exactly one write; two empty attempts produce a visible failure,
+and the same session accepts another turn. Broker tests cover fragmented SSE,
+streaming output, bounded buffering, cancellation, and accounting identity.
+The built desktop renderer and host were driven in Electron with an isolated
+project/account fixture and controlled model transport: one real MCP write,
+empty continuation, recovered reply, and changed-file card; a subsequent pair
+of empty responses showed the incomplete-turn explanation and retained the file.
+Both settled surfaces were reviewed by eye with telemetry unavailable.
+This establishes local recovery and native protocol behavior. The original raw
+upstream response was not retained, so the provider-side cause of the empty
+generation remains unproven; no live-provider or packaged desktop pass is claimed.
+
 **First-send setup diagnostics (2026-10-09):** the access prompt previously
 replaced a known bootstrap failure with a generic connection sentence.
 `infrastructure/catalog-api.ts` now retains its stage and explanation;

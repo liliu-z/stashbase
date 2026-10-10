@@ -308,6 +308,9 @@ stable status without download, retry, or a new durable demand latch.
   agents run do not release the turn or its queue. Native runtimes that emit no
   state events retain the result boundary. Stop still requires native completion
   and interrupt acknowledgement; process death remains a failed session exit.
+- OpenQuill retains native finish reasons; an unknown final completion is a
+  failed turn. Native errors during execution wait for idle, and message events
+  retain their originating turn so trailing error updates cannot fail a new turn.
 - Project Agent preferences are explicit choices in Node-owned app config, keyed
   by registered project scope. Readiness and history restore never write them.
   Thinking effort is stored separately per Agent in that project. Composer choices
@@ -451,6 +454,12 @@ data migration is not required by [maintenance policy](../MAINTENANCE.md#previou
   across the one auth-refresh retry, and cannot expose account tokens in history.
   Turn/channel retirement cancels body reads and pending upstream work; awaited
   credential acquisition cannot forward a request after retirement.
+  The broker buffers a bounded empty SSE prefix and retries an empty model call
+  once with the same body and turn, including completed tool results. The new
+  model attempt gets a fresh accounting key. Any output, tool-call data, provider
+  error, or unrecognized event disables replay; ordinary output still streams.
+  Repeated empty responses fail without native automatic retries. Cancellation
+  retires both prefix buffering and recovery before another upstream call.
   Hosted quota/accounting and Stripe billing stay external; the desktop exposes
   bounded usage, plans, and subscription status. The host requests Checkout and
   Portal pages with the account session and hands the renderer only a verified

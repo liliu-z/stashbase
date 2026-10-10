@@ -113,6 +113,11 @@ repair, an outdated runtime, provider limits, transport loss, and turn failure s
 recovery addresses the actual cause. An outdated runtime updates in place from
 the failed turn; the conversation reconnects on it and resends the refused
 request. A failed history load never becomes an empty conversation.
+Default retries an empty model response once within the current turn, retaining
+completed tool results and file changes. Once a model response has begun producing
+output, it is not automatically replayed. Exhausted recovery or an unknown native
+completion shows an incomplete-turn failure, never silent success. Recovery must
+not automatically repeat the whole user request or its completed file operations.
 An unknown outcome keeps the runtime or connection's reported failure visible
 beside the review action; it must not replace a known cause with a generic
 network explanation. Reconnecting alone does not establish what finished.

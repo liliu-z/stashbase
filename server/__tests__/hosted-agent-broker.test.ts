@@ -21,7 +21,7 @@ test('hosted Agent broker keeps the account credential upstream and streams an O
         body: String(init?.body),
       });
       if (upstream.length === 1) return new Response('{}', { status: 401 });
-      return new Response('data: {"choices":[]}\n\ndata: [DONE]\n\n', {
+      return new Response('data: {"choices":[{"delta":{"content":"Hello"}}]}\n\ndata: [DONE]\n\n', {
         headers: { 'content-type': 'text/event-stream' },
       });
     },
@@ -53,6 +53,116 @@ test('hosted Agent broker keeps the account credential upstream and streams an O
   assert.equal(runtime.model, 'stashbase-agent-default');
   assert.equal(upstream[0].url, 'https://gateway.invalid/v1/agent/chat/completions');
   assert.doesNotMatch(upstream[0].body, /account-token/);
+});
+
+const emptyResponse = 'data: {"choices":[{"delta":{"role":"assistant","content":""},"finish_reason":null}]}\r\n\r\n'
+  + 'data: {"choices":[],"usage":{"prompt_tokens":10,"completion_tokens":0}}\r\n\r\ndata: [DONE]\r\n\r\n';
+
+async function streamHarness(t: test.TestContext, respond: (attempt: number, signal: AbortSignal) => Response) {
+  const calls: Array<{ body: string; key: string | null; turn: string | null }> = [];
+  const broker = new HostedAgentBroker({
+    accessToken: async () => 'fixture-token',
+    fetch: async (_url, init) => {
+      const headers = new Headers(init?.headers);
+      calls.push({ body: String(init?.body), key: headers.get('idempotency-key'), turn: headers.get('x-stashbase-agent-turn-id') });
+      return respond(calls.length, init!.signal!);
+    },
+    upstreamUrl: 'https://gateway.invalid', clientVersion: () => 'fixture',
+  });
+  await broker.start();
+  t.after(() => broker.close());
+  const runtime = broker.runtime('empty-response')!;
+  broker.beginTurn('empty-response', '00000000-0000-4000-8000-000000000004');
+  return { broker, calls, request: () => fetch(`${runtime.baseUrl}/chat/completions`, {
+    method: 'POST', headers: { authorization: `Bearer ${runtime.apiKey}` },
+    body: JSON.stringify({ messages: [{ role: 'tool', tool_call_id: 'saved-file', content: 'File already written' }], stream: true }),
+  }) };
+}
+
+function sse(text: string): Response {
+  // Exercise fragmented UTF-8 and SSE delimiters, rather than one convenient chunk.
+  const bytes = new TextEncoder().encode(text);
+  return new Response(new ReadableStream({
+    start(controller) {
+      for (let i = 0; i < bytes.length; i += 7) controller.enqueue(bytes.slice(i, i + 7));
+      controller.close();
+    },
+  }), { headers: { 'content-type': 'text/event-stream' } });
+}
+
+test('an empty model response retries only the model call, retaining tool results and turn identity', async (t) => {
+  const answer = 'data: {"choices":[{"delta":{"content":"已保存"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n';
+  const harness = await streamHarness(t, attempt => sse(attempt === 1 ? emptyResponse : answer));
+  const response = await harness.request();
+  assert.equal(response.status, 200);
+  assert.equal(await response.text(), answer, 'empty attempt framing must not leak downstream');
+  assert.equal(harness.calls.length, 2);
+  assert.equal(harness.calls[0].body, harness.calls[1].body, 'never resend the user turn without its tool results');
+  assert.equal(harness.calls[0].turn, harness.calls[1].turn);
+  assert.notEqual(harness.calls[0].key, harness.calls[1].key, 'a new model attempt must not reuse a settled accounting request');
+});
+
+test('repeated empty model responses fail visibly after one retry', async (t) => {
+  const harness = await streamHarness(t, () => sse(emptyResponse));
+  const response = await harness.request();
+  assert.equal(response.status, 422, 'native runtime must not keep retrying an exhausted recovery');
+  assert.equal(harness.calls.length, 2);
+  const body = await response.json() as { error: { code: string; message: string } };
+  assert.equal(body.error.code, 'agent_empty_response');
+  assert.match(body.error.message, /empty response twice/);
+});
+
+for (const output of [
+  { choices: [{ delta: { tool_calls: [{ index: 0, id: 'write', type: 'function', function: { name: 'stashbase_write_file', arguments: '{' } }] } }] },
+  { choices: [{ delta: { content: 'Partial reply' } }] },
+  { choices: [{ delta: { reasoning_content: 'Thinking' } }] },
+  { choices: [{ delta: {}, finish_reason: 'content_filter' }] },
+  { error: { message: 'Provider refused this request' } },
+]) {
+  test(`model output is never replayed: ${JSON.stringify(output)}`, async (t) => {
+    const body = `data: ${JSON.stringify(output)}\n\n`;
+    let finish!: () => void;
+    const harness = await streamHarness(t, () => new Response(new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(body));
+        finish = () => controller.close();
+      },
+    }), { headers: { 'content-type': 'text/event-stream' } }));
+    const response = await harness.request();
+    const reader = response.body!.getReader();
+    assert.equal(new TextDecoder().decode((await reader.read()).value), body, 'output must stream before upstream EOF');
+    finish();
+    assert.equal((await reader.read()).done, true);
+    assert.equal(harness.calls.length, 1);
+  });
+}
+
+test('retiring a turn cancels an empty prefix without starting a retry', async (t) => {
+  const entered = deferred<void>();
+  const cancelled = deferred<void>();
+  const harness = await streamHarness(t, () => new Response(new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode(': heartbeat\n\n'));
+      entered.resolve();
+    },
+    cancel() { cancelled.resolve(); },
+  }), { headers: { 'content-type': 'text/event-stream' } }));
+  const request = assert.rejects(harness.request());
+  await entered.promise;
+  harness.broker.endTurn('empty-response');
+  await Promise.all([request, cancelled.promise]);
+  assert.equal(harness.calls.length, 1);
+});
+
+test('empty response buffering is bounded and malformed events are not retried', async (t) => {
+  const oversized = await streamHarness(t, () => sse(`: ${' '.repeat(65 * 1024)}\n\n`));
+  const response = await oversized.request();
+  assert.equal(response.status, 422);
+  assert.match(await response.text(), /without a reply/);
+  assert.equal(oversized.calls.length, 1);
+  const malformed = await streamHarness(t, () => sse('data: {broken}\n\n'));
+  assert.equal(await (await malformed.request()).text(), 'data: {broken}\n\n');
+  assert.equal(malformed.calls.length, 1);
 });
 
 for (const scenario of [

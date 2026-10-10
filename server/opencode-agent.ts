@@ -82,6 +82,9 @@ export class OpenCodeEventTranslator {
   private sessionId: string | null = null;
   private turnActive = false;
   private nativeTurnStarted = false;
+  private lastFinishReason: string | undefined;
+  private turnNumber = 0;
+  private readonly messageTurns = new Map<string, number>();
   private readonly content = new Map<string, string>();
   private readonly tools = new Map<string, ToolPart['state']['status']>();
   private readonly toolNames = new Map<string, string>();
@@ -97,7 +100,9 @@ export class OpenCodeEventTranslator {
   beginTurn(): AgentServerEvent[] {
     if (this.turnActive) return [];
     this.turnActive = true;
+    this.turnNumber++;
     this.nativeTurnStarted = false;
+    this.lastFinishReason = undefined;
     this.diffs.clear();
     return [{ t: 'turn-start' }];
   }
@@ -129,7 +134,9 @@ export class OpenCodeEventTranslator {
           this.errors.add(message);
           events.push(agentTurnErrorEvent(message));
         }
-        events.push(...this.finishTurn(true));
+        // A running native turn still owns cleanup until idle. Its message
+        // error can arrive even after idle, so retain message/turn attribution.
+        if (!this.nativeTurnStarted) events.push(...this.finishTurn(true));
         return events;
       }
       case 'session.updated':
@@ -141,8 +148,12 @@ export class OpenCodeEventTranslator {
         return event.properties.diff.flatMap((diff) => this.fileDiff(diff));
       case 'message.updated': {
         const info = event.properties.info;
-        if (this.matches(info.sessionID) && info.role === 'user') this.userMessages.add(info.id);
-        if (!this.matches(info.sessionID) || info.role !== 'assistant' || !info.error) return [];
+        if (!this.matches(info.sessionID)) return [];
+        if (!this.messageTurns.has(info.id)) this.messageTurns.set(info.id, this.turnNumber);
+        if (info.role === 'user') this.userMessages.add(info.id);
+        if (info.role !== 'assistant' || !this.turnActive || this.messageTurns.get(info.id) !== this.turnNumber) return [];
+        if (this.turnActive && info.finish) this.lastFinishReason = info.finish;
+        if (!info.error) return [];
         const message = 'data' in info.error && typeof info.error.data?.message === 'string'
           ? info.error.data.message
           : info.error.name;
@@ -182,13 +193,22 @@ export class OpenCodeEventTranslator {
     // `session.status: idle` and `session.idle` can straddle the next prompt.
     // Its optimistic start is not evidence that the native runtime started it.
     if (!isError && !interrupted && !this.nativeTurnStarted) return [];
+    const events: AgentServerEvent[] = [];
+    if (!isError && !interrupted && this.lastFinishReason === 'unknown' && !this.errors.size) {
+      events.push(agentTurnErrorEvent('The Agent model stopped without a complete response. The task may be incomplete; completed file changes have been kept.'));
+      isError = true;
+    }
+    isError ||= this.errors.size > 0;
     this.turnActive = false;
     this.errors.clear();
-    return [{ t: 'turn-end', isError }];
+    return [...events, { t: 'turn-end', isError }];
   }
 
   private part(part: Part, delta?: string): AgentServerEvent[] {
     if (!this.matches(part.sessionID) || this.userMessages.has(part.messageID)) return [];
+    if (!this.messageTurns.has(part.messageID)) this.messageTurns.set(part.messageID, this.turnNumber);
+    if (this.messageTurns.get(part.messageID) !== this.turnNumber) return [];
+    if (part.type === 'step-finish' && this.turnActive) this.lastFinishReason = part.reason;
     if (part.type === 'text' || part.type === 'reasoning') {
       const previous = this.content.get(part.id) ?? '';
       const next = part.text;

@@ -70,6 +70,65 @@ async function settle(): Promise<void> {
   await new Promise<void>((resolve) => setImmediate(resolve));
 }
 
+test('Default does not silently complete after tools followed by an empty unknown model response', async (t) => {
+  const harness = modeHarness('acceptEdits');
+  t.after(() => harness.session.dispose());
+  await settle();
+  harness.send({ t: 'prompt', text: 'Read my profile and finish the setup.' });
+  await settle();
+  const part = (value: Record<string, unknown>, messageID = 'read-message') => {
+    harness.feed.emit('event', { type: 'message.part.updated', properties: { part: {
+      id: `${messageID}-${value.type}`, sessionID: 'mode-session', messageID, ...value,
+    } } });
+  };
+  part({ type: 'tool', callID: 'read-profile', tool: 'stashbase_read_file', state: {
+    status: 'completed', input: { path: '/workspace/profile.md' }, output: 'Profile',
+    title: 'Read profile', metadata: {}, time: { start: 1, end: 2 },
+  } });
+  // Sanitized replay of the reported turn: a completed read, then a model
+  // message with no text/tools, zero output tokens and finish=unknown.
+  const tokens = { input: 5476, output: 0, reasoning: 0, cache: { read: 15975, write: 0 } };
+  part({ type: 'step-start' }, 'empty-message');
+  part({ type: 'step-finish', reason: 'unknown', tokens, cost: 0 }, 'empty-message');
+  harness.feed.emit('event', { type: 'message.updated', properties: { info: {
+    id: 'empty-message', sessionID: 'mode-session', role: 'assistant',
+    parentID: 'request', finish: 'unknown', tokens, time: { created: 3, completed: 4 },
+  } } });
+  harness.feed.emit('event', { type: 'session.status', properties: { sessionID: 'mode-session', status: { type: 'idle' } } });
+  harness.feed.emit('event', { type: 'session.idle', properties: { sessionID: 'mode-session' } });
+  await settle();
+  assert.ok(harness.events().some(event => event.t === 'tool-result'));
+  assert.equal(harness.events().some(event => event.t === 'turn-end' && !event.isError), false,
+    'an empty unknown response must not report successful completion');
+  assert.ok(harness.events().some(event => event.t === 'error'), 'the incomplete turn must explain the failure');
+});
+
+test('Default errors wait for native idle and late message errors cannot fail the next turn', () => {
+  const translator = new OpenCodeEventTranslator();
+  translator.bindSession('session-1');
+  const busy: Event = { type: 'session.status', properties: { sessionID: 'session-1', status: { type: 'busy' } } };
+  const idle: Event = { type: 'session.status', properties: { sessionID: 'session-1', status: { type: 'idle' } } };
+  const error = { name: 'APIError', data: { message: 'The model returned an empty response.', isRetryable: false } } as const;
+  const message = (id: string, failed = false) => ({
+    type: 'message.updated', properties: { info: { id, sessionID: 'session-1', role: 'assistant', ...(failed ? { error } : {}) } },
+  }) as unknown as Event;
+  translator.beginTurn();
+  translator.translate(busy);
+  translator.translate(message('failed-message'));
+  assert.deepEqual(translator.translate({ type: 'session.error', properties: { sessionID: 'session-1', error } }), [
+    { t: 'error', message: error.data.message },
+  ]);
+  assert.equal(translator.isTurnActive(), true, 'native cleanup must finish before another prompt is admitted');
+  assert.deepEqual(translator.translate(idle), [{ t: 'turn-end', isError: true }]);
+  translator.beginTurn();
+  assert.deepEqual(translator.translate(message('failed-message', true)), [], 'trailing error belongs to the old turn');
+  translator.translate(busy);
+  translator.translate(message('next-message'));
+  assert.deepEqual(translator.translate(message('next-message', true)), [{ t: 'error', message: error.data.message }],
+    'the same failure in a new message must still be reported');
+  assert.deepEqual(translator.translate(idle), [{ t: 'turn-end', isError: true }]);
+});
+
 test('Default Agent applies the selected mode to each turn and freezes it while working', async () => {
   const { session, prompts, send, feed } = modeHarness('plan');
   try {

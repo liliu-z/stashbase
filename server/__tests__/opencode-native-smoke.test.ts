@@ -14,6 +14,7 @@ import type { EventPermissionAsked } from '@opencode-ai/sdk/v2/types';
 import { OpenCodeEventTranslator, OpenCodePanelSession } from '../opencode-agent.ts';
 import { ensureMcpLauncher } from '../agent-mcp.ts';
 import { filesystemPath } from '../filesystem-path.ts';
+import { HostedAgentBroker } from '../hosted-agent-broker.ts';
 import {
   BUNDLED_OPENCODE_VERSION,
   buildOpenCodeConfig,
@@ -33,10 +34,10 @@ class PanelSocket extends EventEmitter {
     this.emit('server-event', event);
   }
   close(): void { this.readyState = 3; this.emit('close'); }
-  waitFor(type: string): Promise<void> {
+  waitFor(type: string, allowError = false): Promise<void> {
     return new Promise((resolve, reject) => {
       const listener = (event: { t: string; message?: string }) => {
-        if (event.t === 'error' || event.t === 'exit') {
+        if ((event.t === 'error' && !allowError) || event.t === 'exit') {
           this.off('server-event', listener);
           reject(new Error(event.message ?? 'Panel exited'));
           return;
@@ -101,6 +102,8 @@ test('pinned bundled OpenCode completes one SDK session against a fake compatibl
   t.after(() => fs.rmSync(outside, { recursive: true, force: true }));
   const gatewayRequests: Array<Record<string, unknown>> = [];
   let nextTool: { name: string; arguments: string } | undefined;
+  let emptyResponses = 0;
+  let emptyAfterTool = false;
   const gateway = http.createServer(async (request, response) => {
     const chunks: Buffer[] = [];
     for await (const chunk of request) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
@@ -111,6 +114,12 @@ test('pinned bundled OpenCode completes one SDK session against a fake compatibl
         ? { name: 'bash', arguments: JSON.stringify({ command: 'node -p process.versions.node', description: 'Check installed Node' }) }
         : undefined);
     nextTool = undefined;
+    const empty = !tool && emptyResponses > 0;
+    if (empty) emptyResponses--;
+    if (tool && emptyAfterTool) {
+      emptyAfterTool = false;
+      emptyResponses = 1;
+    }
     response.writeHead(200, { 'content-type': 'text/event-stream' });
     const base = { id: 'chatcmpl-stashbase-smoke', object: 'chat.completion.chunk', created: 1, model: 'stashbase-agent-default' };
     response.write(`data: ${JSON.stringify({
@@ -122,26 +131,30 @@ test('pinned bundled OpenCode completes one SDK session against a fake compatibl
           tool_calls: [{
             index: 0, id: `smoke-tool-${gatewayRequests.length}`, type: 'function', function: tool,
           }],
-        } : { role: 'assistant', content: 'probe ok' },
+        } : { role: 'assistant', content: empty ? '' : 'probe ok' },
         finish_reason: null,
       }],
     })}\n\n`);
     response.write(`data: ${JSON.stringify({
       ...base,
-      choices: [{ index: 0, delta: {}, finish_reason: tool ? 'tool_calls' : 'stop' }],
-      usage: { prompt_tokens: 1, completion_tokens: 2, total_tokens: 3 },
+      choices: empty ? [] : [{ index: 0, delta: {}, finish_reason: tool ? 'tool_calls' : 'stop' }],
+      usage: { prompt_tokens: 1, completion_tokens: empty ? 0 : 2, total_tokens: empty ? 1 : 3 },
     })}\n\n`);
     response.end('data: [DONE]\n\n');
   });
   const gatewayPort = await listen(gateway);
+  const broker = new HostedAgentBroker({
+    accessToken: async () => 'fixture-account-token', fetch: globalThis.fetch,
+    upstreamUrl: `http://127.0.0.1:${gatewayPort}/v1/chat/completions`, clientVersion: () => 'native-smoke',
+  });
+  await broker.start();
+  t.after(() => broker.close());
+  const model = broker.runtime('native-smoke')!;
+  broker.beginTurn('native-smoke', '00000000-0000-4000-8000-000000000001');
   const serverPort = await unusedPort();
   const username = 'stashbase';
   const password = 'native-smoke-secret';
-  const config = buildOpenCodeConfig({
-    apiKey: 'fake-loopback-key',
-    baseUrl: `http://127.0.0.1:${gatewayPort}/v1`,
-    model: 'stashbase-agent-default',
-  }, '/unused/stashbase-mcp');
+  const config = buildOpenCodeConfig(model, '/unused/stashbase-mcp');
   config.mcp = {
     stashbase: {
       type: 'local',
@@ -338,14 +351,16 @@ test('pinned bundled OpenCode completes one SDK session against a fake compatibl
   const panel = new OpenCodePanelSession(socket as unknown as WebSocket, {
     windowId: 'native-modes', folder: temporaryRoot, access: 'acceptEdits',
   }, {
-    client: async () => client, beginTurn: () => {}, endTurn: () => {},
+    client: async () => client,
+    beginTurn: turnId => broker.beginTurn('native-smoke', turnId),
+    endTurn: () => broker.endTurn('native-smoke'),
     onExit: () => () => {}, close: async () => {},
   });
   t.after(() => panel.dispose());
   await socket.waitFor('ready');
   const modeFile = path.join(temporaryRoot, 'mode-result.md');
-  const runPanelTurn = async () => {
-    const ended = socket.waitFor('turn-end');
+  const runPanelTurn = async (allowError = false) => {
+    const ended = socket.waitFor('turn-end', allowError);
     socket.request({ t: 'prompt', text: 'Run the fixture probe.' });
     await ended;
   };
@@ -368,6 +383,29 @@ test('pinned bundled OpenCode completes one SDK session against a fake compatibl
   await runPanelTurn();
   assert.equal(fs.readFileSync(modeFile, 'utf8'), 'Ask approved', 'switching out of Plan must restore approved writes');
   assert.equal(socket.events.filter(event => event.t === 'permission').length, 1);
+
+  socket.request({ t: 'set-mode', mode: 'acceptEdits' });
+  const recoveryStart = socket.events.length;
+  const callsBeforeRecovery = gatewayRequests.length;
+  nextTool = { name: 'stashbase_write_file', arguments: JSON.stringify({ path: modeFile, content: 'Saved before empty response' }) };
+  emptyAfterTool = true;
+  await runPanelTurn();
+  assert.equal(gatewayRequests.length - callsBeforeRecovery, 3, 'write, empty continuation, recovered continuation');
+  const recoveryEvents = socket.events.slice(recoveryStart) as Array<{ t: string; delta?: string; isError?: boolean }>;
+  assert.equal(recoveryEvents.filter(event => event.t === 'tool-result').length, 1, 'recovery must not execute the write again');
+  assert.ok(recoveryEvents.some(event => event.t === 'text' && event.delta?.includes('probe ok')));
+  assert.deepEqual(recoveryEvents.filter(event => event.t === 'turn-end'), [{ t: 'turn-end', isError: false }]);
+  assert.equal(fs.readFileSync(modeFile, 'utf8'), 'Saved before empty response');
+
+  const failureStart = socket.events.length;
+  const callsBeforeFailure = gatewayRequests.length;
+  emptyResponses = 2;
+  await runPanelTurn(true);
+  assert.equal(gatewayRequests.length - callsBeforeFailure, 2, 'native runtime must not retry beyond the broker limit');
+  const failureEvents = socket.events.slice(failureStart) as Array<{ t: string; message?: string; isError?: boolean }>;
+  assert.ok(failureEvents.some(event => event.t === 'error' && event.message?.includes('empty response twice')));
+  assert.deepEqual(failureEvents.filter(event => event.t === 'turn-end'), [{ t: 'turn-end', isError: true }]);
+  await runPanelTurn(); // The same native session remains usable after the failure.
   panel.dispose();
 
   const toolNames = (request: Record<string, unknown>) => (
