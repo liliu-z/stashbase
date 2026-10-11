@@ -31,12 +31,22 @@ export function registerExternalNavigation(dependencies: ExternalNavigationDepen
     const request = externalNavigationRequestSchema.safeParse(rawRequest);
     if (!request.success) return failure('invalid-request', 'This link cannot be opened.');
 
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       // Revalidated immediately above: no renderer-controlled scheme reaches Electron shell.
-      await dependencies.openExternal(request.data.url);
+      // The OS can stall while resolving the default browser. The request has
+      // already been handed off; bound the acknowledgement and permit a retry.
+      await Promise.race([
+        dependencies.openExternal(request.data.url),
+        new Promise<never>((_resolve, reject) => {
+          timer = setTimeout(() => reject(new Error('Browser launch timed out.')), 10_000);
+        }),
+      ]);
       return externalNavigationResponseSchema.parse({ ok: true });
     } catch {
       return failure('unavailable', 'The system browser could not open this link.');
+    } finally {
+      clearTimeout(timer);
     }
   });
 }

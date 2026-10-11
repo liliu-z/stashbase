@@ -242,12 +242,12 @@ function focusWindow(win) {
   return true;
 }
 
-function isOAuthReturnUrl(value) {
+function isReturnUrl(value, authority) {
   if (typeof value !== 'string' || value.length > 256) return false;
   try {
     const url = new URL(value);
     return url.protocol === 'stashbase:'
-      && url.hostname === 'oauth-complete'
+      && url.hostname === authority
       && (url.pathname === '' || url.pathname === '/')
       && url.search === ''
       && url.hash === ''
@@ -259,6 +259,9 @@ function isOAuthReturnUrl(value) {
   }
 }
 
+function isOAuthReturnUrl(value) { return isReturnUrl(value, 'oauth-complete'); }
+function isBillingReturnUrl(value) { return isReturnUrl(value, 'billing-return'); }
+
 function isStashBaseProtocolUrl(value) {
   if (typeof value !== 'string' || value.length > 2048) return false;
   try { return new URL(value).protocol === 'stashbase:'; }
@@ -267,6 +270,7 @@ function isStashBaseProtocolUrl(value) {
 
 function classifyProtocolLaunch(argv) {
   if (argv.some(isOAuthReturnUrl)) return 'oauth-return';
+  if (argv.some(isBillingReturnUrl)) return 'billing-return';
   if (argv.some(isStashBaseProtocolUrl)) return 'inert';
   return 'ordinary';
 }
@@ -354,6 +358,7 @@ module.exports = {
   createWindowRegistry,
   focusWindow,
   isOAuthReturnUrl,
+  isBillingReturnUrl,
   isStashBaseProtocolUrl,
   openOrFocusFolder,
   releaseWindowContextWithRetry,

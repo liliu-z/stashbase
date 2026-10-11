@@ -43,6 +43,8 @@ export interface BillingViewModel {
   readonly confirming: BillingConfirmation | null;
   /** A Stripe page is being requested. */
   readonly busy: boolean;
+  readonly opening: 'checkout' | 'portal' | null;
+  readonly browserPage: 'checkout' | 'portal' | null;
   readonly failure: FailureView | null;
   subscribe(priceId: string): void;
   manage(): void;
@@ -53,12 +55,14 @@ export interface BillingViewModel {
 
 export function useBilling(
   port: AgentRuntimePort,
-  openExternal: (href: string) => void,
+  openExternal: (href: string) => Promise<boolean> | void,
   signedIn: boolean,
 ): BillingViewModel {
   const queryClient = useQueryClient();
   const [confirmingSince, setConfirmingSince] = useState<number | null>(null);
   const [slow, setSlow] = useState(false);
+  const [browserPage, setBrowserPage] = useState<'checkout' | 'portal' | null>(null);
+  const [flow, setFlow] = useState<'checkout' | 'portal' | null>(null);
   const waiting = confirmingSince !== null && !slow;
 
   const plans = useQuery({ ...billingPlansQuery(port), enabled: signedIn });
@@ -70,7 +74,14 @@ export function useBilling(
   const { refetch: refetchStatus } = status;
   const refreshStatus = useCallback(() => void refetchStatus(), [refetchStatus]);
   // Returning from Checkout or the Portal focuses the window again.
-  useWindowFocus(refreshStatus, signedIn);
+  const resumeConfirmation = useCallback(() => {
+    if (confirmingSince !== null) {
+      setSlow(false);
+      setConfirmingSince(Date.now());
+    }
+    refreshStatus();
+  }, [confirmingSince, refreshStatus]);
+  useWindowFocus(resumeConfirmation, signedIn);
 
   useEffect(() => {
     if (confirmingSince === null || slow) return;
@@ -82,22 +93,30 @@ export function useBilling(
   }, [confirmingSince, slow]);
 
   useEffect(() => {
-    if (confirmingSince === null || !status.data || !billingPaid(status.data)) return;
-    setConfirmingSince(null);
-    setSlow(false);
+    if (confirmingSince === null || !status.data) return;
+    if (flow === 'checkout') {
+      if (!billingPaid(status.data)) return;
+      setConfirmingSince(null);
+      setFlow(null);
+      setSlow(false);
+    }
     void queryClient.invalidateQueries({ queryKey: settingsQueryKeys.agentAllowance });
     void queryClient.invalidateQueries({ queryKey: settingsQueryKeys.agentCatalog });
-  }, [confirmingSince, queryClient, status.data]);
+  }, [confirmingSince, flow, queryClient, status.data]);
+
+  const openPage = async (url: string, kind: 'checkout' | 'portal') => {
+    if ((await openExternal(url)) === false) throw new Error('The browser did not open.');
+    setFlow((current) => (current === 'checkout' ? current : kind));
+    setSlow(false);
+    setConfirmingSince(Date.now());
+  };
 
   const checkout = useSettingsCommand(
     'billingCheckout',
     (priceId: string, signal) => port.startCheckout(priceId, signal),
     {
-      onDone: (url) => {
-        openExternal(url);
-        setSlow(false);
-        setConfirmingSince(Date.now());
-      },
+      onStart: () => setBrowserPage('checkout'),
+      onDone: (url) => openPage(url, 'checkout'),
       // A refusal such as an existing subscription changes what the panel
       // should offer, so the rights are read again.
       onFailed: refreshStatus,
@@ -106,22 +125,26 @@ export function useBilling(
   const portal = useSettingsCommand(
     'billingPortal',
     (_input: void, signal) => port.openBillingPortal(signal),
-    { onDone: (url) => openExternal(url) },
+    { onStart: () => setBrowserPage('portal'), onDone: (url) => openPage(url, 'portal') },
   );
 
   return {
     busy: anyBusy(checkout, portal),
-    confirming: confirmingSince === null ? null : slow ? 'slow' : 'waiting',
+    opening: checkout.busy ? 'checkout' : portal.busy ? 'portal' : null,
+    browserPage,
+    confirming: flow !== 'checkout' || confirmingSince === null ? null : slow ? 'slow' : 'waiting',
     // Each page names what did not open; a refusal such as an existing
     // subscription is already answered by the status read it triggers.
-    failure: checkout.failure
-      ? { message: 'Could not open the payment page. Try again.', tone: checkout.failure.tone }
-      : portal.failure
-        ? {
-            message: 'Could not open subscription management. Try again.',
-            tone: portal.failure.tone,
-          }
-        : null,
+    failure:
+      browserPage === 'checkout' && checkout.failure
+        ? { message: 'Could not open the payment page. Try again.', tone: checkout.failure.tone }
+        : browserPage === 'portal' && portal.failure
+          ? {
+              message:
+                'Could not open subscription management. Check your connection and default browser, then try again.',
+              tone: portal.failure.tone,
+            }
+          : null,
     manage: () => portal.run(),
     plans: plans.data ?? [],
     plansFailed: plans.isError,
@@ -136,6 +159,7 @@ export function useBilling(
     status: status.data ?? null,
     statusFailed: status.isError,
     stopWaiting: () => {
+      setFlow(null);
       setConfirmingSince(null);
       setSlow(false);
     },

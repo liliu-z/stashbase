@@ -41,7 +41,7 @@ export interface AccountViewModel {
   readonly loadFailed: boolean;
   retryAccount(): void;
   /** Hands a page to the system browser, as sign-in does. */
-  openExternal(href: string): void;
+  openExternal(href: string): Promise<boolean> | void;
   /** The browser round trip is open: started, and not yet reported finished. */
   readonly signInPending: boolean;
   /** A browser flow is open and its local wait can be stopped. */
@@ -61,7 +61,7 @@ export interface AccountViewModel {
 
 export function useAccount(
   port: AccountPort,
-  openExternal: (href: string) => void,
+  openExternal: (href: string) => Promise<boolean> | void,
 ): AccountViewModel {
   const queryClient = useQueryClient();
   const account = useQuery(accountQuery(port));

@@ -142,12 +142,36 @@ describe('AgentRuntimesPanel', () => {
     await waitFor(() =>
       expect(vi.mocked(port.getAllowance).mock.calls.length).toBeGreaterThan(allowanceReads),
     );
-    await user.click(screen.getByRole('button', { name: 'Manage' }));
+    await user.click(screen.getByRole('button', { name: 'Manage or cancel' }));
     await waitFor(() =>
       expect(rendered.onOpenExternal).toHaveBeenLastCalledWith(
         'https://billing.stripe.com/p/session/test',
       ),
     );
+  });
+
+  it('keeps cancellation reachable during confirmation and retries a refused browser launch', async () => {
+    const port = agentRuntimePort({
+      getBillingStatus: vi.fn(async () => ({ ...FREE_BILLING, canManage: true })),
+    });
+    const open = vi
+      .fn(async () => true)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+    renderPanel(port, accountPort(SIGNED_IN_ACCOUNT), open);
+    const user = userEvent.setup();
+    await user.click(
+      (await screen.findAllByRole('button', { name: 'Subscribe' }))[0] as HTMLElement,
+    );
+    await screen.findByText('Waiting for payment in your browser.');
+    await user.click(screen.getByRole('button', { name: 'Manage or cancel' }));
+    await screen.findByText(/Could not open subscription management/);
+    await user.click(screen.getByRole('button', { name: 'Manage or cancel' }));
+    await waitFor(() => expect(open).toHaveBeenCalledTimes(3));
+    await waitFor(() =>
+      expect(screen.queryByText(/Could not open subscription management/)).toBeNull(),
+    );
+    expect(screen.queryByRole('button', { name: 'Subscribe' })).toBeNull();
   });
 
   it('keeps the plans after a refused Checkout and reads the rights again', async () => {

@@ -90,11 +90,11 @@ function fakePort(): AgentRuntimePort {
 }
 
 /** A Plus subscriber: the plan list gives way to the Portal. */
-function subscribedPort(): AgentRuntimePort {
+function subscribedPort(cancelAtPeriodEnd = false): AgentRuntimePort {
   return {
     ...fakePort(),
     getBillingStatus: async () => ({
-      cancelAtPeriodEnd: false,
+      cancelAtPeriodEnd,
       canManage: true,
       paidThrough: '2099-11-05T00:00:00.000Z',
       planName: 'Plus',
@@ -192,6 +192,8 @@ type Story = StoryObj<typeof Harness>;
 export const Ready: Story = { args: { account: signedIn, port: fakePort() } };
 
 export const Subscribed: Story = { args: { account: signedIn, port: subscribedPort() } };
+
+export const RenewalCanceled: Story = { args: { account: signedIn, port: subscribedPort(true) } };
 
 export const NeedsSignIn: Story = { args: { account: signedOut, port: accountRequiredPort() } };
 

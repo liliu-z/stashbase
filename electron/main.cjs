@@ -52,6 +52,7 @@ const {
   createWindowRegistry,
   focusWindow,
   isOAuthReturnUrl,
+  isBillingReturnUrl,
   isStashBaseProtocolUrl,
   openOrFocusFolder,
   releaseWindowContextWithRetry,
@@ -1062,6 +1063,17 @@ function focusOAuthReturn() {
   });
 }
 
+// This data-free link only focuses the app. The hosted status API owns rights.
+function focusBillingReturn() {
+  void app.whenReady().then(async () => {
+    if (process.platform === 'darwin') app.focus({ steal: true });
+    if (!focusLastMainWindow()) {
+      await initialWindowFlight.run();
+      focusLastMainWindow();
+    }
+  });
+}
+
 function registerOAuthReturnProtocol() {
   const registered = process.defaultApp && process.argv[1]
     ? app.setAsDefaultProtocolClient('stashbase', process.execPath, [path.resolve(process.argv[1])])
@@ -1071,8 +1083,8 @@ function registerOAuthReturnProtocol() {
 
 app.on('open-url', (event, url) => {
   if (isStashBaseProtocolUrl(url)) event.preventDefault();
-  if (!isOAuthReturnUrl(url)) return;
-  focusOAuthReturn();
+  if (isBillingReturnUrl(url)) focusBillingReturn();
+  else if (isOAuthReturnUrl(url)) focusOAuthReturn();
 });
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
@@ -1082,6 +1094,10 @@ if (!hasSingleInstanceLock) {
 } else {
   app.on('second-instance', (_event, argv) => {
     const protocolLaunch = classifyProtocolLaunch(argv);
+    if (protocolLaunch === 'billing-return') {
+      focusBillingReturn();
+      return;
+    }
     if (protocolLaunch === 'oauth-return') {
       focusOAuthReturn();
       return;
@@ -1122,6 +1138,7 @@ if (!hasSingleInstanceLock) {
     app.on('browser-window-focus', () => { void desktopUpdates.checkOnActivity(); });
     powerMonitor.on('resume', () => { void desktopUpdates.checkOnActivity(); });
     if (initialProtocolLaunch === 'oauth-return') focusOAuthReturn();
+    if (initialProtocolLaunch === 'billing-return') focusBillingReturn();
   });
 
   app.on('activate', () => {

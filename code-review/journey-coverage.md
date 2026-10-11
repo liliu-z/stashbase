@@ -666,6 +666,15 @@ Host/services: `server/retrieval/index.ts`, `server/indexer.mfs.ts`, `python/sta
 
 ## J06: Agent
 
+- **Low-credit calls (2026-10-11):** the hosted API's account-locked reservation
+  reduces output to fit account/monthly and turn capacity while retaining input
+  cost. API ledger tests cover positive remaining balance, concurrent last-credit
+  reservations, release, and turn limits; gateway tests verify the provider gets
+  the approved ceiling. `server/__tests__/hosted-agent-broker.test.ts` covers
+  accurate insufficient-credit/turn wording through the OpenCode translator and
+  retained recovery kinds. These fixtures do not establish real-provider response
+  quality or complete Agent tasks with very small output budgets.
+
 **Default empty completion (2026-10-11):** the reported local transcript records
 successful reads followed by an assistant message with zero output tokens,
 no text/tools, and `finish: unknown`; the adapter previously reported success.
@@ -808,7 +817,16 @@ separate purchase path. A host test covers the bearer token, one refresh after
 401, and refusal of a non-Stripe or non-HTTPS page. Panel tests cover Checkout
 for a chosen plan, waiting until the status read confirms paid rights, the
 following allowance refresh, Portal for a subscriber, and a refused Checkout that
-keeps the plans and reads rights again. A sidebar test opens it from the account
+keeps the plans and reads rights again. Hook regressions cover returning after a
+long Checkout and a refused browser launch; panel coverage keeps management
+reachable during confirmation and retries a failed handoff. Host tests cover a
+stalled billing request and recovery; native tests cover browser launch timeout
+and strict billing-return classification. A driven built Storybook pass on
+2026-10-11 checked the canceled-renewal label and management feedback at the
+28rem settings width. The built pricing return was checked without a browser
+session or billing API, retaining the app-return link. The website return button needs no
+browser login. Live discounted Checkout and cancellation with the patched desktop
+and deployed services remain unverified. A sidebar test opens it from the account
 menu's Plans and billing. The one-time sign-in banner is
 `settings/hooks/use-account-offers.ts`, appended to the notice strip by
 `app/composition/layout/workspace-notice-strip.tsx`; the host stores answered

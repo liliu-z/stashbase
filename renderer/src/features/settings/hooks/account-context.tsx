@@ -24,7 +24,7 @@ export function AccountProvider({
   port,
 }: {
   children: ReactNode;
-  openExternal: (href: string) => void;
+  openExternal: (href: string) => Promise<boolean> | void;
   port: AccountPort;
 }) {
   const account = useAccount(port, openExternal);

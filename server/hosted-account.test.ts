@@ -193,6 +193,25 @@ test('billing calls carry the desktop session, refresh once on 401, and open onl
   assert.equal(output.insecure, 'Billing returned an unexpected page.');
 });
 
+test('a stalled billing response times out and a later attempt can recover', () => {
+  const result = runIsolated(`
+    const timeout = AbortSignal.timeout.bind(AbortSignal);
+    AbortSignal.timeout = () => timeout(20);
+    globalThis.fetch = async (_url, init) => new Promise((_resolve, reject) => {
+      init.signal.addEventListener('abort', () => reject(init.signal.reason), { once: true });
+    });
+    const keepAlive = setInterval(() => {}, 1000);
+    const account = await import('./server/hosted-account.ts');
+    const error = await account.fetchHostedBillingPlans().then(() => null, error => error.name);
+    globalThis.fetch = async () => Response.json({ plans: [] });
+    const plans = await account.fetchHostedBillingPlans();
+    clearInterval(keepAlive);
+    process.stdout.write(JSON.stringify({ error, plans }));
+  `);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout), { error: 'TimeoutError', plans: [] });
+});
+
 test('OAuth PKCE session persists locally and authenticates Agent allowance requests', () => {
   const result = runIsolated(`
     const calls = [];

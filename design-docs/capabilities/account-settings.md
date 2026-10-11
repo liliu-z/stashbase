@@ -102,6 +102,13 @@ simulators use a separate development-only entry. Neither belongs in normal Sett
 - External MCP rotation invalidates the old token. Disable retires exposed access
   promptly, including unfinished requests, while ordinary local work remains usable.
 
+Default Agent reduces each model call's output budget to fit the remaining
+credits and turn budget. A smaller budget may shorten or truncate the response;
+remaining credits do not guarantee completion of a whole task. When the input
+and minimum output cannot fit, report insufficient credits for this request,
+without claiming the balance is zero. A shorter conversation can reduce input
+cost; otherwise the user can wait for refill or manage their plan.
+
 ## Other Settings Decisions
 
 - Automatic update checks run throughout an open application, every 15 minutes
@@ -153,9 +160,9 @@ Claude/Codex access, and BYOK search remain independent. Settings -> Agents show
 the signed-in account's plan, beside its credits; Plans and billing in the
 sidebar account menu opens it there. A Free account sees each tier with its price and
 Subscribe; a subscribed account sees its plan, paid-through or end date, and
-Manage. Subscribe asks the hosted API, as the desktop account, for a
+Manage or cancel. Subscribe asks the hosted API, as the desktop account, for a
 Stripe Checkout page and opens it in the system browser, so paying never requires
-a website sign-in. Manage opens the Stripe Customer Portal the same
+a website sign-in. Manage or cancel opens the Stripe Customer Portal the same
 way. The desktop host holds the session token and verifies that the returned page
 is Stripe-hosted; the renderer receives only that page, and no desktop session
 token travels in a link. Promotion codes are entered on the Checkout page, which
@@ -164,16 +171,25 @@ shows the discount and renewal terms. Opening billing never sends a draft.
 After Checkout opens, Settings shows that it is waiting for payment and polls
 subscription rights, also re-reading them when the window regains focus. It stops
 polling after two minutes and keeps the purchase buttons hidden until the reader
-refreshes or stops waiting. Confirmed rights refresh the credit balance. The
-browser returns to the website's pricing page, which points a reader without a
-browser session back to the app. The website remains an independent purchase
+refreshes or dismisses the wait. Returning to the app restarts this bounded
+confirmation window, including after a long Checkout. Management remains available
+while confirmation is pending. Portal opening names the browser handoff; failures
+clear the busy state and offer a retry. Billing HTTP requests have a twenty-second
+HTTP deadline shared by retries; authentication retains its separate bounded
+refresh call. System browser acknowledgement has a
+ten-second deadline. Dismiss only closes the local wait and does not cancel a plan.
+Confirmed rights refresh the credit balance. Portal return also polls for updated
+rights, including cancellation and plan changes. Cancellation explicitly says
+renewal is canceled and gives the remaining access date.
+The browser returns to the website's pricing page, whose Return to StashBase button
+works without a website session. Its data-free native link only focuses the app; The website remains an independent purchase
 path for a browser-signed-in account.
 
 Stripe owns prices, promotion codes, and payment management. The hosted API owns
 subscription rights and usage. A discounted subscription receives its full tier
-allowance. Seven-day usage windows remain independent of monthly billing: renewal
-or a tier change preserves consumption and the refresh date. A paid upgrade raises
-the current ceiling; a paid downgrade lowers it. Paid-tier changes use Stripe
+allowance. Paid credits follow the successfully paid monthly billing period.
+A tier change preserves consumption within that period; an upgrade raises the
+current ceiling. Free credits keep their separate seven-day window. Paid-tier changes use Stripe
 prorations. Cancellation retains access until paid-through, then returns to Free.
 A browser success redirect is not evidence of payment; pending confirmation stays
 visible until the API confirms rights. Failed billing does not discard local work.

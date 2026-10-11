@@ -460,11 +460,21 @@ data migration is not required by [maintenance policy](../MAINTENANCE.md#previou
   error, or unrecognized event disables replay; ordinary output still streams.
   Repeated empty responses fail without native automatic retries. Cancellation
   retires both prefix buffering and recovery before another upstream call.
+  The hosted ledger sizes output under its account lock against available
+  account and turn budgets, preserving the conservative input reservation.
+  Its approved output limit travels to the provider; the desktop never computes
+  a budget from the displayed percentage. Hosted quota failures distinguish
+  insufficient request credits from insufficient turn budget and preserve their
+  recovery classification through the native runtime message boundary.
   Hosted quota/accounting and Stripe billing stay external; the desktop exposes
   bounded usage, plans, and subscription status. The host requests Checkout and
   Portal pages with the account session and hands the renderer only a verified
   Stripe-hosted URL; desktop account tokens never appear in links or Stripe
-  configuration. Website billing uses its own browser session.
+  configuration. Billing HTTP calls share a twenty-second deadline across retries;
+  authentication refresh retains its existing ten-second bound. Native browser acknowledgement is bounded to ten seconds;
+  renderer billing retains the result to report launch failures. The exact,
+  data-free `stashbase://billing-return` link only focuses a window and cannot
+  grant rights or acknowledge an OAuth flow. Website billing uses its own browser session.
   Child environment and AppData HOME/config isolate ambient secrets and user config.
 - Built-in HTTP and external MCP share Project Operations. Streamable HTTP checks
   the current Settings token on every POST; rotation invalidates old tokens.

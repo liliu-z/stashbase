@@ -47,3 +47,16 @@ test('external navigation rejects unsafe URLs and unauthorized senders before sh
   assert.equal((await denied.open(denied.event, { url: 'https://example.com' })).ok, false);
   assert.deepEqual(opened, []);
 });
+
+test('a stalled system browser returns a failure and permits another attempt', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let finish;
+  const setup = harness({ openExternal: () => new Promise(resolve => { finish = resolve; }) });
+  const opening = setup.open(setup.event, { url: 'https://billing.stripe.com/test' });
+  t.mock.timers.tick(10_000);
+  assert.equal((await opening).ok, false);
+  finish(); // A late OS acknowledgement cannot turn the old result into success.
+  const retry = setup.open(setup.event, { url: 'https://billing.stripe.com/test' });
+  finish();
+  assert.deepEqual(await retry, { ok: true });
+});

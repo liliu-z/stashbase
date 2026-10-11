@@ -19,15 +19,32 @@ function subscriptionDetail(status: BillingStatus): string {
   if (billingPaid(status) && status.paidThrough) {
     const plan = status.planName ?? 'Paid plan';
     return status.cancelAtPeriodEnd
-      ? `${plan} · Ends ${paidDate(status.paidThrough)}`
+      ? `${plan} · Renewal canceled. Access until ${paidDate(status.paidThrough)}`
       : `${plan} · Paid through ${paidDate(status.paidThrough)}`;
   }
-  return 'Paid credits are not active. Use Manage to check payment.';
+  return 'Paid credits are not active. Manage or cancel your subscription to check payment.';
 }
 
 export function SubscriptionRows({ billing }: { billing: BillingViewModel }) {
   const { status } = billing;
   const failure = billing.failure && <FailureNotice className="mt-1" failure={billing.failure} />;
+
+  const manage = status?.canManage && (
+    <Button
+      disabled={billing.busy}
+      loading={billing.opening === 'portal'}
+      onClick={billing.manage}
+      size="compact"
+      variant="tertiary"
+    >
+      {billing.opening === 'portal' ? 'Opening browser…' : 'Manage or cancel'}
+    </Button>
+  );
+  const browserHelp = billing.browserPage === 'portal' && !billing.busy && !billing.failure && (
+    <p className="text-caption text-muted-foreground">
+      Manage or cancel in your browser, then return here. If it did not open, try again.
+    </p>
+  );
 
   if (billing.confirming) {
     return (
@@ -36,22 +53,24 @@ export function SubscriptionRows({ billing }: { billing: BillingViewModel }) {
         detail={
           billing.confirming === 'waiting'
             ? 'Waiting for payment in your browser.'
-            : 'Still confirming your subscription. Refresh to check again.'
+            : 'Payment is not confirmed yet. Refresh or check your subscription in the browser.'
         }
         title="Subscription"
-        trail={
-          <>
-            {billing.confirming === 'slow' && (
-              <Button onClick={billing.refresh} size="compact" variant="tertiary">
-                Refresh
-              </Button>
-            )}
-            <Button onClick={billing.stopWaiting} size="compact" variant="ghost">
-              Stop waiting
+        trail={manage}
+      >
+        {failure}
+        {browserHelp}
+        <div className="flex flex-wrap gap-1">
+          {billing.confirming === 'slow' && (
+            <Button onClick={billing.refresh} size="compact" variant="tertiary">
+              Refresh
             </Button>
-          </>
-        }
-      />
+          )}
+          <Button onClick={billing.stopWaiting} size="compact" variant="ghost">
+            Dismiss
+          </Button>
+        </div>
+      </SettingsRow>
     );
   }
 
@@ -69,23 +88,9 @@ export function SubscriptionRows({ billing }: { billing: BillingViewModel }) {
 
   if (billingSubscribed(status)) {
     return (
-      <SettingsRow
-        as="li"
-        detail={subscriptionDetail(status)}
-        title="Subscription"
-        trail={
-          <Button
-            disabled={billing.busy}
-            loading={billing.busy}
-            onClick={billing.manage}
-            size="compact"
-            variant="tertiary"
-          >
-            Manage
-          </Button>
-        }
-      >
+      <SettingsRow as="li" detail={subscriptionDetail(status)} title="Subscription" trail={manage}>
         {failure}
+        {browserHelp}
       </SettingsRow>
     );
   }
@@ -96,8 +101,10 @@ export function SubscriptionRows({ billing }: { billing: BillingViewModel }) {
         as="li"
         detail="Free. Have a promotion code? Enter it on the payment page."
         title="Subscription"
+        trail={manage}
       >
         {failure}
+        {browserHelp}
       </SettingsRow>
       {billing.plansFailed && (
         <SettingsMessage
@@ -109,7 +116,7 @@ export function SubscriptionRows({ billing }: { billing: BillingViewModel }) {
       {billing.plans.map((plan) => (
         <SettingsRow
           as="li"
-          detail={`${billingPrice(plan)} · More Default Agent credits every week`}
+          detail={`${billingPrice(plan)} · More Default Agent credits`}
           key={plan.priceId}
           title={plan.name}
           titleTone={plan.available ? 'default' : 'muted'}
@@ -120,7 +127,11 @@ export function SubscriptionRows({ billing }: { billing: BillingViewModel }) {
               size="compact"
               variant="tertiary"
             >
-              {plan.available ? 'Subscribe' : 'Coming soon'}
+              {billing.opening === 'checkout'
+                ? 'Opening payment…'
+                : plan.available
+                  ? 'Subscribe'
+                  : 'Coming soon'}
             </Button>
           }
         />

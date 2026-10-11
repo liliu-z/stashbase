@@ -423,6 +423,14 @@ test('OAuth return deep links have one exact, data-free authority', () => {
   }]);
 });
 
+test('billing return only accepts a data-free focus link', () => {
+  assert.equal(classifyProtocolLaunch(['stashbase://billing-return']), 'billing-return');
+  for (const url of ['stashbase://billing-return?paid=true', 'stashbase://billing-return#token',
+    'stashbase://user@billing-return', 'stashbase://billing-return:123', 'stashbase://billing-return/confirm']) {
+    assert.equal(classifyProtocolLaunch([url]), 'inert');
+  }
+});
+
 test('folder entry focuses a matching window, including its initiating window', async () => {
   const registry = createWindowRegistry({ platform: 'linux' });
   const notes = {

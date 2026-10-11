@@ -246,7 +246,7 @@ function WorkspaceWindow() {
     // runtime picker, and Settings all read the same open sign-in rather than
     // each starting one of their own.
     <AccountProvider
-      openExternal={(href) => void dependencies.documents.openExternal(href)}
+      openExternal={dependencies.documents.openExternal}
       port={dependencies.settings.accountApi}
     >
       <WorkspaceLayout

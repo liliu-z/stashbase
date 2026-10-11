@@ -510,11 +510,14 @@ export function stripeBillingUrl(value: unknown): string {
 async function hostedBillingRequest<T>(
   path: string,
   init: { method: 'GET' | 'POST'; body?: unknown },
-  options: { forceRefreshToken?: boolean } = {},
+  options: { forceRefreshToken?: boolean; signal?: AbortSignal } = {},
 ): Promise<T> {
+  const signal = options.signal ?? AbortSignal.timeout(20_000);
   const token = await hostedAccessToken({ forceRefresh: options.forceRefreshToken });
+  signal.throwIfAborted();
   const response = await fetch(`${STASHBASE_API_URL}${path}`, {
     method: init.method,
+    signal,
     headers: {
       authorization: `Bearer ${token}`,
       'x-stashbase-client-version': CLIENT_VERSION,
@@ -524,7 +527,7 @@ async function hostedBillingRequest<T>(
   });
   const payload = await jsonBody<T & ErrorPayload>(response);
   if (response.status === 401 && !options.forceRefreshToken) {
-    return hostedBillingRequest(path, init, { forceRefreshToken: true });
+    return hostedBillingRequest(path, init, { forceRefreshToken: true, signal });
   }
   if (!response.ok) throw new Error(messageOf(payload, `Billing is temporarily unavailable (HTTP ${response.status}).`));
   return payload as T;
@@ -532,6 +535,7 @@ async function hostedBillingRequest<T>(
 
 export async function fetchHostedBillingPlans(): Promise<HostedBillingPlan[]> {
   const response = await fetch(`${STASHBASE_API_URL}/v1/billing/plans`, {
+    signal: AbortSignal.timeout(20_000),
     headers: { 'x-stashbase-client-version': CLIENT_VERSION },
   });
   const payload = await jsonBody<{ plans?: HostedBillingPlan[] } & ErrorPayload>(response);
