@@ -68,7 +68,7 @@ function KeyRow({ embedder, state }: { embedder: EmbedderViewModel; state: Embed
       detail={
         state.hasKey
           ? `${label} API key saved`
-          : 'Use an OpenAI or OpenRouter key. Your provider bills indexing and search to your account.'
+          : 'Use an OpenAI, OpenRouter, or Requesty key. Your provider bills indexing and search to your account.'
       }
       title={
         <>
