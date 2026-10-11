@@ -831,7 +831,11 @@ and deployed services remain unverified. A macOS v2.15.7 release-package pass on
 management button from its opening state to a usable retry state. The free
 account's live Portal rendered after a browser reload; first-load reliability
 was not established. Automated custom-scheme navigation was blocked by the
-browser tool, so this pass does not establish the native return handoff.
+browser tool; the user subsequently clicked Return to StashBase and confirmed
+that the desktop opened. Inspection found the release package's Settings usable,
+and Dismiss restored the Free subscription and purchase controls after an unpaid
+live Checkout. This proves manual app opening and waiting-state recovery, not
+paid-state refresh in the packaged app.
 A sidebar test opens it from the account
 menu's Plans and billing. The one-time sign-in banner is
 `settings/hooks/use-account-offers.ts`, appended to the notice strip by
@@ -876,9 +880,13 @@ account, `STASHBASE50`, and Stripe's test Visa. Checkout charged a $5 test invoi
 after a $5 discount and automatically returned to the local pricing page showing
 Plus through 2026-11-11. Stripe and the local projection agreed; all three payment
 events were processed within two seconds of receipt, with none pending, and the
-full $1 fixture allowance was retained. The Mac locked before the subsequent
-Portal/cancellation UI check, leaving that repeat check unverified. This local
-stack does not change the account's production subscription.
+full $1 fixture allowance was retained. The subsequent Portal pass opened without
+a reload, completed period-end cancellation, and returned to pricing showing
+`Plus · Ends 2026/11/11`. The cancellation webhook was processed, the local
+projection matched Stripe's scheduled cancellation timestamp, and paid rights
+and the fixture allowance remained available through the paid period. This local
+stack does not change the account's production subscription or establish the
+packaged desktop's paid-state refresh.
 The API's repeatable `billing:verify` command passed real Stripe test-clock
 renewal, failed collection, payment recovery after store restart, cancellation at
 period end, and paid prorated tier changes against an isolated PostgreSQL ledger.
