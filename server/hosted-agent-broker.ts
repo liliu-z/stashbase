@@ -356,8 +356,10 @@ export class HostedAgentBroker {
         const upstreamMessage = nested?.message ?? payload?.message ?? `The Agent gateway failed (HTTP ${upstream.status}).`;
         const upstreamCode = nested?.code ?? payload?.code;
         const allowanceMessage = upstreamCode === 'agent_turn_budget_exhausted'
-          ? `This Agent turn reached its spending limit. ${upstreamMessage}`
-          : `Free Agent credits are exhausted. ${upstreamMessage}`;
+          ? 'This Agent turn has insufficient spending budget for another model call.'
+          : upstreamCode === 'agent_allowance_exhausted' || !upstreamCode
+            ? 'Remaining Agent credits cannot cover this request. Try a shorter conversation or wait for credits to refill.'
+            : upstreamMessage;
         writeJson(response, upstream.status, {
           error: {
             message: upstream.status === 402

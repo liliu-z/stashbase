@@ -32,7 +32,7 @@ const RUNTIME_OUTDATED_PATTERN =
 const AUTH_PATTERN =
   /authentication_error|invalid api key|api key.{0,20}invalid|please run \/login|not logged in|logged out|login required|unauthorized|\b401\b|token.{0,30}(expired|revoked|invalid)|oauth.{0,20}(expired|error|revoked)|sign in again|re-?authenticate/i;
 const QUOTA_PATTERN =
-  /usage limit|quota|credit balance|out of credits|usage cap|spending (limit|cap)|plan limit|(weekly|monthly|5-hour) limit|insufficient_quota/i;
+  /usage limit|quota|credit balance|out of credits|usage cap|spending (limit|cap|budget)|plan limit|(weekly|monthly|5-hour) limit|insufficient_quota/i;
 const RATE_LIMIT_PATTERN =
   /rate.?limit|too many requests|\b429\b|overloaded|\b529\b|throttl/i;
 const NETWORK_PATTERN =
@@ -42,7 +42,7 @@ export function classifyAgentTurnFailure(message: string): AgentTurnFailureKind 
   if (RUNTIME_OUTDATED_PATTERN.test(message)) return 'runtime-outdated';
   if (AUTH_PATTERN.test(message)) return 'auth-expired';
   if (/hosted_access_restricted|hosted ai access is restricted|agent access is restricted/i.test(message)) return 'access-restricted';
-  if (/free agent credits are exhausted|agent_allowance_exhausted|quota_exhausted|stashbase.{0,30}(agent )?allowance|(weekly|monthly) agent allowance/i.test(message)) return 'allowance-exhausted';
+  if (/free agent credits are exhausted|remaining agent credits cannot cover|agent_allowance_exhausted|quota_exhausted|stashbase.{0,30}(agent )?allowance|(weekly|monthly) agent allowance/i.test(message)) return 'allowance-exhausted';
   if (QUOTA_PATTERN.test(message)) return 'quota';
   if (RATE_LIMIT_PATTERN.test(message)) return 'rate-limit';
   if (NETWORK_PATTERN.test(message)) return 'network';

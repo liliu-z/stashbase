@@ -166,8 +166,8 @@ test('empty response buffering is bounded and malformed events are not retried',
 });
 
 for (const scenario of [
-  { code: 'agent_allowance_exhausted', message: 'Free Agent credits are exhausted.', kind: 'allowance-exhausted' },
-  { code: 'agent_turn_budget_exhausted', message: 'This Agent turn reached its spending limit.', kind: 'quota' },
+  { code: 'agent_allowance_exhausted', message: 'Remaining Agent credits cannot cover this request. Try a shorter conversation or wait for credits to refill.', kind: 'allowance-exhausted' },
+  { code: 'agent_turn_budget_exhausted', message: 'This Agent turn has insufficient spending budget for another model call.', kind: 'quota' },
 ]) {
   test(`hosted Agent broker preserves ${scenario.code} through the OpenCode translator`, async (t) => {
     const broker = new HostedAgentBroker({
@@ -187,7 +187,7 @@ for (const scenario of [
     });
     const payload = await response.json() as { error: { message: string; code: string } };
     assert.equal(response.status, 402);
-    assert.equal(payload.error.message, `${scenario.message} Limit reached.`);
+    assert.equal(payload.error.message, scenario.message);
     assert.equal(payload.error.code, scenario.code);
     const translator = new OpenCodeEventTranslator();
     translator.bindSession('ours');
