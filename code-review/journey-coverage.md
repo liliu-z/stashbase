@@ -826,7 +826,13 @@ and strict billing-return classification. A driven built Storybook pass on
 28rem settings width. The built pricing return was checked without a browser
 session or billing API, retaining the app-return link. The website return button needs no
 browser login. Live discounted Checkout and cancellation with the patched desktop
-and deployed services remain unverified. A sidebar test opens it from the account
+and deployed services remain unverified. A macOS v2.15.7 release-package pass on
+2026-10-11 opened Plans and billing, launched live Checkout, and returned the
+management button from its opening state to a usable retry state. The free
+account's live Portal rendered after a browser reload; first-load reliability
+was not established. Automated custom-scheme navigation was blocked by the
+browser tool, so this pass does not establish the native return handoff.
+A sidebar test opens it from the account
 menu's Plans and billing. The one-time sign-in banner is
 `settings/hooks/use-account-offers.ts`, appended to the notice strip by
 `app/composition/layout/workspace-notice-strip.tsx`; the host stores answered
@@ -865,6 +871,14 @@ Checkout completed a $5 half-price Plus test purchase; provider and local record
 agreed on the active subscription and paid-through date, with all three payment
 events processed and the full fixture allowance available. This establishes the
 local initial-purchase flow, not live collection or packaged desktop handoff.
+A repeat browser-driven sandbox pass on 2026-10-11 used the current signed-in
+account, `STASHBASE50`, and Stripe's test Visa. Checkout charged a $5 test invoice
+after a $5 discount and automatically returned to the local pricing page showing
+Plus through 2026-11-11. Stripe and the local projection agreed; all three payment
+events were processed within two seconds of receipt, with none pending, and the
+full $1 fixture allowance was retained. The Mac locked before the subsequent
+Portal/cancellation UI check, leaving that repeat check unverified. This local
+stack does not change the account's production subscription.
 The API's repeatable `billing:verify` command passed real Stripe test-clock
 renewal, failed collection, payment recovery after store restart, cancellation at
 period end, and paid prorated tier changes against an isolated PostgreSQL ledger.
