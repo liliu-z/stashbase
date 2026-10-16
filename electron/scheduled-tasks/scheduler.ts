@@ -20,7 +20,7 @@ import {
 import type { ScheduledRunOutcome } from '../../shared/protocols/electron/scheduled-tasks.ts';
 import { dueOccurrence } from '../../shared/scheduled-task-timing.ts';
 
-export { dueOccurrence, latestOccurrence } from '../../shared/scheduled-task-timing.ts';
+export { dueOccurrence } from '../../shared/scheduled-task-timing.ts';
 
 type Trigger = 'schedule' | 'manual';
 

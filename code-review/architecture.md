@@ -515,13 +515,16 @@ across three owners; none keeps another's state.
 | Renderer Agent feature | Starts the run's chat through the session's ordinary send path, answers whether its request was accepted, and reports how its first turn ended. Shows the task list in the chat's place. |
 
 - `shared/scheduled-task-timing.ts` is the one due rule: main decides what to claim
-  with it, and the list's adapter reads each task's next run from it.
+  with it, the list's adapter reads each task's next run and its missed days from it,
+  and the server records the missed days with it when a claim follows them, so the
+  list's pending entry and the recorded one never disagree.
 - Claims are at most once. The server refuses an occurrence at or before the one last
   claimed and a second run of a task still running in this process; a run left running
   by an earlier process reads as failed. A lost answer never causes a second dispatch.
 - Each task keeps a bounded run history. A run moves forward only: main's report
   applies only to a run still starting, and the window's first-turn report only to a
-  sent run, so a late or repeated report never rewrites an outcome.
+  sent run, so a late or repeated report never rewrites an outcome. The first-turn
+  report carries a bounded excerpt of the Agent's last reply, kept with the outcome.
 - Main reaches state only through the server's task routes, as it does for update
   preferences; it reads neither config nor task files. Every request names its project
   and only registered projects answer.

@@ -517,7 +517,9 @@ function requirePath(input: string): void {
 }
 
 function defaultCwdFor(platform: FilesystemPlatform): string {
-  if (platform !== 'win32') return process.cwd();
+  // A module for another platform than the host's (tests) cannot resolve
+  // against the host's working directory, so it starts at that platform's root.
+  if (platform !== 'win32') return path.posix.isAbsolute(process.cwd()) ? process.cwd() : '/';
   return path.win32.isAbsolute(process.cwd()) ? process.cwd() : 'C:\\';
 }
 

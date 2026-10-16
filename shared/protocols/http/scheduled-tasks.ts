@@ -11,6 +11,8 @@ export const SCHEDULED_TASK_LIMITS = {
   files: 20,
   name: 120,
   prompt: 32_000,
+  /** How much of a run’s final reply the task list keeps. */
+  summary: 300,
   tasks: 50,
 } as const;
 
@@ -47,18 +49,25 @@ const runTrigger = z.enum(['schedule', 'manual']);
 /** One run of a task, as the app recorded it. `running`: its chat is being
  *  started. `sent`: the chat exists and its request was accepted, and the
  *  first turn has not reported back. `completed` and `failed` say how it
- *  ended; a run that failed with no chat never started one. */
+ *  ended; a run that failed with no chat never started one. `missed`: daily
+ *  runs that never started because StashBase was closed or asleep; one entry
+ *  covers `missedCount` days, from `startedAt` (the first one's time) to
+ *  `occurrence` (the last one's). */
 export const scheduledTaskRunSchema = z
   .object({
     agent: agentIdSchema.nullable(),
     finishedAt: instant.nullable(),
+    missedCount: z.number().int().positive().nullable(),
     /** The scheduled time a scheduled run was for; null for Run now. */
     occurrence: instant.nullable(),
     reason: z.string().max(500).nullable(),
     runId: z.string().min(1).max(64),
     sessionId: z.string().min(1).max(256).nullable(),
     startedAt: instant,
-    status: z.enum(['running', 'sent', 'completed', 'failed']),
+    status: z.enum(['running', 'sent', 'completed', 'failed', 'missed']),
+    /** The start of the Agent’s last reply once the first turn ended, so the
+     *  list says what the run found or why it could not do the work. */
+    summary: z.string().max(SCHEDULED_TASK_LIMITS.summary).nullable(),
     title: z.string().max(200).nullable(),
     trigger: runTrigger,
   })
@@ -170,6 +179,7 @@ export const scheduleSettleRequestSchema = z
     reason: z.string().max(500).nullable(),
     runId: z.string().min(1).max(64),
     status: z.enum(['completed', 'failed']),
+    summary: z.string().max(SCHEDULED_TASK_LIMITS.summary).nullable(),
     taskId: z.string().min(1).max(64),
   })
   .strict();

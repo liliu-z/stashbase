@@ -24,15 +24,25 @@ const FOLDER = '/project/Brief';
 const SCOPE = { kind: 'folder', path: FOLDER } as const;
 const HOUR = 3_600_000;
 
+/** 08:00 local, `daysAgo` days before today. */
+function day(daysAgo: number): number {
+  const at = new Date();
+  at.setDate(at.getDate() - daysAgo);
+  at.setHours(8, 0, 0, 0);
+  return at.getTime();
+}
+
 function run(overrides: Partial<ScheduledTaskRun>): ScheduledTaskRun {
   return {
     agent: 'claude',
+    missedCount: null,
     occurrence: null,
     reason: null,
     runId: 'run-1',
     sessionId: null,
     startedAt: Date.now() - HOUR,
     status: 'completed',
+    summary: null,
     title: null,
     trigger: 'schedule',
     ...overrides,
@@ -74,6 +84,7 @@ const busy: ProjectSchedule = {
           runId: 'run-1',
           sessionId: 'native-6',
           startedAt: Date.now() - 26 * HOUR,
+          summary: 'Saved briefs/oct-15.md with three open threads.',
           title: 'Daily brief · Oct 15',
         }),
       ],
@@ -168,7 +179,8 @@ describe('ScheduledTasksView', () => {
 
     expect(within(brief).getByText(/^Every day at 8:00\sAM · Claude$/u)).not.toBeNull();
     expect(within(brief).getByText(/^Next run (today|tomorrow) at /u)).not.toBeNull();
-    expect(within(brief).getByText('Sent')).not.toBeNull();
+    expect(within(brief).getByText('Started')).not.toBeNull();
+    expect(within(brief).getByText('Open its chat to see how it ended.')).not.toBeNull();
     expect(within(weekly).getByText('Off. Switch it on to run every day.')).not.toBeNull();
     expect(within(weekly).getByText('Did not run')).not.toBeNull();
     expect(
@@ -204,8 +216,11 @@ describe('ScheduledTasksView', () => {
     expect(lines.map((line) => line.textContent)).toEqual([
       expect.stringContaining('Daily brief'),
       expect.stringContaining('Did not run'),
-      expect.stringContaining('Done'),
+      expect.stringContaining('Finished'),
     ]);
+    expect(
+      within(history).getByText('Saved briefs/oct-15.md with three open threads.').tagName,
+    ).toBe('BLOCKQUOTE');
     expect(within(history).getByText(/StashBase was closed or asleep then\./u)).not.toBeNull();
 
     // The window holds the sent run's chat, which is waiting for approval.
@@ -255,6 +270,64 @@ describe('ScheduledTasksView', () => {
       ),
     );
     expect(await row('Weekly review')).not.toBeNull();
+  });
+
+  it('says which days a task missed, with no chat to open and Run now still there', async () => {
+    setup({
+      ...busy,
+      tasks: [
+        task({
+          enabled: true,
+          runs: [
+            run({
+              agent: null,
+              missedCount: 3,
+              occurrence: day(1),
+              runId: 'missed-1',
+              startedAt: day(3),
+              status: 'missed',
+            }),
+          ],
+        }),
+      ],
+    });
+    const brief = await row('Daily brief');
+
+    expect(within(brief).getByText('Missed 3 runs')).not.toBeNull();
+    expect(within(brief).getByText('StashBase was closed or asleep then.')).not.toBeNull();
+    expect(within(brief).getByText(/^\w+ \d+ – \w+ \d+, 8:00/u)).not.toBeNull();
+    expect(within(brief).queryByRole('button', { name: 'Open chat' })).toBeNull();
+    expect(within(brief).getByRole('button', { name: 'Run now' })).toHaveProperty(
+      'disabled',
+      false,
+    );
+  });
+
+  it('names following the project apart from always using one Agent', async () => {
+    setup({ folderPath: FOLDER, problem: null, tasks: [], version: null });
+    await userEvent.click(await screen.findByRole('button', { name: 'New task' }));
+    const agent = screen.getByRole('combobox', { name: 'Agent' });
+    expect(agent.textContent).toBe('Follow this project (now Default)');
+    await userEvent.click(agent);
+    const options = (await screen.findAllByRole('option')).map((option) => option.textContent);
+
+    expect(options).toEqual([
+      'Follow this project (now Default)',
+      'Always Codex',
+      'Always Claude',
+      'Always Default',
+    ]);
+  });
+
+  it('shows a task pinned to the project’s Agent as pinned, not as following', async () => {
+    setup({
+      folderPath: FOLDER,
+      problem: null,
+      tasks: [task({ agent: 'stashbase', id: 'pinned', name: 'Pinned' })],
+      version: 'sha256:1',
+    });
+    await userEvent.click(await screen.findByRole('button', { name: 'Pinned' }));
+    expect(screen.getByRole('combobox', { name: 'Agent' }).textContent).toBe('Always Default');
   });
 
   it('keeps the edit when the task file changed underneath it', async () => {

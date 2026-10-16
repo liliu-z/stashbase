@@ -32,20 +32,23 @@ function task(overrides = {}) {
 }
 
 test('a daily task is due once its time has passed, once per day', () => {
-  assert.equal(dueOccurrence(task(), at(16, 7, 59))?.getTime(), at(15, 8).getTime());
+  assert.equal(dueOccurrence(task(), at(16, 7, 59)), null);
   assert.equal(dueOccurrence(task(), at(16, 8))?.getTime(), at(16, 8).getTime());
   const ranToday = task({ lastDispatchedAt: iso(at(16, 8)), lastOccurrence: iso(at(16, 8)) });
   assert.equal(dueOccurrence(ranToday, at(16, 23)), null);
   assert.equal(dueOccurrence(ranToday, at(17, 8))?.getTime(), at(17, 8).getTime());
 });
 
-test('a missed run catches up once, and never for a time before the task was switched on', () => {
-  // Closed all of the 15th: launching at 07:00 on the 16th runs the missed
-  // occurrence once, and the 08:00 run that day does not follow it.
+test('a run missed today catches up once; an earlier day\'s does not run late', () => {
+  // Closed all of the 15th: launching at 07:00 on the 16th runs nothing,
+  // and the 08:00 run that day happens at its time.
   const missed = task({ lastDispatchedAt: iso(at(14, 8)), lastOccurrence: iso(at(14, 8)) });
-  assert.equal(dueOccurrence(missed, at(16, 7))?.getTime(), at(15, 8).getTime());
-  const caughtUp = { ...missed, lastDispatchedAt: iso(at(16, 7)), lastOccurrence: iso(at(15, 8)) };
-  assert.equal(dueOccurrence(caughtUp, at(16, 9)), null);
+  assert.equal(dueOccurrence(missed, at(16, 7)), null);
+  assert.equal(dueOccurrence(missed, at(16, 8))?.getTime(), at(16, 8).getTime());
+  // Asleep through 08:00 on the 16th: waking at 13:00 runs it once.
+  assert.equal(dueOccurrence(missed, at(16, 13))?.getTime(), at(16, 8).getTime());
+  const caughtUp = { ...missed, lastDispatchedAt: iso(at(16, 13)), lastOccurrence: iso(at(16, 8)) };
+  assert.equal(dueOccurrence(caughtUp, at(16, 23)), null);
 
   // Switched on at 15:00: 08:00 that day is not a missed run.
   assert.equal(dueOccurrence(task({ enabledAt: iso(at(16, 15)) }), at(16, 16)), null);

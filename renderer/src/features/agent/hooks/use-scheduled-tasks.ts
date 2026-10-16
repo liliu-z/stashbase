@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import {
   ScheduledTasksError,
@@ -115,4 +115,34 @@ export function useScheduledTasks(port: ScheduledTasksPort, folderPath: string, 
         return result.ok ? result.outcome : null;
       }),
   };
+}
+
+/** The native ids of the chats scheduled runs started in one project, so the
+ *  Chats list can mark them. It shares the task list's cache and reads it
+ *  again whenever `chats` changes, which is when a run's chat can appear. */
+export function useScheduledRunSessions(
+  port: ScheduledTasksPort | undefined,
+  folderPath: string,
+  chats: unknown,
+): ReadonlySet<string> {
+  const query = useQuery({
+    enabled: port !== undefined,
+    queryFn: ({ signal }) =>
+      port ? port.read(folderPath, signal) : Promise.reject(new Error('No scheduled tasks')),
+    queryKey: queryKey(folderPath),
+    retry: false,
+  });
+  const { refetch } = query;
+  useEffect(() => {
+    if (port) void refetch();
+  }, [chats, port, refetch]);
+  return useMemo(
+    () =>
+      new Set(
+        query.data?.tasks.flatMap((task) =>
+          task.runs.flatMap((run) => (run.sessionId ? [run.sessionId] : [])),
+        ),
+      ),
+    [query.data],
+  );
 }

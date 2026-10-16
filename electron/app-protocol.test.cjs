@@ -26,7 +26,8 @@ test('app scheme is registered as a standard secure fetch-capable origin', () =>
 });
 
 test('app protocol resolves only renderer-host assets beneath its build root', () => {
-  const root = path.join(path.sep, 'repo', 'dist', 'renderer');
+  // Absolute on every host: on Windows a bare `\repo` would gain a drive.
+  const root = path.resolve(path.sep, 'repo', 'dist', 'renderer');
   assert.equal(assetPathFromRequest('app://renderer/', root), path.join(root, 'index.html'));
   assert.equal(
     assetPathFromRequest('app://renderer/assets/app.js?cache=1', root),

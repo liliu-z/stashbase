@@ -88,9 +88,11 @@ export function ScheduledTaskForm({
   const changedUnderneath = latest !== null && dirty && !sameDraft(latest, opened);
 
   const problem = draftProblem(draft);
+  // Following the project and pinning one Agent are different choices even
+  // when they name the same Agent today, so each says which it is.
   const agentItems = [
-    { label: `Project’s Agent (${agentLabel(projectAgent)})`, value: PROJECT_AGENT },
-    ...AGENT_ORDER.map((id) => ({ label: agentLabel(id), value: id })),
+    { label: `Follow this project (now ${agentLabel(projectAgent)})`, value: PROJECT_AGENT },
+    ...AGENT_ORDER.map((id) => ({ label: `Always ${agentLabel(id)}`, value: id })),
   ];
 
   return (
@@ -125,8 +127,8 @@ export function ScheduledTaskForm({
           </label>
         </div>
         <p className="m-0 text-caption text-muted-foreground" id={ids.note}>
-          Runs only while StashBase is open. A run missed while it was closed starts once when you
-          open it again.
+          Runs only while StashBase is open. A run missed while it was closed starts when you open
+          it again that day.
         </p>
         <div className="flex flex-col gap-1">
           <label className={LABEL_CLASS} htmlFor={ids.agent}>

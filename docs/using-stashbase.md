@@ -86,12 +86,17 @@ workflow), or both. A task that only mentions a file asks the Agent to follow it
 file is read as it is when the task runs.
 
 The list shows each task's next run, or that it is off, and what became of its latest
-run: starting, working, waiting for your approval, done, did not finish, or did not run
-with the reason. **Run history** below lists every recent run with its time, outcome,
-and chat, and says when a run started late because StashBase was closed or asleep.
+run: starting, working, waiting for your approval, finished, did not finish, did not run,
+or missed, with the reason. A finished run quotes the start of the Agent's last reply,
+so you can see whether it did the work without opening the chat. **Run history** below
+lists every recent run with its time, outcome, and chat, and says when a run started
+late because StashBase was closed or asleep. A run's chat shows a clock in the chat
+list.
 
-- Tasks run only while StashBase is open. A run missed while it was closed or while the
-  computer slept starts once when you come back.
+- Tasks run only while StashBase is open. A run missed earlier that day, while it was
+  closed or while the computer slept, starts once when you come back. A run missed on
+  an earlier day is listed as missed instead of running late, and the task runs at its
+  next time.
 - The switch beside a task belongs to this computer. Copying a project or a template,
   or syncing the folder to another computer, never switches a task on.
 - **Run now** starts a run right away without moving the task's next run.

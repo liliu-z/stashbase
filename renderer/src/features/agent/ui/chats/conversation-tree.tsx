@@ -2,7 +2,7 @@
  *  that opens on a click and renames in place on a slow second click or F2,
  *  and a per-row menu for deletion. Grouping and ordering are decided in the
  *  domain; this module owns the interaction and the editing affordance. */
-import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { CalendarClock, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -67,12 +67,15 @@ function ConversationRow({
   onDelete,
   onRename,
   onRestore,
+  scheduled,
 }: {
   conversation: AgentConversationItem;
   onActivate(tabId: string): void;
   onDelete(entry: AgentHistoryEntry): void;
   onRename(conversation: AgentConversationItem, title: string): void;
   onRestore(entry: AgentHistoryEntry): void;
+  /** Whether a scheduled task started this chat. */
+  scheduled: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [caretOffset, setCaretOffset] = useState<number | undefined>();
@@ -146,7 +149,7 @@ function ConversationRow({
             }
           }}
           label={conversation.title}
-          aria-label={`${conversation.title}${conversation.draft ? ', Draft' : ''}${conversation.status ? `, ${conversation.status}` : ''}`}
+          aria-label={`${conversation.title}${scheduled ? ', Scheduled run' : ''}${conversation.draft ? ', Draft' : ''}${conversation.status ? `, ${conversation.status}` : ''}`}
           title={conversation.title}
         >
           {conversation.status === 'Working…' || conversation.status === 'Waiting for approval' ? (
@@ -155,6 +158,13 @@ function ConversationRow({
             </span>
           ) : conversation.draft ? (
             <span className="text-caption text-muted-foreground">Draft</span>
+          ) : scheduled ? (
+            <CalendarClock
+              aria-hidden
+              className="size-3.5 shrink-0 text-muted-foreground"
+              data-scheduled-run=""
+              strokeWidth={1.75}
+            />
           ) : undefined}
         </SidebarMenuButton>
       )}
@@ -176,12 +186,14 @@ function ConversationGroup({
   onDelete,
   onRename,
   onRestore,
+  scheduled,
 }: {
   group: AgentConversationGroup;
   onActivate(tabId: string): void;
   onDelete(entry: AgentHistoryEntry): void;
   onRename(conversation: AgentConversationItem, title: string): void;
   onRestore(entry: AgentHistoryEntry): void;
+  scheduled: ReadonlySet<string>;
 }) {
   const [visibleCount, setVisibleCount] = useState(CONVERSATION_PAGE_SIZE);
   const visibleItems = group.items.slice(0, visibleCount);
@@ -197,6 +209,7 @@ function ConversationGroup({
             onDelete={onDelete}
             onRename={onRename}
             onRestore={onRestore}
+            scheduled={conversation.entry !== undefined && scheduled.has(conversation.entry.id)}
           />
         ))}
       </SidebarMenu>
@@ -213,18 +226,23 @@ function ConversationGroup({
   );
 }
 
+const NO_SCHEDULED_RUNS: ReadonlySet<string> = new Set();
+
 export function ConversationTree({
   groups,
   onActivate,
   onDelete,
   onRename,
   onRestore,
+  scheduled = NO_SCHEDULED_RUNS,
 }: {
   groups: AgentConversationGroup[];
   onActivate(tabId: string): void;
   onDelete(entry: AgentHistoryEntry): void;
   onRename(conversation: AgentConversationItem, title: string): void;
   onRestore(entry: AgentHistoryEntry): void;
+  /** Native ids of the chats scheduled tasks started, marked with a clock. */
+  scheduled?: ReadonlySet<string> | undefined;
 }) {
   return (
     <div className="space-y-1">
@@ -236,6 +254,7 @@ export function ConversationTree({
           onDelete={onDelete}
           onRename={onRename}
           onRestore={onRestore}
+          scheduled={scheduled}
         />
       ))}
     </div>

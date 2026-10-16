@@ -88,10 +88,19 @@ describe('startScheduledRun', () => {
       titleEdited: true,
     });
 
-    // The first turn's end is reported, so the task list keeps it.
+    // The first turn's end is reported with the start of its last reply, so
+    // the task list keeps both and says what the run found.
     expect(report).not.toHaveBeenCalled();
+    listener?.onEvent({ delta: 'Reading the workflow.', kind: 'text' });
+    listener?.onEvent({ kind: 'notice', message: 'Model fell back.' });
+    listener?.onEvent({ delta: "## Brief\n\nI couldn't save **`brief.md`**.", kind: 'text' });
     listener?.onEvent({ isError: false, kind: 'turn-ended' });
-    await vi.waitFor(() => expect(report).toHaveBeenCalledWith({ status: 'completed' }));
+    await vi.waitFor(() =>
+      expect(report).toHaveBeenCalledWith({
+        status: 'completed',
+        summary: "Brief I couldn't save brief.md.",
+      }),
+    );
   });
 
   it('fails a run whose file left the project, and keeps no empty chat for it', async () => {

@@ -25,6 +25,7 @@ import {
   type AgentHistoryEntry,
 } from '@/features/agent/domain/conversation-history';
 import { useConversationHistory } from '@/features/agent/hooks/use-conversation-history';
+import { useScheduledRunSessions } from '@/features/agent/hooks/use-scheduled-tasks';
 import type { AgentChatsProps } from '@/features/agent/ui/workspace-lazy';
 import { FailureLine } from '@/shared/ui/failure-notice';
 
@@ -39,6 +40,7 @@ export default function AgentChats({
 }: AgentChatsProps) {
   const tasksShown = useStore(runtime.store, (state) => state.surface === 'scheduled-tasks');
   const history = useConversationHistory(runtime, scope);
+  const scheduledRuns = useScheduledRunSessions(scheduledTasks, scope.path, history.history);
   const activeId = useStore(runtime.store, (state) => state.activeId);
   const tabs = useStore(runtime.store, (state) => state.tabs);
   const [query, setQuery] = useState('');
@@ -256,6 +258,7 @@ export default function AgentChats({
               }}
               onRename={rename}
               onRestore={(entry) => void runtime.restore(entry)}
+              scheduled={scheduledRuns}
             />
             {history.mutationFailure && deleteTarget === null && (
               <FailureLine className="px-2 py-1" tone="input">

@@ -2044,15 +2044,17 @@ Host/services: `server/routes/gallery.ts`, `server/github-import.ts`, `server/gi
 - **Contract Test:** `server/scheduled-tasks.test.ts` covers lenient parsing,
   single-task edits that keep unknown fields, version conflicts, unreadable files left
   untouched, at-most-once claims, enabled-time cutoff, bounded run history, forward-only
-  run reports, stale running runs, and removal.
-  Electron suites cover the due rule with catch-up, one run per day, Run now, the run
+  run reports with their bounded reply excerpt, missed days recorded as one entry
+  (including across a clock change), stale running runs, and removal.
+  Electron suites cover the due rule with same-day catch-up, one run per day, Run now, the run
   coordinator's late-subscriber pull and deadlines, preload de-duplication, and the
   no-focus window rule. Renderer suites drive a run through the real session runtime
   over a fake port (sent in the background with its title and file, its first-turn
-  outcome reported, refused for a missing file or an unready Agent), the surface that
-  stands in the chat's place, and the list page: next run, latest-run states including
-  a held chat's live approval wait, the run history with late runs, the empty list,
-  and the in-page form.
+  outcome and reply excerpt reported, refused for a missing file or an unready Agent),
+  the surface that stands in the chat's place, and the list page: next run, latest-run
+  states including a held chat's live approval wait and missed days, the run history
+  with late runs and reply excerpts, the empty list, the in-page form with its Agent
+  choices, and the clock on run chats in the chat list.
 - **Driven Runtime Pass:** 2026-10-16, built app under an isolated HOME and port: a
   due task was claimed about 20 seconds after launch, its project window opened hidden
   and unfocused, the run failed with the Agent-readiness reason (no Agent set up in
@@ -2063,12 +2065,27 @@ Host/services: `server/routes/gallery.ts`, `server/github-import.ts`, `server/gi
   latest run and the run history. The page followed an external file edit within one
   refresh, recorded Run now in the history, and edited a task in the page with its
   named file as a chip. No live Agent turn was driven.
+- **Driven Runtime Pass (Windows):** 2026-10-16, source build with a signed-in
+  Default Agent: a task due at 17:47 was claimed at 17:47:44, sent its chat without
+  taking the visible chat, and settled as finished with its title. With the task's
+  record set to a last run on Oct 13, launching at 20:19 recorded "Missed 2 runs"
+  (Oct 14 – Oct 15) before claiming that day's run, which wrote its brief file and
+  showed "Finished" with the late note and the reply excerpt. A Claude task with no
+  sign-in failed as "Did not run" with the sign-in reason. The Chats list marked both
+  run chats with the clock and not the reader's own chat. A Codex task ran on time
+  and settled with its excerpt. With only Welcome open and Notepad focused, a due
+  task opened its project in a hidden window, kept Notepad focused, and finished;
+  focusing StashBase revealed it behind the focused window. A run whose app was
+  quit mid-turn read as "Started" after relaunch, and its Open chat restored the
+  partial chat. A copied project listed every task off with no history. An approval
+  wait could not be produced: in Ask mode the runtimes reported their write tool and
+  shell as unavailable, and the runs finished with that reply as their excerpt.
 - **AI Eval:** Not applicable; a run's quality is the workflow's and the Agent's.
 - **Release Check:** packaged macOS, Windows, and Linux runs with a signed-in Agent,
   including sleep/wake catch-up and the hidden-window reveal on each platform.
-- **Gap:** a sent run with a real runtime, its later approval wait, and the persisted
-  title on each runtime are unproven in the app; a turn that fails after its request
-  was accepted is visible in its chat, not in the task's last result.
+- **Gap:** a run's later approval wait, the persisted title on each runtime, a signed-in
+  Claude run, macOS, Linux, and packaged builds are unproven in the app. The reply excerpt shows what a finished turn said, not whether
+  its work succeeded.
 
 ## Maintenance Rule
 

@@ -98,7 +98,13 @@ export function mount(app: express.Express, store: ScheduledTaskStore = schedule
       const root = await projectRoot(parsed.data.folderPath);
       const task = await runnableTask(root, parsed.data.taskId);
       if (!task) throw refusal('This task can no longer run. Check it in the task list.', 409, 'TASK_UNAVAILABLE');
-      const claimed = store.claim(root, task.id, parsed.data);
+      const claimed = store.claim(
+        root,
+        task.id,
+        parsed.data.trigger === 'schedule'
+          ? { occurrence: parsed.data.occurrence, time: task.time, trigger: 'schedule' }
+          : { trigger: 'manual' },
+      );
       if (!claimed.ok) throw refusal(CLAIM_REFUSALS[claimed.refusal], 409, 'TASK_NOT_CLAIMED');
       res.json(scheduleClaimResponseSchema.parse({ runId: claimed.runId, task }));
     } catch (error) { sendError(res, error); }

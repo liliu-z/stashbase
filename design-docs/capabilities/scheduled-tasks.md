@@ -86,13 +86,20 @@ never has to open a chat or a log to find out.
   nothing. Opening any chat brings the chat back.
 - Each task says when it runs next, or that it is off and will not run.
 - Each task says what became of its latest run: starting its chat, working, waiting
-  for the reader's approval, done, did not finish, or did not run, with the reason.
-  While this window holds the run's chat, its state is live.
+  for the reader's approval, finished, did not finish, did not run, or missed, with
+  the reason. While this window holds the run's chat, its state is live.
+- A finished run quotes the start of the Agent's last reply. A turn can end normally
+  and still say it could not do the work, so "finished" alone would claim more than
+  the app knows.
 - A run history lists every recent run with its time, its outcome, its reason when it
   failed, and a way into its chat. A run that started late says it was due earlier
-  and StashBase was closed or asleep then.
+  and StashBase was closed or asleep then. Days a task missed are one entry that says
+  which days.
+- A chat a task started carries a clock in the chat list, so it reads as the task's
+  and not as one the reader started.
 - How a run's first turn ended is kept once it settles, so the outcome is still there
-  after a restart. A run whose window closed before then stays Sent.
+  after a restart. A run whose window closed before then reads as started, and points
+  to its chat for how it ended.
 
 ### Quiet by design
 
@@ -113,10 +120,12 @@ This keeps every run inside the app the reader can see and control, with the sam
 permissions and windows as their own work.
 
 - The form says so beside the time.
-- A run missed while the app was closed or the computer slept starts once when the
-  reader comes back. A task runs at most once a local day, and never for a time before
-  it was switched on, so turning a task on in the afternoon does not run the morning's
-  occurrence.
+- A run missed earlier the same day, while the app was closed or the computer slept,
+  starts once when the reader comes back. One missed on an earlier day does not run
+  late: its result would be stale, and it would take the place of that day's own run.
+  It is listed as missed, and the task runs at its next time. A task runs at most once
+  a local day, and never for a time before it was switched on, so turning a task on in
+  the afternoon does not run the morning's occurrence.
 
 ### Nothing asks a reader who is not there
 
@@ -159,7 +168,6 @@ shows the format to readers.
 - Agents learn the file format from the user guide or an existing file; StashBase's
   own Agent instructions do not describe it, which keeps every session's prompt
   unchanged. Whether a short description is worth that cost is open.
-- Chats that tasks started are not marked in the chat list beyond their titles.
 
 ## Related Journeys
 

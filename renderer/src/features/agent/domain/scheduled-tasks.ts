@@ -12,7 +12,8 @@ import type { AgentId } from '@/features/agent/domain/session';
 /** One run as the app recorded it. `running`: its chat is being started.
  *  `sent`: the chat's request was accepted and its first turn has not
  *  reported back. `completed` and `failed` say how it ended; a failed run
- *  with no chat never started one. */
+ *  with no chat never started one. `missed`: daily runs that never started
+ *  because StashBase was closed or asleep. */
 export interface ScheduledTaskRun {
   readonly agent: AgentId | null;
   /** The time a scheduled run was due; null for Run now. */
@@ -22,7 +23,12 @@ export interface ScheduledTaskRun {
   /** The native conversation the run started, to open it from the list. */
   readonly sessionId: string | null;
   readonly startedAt: number;
-  readonly status: 'running' | 'sent' | 'completed' | 'failed';
+  readonly status: 'running' | 'sent' | 'completed' | 'failed' | 'missed';
+  /** For a missed entry, how many daily runs it covers, from `startedAt`
+   *  (the first one's time) to `occurrence` (the last one's). */
+  readonly missedCount: number | null;
+  /** The start of the Agent’s last reply once the first turn ended. */
+  readonly summary: string | null;
   readonly title: string | null;
   readonly trigger: 'schedule' | 'manual';
 }
@@ -77,10 +83,32 @@ export interface ScheduledRunRequest {
   readonly title: string;
 }
 
-/** How a sent run's first turn ended, as its window saw it. */
+/** How a sent run's first turn ended, as its window saw it, with the start
+ *  of the Agent’s last reply: a turn can end normally and still say it could
+ *  not do the work. */
 export type ScheduledTurnOutcome =
-  | { readonly status: 'completed' }
-  | { readonly status: 'failed'; readonly reason: string };
+  | { readonly status: 'completed'; readonly summary: string | null }
+  | { readonly status: 'failed'; readonly reason: string; readonly summary: string | null };
+
+const SUMMARY_MAX = 300;
+
+/** A reply as one plain line for the task list: headings, list markers,
+ *  link targets, bold and code marks and line breaks dropped, cut at a word
+ *  near the limit. */
+export function runSummary(reply: string): string | null {
+  const line = reply
+    .replace(/^#{1,6}\s+/gmu, '')
+    .replace(/^\s*(?:[-*+]|\d+[.)])\s+/gmu, '')
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/gu, '$1')
+    .replace(/[*`]+/gu, '')
+    .replace(/\s+/gu, ' ')
+    .trim();
+  if (!line) return null;
+  if (line.length <= SUMMARY_MAX) return line;
+  const cut = line.slice(0, SUMMARY_MAX - 1);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > SUMMARY_MAX / 2 ? cut.slice(0, space) : cut).trimEnd()}…`;
+}
 
 export type ScheduledRunOutcome =
   | { readonly status: 'sent'; readonly agent: AgentId; readonly sessionId: string }
@@ -145,7 +173,8 @@ export function scheduledRunPrompt(prompt: string, files: readonly string[]): st
 /** "Every day at 8:00 AM", in the reader's own clock, the way the list
  *  reads a task's time; a time the file states badly is quoted as written. */
 export function scheduleLabel(time: string, locale: Intl.LocalesArgument = []): string {
-  const match = time.match(/^(\d{2}):(\d{2})$/u);
+  // Same rule as the form: `25:00` would otherwise roll over to 1:00 AM.
+  const match = time.match(/^([01]\d|2[0-3]):([0-5]\d)$/u);
   if (!match) return `Every day at ${time}`;
   const at = new Date(2000, 0, 1, Number(match[1]), Number(match[2]));
   return `Every day at ${at.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' })}`;

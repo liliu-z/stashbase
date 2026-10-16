@@ -20,6 +20,7 @@ import { honoredAccessMode } from '@/features/agent/domain/access';
 import type { Agent } from '@/features/agent/domain/agent-catalog';
 import { agentLabel } from '@/features/agent/domain/agent-catalog';
 import {
+  runSummary,
   scheduledRunPrompt,
   type ScheduledRunOutcome,
   type ScheduledRunRequest,
@@ -200,19 +201,30 @@ export async function startScheduledRun(
   return outcome;
 }
 
+/** The start of the Agent’s last reply in the turn, if it wrote one. */
+function lastReply(state: AgentSessionState): string | null {
+  const reply = state.transcript.findLast(
+    (block) => block.kind === 'assistant' && block.text.trim() !== '',
+  );
+  return reply?.kind === 'assistant' ? runSummary(reply.text) : null;
+}
+
 /** How a first turn ended, or null when the chat closed without saying. */
 function turnOutcome(state: AgentSessionState): ScheduledTurnOutcome | null {
   const { connection, delivery } = state;
   if (connection.kind === 'retired' || connection.kind === 'disposed') return null;
-  if (delivery === 'completed') return { status: 'completed' };
-  if (delivery === 'stopped') return { reason: 'Stopped before it finished.', status: 'failed' };
+  const summary = lastReply(state);
+  if (delivery === 'completed') return { status: 'completed', summary };
+  if (delivery === 'stopped') {
+    return { reason: 'Stopped before it finished.', status: 'failed', summary };
+  }
   if (delivery === 'unknown') return null;
   const error = state.transcript.findLast((block) => block.kind === 'error');
   const lost =
     connection.kind === 'failed' || connection.kind === 'closed' ? connection.message : null;
   const reason =
     (error?.kind === 'error' ? error.text : null) ?? lost ?? 'The Agent did not finish.';
-  return { reason, status: 'failed' };
+  return { reason, status: 'failed', summary };
 }
 
 /**

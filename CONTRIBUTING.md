@@ -59,7 +59,7 @@ pnpm test:renderer src/features/documents
 pnpm test:renderer src/features/settings/domain/appearance.test.ts
 
 # One host regression; broader boundary suites are in the journey map
-node --import tsx --test server/text-file-transaction.test.ts
+node --import tsx --import ./server/__tests__/isolated-home.ts --test server/text-file-transaction.test.ts
 
 # Story interactions and structural accessibility
 pnpm test:renderer:a11y
@@ -75,6 +75,11 @@ Host test workers automatically suppress production telemetry, including when
 child processes. Automated Electron and packaged-server smoke launches disable it too.
 Manual packaged checks must set `STASHBASE_TELEMETRY_DISABLED=1` before launching;
 see [testing packaged builds](docs/usage-statistics.md#testing-packaged-builds).
+
+`test:server`, `test:agent` and `test:mcp` preload `server/__tests__/isolated-home.ts`,
+which points the home directory, app data and Agent settings at a temporary
+folder, so host tests never change your own `~/.stashbase` config or projects.
+Keep that `--import` when running host test files directly, as above.
 
 Before opening a PR, run `pnpm check` for the complete local source gate.
 It includes `check:web`, documentation validation, host suites, type checks,

@@ -39,6 +39,7 @@ import {
   type ScheduledTaskRunWire,
   type ScheduledTaskWire,
 } from '../shared/protocols/http/scheduled-tasks.ts';
+import { missedRuns } from '../shared/scheduled-task-timing.ts';
 
 const log = logger('scheduled-tasks');
 
@@ -241,6 +242,8 @@ export function withoutTask(parsed: ParsedSchedule, taskId: string): string {
 interface StoredRun {
   agent: AgentId | null;
   finishedAt: string | null;
+  /** For a missed entry, how many daily runs it covers. */
+  missedCount: number | null;
   /** The scheduled time a scheduled run was for; null for Run now. */
   occurrence: string | null;
   reason: string | null;
@@ -248,6 +251,8 @@ interface StoredRun {
   sessionId: string | null;
   startedAt: string;
   status: RunStatus;
+  /** The start of the Agent’s last reply once the first turn ended. */
+  summary: string | null;
   title: string | null;
   trigger: 'schedule' | 'manual';
 }
@@ -289,7 +294,7 @@ export const RUN_HISTORY_LIMIT = 30;
  *  own dispatch deadline is well inside it. */
 const RUN_REPORT_DEADLINE_MS = 10 * 60_000;
 
-const RUN_STATUSES: ReadonlySet<unknown> = new Set(['running', 'sent', 'completed', 'failed']);
+const RUN_STATUSES: ReadonlySet<unknown> = new Set(['running', 'sent', 'completed', 'failed', 'missed']);
 
 function instant(value: unknown): string | null {
   return typeof value === 'string' && Number.isFinite(Date.parse(value)) ? value : null;
@@ -297,6 +302,10 @@ function instant(value: unknown): string | null {
 
 function text(value: unknown, max: number): string | null {
   return typeof value === 'string' && value ? value.slice(0, max) : null;
+}
+
+function positiveInteger(value: unknown): number | null {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : null;
 }
 
 function storedAgent(value: unknown): AgentId | null {
@@ -337,12 +346,14 @@ export function createScheduledTaskStore(io: ScheduledTaskStoreIo) {
     const view: ScheduledTaskRunWire = {
       agent: storedAgent(run.agent),
       finishedAt: instant(run.finishedAt),
+      missedCount: status === 'missed' ? positiveInteger(run.missedCount) ?? 1 : null,
       occurrence: instant(run.occurrence),
       reason: text(run.reason, 500),
       runId,
       sessionId: text(run.sessionId, 256),
       startedAt,
       status,
+      summary: text(run.summary, SCHEDULED_TASK_LIMITS.summary),
       title: text(run.title, 200),
       trigger: run.trigger === 'manual' ? 'manual' : 'schedule',
     };
@@ -443,15 +454,21 @@ export function createScheduledTaskStore(io: ScheduledTaskStoreIo) {
       });
     },
 
+    /** A scheduled claim names its occurrence and the task's time as the file
+     *  states it: an occurrence a clock change moved (02:30 that became
+     *  03:30) does not say what time the task runs on other days. */
     claim(
       root: string,
       taskId: string,
-      request: { trigger: 'schedule' | 'manual'; occurrence?: string | undefined },
+      request:
+        | { trigger: 'manual' }
+        | { trigger: 'schedule'; occurrence?: string | undefined; time: string },
     ): { ok: true; runId: string } | { ok: false; refusal: ClaimRefusal } {
       return mutate(root, taskId, (state) => {
         const current = stateView(state);
         if (current.runs[0]?.status === 'running') return { ok: false, refusal: 'running' } as const;
         let occurrence: string | null = null;
+        let missed: StoredRun | null = null;
         if (request.trigger === 'schedule') {
           const at = request.occurrence ? Date.parse(request.occurrence) : Number.NaN;
           if (!current.enabled) return { ok: false, refusal: 'disabled' } as const;
@@ -462,7 +479,27 @@ export function createScheduledTaskStore(io: ScheduledTaskStoreIo) {
           if (current.lastOccurrence && at <= Date.parse(current.lastOccurrence)) {
             return { ok: false, refusal: 'already-claimed' } as const;
           }
-          occurrence = new Date(at).toISOString();
+          // Days skipped since the last run are kept in history as one entry
+          // before this run moves the last occurrence past them.
+          const claimed = new Date(at);
+          const skipped = missedRuns({ ...current, problem: null, time: request.time }, claimed);
+          if (skipped) {
+            missed = {
+              agent: null,
+              finishedAt: null,
+              missedCount: skipped.count,
+              occurrence: skipped.last.toISOString(),
+              reason: null,
+              runId: io.createId(),
+              sessionId: null,
+              startedAt: skipped.first.toISOString(),
+              status: 'missed',
+              summary: null,
+              title: null,
+              trigger: 'schedule',
+            };
+          }
+          occurrence = claimed.toISOString();
           state.lastOccurrence = occurrence;
           state.lastDispatchedAt = io.now().toISOString();
         }
@@ -471,16 +508,18 @@ export function createScheduledTaskStore(io: ScheduledTaskStoreIo) {
         const run: StoredRun = {
           agent: null,
           finishedAt: null,
+          missedCount: null,
           occurrence,
           reason: null,
           runId,
           sessionId: null,
           startedAt: io.now().toISOString(),
           status: 'running',
+          summary: null,
           title: null,
           trigger: request.trigger,
         };
-        state.runs = [run, ...storedRuns(state)].slice(0, RUN_HISTORY_LIMIT);
+        state.runs = [run, ...(missed ? [missed] : []), ...storedRuns(state)].slice(0, RUN_HISTORY_LIMIT);
         return { ok: true, runId } as const;
       });
     },
@@ -517,13 +556,14 @@ export function createScheduledTaskStore(io: ScheduledTaskStoreIo) {
       root: string,
       taskId: string,
       runId: string,
-      result: { status: 'completed' | 'failed'; reason: string | null },
+      result: { status: 'completed' | 'failed'; reason: string | null; summary: string | null },
     ): boolean {
       return updateRun(root, taskId, runId, (run) => run.status !== 'sent' ? null : {
         ...run,
         finishedAt: io.now().toISOString(),
         reason: result.status === 'failed' ? (result.reason ?? 'The Agent did not finish.') : null,
         status: result.status,
+        summary: result.summary?.slice(0, SCHEDULED_TASK_LIMITS.summary) || null,
       });
     },
   };

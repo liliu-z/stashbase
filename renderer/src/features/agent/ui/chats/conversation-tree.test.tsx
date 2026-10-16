@@ -41,7 +41,7 @@ function group(overrides: Partial<AgentConversationGroup> = {}): AgentConversati
   };
 }
 
-function renderTree(groups: AgentConversationGroup[], spies = {}) {
+function renderTree(groups: AgentConversationGroup[], spies = {}, scheduled?: ReadonlySet<string>) {
   const handlers = {
     onActivate: vi.fn(),
     onDelete: vi.fn(),
@@ -49,11 +49,51 @@ function renderTree(groups: AgentConversationGroup[], spies = {}) {
     onRestore: vi.fn(),
     ...spies,
   };
-  const view = render(<ConversationTree groups={groups} {...handlers} />);
+  const view = render(<ConversationTree groups={groups} scheduled={scheduled} {...handlers} />);
   return { ...handlers, view };
 }
 
 describe('conversation tree', () => {
+  it('marks a chat a scheduled task started, unless its live status says more', () => {
+    const brief = {
+      active: false,
+      agent: 'codex' as const,
+      entry: entry('native-2', 'Daily brief · Oct 16'),
+      id: 'codex:native-2',
+      lastModified: 2,
+      title: 'Daily brief · Oct 16',
+    };
+    const { view } = renderTree(
+      [
+        group({
+          items: [
+            ...group().items,
+            brief,
+            {
+              ...brief,
+              draft: true,
+              id: 'codex:x',
+              entry: entry('native-3', 'Brief draft'),
+              title: 'Brief draft',
+            },
+          ],
+        }),
+      ],
+      {},
+      new Set(['native-2', 'native-3']),
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Daily brief · Oct 16, Scheduled run' }),
+    ).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Reading list' })).not.toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Brief draft, Scheduled run, Draft' }),
+    ).not.toBeNull();
+    // One clock: the draft row shows Draft in its place.
+    expect(view.container.querySelectorAll('[data-scheduled-run]')).toHaveLength(1); // dom-contract: the clock is aria-hidden; its name is on the row
+  });
+
   it('restores a closed conversation and activates an open one', async () => {
     const { onActivate, onRestore } = renderTree([
       group({

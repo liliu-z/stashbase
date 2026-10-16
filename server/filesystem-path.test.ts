@@ -15,6 +15,17 @@ test('POSIX paths preserve case and root joins', () => {
   assert.equal(paths.relative('/Data', '/Database/File.md'), null);
 });
 
+test('a module for another platform than the host resolves without an explicit cwd', () => {
+  const posix = createFilesystemPath({ platform: 'posix' });
+  assert.equal(posix.absolute('/work/notes'), '/work/notes');
+  assert.equal(posix.isAbsolute('/work/notes'), true);
+  assert.match(posix.absolute('notes'), /^\/(?:.*\/)?notes$/u);
+
+  const windows = createFilesystemPath({ platform: 'win32' });
+  assert.equal(windows.absolute('C:\\Work\\Notes'), 'C:/Work/Notes');
+  assert.match(windows.absolute('notes'), /^[A-Za-z]:\/(?:.*\/)?notes$/u);
+});
+
 test('macOS identity follows the mounted volume case behaviour', async (t) => {
   if (process.platform !== 'darwin') {
     t.skip('requires a native macOS filesystem');
