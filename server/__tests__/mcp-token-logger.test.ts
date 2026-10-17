@@ -283,3 +283,123 @@ test('resolveLogPath in analyzer matches getLogFilePath in logger', () => {
     else delete process.env.STASHBASE_MCP_LOG_PATH;
   }
 });
+
+test('CallToolRequestSchema logs thrown tool errors and propagates original error', async () => {
+  resetSessionState();
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-mcp-error-log-'));
+  const logFile = path.join(tempDir, 'error-calls.jsonl');
+  const prevEnv = process.env.STASHBASE_MCP_LOG_PATH;
+  process.env.STASHBASE_MCP_LOG_PATH = logFile;
+
+  try {
+    const dummyOps = {
+      info: async () => ({ folder_home: '/home', folders: [] }),
+      search: async () => {
+        throw new Error('Database connection failed');
+      },
+      keywordSearch: async () => ({ hits: [], mode: 'keyword' as const, folder: '/home' }),
+      reindex: async () => ({ folders: [], total: 0, indexed: 0, pendingCount: 0, pending: 0, upToDate: true }),
+      createProject: async () => ({ path: '/home/new' }),
+      listDirectory: async () => ({ path: '/home', entries: [] }),
+      read: async () => ({ path: '/home/note.md', format: 'markdown', content: 'test data' }),
+      write: async () => ({ path: '/home/note.md', version: '1' }),
+      edit: async () => ({ path: '/home/note.md', version: '2' }),
+      move: async () => ({ path: '/home/renamed.md' }),
+      delete: async () => ({ ok: true }),
+    };
+
+    const server = createProjectMcpServer({
+      webBase: 'http://127.0.0.1:8090',
+      operations: dummyOps as any,
+    });
+
+    const serverRecord = server as unknown as Record<string, Map<string, Function>>;
+    const handler = serverRecord['_requestHandlers']?.get(CallToolRequestSchema.shape.method.value);
+    assert.ok(handler, 'CallToolRequestSchema handler exists');
+
+    const extra = { signal: new AbortController().signal, sendNotification: async () => {} };
+
+    // 1. Thrown exception from missing query argument in search_project
+    await assert.rejects(
+      async () => {
+        await handler({
+          method: 'tools/call',
+          params: {
+            name: 'search_project',
+            arguments: { query: '' },
+          },
+        }, extra);
+      },
+      (err: Error) => err.message === '`query` is required',
+      'original error must be propagated to caller',
+    );
+
+    // 2. Thrown exception from unknown tool
+    await assert.rejects(
+      async () => {
+        await handler({
+          method: 'tools/call',
+          params: {
+            name: 'non_existent_tool',
+            arguments: { foo: 'bar' },
+          },
+        }, extra);
+      },
+      (err: Error) => err.message === 'unknown tool: non_existent_tool',
+      'unknown tool error must be propagated to caller',
+    );
+
+    // 3. Verify exactly 2 records were logged, one per thrown call
+    const lines = fs.readFileSync(logFile, 'utf8').trim().split('\n');
+    assert.equal(lines.length, 2, 'exactly two records logged for two calls');
+
+    const first = JSON.parse(lines[0] ?? '{}');
+    assert.equal(first.toolName, 'search_project');
+    assert.equal(first.isError, true, 'isError must be true');
+    assert.ok(first.durationMs >= 0, 'durationMs must be non-negative');
+    assert.equal(first.charCount, '`query` is required'.length);
+    assert.equal(first.estTokens, Math.ceil('`query` is required'.length / 4));
+
+    const second = JSON.parse(lines[1] ?? '{}');
+    assert.equal(second.toolName, 'non_existent_tool');
+    assert.equal(second.isError, true, 'isError must be true');
+    assert.ok(second.durationMs >= 0, 'durationMs must be non-negative');
+    assert.equal(second.charCount, 'unknown tool: non_existent_tool'.length);
+    assert.equal(second.estTokens, Math.ceil('unknown tool: non_existent_tool'.length / 4));
+
+    // 4. Successful call is returned unchanged and not double-logged
+    const successResult = await handler({
+      method: 'tools/call',
+      params: {
+        name: 'list_projects',
+        arguments: {},
+      },
+    }, extra);
+
+    assert.ok(successResult.content, 'successful call returns response');
+    const linesAfterSuccess = fs.readFileSync(logFile, 'utf8').trim().split('\n');
+    assert.equal(linesAfterSuccess.length, 3, 'successful call adds exactly one record');
+    const third = JSON.parse(linesAfterSuccess[2] ?? '{}');
+    assert.equal(third.toolName, 'list_projects');
+    assert.equal(third.isError, undefined, 'successful call does not have isError true');
+
+    // 5. Unwritable log path cannot mask or replace tool error
+    process.env.STASHBASE_MCP_LOG_PATH = path.join(tempDir, 'nonexistent_dir', '\0', 'invalid.jsonl');
+    await assert.rejects(
+      async () => {
+        await handler({
+          method: 'tools/call',
+          params: {
+            name: 'unknown_tool_2',
+            arguments: {},
+          },
+        }, extra);
+      },
+      (err: Error) => err.message === 'unknown tool: unknown_tool_2',
+      'tool error must still be propagated even when logger fails',
+    );
+  } finally {
+    process.env.STASHBASE_MCP_LOG_PATH = prevEnv;
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});

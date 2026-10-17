@@ -232,8 +232,26 @@ export function createProjectMcpServer(opts: ProjectMcpServerOptions): Server {
       throw new Error(`unknown tool: ${req.params.name}`);
     };
 
-    const response = await execute();
-    const durationMs = Math.round(performance.now() - startTime);
+    let response;
+    try {
+      response = await execute();
+    } catch (error: unknown) {
+      const durationMs = Math.max(0, Math.round(performance.now() - startTime));
+      try {
+        logToolCall({
+          toolName: req.params.name,
+          args: (req.params.arguments ?? {}) as Record<string, unknown>,
+          durationMs,
+          textPayload: error instanceof Error ? error.message : String(error),
+          isError: true,
+        });
+      } catch {
+        // Logger failures must never replace or mask the original tool error.
+      }
+      throw error;
+    }
+
+    const durationMs = Math.max(0, Math.round(performance.now() - startTime));
 
     const textPayload = response.content
       ?.filter((item): item is { type: 'text'; text: string } => item.type === 'text')
