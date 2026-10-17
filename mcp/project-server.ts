@@ -21,6 +21,7 @@ import { parseProjectFileLineBound } from '../server/project-file-reader.ts';
 import type { McpAgentTool } from '../server/default-agent-tools.ts';
 import { AGENT_TOOL_MAX_FILES } from '../shared/protocols/http/agent-tools.ts';
 import { callAgentTool, createHttpProjectOperations } from './project-operations-http.ts';
+import { logToolCall } from './token-logger.ts';
 import {
   parseSearchMode,
   toRetrievalMode,
@@ -82,151 +83,172 @@ export function createProjectMcpServer(opts: ProjectMcpServerOptions): Server {
   }));
 
   server.setRequestHandler(CallToolRequestSchema, async (req, extra) => {
-    const args = (req.params.arguments ?? {}) as Record<string, unknown>;
-    const folder = typeof args.folder === 'string' && args.folder.trim() ? args.folder : undefined;
+    const startTime = performance.now();
+    const execute = async () => {
+      const args = (req.params.arguments ?? {}) as Record<string, unknown>;
+      const folder = typeof args.folder === 'string' && args.folder.trim() ? args.folder : undefined;
 
-    const agentTool = agentTools.find((tool) => tool.name === req.params.name);
-    if (agentTool) {
-      // A crew member's call is a whole model generation, far longer than
-      // the runtime's per-request MCP timeout. The runtime restarts that
-      // timeout on each progress notification, so the call reports progress
-      // while it runs instead of every tool getting a long timeout.
-      const progressToken = req.params._meta?.progressToken;
-      let progress = 0;
-      const heartbeat = progressToken === undefined ? undefined : setInterval(() => {
-        progress += 1;
-        void extra.sendNotification({
-          method: 'notifications/progress',
-          params: { progressToken, progress, message: `${agentTool.label} is working` },
-        }).catch(() => {});
-      }, opts.agentToolProgressMs ?? AGENT_TOOL_PROGRESS_MS);
-      let result;
-      try {
-        result = await callAgentTool(webBase, agentTool.id, args, windowId, agentSessionId, extra.signal);
-      } finally {
-        if (heartbeat) clearInterval(heartbeat);
+      const agentTool = agentTools.find((tool) => tool.name === req.params.name);
+      if (agentTool) {
+        // A crew member's call is a whole model generation, far longer than
+        // the runtime's per-request MCP timeout. The runtime restarts that
+        // timeout on each progress notification, so the call reports progress
+        // while it runs instead of every tool getting a long timeout.
+        const progressToken = req.params._meta?.progressToken;
+        let progress = 0;
+        const heartbeat = progressToken === undefined ? undefined : setInterval(() => {
+          progress += 1;
+          void extra.sendNotification({
+            method: 'notifications/progress',
+            params: { progressToken, progress, message: `${agentTool.label} is working` },
+          }).catch(() => {});
+        }, opts.agentToolProgressMs ?? AGENT_TOOL_PROGRESS_MS);
+        let result;
+        try {
+          result = await callAgentTool(webBase, agentTool.id, args, windowId, agentSessionId, extra.signal);
+        } finally {
+          if (heartbeat) clearInterval(heartbeat);
+        }
+        return { content: [{ type: 'text', text: result.text }] };
       }
-      return { content: [{ type: 'text', text: result.text }] };
-    }
 
-    if (req.params.name === 'list_projects') {
-      const info = await operations.info();
-      return {
-        content: [{ type: 'text', text: JSON.stringify(info, null, 2) }],
-      };
-    }
-
-    if (req.params.name === 'search_project') {
-      const query = typeof args.query === 'string' ? args.query.trim() : '';
-      if (!query) throw new Error('`query` is required');
-      const pathPrefix = typeof args.path_prefix === 'string' && args.path_prefix.trim()
-        ? args.path_prefix : undefined;
-      const parsedTypes = parseSearchTypes(args.types);
-      if (parsedTypes == null) {
+      if (req.params.name === 'list_projects') {
+        const info = await operations.info();
         return {
-          content: [{ type: 'text', text: SEARCH_TYPES_VALIDATION_ERROR }],
-          isError: true,
+          content: [{ type: 'text', text: JSON.stringify(info, null, 2) }],
         };
       }
-      const types = args.types == null ? undefined : parsedTypes;
-      const mode = parseSearchMode(args.mode);
-      if (mode === null) {
+
+      if (req.params.name === 'search_project') {
+        const query = typeof args.query === 'string' ? args.query.trim() : '';
+        if (!query) throw new Error('`query` is required');
+        const pathPrefix = typeof args.path_prefix === 'string' && args.path_prefix.trim()
+          ? args.path_prefix : undefined;
+        const parsedTypes = parseSearchTypes(args.types);
+        if (parsedTypes == null) {
+          return {
+            content: [{ type: 'text', text: SEARCH_TYPES_VALIDATION_ERROR }],
+            isError: true,
+          };
+        }
+        const types = args.types == null ? undefined : parsedTypes;
+        const mode = parseSearchMode(args.mode);
+        if (mode === null) {
+          return {
+            content: [{ type: 'text', text: SEARCH_MODE_VALIDATION_ERROR }],
+            isError: true,
+          };
+        }
+        const caseStrict = args.case_strict === true;
+        const wholeWord = args.whole_word === true;
+        const k = Math.max(
+          1,
+          Math.min(MAX_TOP_K, Math.floor(typeof args.top_k === 'number' ? args.top_k : DEFAULT_TOP_K)),
+        );
+        const searchResult = await operations.search({ query, topK: k, folder, pathPrefix, types, mode: toRetrievalMode(mode), caseStrict, wholeWord });
+        const hits = annotateSearchHitsForMcp(searchResult.hits);
+        const effectiveMode = toSearchMode(searchResult.mode);
         return {
-          content: [{ type: 'text', text: SEARCH_MODE_VALIDATION_ERROR }],
-          isError: true,
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              query,
+              mode: effectiveMode,
+              folder: searchResult.folder,
+              path_prefix: pathPrefix ?? null,
+              types: types ?? null,
+              top_k: k,
+              ...(searchResult.truncated ? { truncated: true } : {}),
+              hits,
+            }, null, 2),
+          }],
         };
       }
-      const caseStrict = args.case_strict === true;
-      const wholeWord = args.whole_word === true;
-      const k = Math.max(
-        1,
-        Math.min(MAX_TOP_K, Math.floor(typeof args.top_k === 'number' ? args.top_k : DEFAULT_TOP_K)),
-      );
-      const searchResult = await operations.search({ query, topK: k, folder, pathPrefix, types, mode: toRetrievalMode(mode), caseStrict, wholeWord });
-      const hits = annotateSearchHitsForMcp(searchResult.hits);
-      const effectiveMode = toSearchMode(searchResult.mode);
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify({
-            query,
-            mode: effectiveMode,
-            folder: searchResult.folder,
-            path_prefix: pathPrefix ?? null,
-            types: types ?? null,
-            top_k: k,
-            ...(searchResult.truncated ? { truncated: true } : {}),
-            hits,
-          }, null, 2),
-        }],
-      };
-    }
 
-    if (req.params.name === 'list_directory') {
-      const result = await operations.listDirectory(args.path);
-      return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-      };
-    }
+      if (req.params.name === 'list_directory') {
+        const result = await operations.listDirectory(args.path);
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
+      }
 
-    if (req.params.name === 'read_file') {
-      const offset = parseProjectFileLineBound(args.offset, 'offset');
-      const limit = parseProjectFileLineBound(args.limit, 'limit');
-      const result = await operations.read(
-        filePathArg(args),
-        offset == null && limit == null ? undefined : { offset, limit },
-      );
-      return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-      };
-    }
+      if (req.params.name === 'read_file') {
+        const offset = parseProjectFileLineBound(args.offset, 'offset');
+        const limit = parseProjectFileLineBound(args.limit, 'limit');
+        const result = await operations.read(
+          filePathArg(args),
+          offset == null && limit == null ? undefined : { offset, limit },
+        );
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
+      }
 
-    if (req.params.name === 'write_file') {
-      const result = await operations.write({ path: args.path, content: args.content, baseVersion: typeof args.baseVersion === 'string' ? args.baseVersion : undefined });
-      return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-      };
-    }
+      if (req.params.name === 'write_file') {
+        const result = await operations.write({ path: args.path, content: args.content, baseVersion: typeof args.baseVersion === 'string' ? args.baseVersion : undefined });
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
+      }
 
-    if (req.params.name === 'edit_file') {
-      const result = await operations.edit({ path: args.path, oldText: args.old_text, newText: args.new_text, replaceAll: args.replace_all === true, baseVersion: typeof args.baseVersion === 'string' ? args.baseVersion : undefined });
-      return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-      };
-    }
+      if (req.params.name === 'edit_file') {
+        const result = await operations.edit({ path: args.path, oldText: args.old_text, newText: args.new_text, replaceAll: args.replace_all === true, baseVersion: typeof args.baseVersion === 'string' ? args.baseVersion : undefined });
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
+      }
 
-    if (req.params.name === 'move_file') {
-      const result = await operations.move({ path: args.path, newPath: args.new_path, cascade: args.cascade !== false });
-      return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-      };
-    }
+      if (req.params.name === 'move_file') {
+        const result = await operations.move({ path: args.path, newPath: args.new_path, cascade: args.cascade !== false });
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
+      }
 
-    if (req.params.name === 'delete_file') {
-      const result = await operations.delete(args.path);
-      return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-      };
-    }
+      if (req.params.name === 'delete_file') {
+        const result = await operations.delete(args.path);
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
+      }
 
-    if (req.params.name === 'reindex') {
-      const result = await operations.reindex({ folder });
-      return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-      };
-    }
+      if (req.params.name === 'reindex') {
+        const result = await operations.reindex({ folder });
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
+      }
 
-    if (req.params.name === 'create_project') {
-      const result = await operations.createProject({
-        name: args.name,
-        location: args.location,
-      });
-      return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-      };
-    }
+      if (req.params.name === 'create_project') {
+        const result = await operations.createProject({
+          name: args.name,
+          location: args.location,
+        });
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
+      }
 
-    throw new Error(`unknown tool: ${req.params.name}`);
+      throw new Error(`unknown tool: ${req.params.name}`);
+    };
+
+    const response = await execute();
+    const durationMs = Math.round(performance.now() - startTime);
+
+    const textPayload = response.content
+      ?.filter((item): item is { type: 'text'; text: string } => item.type === 'text')
+      .map((item) => item.text)
+      .join('\n') ?? '';
+
+    logToolCall({
+      toolName: req.params.name,
+      args: (req.params.arguments ?? {}) as Record<string, unknown>,
+      durationMs,
+      textPayload,
+      isError: response.isError === true,
+    });
+
+    return response;
   });
 
   return server;
