@@ -311,7 +311,15 @@ Release packaging fails closed when signing or notarization credentials are miss
 or ambiguous. The `afterPack` adapter validates versioned framework symlinks
 before signing. It preserves the original bundle in clean CI workspaces and
 uses a metadata-free clone only for local File Provider workspaces; no package,
-Homebrew, or recovery step may mutate or ad-hoc re-sign the app afterward. The
+Homebrew, or recovery step may mutate or ad-hoc re-sign the app afterward.
+After that adapter runs, still before signing, electron-builder's built-in
+`electronFuses` config (`build.electronFuses` in `package.json`) disables the
+`runAsNode`, `enableNodeOptionsEnvironmentVariable`, and
+`enableNodeCliInspectArguments` Electron fuses on every platform's packaged
+binary, closing the packaged-build hardening gap reported in
+[#228](https://github.com/liliu-z/stashbase/issues/228). The remaining fuses
+stay at Electron's defaults; widening that set is a separate decision, not a
+side effect of this one. The
 bundled OpenCode/Bun executable is declared as an additional nested signing
 target and alone receives the unsigned-executable-memory entitlement it needs
 under Hardened Runtime; the main app and ordinary helpers must not inherit that
@@ -402,7 +410,7 @@ credential-free and does not run this probabilistic check.
 | Platform Adapters | `.github/workflows/release-macos.yml`, `release-linux.yml`, `release-windows.yml` |
 | Release asset upload Module | `scripts/upload-release-assets.mjs` over the draft lookup and upload rules in `scripts/github-release-api.mjs` |
 | Native build reuse | `.github/workflows/native-components.yml`, `.github/actions/prepare-native-components/action.yml`, `python/constraints.txt`, `scripts/lock-python.mjs`; contracts in `scripts/packaging/native-cache.test.mjs` |
-| Packaging Module | `scripts/package-desktop.mjs`, signing contracts, `scripts/sign-macos-app.cjs`, `scripts/update-artifact-contract.mjs`, `scripts/build-python-sidecar.mjs`, `scripts/after-pack-macos.cjs` |
+| Packaging Module | `scripts/package-desktop.mjs`, signing contracts, `scripts/sign-macos-app.cjs`, `scripts/update-artifact-contract.mjs`, `scripts/build-python-sidecar.mjs`, `scripts/after-pack-macos.cjs`, the `build.electronFuses` contract in `package.json` |
 | Application icon | `scripts/icons/build.mjs` behind `pnpm build:icons`, rendering `build/icon.svg` in `scripts/icons/render.mjs` with the size table and containers in `scripts/icons/encode.mjs` |
 | Packaged verification | `scripts/smoke-packaged-server.mjs` (including the explicit OpenCode resource version probe) and platform release verifiers |
 | Focused evidence | `scripts/packaging/inputs.test.mjs`, `scripts/icons/encode.test.mjs`, `server/__tests__/opencode-native-smoke.test.ts`, `scripts/require-green-ci.test.mjs`, signing contract tests, `scripts/update-release-contract.test.mjs`, `electron/update-install-strategy.test.cjs`, the platform workflows, applicable retained semantic retrieval reports, and the N→N+1 release check |

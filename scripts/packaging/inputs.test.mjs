@@ -6,8 +6,10 @@ import os from 'node:os';
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
 import { extractorInputs, extractorVersion } from './extractor-release.mjs';
+import { flipFuses, getCurrentFuseWire, FuseV1Options, FuseVersion } from '@electron/fuses';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
@@ -107,6 +109,63 @@ test('electron-builder includes local CommonJS dependencies outside electron/', 
     [],
     `package.json build.files omits Electron runtime dependencies:\n${missing.join('\n')}`,
   );
+});
+
+test('packaged builds close the run_as_node/CLI-inspect/NODE_OPTIONS fuse gap on every platform', () => {
+  // https://github.com/liliu-z/stashbase/issues/228: an unflipped Electron
+  // binary lets `ELECTRON_RUN_AS_NODE=1 StashBase(.exe)` run as a bare Node
+  // runtime with no Electron sandbox, and lets NODE_OPTIONS / --inspect
+  // attach a debugger to the packaged app. electron-builder's built-in
+  // `electronFuses` config flips these on every platform's output
+  // (`doAddElectronFuses` runs after the custom `afterPack` adapter and
+  // before signing); no per-platform script is required.
+  const fuses = pkg.build?.electronFuses;
+  assert.deepEqual(fuses, {
+    runAsNode: false,
+    enableNodeOptionsEnvironmentVariable: false,
+    enableNodeCliInspectArguments: false,
+  }, 'package.json build.electronFuses must disable exactly these three fuses, leaving the rest at Electron defaults until that is a deliberate decision');
+});
+
+test('the electronFuses config actually disables the targeted fuses and nothing else', async () => {
+  // Exercises the real @electron/fuses flip against the genuine Electron
+  // binary this repo packages (not a fixture), the same way electron-builder
+  // invokes it from `build.electronFuses`, so a config typo or an
+  // @electron/fuses behavior change would fail this test rather than first
+  // surfacing in a shipped build.
+  const require = createRequire(import.meta.url);
+  const electronBinary = require('electron');
+  const tmpBinary = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-fuses-')), path.basename(electronBinary));
+  fs.copyFileSync(electronBinary, tmpBinary);
+  try {
+    const before = await getCurrentFuseWire(tmpBinary);
+
+    const fuses = pkg.build.electronFuses;
+    await flipFuses(tmpBinary, {
+      version: FuseVersion.V1,
+      [FuseV1Options.RunAsNode]: fuses.runAsNode,
+      [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: fuses.enableNodeOptionsEnvironmentVariable,
+      [FuseV1Options.EnableNodeCliInspectArguments]: fuses.enableNodeCliInspectArguments,
+    });
+
+    const after = await getCurrentFuseWire(tmpBinary);
+    const DISABLED = 48; // ASCII '0', @electron/fuses' FuseState.DISABLE
+    assert.equal(after[FuseV1Options.RunAsNode], DISABLED);
+    assert.equal(after[FuseV1Options.EnableNodeOptionsEnvironmentVariable], DISABLED);
+    assert.equal(after[FuseV1Options.EnableNodeCliInspectArguments], DISABLED);
+
+    for (const untouched of [
+      FuseV1Options.EnableCookieEncryption,
+      FuseV1Options.EnableEmbeddedAsarIntegrityValidation,
+      FuseV1Options.OnlyLoadAppFromAsar,
+      FuseV1Options.LoadBrowserProcessSpecificV8Snapshot,
+      FuseV1Options.GrantFileProtocolExtraPrivileges,
+    ]) {
+      assert.equal(after[untouched], before[untouched], `fuse ${untouched} must stay at its Electron default`);
+    }
+  } finally {
+    fs.rmSync(path.dirname(tmpBinary), { recursive: true, force: true });
+  }
 });
 
 test('Windows extractor build wires PyInstaller hide-console without switching off stderr', () => {

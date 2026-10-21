@@ -130,6 +130,11 @@
     "icon": "build/icon",
     "afterPack": "scripts/after-pack-macos.cjs",
     "afterSign": "scripts/notarize-macos.cjs",
+    "electronFuses": {
+      "runAsNode": false,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false
+    },
     "directories": {
       "output": "release.nosync"
     },
@@ -246,7 +251,7 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-    "createStartMenuShortcut": true
+      "createStartMenuShortcut": true
     },
     "linux": {
       "category": "Office",
@@ -291,6 +296,7 @@
   },
   "devDependencies": {
     "@codemirror/state": "^6.6.0",
+    "@electron/fuses": "^2.1.3",
     "@electron/notarize": "2.5.0",
     "@electron/osx-sign": "1.3.3",
     "@types/better-sqlite3": "^7.6.13",
