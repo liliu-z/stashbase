@@ -21,6 +21,7 @@ dev-docs/
 package-lock.json
 test-results/
 playwright-report/
+logs/
 
 # Chinese mirrors / drafts. The committed docs are English-only
 # (see CLAUDE.md); Chinese Markdown variants stay local.
