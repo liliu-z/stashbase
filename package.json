@@ -40,6 +40,7 @@
     "dev:desktop": "node scripts/electron/dev.mjs",
     "start": "tsx server/index.ts",
     "mcp": "tsx mcp/server.ts",
+    "analyze:mcp": "node --import tsx scripts/analyze-mcp-logs.ts",
     "build:web": "vp run @stashbase/renderer#build",
     "build:electron-boundary": "node scripts/electron/boundary.mjs",
     "build:icons": "node scripts/icons/build.mjs",
