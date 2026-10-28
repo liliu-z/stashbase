@@ -24,6 +24,18 @@ const preset = async (group: string, name: string) =>
   within(await screen.findByRole('radiogroup', { name: group })).getByRole('radio', { name });
 
 describe('ReadingTextMenu', () => {
+  it('places the local Math switch beside the reading font control', async () => {
+    withQueryClient(<ReadingTextMenu appearanceApi={appearancePort()} />);
+    const user = userEvent.setup();
+    const font = await screen.findByRole('button', { name: 'Reading text: Serif' });
+    const math = await screen.findByRole('switch', { name: 'Math' });
+
+    expect(math.parentElement?.parentElement).toBe(font.parentElement);
+    expect(math.getAttribute('aria-checked')).toBe('false');
+    await user.click(math);
+    expect(math.getAttribute('aria-checked')).toBe('true');
+  });
+
   it('saves only the reading font and applies it at once', async () => {
     const port = appearancePort();
     withQueryClient(<ReadingTextMenu appearanceApi={port} />);
