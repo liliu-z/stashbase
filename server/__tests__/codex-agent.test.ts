@@ -322,7 +322,8 @@ test("Codex injects the Chat's Persona with hidden StashBase routing policy", as
   const developerInstructions = native.requests.find(
     (request) => request.method === 'thread/start',
   )?.params.developerInstructions;
-  assert.equal(developerInstructions, composeAgentRuntimeInstructions(persona));
+  // Math off for this project, as the isolated config has no record of it.
+  assert.equal(developerInstructions, composeAgentRuntimeInstructions(persona, false));
 });
 
 test('Codex holds a model chosen while its catalog is still being read and applies it to the first turn', async (t) => {

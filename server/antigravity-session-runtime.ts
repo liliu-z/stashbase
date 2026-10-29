@@ -338,9 +338,16 @@ export class AntigravitySession implements AttributedAgentSession {
         this.settleTurn(false);
         return;
       }
+      // The project's Math switch decides which formula source the agent
+      // writes, and this is the one channel Antigravity re-reads per turn: the
+      // instructions ride ahead of the first message only, so a switch changed
+      // mid-session reaches the agent when this process starts again.
       const text = this.instructionsSent
         ? prompt
-        : antigravityPromptWithInstructions(resolveAgentRuntimeInstructions(this.persona), prompt);
+        : antigravityPromptWithInstructions(
+            resolveAgentRuntimeInstructions(this.persona, this.cwd),
+            prompt,
+          );
       this.instructionsSent = true;
       agentDiagnosticStage(this.ws, 'runtime_dispatched');
       proc.stdin.write(antigravityUserMessage(text));

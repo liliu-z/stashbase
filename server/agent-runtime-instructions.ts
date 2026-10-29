@@ -1,4 +1,5 @@
 import { resolveAgentPersona } from './agent-persona.ts';
+import { getProjectMathMode } from './app-config.ts';
 
 /** Product-owned conversation and tool-routing policy shared by all Agent
  * runtimes. This policy is not part of the user-chosen Persona. How the Agent
@@ -20,12 +21,41 @@ const STASHBASE_AGENT_RUNTIME_POLICY = [
 /** One role for bundled and native runtimes; a chosen Persona can narrow it. */
 const STASHBASE_AGENT_ROLE = "You are an agent working in StashBase, a writing workspace for thinking, research, drafting, and revision. Projects contain ordinary local files, including code and configuration when the task calls for them. Follow the user's requested scope, format, language, and working style. Distinguish evidence from assumptions and never invent sources. Complete the requested work and explain any remaining blocker concisely.";
 
-/** Compose the shared role, optional Persona text, and product policy. */
-export function composeAgentRuntimeInstructions(persona?: string): string {
-  return [STASHBASE_AGENT_ROLE, persona, STASHBASE_AGENT_RUNTIME_POLICY].filter(Boolean).join('\n\n');
+/** The project's Math switch, as the runtime can use it: `undefined` when the
+ *  conversation has no project to read a switch from, so the policy simply
+ *  leaves the delimiters to the user's own request. */
+export function projectMathMode(scope: string | null | undefined): boolean | undefined {
+  return scope ? getProjectMathMode(scope) : undefined;
 }
 
-/** Resolve the Chat's Persona id before composing a native session's prompt. */
-export function resolveAgentRuntimeInstructions(persona: string | undefined): string {
-  return composeAgentRuntimeInstructions(resolveAgentPersona(persona));
+/** Which formula source this project renders. The Chat surface follows the
+ *  same switch, so an agent that wrote `\(...\)` into a project reading
+ *  `$...$` would still be legible; naming the project's own form keeps the
+ *  Markdown file it writes readable in the editor too. */
+function mathFormattingInstruction(mathMode: boolean): string {
+  return mathMode
+    ? '- In Markdown, write inline formulas as `$...$` and display formulas as `$$` blocks; escape a literal dollar sign as `\\$` so an amount survives.'
+    : '- In Markdown, write inline formulas as `\\(...\\)` and display formulas as `$$` blocks; an ordinary amount can use a plain `$`.';
+}
+
+/** Compose the shared role, optional Persona text, and product policy. */
+export function composeAgentRuntimeInstructions(persona?: string, mathMode?: boolean): string {
+  const policy = mathMode === undefined
+    ? STASHBASE_AGENT_RUNTIME_POLICY
+    : STASHBASE_AGENT_RUNTIME_POLICY.replace(
+        '</stashbase_runtime_policy>',
+        // A function replacer, not a string: the instruction is full of `$`
+        // delimiters, which String.replace would otherwise treat as patterns.
+        () => `${mathFormattingInstruction(mathMode)}\n</stashbase_runtime_policy>`,
+      );
+  return [STASHBASE_AGENT_ROLE, persona, policy].filter(Boolean).join('\n\n');
+}
+
+/** Resolve the Chat's Persona id and its project's Math switch before composing
+ *  a native session's prompt. */
+export function resolveAgentRuntimeInstructions(
+  persona: string | undefined,
+  scope?: string | null,
+): string {
+  return composeAgentRuntimeInstructions(resolveAgentPersona(persona), projectMathMode(scope));
 }

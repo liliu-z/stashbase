@@ -22,6 +22,7 @@ import type { EmbedderProvider } from '../shared/embedding.ts';
 import type { HostedAccountOffer } from '../shared/account.ts';
 import type { DefaultAgentToolChoice } from '../shared/protocols/http/agent-tools.ts';
 import { normalizeHostedDisplayName, parseGoogleAvatarUrl } from './hosted-account-profile.ts';
+import { filesystemPath } from './filesystem-path.ts';
 
 export type {
   AppearancePreferences,
@@ -147,6 +148,11 @@ export interface AppConfigFile {
    *  run went. The tasks themselves live in the project's `.schedules.json`;
    *  `scheduled-tasks.ts` owns this record's shape. */
   scheduledTasks?: Array<{ scope: string; tasks?: Record<string, unknown> }>;
+  /** Per project, whether `$...$` opens a formula in its Markdown documents and
+   *  Chat. Only an explicit switch writes a record: absent and malformed
+   *  entries mean off, the default that keeps a price written with `$` prose.
+   *  Read and written through `getProjectMathMode` / `setProjectMathMode`. */
+  mathMode?: Array<{ scope: string; enabled: boolean }>;
 }
 
 export function readAppConfigStrict(file = CONFIG_FILE): AppConfigFile {
@@ -475,4 +481,30 @@ export function getUpdatePreferences(): UpdatePreferences {
 
 export function setUpdatePreferences(next: Partial<UpdatePreferences>): UpdatePreferences {
   return updatePreferences.set(next);
+}
+
+/** A project's math mode, read by its registered folder root. An unreadable
+ *  config, a removed project or a record whose value is not a boolean all fall
+ *  back to off rather than failing the surface that only wanted to know how to
+ *  render a dollar sign. */
+export function getProjectMathMode(scope: string, config = readAppConfig()): boolean {
+  return (config.mathMode ?? []).some(
+    (entry) => typeof entry?.scope === 'string'
+      && entry.enabled === true
+      && filesystemPath.equal(entry.scope, scope),
+  );
+}
+
+/** Strict read-modify-write of one project's switch. Setting it to the default
+ *  drops the record, so config.json keeps naming only the projects that left it. */
+export function setProjectMathMode(scope: string, enabled: boolean): boolean {
+  const config = readAppConfigStrict();
+  const others = (config.mathMode ?? []).filter(
+    (entry) => !(typeof entry?.scope === 'string' && filesystemPath.equal(entry.scope, scope)),
+  );
+  const next = enabled ? [...others, { scope, enabled: true }] : others;
+  if (next.length > 0) config.mathMode = next;
+  else delete config.mathMode;
+  writeAppConfigStrict(config);
+  return enabled;
 }

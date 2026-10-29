@@ -574,7 +574,7 @@ export class CodexSession implements AttributedAgentSession {
       // Keep the chosen Persona distinct from StashBase's internal
       // project-routing policy even though Codex receives their composition
       // through one native developer-instructions field.
-      developerInstructions: resolveAgentRuntimeInstructions(this.persona),
+      developerInstructions: resolveAgentRuntimeInstructions(this.persona, cwd),
     };
     const result = await this.request(
       this.resumeThreadId ? 'thread/resume' : 'thread/start',

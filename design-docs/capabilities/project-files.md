@@ -270,11 +270,18 @@ passage is sent.
 Markdown frontmatter is outside the prose editor. A turn review that would change it is
 refused with a visible reason; its metadata is never silently omitted from a review.
 
-Markdown math uses double-dollar delimiters or `math` / `latex` fenced blocks.
-Single-dollar amounts remain ordinary text in Documents and Chat, including
-when a Markdown document is saved. Chat replies also render LaTeX's `\[ \]` and
-`\( \)` delimiters, which many models write, outside code. Documents does not
-treat them as math.
+Markdown math opens on double-dollar delimiters or `math` / `latex` fenced
+blocks in every project. A per-project **Math** switch, immediately right of the
+document's font menu, offers single-dollar `$…$` as a third inline form: off by
+default, so an amount like `$4` stays ordinary text in Documents and Chat and
+survives a save; on, `$x^2$` renders as a formula and `\$` writes a literal
+dollar sign. Chat additionally renders LaTeX's `\[ \]` and `\( \)` delimiters,
+which many models write outside code; Documents does not treat those as math.
+Turning the switch changes only how dollars are read on screen: it rewrites no
+document, stored message, or selection, and disturbs no undo history, reading
+position, or save state. The choice is kept with the project and returns after a
+reopen or restart, and every built-in agent is told which delimiters that project
+reads.
 
 File diffs, save-conflict comparisons, and agent tool approvals have their own
 flows. Other editable formats currently have no inline revision surface.

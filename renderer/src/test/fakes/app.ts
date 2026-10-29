@@ -18,6 +18,7 @@ import {
   agentRuntimePort,
   appearancePort,
   embedderPort,
+  mathModePort,
   mcpAccessPort,
 } from './settings';
 import { folderPicker, workspaceAdapters } from './workspace';
@@ -60,6 +61,7 @@ export function appDependencies(overrides: Partial<AppDependencies> = {}): AppDe
       accountApi: accountPort(),
       agentRuntimeApi: agentRuntimePort(),
       appearanceApi: appearancePort(),
+      mathModeApi: mathModePort(),
       setAppearance: async () => undefined,
       systemTextApi: { listFonts: async () => [], spellcheckLanguages: async () => [] },
       telemetryApi: {

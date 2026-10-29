@@ -36,6 +36,7 @@ import {
   useWorkspaceSession,
 } from '@/features/workspace/public';
 import { DEFAULT_PERSONA_ICON } from '@/shared/domain/persona-icon';
+import { MathModeProvider } from '@/shared/ui/math-mode';
 
 import { usePreparationCommands } from './composition/commands/use-preparation-commands';
 import { useWorkspaceCommands } from './composition/commands/use-workspace-commands';
@@ -58,6 +59,7 @@ import { useAgentNotifications } from './composition/use-agent-notifications';
 import { useAgentUsage } from './composition/use-agent-usage';
 import { useAppearanceSurface } from './composition/use-appearance-surface';
 import { useDesktopUsage } from './composition/use-desktop-usage';
+import { useProjectMathMode } from './composition/use-project-math-mode';
 import type { AppDependencies } from './dependencies';
 import { ShellBoundary } from './shell-boundary';
 
@@ -112,6 +114,9 @@ function WorkspaceWindow() {
   const activeFolder = project?.activeFolder ?? null;
   const selectedPath = activeFolder?.path ?? null;
   const folderPath = workspace?.scope.folder.path ?? null;
+  // One switch per project, read from the server and shared with every surface
+  // that renders a formula: the document editor and the Chat transcript.
+  const mathMode = useProjectMathMode(dependencies.settings.mathModeApi, folderPath);
   const status = useFolderStatus(dependencies.preparation.statusApi, folderPath).data ?? null;
   // Search by meaning exists only once the reader's own key is on. The
   // window reads that once, and every folder's readiness is projected through
@@ -274,118 +279,121 @@ function WorkspaceWindow() {
       openExternal={dependencies.documents.openExternal}
       port={dependencies.settings.accountApi}
     >
-      <WorkspaceLayout
-        dialogs={
-          <>
-            {gallery.surfaces}
-            <ImportGitHubDialog
-              import={entry.importDialog.request}
-              onClose={entry.importDialog.close}
-              open={entry.importDialog.open}
-            />
-            <WorkspaceDialogs
+      {/* The project's Math mode, for the document surface and the transcript. */}
+      <MathModeProvider value={mathMode}>
+        <WorkspaceLayout
+          dialogs={
+            <>
+              {gallery.surfaces}
+              <ImportGitHubDialog
+                import={entry.importDialog.request}
+                onClose={entry.importDialog.close}
+                open={entry.importDialog.open}
+              />
+              <WorkspaceDialogs
+                documents={documents}
+                quickOpen={chrome.quickOpen}
+                revisionPreview={
+                  import.meta.env.DEV ? (
+                    <RevisionPreview
+                      onStart={revisionPreview.start}
+                      refusal={revisionPreview.refusal}
+                    />
+                  ) : null
+                }
+                settings={chrome.settings}
+                renderUpdatePreview={(closeDeveloper) =>
+                  import.meta.env.DEV ? (
+                    <UpdatePreview
+                      active={updatePreview.notice !== null}
+                      onShow={(previewStatus) => {
+                        updatePreview.show(previewStatus);
+                        closeDeveloper();
+                        session.runtime.setSidebarOpen(true);
+                        chrome.settings.close();
+                      }}
+                      onStop={updatePreview.stop}
+                    />
+                  ) : null
+                }
+                workspace={workspace}
+              />
+            </>
+          }
+          hasActiveFolder={activeFolder !== null}
+          floatingNotices={notices.floating}
+          notices={notices.strip}
+          panes={
+            <WorkspacePanes
+              chatPaneOpen={chatPaneOpen}
+              agent={{ runtime }}
               documents={documents}
-              quickOpen={chrome.quickOpen}
-              revisionPreview={
-                import.meta.env.DEV ? (
-                  <RevisionPreview
-                    onStart={revisionPreview.start}
-                    refusal={revisionPreview.refusal}
-                  />
-                ) : null
-              }
+              workspace={workspace}
+              mode={chrome.navigator.mode}
+              onAskAgent={askAgent}
+              onBrowsePersonas={gallery.browsePersonas}
+              newTab={newTab}
+              onCreateDraft={newDraft}
+              onCreateInteractiveNote={newInteractiveNote}
+              onPrepare={preparation.prepare}
+              onReprocess={refresh.reprocess}
+              onReviewTurnChange={revisions.reviewTurnChange}
+              onShowDocuments={() => chrome.navigator.selectMode('documents')}
+              session={session}
               settings={chrome.settings}
-              renderUpdatePreview={(closeDeveloper) =>
-                import.meta.env.DEV ? (
-                  <UpdatePreview
-                    active={updatePreview.notice !== null}
-                    onShow={(previewStatus) => {
-                      updatePreview.show(previewStatus);
-                      closeDeveloper();
-                      session.runtime.setSidebarOpen(true);
-                      chrome.settings.close();
-                    }}
-                    onStop={updatePreview.stop}
-                  />
-                ) : null
-              }
+              sources={sources}
+              status={status}
+            />
+          }
+          session={session}
+          sidebar={
+            <WorkspaceSidebar
+              activeFolder={activeFolder}
+              agent={{ runtime, scope: agent.scope }}
+              documents={documents}
+              folder={{
+                ...folder,
+                hiddenFiles: listing
+                  ? {
+                      disabled: hiddenFiles.pending,
+                      shown: hiddenFiles.showHiddenFiles,
+                      toggle: hiddenFiles.toggle,
+                    }
+                  : null,
+              }}
+              navigator={chrome.navigator}
+              notices={notices.corner}
+              onBrowseGallery={gallery.browse}
+              onReprocess={refresh.reprocess}
+              projectEntry={entry}
+              settings={chrome.settings}
+              sources={sources}
               workspace={workspace}
             />
-          </>
-        }
-        hasActiveFolder={activeFolder !== null}
-        floatingNotices={notices.floating}
-        notices={notices.strip}
-        panes={
-          <WorkspacePanes
-            chatPaneOpen={chatPaneOpen}
-            agent={{ runtime }}
-            documents={documents}
-            workspace={workspace}
-            mode={chrome.navigator.mode}
-            onAskAgent={askAgent}
-            onBrowsePersonas={gallery.browsePersonas}
-            newTab={newTab}
-            onCreateDraft={newDraft}
-            onCreateInteractiveNote={newInteractiveNote}
-            onPrepare={preparation.prepare}
-            onReprocess={refresh.reprocess}
-            onReviewTurnChange={revisions.reviewTurnChange}
-            onShowDocuments={() => chrome.navigator.selectMode('documents')}
-            session={session}
-            settings={chrome.settings}
-            sources={sources}
-            status={status}
-          />
-        }
-        session={session}
-        sidebar={
-          <WorkspaceSidebar
-            activeFolder={activeFolder}
-            agent={{ runtime, scope: agent.scope }}
-            documents={documents}
-            folder={{
-              ...folder,
-              hiddenFiles: listing
-                ? {
-                    disabled: hiddenFiles.pending,
-                    shown: hiddenFiles.showHiddenFiles,
-                    toggle: hiddenFiles.toggle,
-                  }
-                : null,
-            }}
-            navigator={chrome.navigator}
-            notices={notices.corner}
-            onBrowseGallery={gallery.browse}
-            onReprocess={refresh.reprocess}
-            projectEntry={entry}
-            settings={chrome.settings}
-            sources={sources}
-            workspace={workspace}
-          />
-        }
-        started={chrome.started}
-        titlebar={
-          <WorkspaceTitlebar
-            agent={runtime}
-            chatPaneOpen={chatPaneOpen}
-            newTab={newTab}
-            onToggleChatPane={() => setChatPaneOpen((open) => !open)}
-            sidebarNotices={notices.cornerShown}
-            documents={documents}
-            hasActiveFolder={activeFolder !== null}
-            mode={chrome.navigator.mode}
-          />
-        }
-        welcome={
-          <ProjectWelcome
-            {...dependencies.project}
-            gallery={gallery.band}
-            entry={entry}
-            isRestoringSession={session.status.kind === 'restoring'}
-          />
-        }
-      />
+          }
+          started={chrome.started}
+          titlebar={
+            <WorkspaceTitlebar
+              agent={runtime}
+              chatPaneOpen={chatPaneOpen}
+              newTab={newTab}
+              onToggleChatPane={() => setChatPaneOpen((open) => !open)}
+              sidebarNotices={notices.cornerShown}
+              documents={documents}
+              hasActiveFolder={activeFolder !== null}
+              mode={chrome.navigator.mode}
+            />
+          }
+          welcome={
+            <ProjectWelcome
+              {...dependencies.project}
+              gallery={gallery.band}
+              entry={entry}
+              isRestoringSession={session.status.kind === 'restoring'}
+            />
+          }
+        />
+      </MathModeProvider>
     </AccountProvider>
   );
 }

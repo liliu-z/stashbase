@@ -8,6 +8,7 @@ import 'katex/dist/katex.min.css';
 import { parseCitationHref } from '@/features/agent/domain/citation';
 import type { SourceReference } from '@/shared/domain/source-reference';
 import { MARKDOWN_PROSE_CLASS } from '@/shared/ui/markdown-prose';
+import { useMathMode } from '@/shared/ui/math-mode';
 
 function isHttpUrl(href: string): boolean {
   try {
@@ -119,13 +120,16 @@ export const AgentMarkdown = memo(function AgentMarkdown({
 }: MarkdownLinks & {
   markdown: string;
 }) {
+  // The project's Math mode, the same switch the document beside it follows.
+  const { enabled: mathMode } = useMathMode();
   return (
     <div className={MARKDOWN_PROSE_CLASS}>
       <ReactMarkdown
         components={markdownComponents({ onOpenExternal, onOpenSource, sourceFor })}
-        // Single-dollar text math would swallow ordinary prices ("$4 ... $5");
-        // math still opens with two dollars or a ```math fence.
-        remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: false }]]}
+        // With the switch off, single dollars would swallow ordinary prices
+        // ("$4 ... $5"); math still opens with two dollars, `\( \)` and `\[ \]`
+        // either way. With it on, `$x^2$` opens a formula and `\$` stays prose.
+        remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: mathMode }]]}
         rehypePlugins={[
           [rehypeKatex, { trust: false, strict: 'ignore', maxExpand: 1000, maxSize: 20 }],
         ]}
