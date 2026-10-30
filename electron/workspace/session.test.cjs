@@ -18,6 +18,7 @@ const snapshot = {
     activeTabId: null,
     expandedPaths: ['drafts'],
     folderPath: '/workspace/notes',
+    mathMode: false,
     selectedPath: null,
     tabs: [],
   }],
@@ -52,6 +53,11 @@ test('workspace session store round-trips validated state and ignores corrupt ve
   assert.equal(await store.read(), null);
   await store.write(snapshot);
   assert.deepEqual(await store.read(), snapshot);
+
+  const legacy = structuredClone(snapshot);
+  delete legacy.folders[0].mathMode;
+  await fs.writeFile(filePath, JSON.stringify(legacy));
+  assert.equal((await store.read()).folders[0].mathMode, false);
 
   await fs.writeFile(filePath, JSON.stringify({ ...snapshot, version: 2 }));
   assert.equal(await store.read(), null);

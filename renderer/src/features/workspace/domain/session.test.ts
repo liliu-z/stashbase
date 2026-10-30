@@ -7,6 +7,7 @@ import {
   recordFolderSession,
   setSessionActiveFolder,
   setSessionAgentPaneWidth,
+  setSessionMathMode,
   setSessionSidebarOpen,
   setSessionSidebarWidth,
 } from './session';
@@ -40,6 +41,7 @@ describe('workspace session state', () => {
           activeTabId: 'tab-1',
           expandedPaths: ['drafts'],
           folderPath: '/project/notes',
+          mathMode: false,
           selectedPath: 'drafts/plan.md',
           tabs: [{ id: 'tab-1', path: 'drafts/plan.md' }],
         },
@@ -50,6 +52,15 @@ describe('workspace session state', () => {
     });
     expect(snapshot).not.toHaveProperty('scope');
     expect(snapshot).not.toHaveProperty('lifecycle');
+  });
+
+  it('keeps Math mode with its project while document state changes', () => {
+    const active = setSessionActiveFolder(createWorkspaceSessionSnapshot(), '/project/notes');
+    const enabled = setSessionMathMode(active, '/project/notes', true);
+    const recorded = recordFolderSession(enabled, createWorkspaceState(scope));
+
+    expect(recorded.folders).toMatchObject([{ folderPath: '/project/notes', mathMode: true }]);
+    expect(setSessionMathMode(recorded, '/project/other', true)).toBe(recorded);
   });
 
   it("brings the sidebar with a window's first folder and leaves later switches alone", () => {
@@ -120,6 +131,7 @@ describe('workspace session state', () => {
           activeTabId: 'missing-tab',
           expandedPaths: ['drafts', 'drafts'],
           folderPath: '/project/notes',
+          mathMode: false,
           selectedPath: null,
           tabs: [
             { id: 'tab-1', path: 'one.md' },

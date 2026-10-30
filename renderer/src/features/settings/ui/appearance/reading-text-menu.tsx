@@ -7,7 +7,6 @@
  *  save rolls the choice back and names the failure inside it. */
 import { Popover } from '@base-ui/react/popover';
 import { ALargeSmall, ChevronDown } from 'lucide-react';
-import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Elevated } from '@/components/ui/elevated';
@@ -37,10 +36,17 @@ function ReadingTextGlyph(props: IconComponentProps) {
   return <ALargeSmall {...props} size={22} />;
 }
 
-export function ReadingTextMenu({ appearanceApi }: { appearanceApi: AppearancePort }) {
+export function ReadingTextMenu({
+  appearanceApi,
+  mathMode,
+  onMathModeChange,
+}: {
+  appearanceApi: AppearancePort;
+  mathMode: boolean;
+  onMathModeChange(enabled: boolean): void;
+}) {
   const appearance = useAppearance(appearanceApi);
   const shape = useShape();
-  const [mathMode, setMathMode] = useState(false);
   const preferences = appearance.preferences;
   // An installed writing font, chosen in Settings, stands in for either preset.
   const installed = preferences?.writingFont ?? null;
@@ -110,11 +116,14 @@ export function ReadingTextMenu({ appearanceApi }: { appearanceApi: AppearancePo
           </Popover.Positioner>
         </Popover.Portal>
       </Popover.Root>
-      <Tooltip content="Math mode for this project" side="bottom">
+      <Tooltip
+        content="Math mode for this project. Use $...$ for formulas and \\$ for a literal dollar sign."
+        side="bottom"
+      >
         <Switch
           checked={mathMode}
           label="Math"
-          onToggle={() => setMathMode((enabled) => !enabled)}
+          onToggle={() => onMathModeChange(!mathMode)}
         />
       </Tooltip>
     </div>

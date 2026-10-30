@@ -40,6 +40,7 @@ describe('workspace tree state', () => {
         activeTabId: 'tab-1',
         expandedPaths: ['drafts'],
         folderPath: '/project/notes',
+        mathMode: false,
         selectedPath: 'drafts/plan.md',
         tabs: [{ id: 'tab-1', path: 'drafts/plan.md' }],
       },

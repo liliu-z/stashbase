@@ -22,6 +22,7 @@ type WorkspaceSessionStatus =
   | { kind: 'ready'; restoredFolder: FolderSessionState | null };
 
 export interface WorkspaceSessionController {
+  mathMode: boolean;
   runtime: WorkspaceSessionRuntime;
   status: WorkspaceSessionStatus;
   shell: {
@@ -54,7 +55,11 @@ export function useWorkspaceSession(
     runtime.setActiveFolder(project.activeFolder?.path ?? null);
   }, [project, memberPaths, runtime, state.restoreStatus]);
   const arriving = !project?.activeFolder && state.snapshot.activeFolderPath !== null;
+  const activeFolder = project?.activeFolder
+    ? restoreFolderSession(state.snapshot, project.activeFolder.path)
+    : null;
   return {
+    mathMode: activeFolder?.mathMode ?? false,
     runtime,
     shell: arriving ? { ...state.snapshot.shell, sidebarOpen: false } : state.snapshot.shell,
     status:
@@ -62,9 +67,7 @@ export function useWorkspaceSession(
         ? { kind: 'restoring' }
         : {
             kind: 'ready',
-            restoredFolder: project?.activeFolder
-              ? restoreFolderSession(state.snapshot, project.activeFolder.path)
-              : null,
+            restoredFolder: activeFolder,
           },
   };
 }

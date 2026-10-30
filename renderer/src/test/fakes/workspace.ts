@@ -138,6 +138,7 @@ export function folderSession(overrides: Partial<FolderSessionState> = {}): Fold
     activeTabId: null,
     expandedPaths: [],
     folderPath: RESEARCH_FOLDER.path,
+    mathMode: false,
     selectedPath: null,
     tabs: [],
     ...overrides,

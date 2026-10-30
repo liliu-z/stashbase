@@ -204,7 +204,13 @@ export function WorkspacePanes({
                     )
                   }
                   renderReadingControl={() => (
-                    <ReadingTextMenu appearanceApi={dependencies.settings.appearanceApi} />
+                    <ReadingTextMenu
+                      appearanceApi={dependencies.settings.appearanceApi}
+                      mathMode={session.mathMode}
+                      onMathModeChange={(enabled) => {
+                        if (workspace) session.runtime.setMathMode(workspace.scope.folder.path, enabled);
+                      }}
+                    />
                   )}
                   revealLabel={dependencies.workspace.revealLabel}
                   runtime={documents}

@@ -41,6 +41,7 @@ export interface FolderSessionState {
   activeTabId: string | null;
   expandedPaths: string[];
   folderPath: string;
+  mathMode: boolean;
   selectedPath: string | null;
   tabs: WorkspaceTabIdentity[];
 }
@@ -164,6 +165,7 @@ export function setSessionActiveFolder(
           activeTabId: null,
           expandedPaths: [],
           folderPath,
+          mathMode: false,
           selectedPath: null,
           tabs: [],
         },
@@ -208,6 +210,7 @@ export function recordFolderSession(
       .filter((path) => workspace.expanded[path] === true)
       .slice(-MAX_SESSION_EXPANDED_PATHS),
     folderPath,
+    mathMode: previous?.mathMode ?? false,
     selectedPath: workspace.selectedPath,
     tabs: documentSession.tabs
       .slice(-MAX_SESSION_TABS)
@@ -231,12 +234,27 @@ export function recordFolderSession(
 function sameFolderSession(a: FolderSessionState, b: FolderSessionState): boolean {
   return (
     a.activeTabId === b.activeTabId &&
+    a.mathMode === b.mathMode &&
     a.selectedPath === b.selectedPath &&
     a.expandedPaths.length === b.expandedPaths.length &&
     a.expandedPaths.every((path, index) => path === b.expandedPaths[index]) &&
     a.tabs.length === b.tabs.length &&
     a.tabs.every((tab, index) => tab.id === b.tabs[index]?.id && tab.path === b.tabs[index]?.path)
   );
+}
+
+export function setSessionMathMode(
+  snapshot: WorkspaceSessionSnapshot,
+  folderPath: string,
+  mathMode: boolean,
+): WorkspaceSessionSnapshot {
+  const index = snapshot.folders.findIndex((folder) => folder.folderPath === folderPath);
+  if (index === -1 || snapshot.folders[index]?.mathMode === mathMode) return snapshot;
+  const folders = [...snapshot.folders];
+  const folder = folders[index];
+  if (!folder) return snapshot;
+  folders[index] = { ...folder, mathMode };
+  return { ...snapshot, folders };
 }
 
 export function setSessionSidebarOpen(
