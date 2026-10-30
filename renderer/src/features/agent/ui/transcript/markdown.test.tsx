@@ -93,6 +93,17 @@ Keep ${'`\\(x\\)`'} as code.`}
     expect(container.textContent).toContain('$4 per month billed annually or $5');
   });
 
+  it('renders paired single-dollar formulas only while Math mode is on', () => {
+    const { container, rerender } = render(<AgentMarkdown markdown="Area: $x^2$." />);
+
+    expect(container.querySelectorAll('math')).toHaveLength(0);
+    expect(container.textContent).toContain('$x^2$');
+
+    rerender(<AgentMarkdown mathMode markdown="Area: $x^2$." />);
+    expect(container.querySelectorAll('math')).toHaveLength(1);
+    expect(container.textContent).not.toContain('$x^2$');
+  });
+
   it('opens only project-resolved file references and keeps refused paths inert', async () => {
     const source = { folderPath: '/project', path: 'draft notes.md' };
     const sourceFor = vi.fn((path: string) => (path === 'draft notes.md' ? source : null));

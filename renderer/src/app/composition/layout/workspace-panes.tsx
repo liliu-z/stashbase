@@ -138,6 +138,7 @@ export function WorkspacePanes({
             catalog={dependencies.agent.catalog}
             accountSignedIn={account.account?.signedIn ?? false}
             header={mode === 'documents'}
+            mathMode={session.mathMode}
             persona={dependencies.agent.persona}
             scheduledTasks={dependencies.agent.scheduledTasks}
             tools={dependencies.agent.tools}
@@ -168,6 +169,7 @@ export function WorkspacePanes({
                   assetApi={dependencies.documents.adapters.asset}
                   docxPreviewApi={dependencies.documents.adapters.docxPreview}
                   genericPreviewApi={dependencies.documents.adapters.genericPreview}
+                  mathMode={session.mathMode}
                   recordUsage={dependencies.recordUsage}
                   onAskAgent={onAskAgent}
                   referencedPassages={referencedPassages}

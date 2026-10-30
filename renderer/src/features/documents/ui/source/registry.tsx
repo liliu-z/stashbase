@@ -69,6 +69,7 @@ const markdown = viewerEntry({
     'navigation',
     'onAskAgent',
     'referencedPassages',
+    'mathMode',
     'onNavigate',
     'onOpenExternal',
     'renderReadingControl',

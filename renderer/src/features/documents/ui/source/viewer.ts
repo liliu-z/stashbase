@@ -40,6 +40,8 @@ export interface DocumentViewerServices {
   assetApi: DocumentAssetPort;
   docxPreviewApi: DocxPreviewPort;
   genericPreviewApi: GenericFilePreviewPort;
+  /** Project-local Markdown parsing preference. */
+  mathMode?: boolean | undefined;
   navigation: DocumentNavigationRuntime;
   /** Absent where no Agent sits beside the document; the surfaces that
    *  select text or cells then offer no Ask agent control. */

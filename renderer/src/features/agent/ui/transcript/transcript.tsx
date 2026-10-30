@@ -56,6 +56,7 @@ const TranscriptBlock = memo(function TranscriptBlock({
   closing,
   editable,
   modelRefresh,
+  mathMode,
   now,
   onEditPrompt,
   onOpenExternal,
@@ -77,6 +78,7 @@ const TranscriptBlock = memo(function TranscriptBlock({
    *  back into the composer. */
   editable: boolean;
   modelRefresh?: AgentModelRefreshView | undefined;
+  mathMode: boolean;
   now: number;
   onEditPrompt?: ((blockId: string) => void) | undefined;
   onOpenExternal(href: string): void;
@@ -113,6 +115,7 @@ const TranscriptBlock = memo(function TranscriptBlock({
       >
         <span className="sr-only">Agent: </span>
         <AgentMarkdown
+          mathMode={mathMode}
           markdown={block.text}
           onOpenExternal={onOpenExternal}
           onOpenSource={onOpenSource}
@@ -169,6 +172,7 @@ export const AgentTranscript = memo(function AgentTranscript({
   blocks,
   focusBlockId,
   modelRefresh,
+  mathMode = false,
   onEditPrompt,
   onOpenExternal,
   onOpenSource,
@@ -191,6 +195,7 @@ export const AgentTranscript = memo(function AgentTranscript({
   /** Reads the hosted models again, offered on a turn refused because the
    *  chosen model's configuration changed. Absent where no hosted list exists. */
   modelRefresh?: AgentModelRefreshView | undefined;
+  mathMode?: boolean | undefined;
   /** Takes a sent prompt back into the composer. Absent when there is no
    *  composer to take it, so no edit control renders. */
   onEditPrompt?: ((blockId: string) => void) | undefined;
@@ -289,6 +294,7 @@ export const AgentTranscript = memo(function AgentTranscript({
                 closing={closing.has(group.id)}
                 editable={group.id === editableId}
                 modelRefresh={modelRefresh}
+                mathMode={mathMode}
                 now={now}
                 onEditPrompt={onEditPrompt}
                 onOpenExternal={onOpenExternal}

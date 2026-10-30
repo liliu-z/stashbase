@@ -5,6 +5,7 @@ import type { DocumentViewerProps } from '@/features/documents/ui/source/viewer'
 export default function MarkdownViewer({
   active,
   name,
+  mathMode = false,
   navigation,
   onAskAgent,
   referencedPassages,
@@ -16,6 +17,7 @@ export default function MarkdownViewer({
   status,
 }: DocumentViewerProps<
   | 'navigation'
+  | 'mathMode'
   | 'onAskAgent'
   | 'referencedPassages'
   | 'onNavigate'
@@ -41,6 +43,7 @@ export default function MarkdownViewer({
           dirty={editor !== null && editor.value !== editor.baseline}
           holdEdits={runtime.holdEdits}
           mode={markdownMode}
+          mathMode={mathMode}
           name={name}
           navigation={navigation}
           onAskAgent={onAskAgent}

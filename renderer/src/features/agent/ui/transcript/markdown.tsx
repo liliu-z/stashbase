@@ -112,20 +112,20 @@ function markdownComponents({
 }
 
 export const AgentMarkdown = memo(function AgentMarkdown({
+  mathMode = false,
   markdown,
   onOpenExternal,
   onOpenSource,
   sourceFor,
 }: MarkdownLinks & {
+  mathMode?: boolean | undefined;
   markdown: string;
 }) {
   return (
     <div className={MARKDOWN_PROSE_CLASS}>
       <ReactMarkdown
         components={markdownComponents({ onOpenExternal, onOpenSource, sourceFor })}
-        // Single-dollar text math would swallow ordinary prices ("$4 ... $5");
-        // math still opens with two dollars or a ```math fence.
-        remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: false }]]}
+        remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: mathMode }]]}
         rehypePlugins={[
           [rehypeKatex, { trust: false, strict: 'ignore', maxExpand: 1000, maxSize: 20 }],
         ]}
