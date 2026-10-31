@@ -467,7 +467,7 @@ export class AgentSession implements AttributedAgentSession {
           systemPrompt: {
             type: 'preset',
             preset: 'claude_code',
-            append: resolveAgentRuntimeInstructions(this.persona),
+            append: resolveAgentRuntimeInstructions(this.persona, cwd),
           },
           // Resuming a past session loads its conversation history so the
           // user can continue it. The transcript itself is rendered from

@@ -103,7 +103,9 @@ test("Claude appends the Chat's Persona before hidden StashBase routing policy",
 
   session.begin();
   await settle();
-  assert.equal(appended, composeAgentRuntimeInstructions(persona));
+  // The project's Math mode is off in this isolated config, and the policy
+  // names the delimiters that follows from it.
+  assert.equal(appended, composeAgentRuntimeInstructions(persona, false));
 });
 
 interface TurnEvent {

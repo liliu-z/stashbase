@@ -31,6 +31,7 @@ import {
 import { SourcePreparationStatus, type FolderIndexStatus } from '@/features/preparation/public';
 import {
   LocalComponentRecovery,
+  MathModeSwitch,
   ReadingTextMenu,
   useAccountView,
 } from '@/features/settings/public';
@@ -209,7 +210,12 @@ export function WorkspacePanes({
                     )
                   }
                   renderReadingControl={() => (
-                    <ReadingTextMenu appearanceApi={dependencies.settings.appearanceApi} />
+                    <div className="flex items-center gap-1">
+                      <ReadingTextMenu appearanceApi={dependencies.settings.appearanceApi} />
+                      {/* Immediately to its right: the same page-level offer, for
+                       *  how this project reads a dollar sign. */}
+                      <MathModeSwitch />
+                    </div>
                   )}
                   revealLabel={dependencies.workspace.revealLabel}
                   runtime={documents}

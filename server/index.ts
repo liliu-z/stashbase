@@ -58,6 +58,7 @@ import { telemetry } from './telemetry.ts';
 import { httpErrorReporting, installHostErrorReporting, unhandledHttpError } from './error-reporting.ts';
 import { mount as mountAppearanceRoutes } from './routes/appearance.ts';
 import { mount as mountWorkspacePreferenceRoutes } from './routes/workspace-preferences.ts';
+import { mount as mountProjectMathModeRoutes } from './routes/project-math-mode.ts';
 import { mount as mountUpdateRoutes } from './routes/updates.ts';
 import { mount as mountLocalComponentRoutes } from './routes/local-components.ts';
 import { resumeExtractorDownload, closeExtractorRuntime } from './python-host.ts';
@@ -311,6 +312,7 @@ app.use([
 mountAppearanceRoutes(app);
 mountTelemetryRoutes(app);
 mountWorkspacePreferenceRoutes(app);
+mountProjectMathModeRoutes(app); // one project's Math switch, read by its folder root
 mountUpdateRoutes(app);
 mountAccountRoutes(app, {
   appReturnToken: process.env.STASHBASE_OAUTH_RETURN_TOKEN ?? '',

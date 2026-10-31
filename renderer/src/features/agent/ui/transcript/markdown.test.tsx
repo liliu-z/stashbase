@@ -1,10 +1,23 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
+
+import { MathModeProvider, type MathModeState } from '@/shared/ui/math-mode';
 
 import { AgentMarkdown } from './markdown';
 
 afterEach(cleanup);
+
+function mathOn(children: ReactNode) {
+  const state: MathModeState = {
+    enabled: true,
+    failure: null,
+    scope: '/project',
+    setEnabled: () => {},
+  };
+  return <MathModeProvider value={state}>{children}</MathModeProvider>;
+}
 
 describe('Agent Markdown', () => {
   it('renders structured GFM instead of exposing source punctuation', () => {
@@ -105,6 +118,22 @@ Keep ${'`\\(x\\)`'} as code.`}
 
     expect(container.querySelectorAll('math')).toHaveLength(0); // dom-contract: KaTeX renders no MathML for plain prose
     expect(container.textContent).toContain('$4 per month billed annually or $5');
+  });
+
+  it('opens a single-dollar formula once the project turns Math on', () => {
+    const { container } = render(mathOn(<AgentMarkdown markdown="Energy is $x^2$ today." />));
+
+    expect(container.querySelectorAll('math')).toHaveLength(1); // dom-contract: KaTeX MathML for the $…$ span
+    expect(container.textContent).not.toContain('$x^2$');
+  });
+
+  it('keeps a $…$ formula and ordinary prices as prose while Math is off', () => {
+    const { container } = render(
+      <AgentMarkdown markdown="Energy is $x^2$; a run costs $4 or $5." />,
+    );
+
+    expect(container.querySelectorAll('math')).toHaveLength(0); // dom-contract: KaTeX renders no MathML for plain prose
+    expect(container.textContent).toContain('$x^2$');
   });
 
   it('opens only project-resolved file references and keeps refused paths inert', async () => {

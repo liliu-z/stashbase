@@ -9,6 +9,7 @@
 import { vi } from 'vite-plus/test';
 
 import type { EmbedderPort } from '@/features/settings/application/embedder-port';
+import type { MathModePort } from '@/features/settings/application/math-mode-port';
 import type {
   AccountPort,
   AgentRuntimePort,
@@ -221,6 +222,21 @@ export function appearancePort(overrides: Partial<AppearancePort> = {}): Appeara
   return {
     load: vi.fn(async () => saved),
     update: vi.fn(async (change) => (saved = { ...saved, ...change })),
+    ...overrides,
+  };
+}
+
+/** One project's Math switch, kept per folder root the way the server keeps it:
+ *  an untouched project reads back off, and a write answers with the state the
+ *  fake now holds. */
+export function mathModePort(overrides: Partial<MathModePort> = {}): MathModePort {
+  const saved = new Map<string, boolean>();
+  return {
+    load: vi.fn(async (scope) => saved.get(scope) ?? false),
+    save: vi.fn(async (scope, enabled) => {
+      saved.set(scope, enabled);
+      return enabled;
+    }),
     ...overrides,
   };
 }

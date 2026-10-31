@@ -89,6 +89,16 @@ Select text in a Markdown document and choose **Heading** on the selection
 toolbar to turn it into Text, Heading 1, Heading 2 or Heading 3. Deeper
 headings, lists and quotes are in the `/` menu.
 
+Formulas in a Markdown document follow a per-project **Math** switch, immediately
+right of the document's font menu. It is off by default, so an amount like `$4`
+stays ordinary text and a formula is written with `$$…$$` or a `math` / `latex`
+fence. Turn it on and `$x^2$` opens a formula too, while `\$` keeps a literal
+dollar sign. The switch changes only how the project reads a dollar sign on
+screen: it rewrites no document and no stored Chat message, keeps undo, selection,
+and reading position where they were, and is remembered for the project across a
+reopen or restart. Chat follows the same switch, and it renders `\( … \)` and
+`\[ … \]` either way.
+
 Some files can be listed without being searchable or editable. Muted files
 are excluded from Search and automatic Chat context. Preview, editing,
 retrieval text, and agent file access vary by format; see the canonical

@@ -24,7 +24,7 @@ import type { Config as NativeConfig } from '@opencode-ai/sdk/v2/types';
 import { getHostedAccountSession } from './app-config.ts';
 import { ensureMcpLauncher } from './agent-mcp.ts';
 import { resolveAgentPersona } from './agent-persona.ts';
-import { composeAgentRuntimeInstructions } from './agent-runtime-instructions.ts';
+import { composeAgentRuntimeInstructions, projectMathMode } from './agent-runtime-instructions.ts';
 import { agentCliPath } from './agent-cli.ts';
 import { appDataRoot } from './local-data.ts';
 import { logger } from './log.ts';
@@ -227,9 +227,10 @@ export function buildOpenCodeConfig(
 ): Config & Pick<NativeConfig, 'skills'> {
   // The tools that are on add how to brief them and each one's standing
   // rule to the main agent's instructions; the tools' own models never see
-  // them.
+  // them. The project's Math switch joins them because Chat renders formulas
+  // the same way, and this config is written when the runtime process starts.
   const runtimeInstructions = [
-    composeAgentRuntimeInstructions(persona),
+    composeAgentRuntimeInstructions(persona, projectMathMode(directory)),
     defaultAgentToolInstructions(tools),
   ].filter(Boolean).join('\n\n');
   const toolPermissions = Object.fromEntries(tools.map(({ tool }) => [`stashbase_${tool.agent.toolName}`, 'allow']));

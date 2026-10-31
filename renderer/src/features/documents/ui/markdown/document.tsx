@@ -35,10 +35,6 @@ import { writeToClipboard } from '@/shared/ui/clipboard';
 import { watchMarkdownChanges } from './changes';
 import { math } from './math';
 import { MarkdownOpenFailure } from './open-failure';
-
-import '@milkdown/crepe/theme/common/style.css';
-import '@milkdown/crepe/theme/frame.css';
-import './document.css';
 import {
   activeHeadingId,
   attachHeadingAnchors,
@@ -50,8 +46,13 @@ import {
   scrollOutlineToHeading,
   type ProseMirrorDocument,
 } from './outline-adapter';
+
+import '@milkdown/crepe/theme/common/style.css';
+import '@milkdown/crepe/theme/frame.css';
+import './document.css';
 import { useAskAgent } from './selection-markdown';
 import { selectionToolbar } from './selection-toolbar';
+import { useDollarMathMode } from './use-dollar-math-mode';
 import { useMarkdownHighlights } from './use-markdown-highlights';
 import { useRevisionReview, type RevisionBinding } from './use-revision-review';
 import { attachWritingAids, createWordCounter, WordCount } from './writing-aids';
@@ -253,6 +254,8 @@ export function MarkdownDocument({
   useEffect(() => {
     editorRef.current?.setReadonly(readOnly);
   }, [readOnly]);
+
+  useDollarMathMode(creationState === 'ready', editorRef);
 
   useEffect(() => {
     const editor = editorRef.current;
