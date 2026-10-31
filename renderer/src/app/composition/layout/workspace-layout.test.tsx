@@ -23,6 +23,7 @@ function session(
   status: WorkspaceSessionController['status'] = { kind: 'ready', restoredFolder: null },
 ): WorkspaceSessionController {
   return {
+    mathMode: false,
     runtime: createWorkspaceSessionRuntime(sessionPersistence()),
     shell: { agentPaneWidth: 576, sidebarOpen: true, sidebarWidth: 300 },
     status,

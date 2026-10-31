@@ -24,6 +24,7 @@ function toDomain(snapshot: WorkspaceSessionSnapshotWire): WorkspaceSessionSnaps
       activeTabId: folder.activeTabId,
       expandedPaths: [...folder.expandedPaths],
       folderPath: folder.folderPath,
+      mathMode: folder.mathMode,
       selectedPath: folder.selectedPath,
       tabs: folder.tabs.map((tab) => ({ ...tab })),
     })),

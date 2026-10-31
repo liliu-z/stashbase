@@ -45,6 +45,9 @@ larger pages sooner.
 - Reads, edits, search results, and file links retain project-and-path identity.
   Missing files and invalid encoding never justify substituting another source
   or rewriting bytes lossily.
+- Markdown Math mode is a local per-project presentation preference. With it
+  off, single-dollar text stays prose; with it on, paired `$...$` is inline
+  math. It never changes Markdown source, frontmatter, or project files.
 - Agent text tools accept ordinary UTF-8 source code and configuration within
   project and session permissions, independently of editor and search formats.
   They preserve the requested filename, including `.env` and names without an

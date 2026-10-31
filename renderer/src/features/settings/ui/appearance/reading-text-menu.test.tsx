@@ -24,9 +24,28 @@ const preset = async (group: string, name: string) =>
   within(await screen.findByRole('radiogroup', { name: group })).getByRole('radio', { name });
 
 describe('ReadingTextMenu', () => {
+  it('places the local Math switch beside the reading font control', async () => {
+    const onMathModeChange = vi.fn();
+    withQueryClient(
+      <ReadingTextMenu
+        appearanceApi={appearancePort()}
+        mathMode={false}
+        onMathModeChange={onMathModeChange}
+      />,
+    );
+    const user = userEvent.setup();
+    const font = await screen.findByRole('button', { name: 'Reading text: Serif' });
+    const math = await screen.findByRole('switch', { name: 'Math' });
+
+    expect(math.parentElement?.parentElement).toBe(font.parentElement);
+    expect(math.getAttribute('aria-checked')).toBe('false');
+    await user.click(math);
+    expect(onMathModeChange).toHaveBeenCalledWith(true);
+  });
+
   it('saves only the reading font and applies it at once', async () => {
     const port = appearancePort();
-    withQueryClient(<ReadingTextMenu appearanceApi={port} />);
+    withQueryClient(<ReadingTextMenu appearanceApi={port} mathMode={false} onMathModeChange={vi.fn()} />);
 
     const user = await open();
     await user.click(await preset('Font', 'Sans'));
@@ -43,7 +62,7 @@ describe('ReadingTextMenu', () => {
 
   it('saves the reading size from the same menu', async () => {
     const port = appearancePort();
-    withQueryClient(<ReadingTextMenu appearanceApi={port} />);
+    withQueryClient(<ReadingTextMenu appearanceApi={port} mathMode={false} onMathModeChange={vi.fn()} />);
 
     const user = await open();
     await user.click(await preset('Size', 'Large'));
@@ -63,7 +82,7 @@ describe('ReadingTextMenu', () => {
         throw new Error('EPIPE');
       }),
     });
-    withQueryClient(<ReadingTextMenu appearanceApi={port} />);
+    withQueryClient(<ReadingTextMenu appearanceApi={port} mathMode={false} onMathModeChange={vi.fn()} />);
 
     const user = await open();
     await user.click(await preset('Font', 'Sans'));

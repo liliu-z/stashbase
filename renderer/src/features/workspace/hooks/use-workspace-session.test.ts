@@ -34,6 +34,7 @@ const savedSession = (folderPath: string, folder: Partial<FolderSessionState> = 
       selectedPath: null,
       tabs: [],
       ...folder,
+      mathMode: folder.mathMode ?? false,
     },
   ],
 });

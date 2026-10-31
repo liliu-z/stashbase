@@ -10,6 +10,7 @@ import { ALargeSmall, ChevronDown } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Elevated } from '@/components/ui/elevated';
+import { Switch } from '@/components/ui/switch';
 import { Tooltip } from '@/components/ui/tooltip';
 import type { AppearancePort } from '@/features/settings/application/ports';
 import {
@@ -35,7 +36,15 @@ function ReadingTextGlyph(props: IconComponentProps) {
   return <ALargeSmall {...props} size={22} />;
 }
 
-export function ReadingTextMenu({ appearanceApi }: { appearanceApi: AppearancePort }) {
+export function ReadingTextMenu({
+  appearanceApi,
+  mathMode,
+  onMathModeChange,
+}: {
+  appearanceApi: AppearancePort;
+  mathMode: boolean;
+  onMathModeChange(enabled: boolean): void;
+}) {
   const appearance = useAppearance(appearanceApi);
   const shape = useShape();
   const preferences = appearance.preferences;
@@ -45,66 +54,78 @@ export function ReadingTextMenu({ appearanceApi }: { appearanceApi: AppearancePo
     installed ??
     READING_FONT_CHOICES.find((choice) => choice.value === preferences?.readingFont)?.label;
   return (
-    <Popover.Root>
-      <Tooltip content="Reading text" side="bottom">
-        <Popover.Trigger
-          render={
-            <Button
-              aria-label={font ? `Reading text: ${font}` : 'Reading text'}
-              disabled={preferences === null}
-              leadingIcon={ReadingTextGlyph}
-              size="compact"
-              trailingIcon={ChevronDown}
-              variant="ghost"
+    <div className="flex items-center gap-2">
+      <Popover.Root>
+        <Tooltip content="Reading text" side="bottom">
+          <Popover.Trigger
+            render={
+              <Button
+                aria-label={font ? `Reading text: ${font}` : 'Reading text'}
+                disabled={preferences === null}
+                leadingIcon={ReadingTextGlyph}
+                size="compact"
+                trailingIcon={ChevronDown}
+                variant="ghost"
+              >
+                {font}
+              </Button>
+            }
+          />
+        </Tooltip>
+        <Popover.Portal>
+          <Popover.Positioner
+            align="start"
+            className="z-50 outline-none"
+            side="bottom"
+            sideOffset={6}
+          >
+            <Popover.Popup
+              aria-label="Reading text"
+              className={cn('flex flex-col gap-3 p-3 outline-none', shape.container)}
+              render={<Elevated offset={2} shadowLevel={3} />}
             >
-              {font}
-            </Button>
-          }
+              <SizeProvider size="compact">
+                <div className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2">
+                  <span className="text-caption text-muted-foreground">Font</span>
+                  <PresetChoice
+                    fill
+                    choices={READING_FONT_CHOICES}
+                    label="Font"
+                    onChoose={(value) => {
+                      if (isReadingFont(value)) appearance.change(readingFontChange(value));
+                    }}
+                    value={installed ? null : (preferences?.readingFont ?? null)}
+                  />
+                  <span className="text-caption text-muted-foreground">Size</span>
+                  <PresetChoice
+                    fill
+                    choices={SCALE_CHOICES}
+                    label="Size"
+                    onChoose={(value) => {
+                      const change = presetChange(PRESET_ROWS.readingTextSize, value);
+                      if (change) appearance.change(change);
+                    }}
+                    value={preferences?.readingTextSize ?? null}
+                  />
+                </div>
+              </SizeProvider>
+              {appearance.failure && (
+                <FailureNotice className="max-w-64 text-caption" failure={appearance.failure} />
+              )}
+            </Popover.Popup>
+          </Popover.Positioner>
+        </Popover.Portal>
+      </Popover.Root>
+      <Tooltip
+        content="Math mode for this project. Use $...$ for formulas and \\$ for a literal dollar sign."
+        side="bottom"
+      >
+        <Switch
+          checked={mathMode}
+          label="Math"
+          onToggle={() => onMathModeChange(!mathMode)}
         />
       </Tooltip>
-      <Popover.Portal>
-        <Popover.Positioner
-          align="start"
-          className="z-50 outline-none"
-          side="bottom"
-          sideOffset={6}
-        >
-          <Popover.Popup
-            aria-label="Reading text"
-            className={cn('flex flex-col gap-3 p-3 outline-none', shape.container)}
-            render={<Elevated offset={2} shadowLevel={3} />}
-          >
-            <SizeProvider size="compact">
-              <div className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2">
-                <span className="text-caption text-muted-foreground">Font</span>
-                <PresetChoice
-                  fill
-                  choices={READING_FONT_CHOICES}
-                  label="Font"
-                  onChoose={(value) => {
-                    if (isReadingFont(value)) appearance.change(readingFontChange(value));
-                  }}
-                  value={installed ? null : (preferences?.readingFont ?? null)}
-                />
-                <span className="text-caption text-muted-foreground">Size</span>
-                <PresetChoice
-                  fill
-                  choices={SCALE_CHOICES}
-                  label="Size"
-                  onChoose={(value) => {
-                    const change = presetChange(PRESET_ROWS.readingTextSize, value);
-                    if (change) appearance.change(change);
-                  }}
-                  value={preferences?.readingTextSize ?? null}
-                />
-              </div>
-            </SizeProvider>
-            {appearance.failure && (
-              <FailureNotice className="max-w-64 text-caption" failure={appearance.failure} />
-            )}
-          </Popover.Popup>
-        </Popover.Positioner>
-      </Popover.Portal>
-    </Popover.Root>
+    </div>
   );
 }

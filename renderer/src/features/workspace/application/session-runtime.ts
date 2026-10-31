@@ -8,6 +8,7 @@ import {
   recordFolderSession,
   setSessionActiveFolder,
   setSessionAgentPaneWidth,
+  setSessionMathMode,
   setSessionSidebarOpen,
   setSessionSidebarWidth,
   type WorkspaceDocumentSession,
@@ -30,6 +31,7 @@ export interface WorkspaceSessionRuntime {
   restore(): Promise<void>;
   setActiveFolder(folderPath: string | null): void;
   setAgentPaneWidth(width: number): void;
+  setMathMode(folderPath: string, enabled: boolean): void;
   setSidebarOpen(open: boolean): void;
   setSidebarWidth(width: number): void;
 }
@@ -128,6 +130,9 @@ export function createWorkspaceSessionRuntime(
     setAgentPaneWidth(width) {
       if (store.getState().restoreStatus === 'loading') shellChangedBeforeRestore = true;
       update((snapshot) => setSessionAgentPaneWidth(snapshot, width));
+    },
+    setMathMode(folderPath, enabled) {
+      update((snapshot) => setSessionMathMode(snapshot, folderPath, enabled));
     },
     setSidebarOpen(open) {
       if (store.getState().restoreStatus === 'loading') shellChangedBeforeRestore = true;

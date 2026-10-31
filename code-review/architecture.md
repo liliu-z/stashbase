@@ -1394,9 +1394,11 @@ registered host boundaries; renderer shared types are a different layer.
   synchronizer; anchor updates must not reparse prose or interrupt IME composition.
   The sole double-cast exemption is its Find controller's structural DOM corpus and guarded
   CSS Highlight probe; other exceptions need their code-owned rationale.
-- Markdown's `math.ts` owns the double-dollar math rule and code-block preview.
-  Single-dollar prices remain prose; math serialization retains double-dollar
-  blocks and explicit `math` / `latex` fences. The transcript's `markdown.tsx`
+- Markdown's `math.ts` owns the Math-mode parser and code-block preview. The
+  workspace session owns its per-project Boolean: single-dollar prices remain
+  prose when it is off, while paired `$...$` is inline math when it is on.
+  Math serialization retains double-dollar blocks and explicit `math` / `latex`
+  fences. The transcript's `markdown.tsx`
   rewrites `\[ \]` and `\( \)` outside code to double-dollar math before parsing.
 - Inline review runs Milkdown's diff plugin, registered directly by
   `revision-adapter.ts`. `@milkdown/plugin-diff` is patched under `patches/` so a

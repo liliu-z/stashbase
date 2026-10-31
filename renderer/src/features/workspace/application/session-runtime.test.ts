@@ -16,6 +16,7 @@ describe('Workspace session runtime', () => {
             activeTabId: 'missing',
             expandedPaths: ['drafts', 'drafts'],
             folderPath: '/project/notes',
+            mathMode: false,
             selectedPath: 'drafts/plan.md',
             tabs: [],
           },
@@ -79,6 +80,24 @@ describe('Workspace session runtime', () => {
     expect(save.mock.calls.at(-1)?.[0]).toMatchObject({
       activeFolderPath: null,
       folders: [],
+    });
+  });
+
+  it('persists Math mode by project while a different project is active', async () => {
+    const save = vi.fn(async (_snapshot: WorkspaceSessionSnapshot) => undefined);
+    const runtime = createWorkspaceSessionRuntime({ load: async () => null, save });
+    await runtime.restore();
+    runtime.setActiveFolder('/project/notes');
+    runtime.setMathMode('/project/notes', true);
+    runtime.setActiveFolder('/project/other');
+    await runtime.flush();
+
+    expect(save.mock.calls.at(-1)?.[0]).toMatchObject({
+      activeFolderPath: '/project/other',
+      folders: [
+        { folderPath: '/project/notes', mathMode: true },
+        { folderPath: '/project/other', mathMode: false },
+      ],
     });
   });
 

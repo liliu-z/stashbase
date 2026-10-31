@@ -14,12 +14,12 @@ afterEach(async () => {
   for (const editor of live.splice(0)) await editor.destroy();
 });
 
-async function open(source: string) {
+async function open(source: string, mathMode = false) {
   const host = document.createElement('div');
   document.body.append(host);
   const editor = new CrepeBuilder({ root: host, defaultValue: source })
     .addFeature(codeMirror)
-    .addFeature(math);
+    .addFeature(math, mathMode);
   live.push(editor);
   await editor.create();
   return { host, markdown: () => editor.getMarkdown() };
@@ -45,6 +45,17 @@ describe('math', () => {
     expect(formula?.dataset.value).toBe('E=mc^2');
     expect(formula?.querySelector('.katex')).not.toBeNull(); // dom-contract: KaTeX's child proves the formula rendered.
     expect(markdown()).toBe(source);
+  });
+
+  it('renders paired single dollars only when the project enables Math mode', async () => {
+    const source = 'Area is $x^2$.\n';
+    const off = await open(source);
+    expect(off.host.querySelector('[data-type="math_inline"]')).toBeNull();
+    expect(off.markdown()).toBe(source);
+
+    const on = await open(source, true);
+    expect(on.host.querySelector<HTMLElement>('[data-type="math_inline"]')?.dataset.value).toBe('x^2');
+    expect(on.markdown()).toBe(source);
   });
 
   it('keeps a $$ block as $$ and a ```latex fence as a fence', async () => {

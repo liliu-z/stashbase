@@ -65,6 +65,8 @@ export interface MarkdownDocumentProps {
   /** Registers the surface's held edit with the document runtime. */
   holdEdits(flush: () => void): () => void;
   mode: MarkdownViewMode;
+  /** The active project's parsing preference. */
+  mathMode?: boolean | undefined;
   name: string;
   /** Ask Agent on the selection toolbar, with the exact selection. Absent
    *  where no Agent sits beside the document. */
@@ -92,6 +94,7 @@ export function MarkdownDocument({
   dirty,
   holdEdits,
   mode,
+  mathMode = false,
   name,
   onAskAgent,
   referencedPassages,
@@ -189,7 +192,7 @@ export function MarkdownDocument({
       .addFeature(toolbar, selectionToolbar({ askAgent: askAgentRun }))
       .addFeature(table)
       .addFeature(codeMirror, { copyText: 'Copy code', languages })
-      .addFeature(math);
+      .addFeature(math, mathMode);
     attachHeadingAnchors(editor);
     const releaseHighlights = attachHighlights(editor);
     const releaseReview = attachReview(editor);
@@ -248,7 +251,7 @@ export function MarkdownDocument({
       stopCreation();
       releaseHeldEdits();
     };
-  }, [askAgentRun, attachHighlights, attachReview, attempt, navigation, tabId, wordCounter]);
+  }, [askAgentRun, attachHighlights, attachReview, attempt, mathMode, navigation, tabId, wordCounter]);
 
   useEffect(() => {
     editorRef.current?.setReadonly(readOnly);

@@ -1,6 +1,6 @@
 /**
- * Math for the Markdown surface, opened only by two dollars or a ```math /
- * ```latex fence — the rule the agent transcript follows.
+ * Math for the Markdown surface. Double dollars and `math`/`latex` fences
+ * always work; one dollar works only when the project enables Math mode.
  *
  * Crepe's own LaTeX feature reads single dollars as math and offers no switch,
  * so ordinary prices ("$0.10–$0.50") lost their dollar signs and turned
@@ -27,9 +27,11 @@ interface MarkdownNode {
   children?: MarkdownNode[];
 }
 
-const remarkDoubleDollarMath = $remark('remarkDoubleDollarMath', () => remarkMath, {
-  singleDollarTextMath: false,
-});
+function remarkMathFor(mathMode: boolean) {
+  return $remark('remarkDoubleDollarMath', () => remarkMath, {
+    singleDollarTextMath: mathMode,
+  });
+}
 
 /** A `$$` block arrives as a LaTeX code block, so it edits and previews like
  *  one and saves back as `$$`. */
@@ -102,7 +104,7 @@ const mathBlockSchema = codeBlockSchema.extendSchema((previous) => (context) => 
 });
 
 /** Add after `codeMirror`, whose preview hook this wraps. */
-export function math(editor: Editor): void {
+export function math(editor: Editor, mathMode = false): void {
   editor
     .config((context) => {
       context.update(codeBlockConfig.key, (previous) => ({
@@ -113,7 +115,7 @@ export function math(editor: Editor): void {
             : previous.renderPreview(language, content, applyPreview),
       }));
     })
-    .use(remarkDoubleDollarMath)
+    .use(remarkMathFor(mathMode))
     .use(remarkMathBlockAsCode)
     .use(mathInlineSchema)
     .use(mathInlineView)

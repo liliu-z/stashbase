@@ -47,6 +47,7 @@ export interface DocumentWorkspaceProps {
   assetApi: DocumentAssetPort;
   docxPreviewApi: DocxPreviewPort;
   genericPreviewApi: GenericFilePreviewPort;
+  mathMode?: boolean | undefined;
   /** Binds a selected Markdown passage to the Agent beside the document. */
   onAskAgent?: ((selection: DocumentSelection) => void) | undefined;
   referencedPassages?: readonly DocumentSelection[] | undefined;
@@ -74,6 +75,7 @@ export function DocumentWorkspace({
   assetApi,
   docxPreviewApi,
   genericPreviewApi,
+  mathMode = false,
   onAskAgent,
   referencedPassages,
   onNavigate = ignoreNavigation,
@@ -160,6 +162,7 @@ export function DocumentWorkspace({
             assetApi={assetApi}
             docxPreviewApi={docxPreviewApi}
             genericPreviewApi={genericPreviewApi}
+            mathMode={mathMode}
             navigation={runtime.navigation}
             onAskAgent={onAskAgent}
             referencedPassages={referencedPassages}

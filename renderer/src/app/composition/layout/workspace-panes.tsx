@@ -140,6 +140,7 @@ export function WorkspacePanes({
             catalog={dependencies.agent.catalog}
             accountSignedIn={account.account?.signedIn ?? false}
             header={mode === 'documents'}
+            mathMode={session.mathMode}
             persona={dependencies.agent.persona}
             scheduledTasks={dependencies.agent.scheduledTasks}
             tools={dependencies.agent.tools}
@@ -172,6 +173,7 @@ export function WorkspacePanes({
                   assetApi={dependencies.documents.adapters.asset}
                   docxPreviewApi={dependencies.documents.adapters.docxPreview}
                   genericPreviewApi={dependencies.documents.adapters.genericPreview}
+                  mathMode={session.mathMode}
                   recordUsage={dependencies.recordUsage}
                   onInputActivity={dependencies.onInputActivity}
                   onAskAgent={onAskAgent}
@@ -209,7 +211,13 @@ export function WorkspacePanes({
                     )
                   }
                   renderReadingControl={() => (
-                    <ReadingTextMenu appearanceApi={dependencies.settings.appearanceApi} />
+                    <ReadingTextMenu
+                      appearanceApi={dependencies.settings.appearanceApi}
+                      mathMode={session.mathMode}
+                      onMathModeChange={(enabled) => {
+                        if (workspace) session.runtime.setMathMode(workspace.scope.folder.path, enabled);
+                      }}
+                    />
                   )}
                   revealLabel={dependencies.workspace.revealLabel}
                   runtime={documents}

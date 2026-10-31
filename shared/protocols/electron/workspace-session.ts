@@ -27,6 +27,7 @@ const workspaceSessionFolderSchema = z
     activeTabId: identitySchema.nullable(),
     expandedPaths: z.array(relativePathSchema).max(2_048),
     folderPath: absolutePathSchema,
+    mathMode: z.boolean().default(false),
     selectedPath: relativePathSchema.nullable(),
     tabs: z.array(workspaceSessionTabSchema).max(50),
   })
