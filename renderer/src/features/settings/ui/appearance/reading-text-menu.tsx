@@ -124,12 +124,27 @@ export function ReadingTextMenu({
       >
         <Switch
           checked={math.enabled}
-          disabled={preferences === null || math.loading || math.saving || projectPath === null}
+          disabled={math.unavailable || math.loading || math.saving || projectPath === null}
           label="Math"
           onToggle={() => math.setEnabled(!math.enabled)}
           size="compact"
         />
       </Tooltip>
+      {math.failure && (
+        <>
+          <FailureNotice className="max-w-48 text-caption" failure={math.failure} />
+          {math.unavailable && (
+            <Button
+              aria-label="Retry Math setting"
+              onClick={math.retry}
+              size="compact"
+              variant="ghost"
+            >
+              Retry
+            </Button>
+          )}
+        </>
+      )}
     </div>
   );
 }
