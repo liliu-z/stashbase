@@ -18,7 +18,7 @@ import { retireAgentProcess, ownAgentProcess, type AgentStopReason } from './age
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import type { WebSocket } from 'ws';
-import { resolveAgentRuntimeInstructions } from './agent-runtime-instructions.ts';
+import { projectMathMode, resolveAgentRuntimeInstructions } from './agent-runtime-instructions.ts';
 import {
   consumeAgentTurnFailure,
   simulatedTurnFailureScript,
@@ -340,7 +340,10 @@ export class AntigravitySession implements AttributedAgentSession {
       }
       const text = this.instructionsSent
         ? prompt
-        : antigravityPromptWithInstructions(resolveAgentRuntimeInstructions(this.persona), prompt);
+        : antigravityPromptWithInstructions(
+            resolveAgentRuntimeInstructions(this.persona, projectMathMode(this.cwd)),
+            prompt,
+          );
       this.instructionsSent = true;
       agentDiagnosticStage(this.ws, 'runtime_dispatched');
       proc.stdin.write(antigravityUserMessage(text));

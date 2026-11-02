@@ -48,6 +48,7 @@ import {
   createAccountAdapter,
   createAgentRuntimeAdapter,
   createAppearanceAdapter,
+  createProjectMathAdapter,
   createSystemTextAdapter,
   createEmbedderAdapter,
   createMcpAccessAdapter,
@@ -56,6 +57,7 @@ import {
   type AccountPort,
   type AgentRuntimePort,
   type AppearancePort,
+  type ProjectMathPort,
   type SystemTextPort,
   type EmbedderPort,
   type McpAccessPort,
@@ -134,6 +136,7 @@ export interface AppDependencies {
     accountApi: AccountPort;
     agentRuntimeApi: AgentRuntimePort;
     appearanceApi: AppearancePort;
+    projectMathApi: ProjectMathPort;
     /** Hands the applied appearance to the desktop's native chrome and
      *  spellchecker. */
     setAppearance: WindowLifecycleBridge['setAppearance'];
@@ -212,6 +215,7 @@ export function createDependencies(): AppDependencies {
       accountApi: createAccountAdapter(http, bridge.runtime.serverOrigin),
       agentRuntimeApi: createAgentRuntimeAdapter(http),
       appearanceApi: createAppearanceAdapter(http),
+      projectMathApi: createProjectMathAdapter(http),
       setAppearance: (appearance) => bridge.windowLifecycle.setAppearance(appearance),
       systemTextApi: createSystemTextAdapter(bridge.textServices),
       telemetryApi: createTelemetryAdapter(http),

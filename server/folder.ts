@@ -557,13 +557,16 @@ export async function removeRecentAsync(absPath: string): Promise<void> {
       storedFolderPathEqualsAsync(entry.scope, target)));
     const scheduleMatches = await Promise.all((snapshot.scheduledTasks ?? []).map(entry =>
       storedFolderPathEqualsAsync(entry?.scope, target)));
+    const projectSettingMatches = await Promise.all((snapshot.projectSettings ?? []).map(entry =>
+      storedFolderPathEqualsAsync(entry.scope, target)));
     const current = readConfigStrict();
     if (JSON.stringify(current) !== revision) continue;
     const filtered = list.filter((_, index) => !matches[index]);
-    if (filtered.length === list.length && !preferenceMatches.some(Boolean) && !scheduleMatches.some(Boolean)) return;
+    if (filtered.length === list.length && !preferenceMatches.some(Boolean) && !scheduleMatches.some(Boolean) && !projectSettingMatches.some(Boolean)) return;
     current.recentFolders = filtered;
     if (preferenceMatches.some(Boolean)) current.agentPreferences = current.agentPreferences!.filter((_, index) => !preferenceMatches[index]);
     if (scheduleMatches.some(Boolean)) current.scheduledTasks = current.scheduledTasks!.filter((_, index) => !scheduleMatches[index]);
+    if (projectSettingMatches.some(Boolean)) current.projectSettings = current.projectSettings!.filter((_, index) => !projectSettingMatches[index]);
     writeConfigStrict(current);
     return;
   }

@@ -222,6 +222,13 @@ html[data-focus-mode='on'] .markdown-crepe:focus-within .ProseMirror > :not(.is-
   line-height: inherit;
 }
 
+/* Math remains editable source text in the editor model. Its matching
+   widget is the visible formula, which lets a Math toggle preserve selection
+   and undo history instead of rebuilding the editor. */
+.markdown-crepe .stashbase-math-source {
+  display: none;
+}
+
 /* One family for headings and prose, so hierarchy comes from size alone; the
    serif's optical-size axis also gives large headings a tighter display cut. */
 .markdown-crepe .milkdown .ProseMirror :is(h1, h2, h3, h4, h5, h6) {

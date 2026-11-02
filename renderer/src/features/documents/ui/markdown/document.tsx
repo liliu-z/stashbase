@@ -22,7 +22,6 @@ import { TabsSubtle, TabsSubtleItem } from '@/components/ui/tabs-subtle';
 import { startMarkdownEditorCreation } from '@/features/documents/application/markdown-editor-lifecycle';
 import type { DocumentNavigationRuntime } from '@/features/documents/application/navigation-runtime';
 import type { MarkdownViewMode } from '@/features/documents/domain/document';
-import { resolveDocumentLink } from '@/features/documents/domain/link-target';
 import { splitLeadingYamlFrontmatter } from '@/features/documents/domain/markdown';
 import type { DocumentHeading } from '@/features/documents/domain/outline';
 import type { DocumentSelection } from '@/features/documents/domain/selection';
@@ -33,7 +32,7 @@ import { prefersReducedMotion } from '@/shared/runtime/appearance-surface';
 import { writeToClipboard } from '@/shared/ui/clipboard';
 
 import { watchMarkdownChanges } from './changes';
-import { math } from './math';
+import { math, refreshMath } from './math';
 import { MarkdownOpenFailure } from './open-failure';
 
 import '@milkdown/crepe/theme/common/style.css';
@@ -52,6 +51,7 @@ import {
 } from './outline-adapter';
 import { useAskAgent } from './selection-markdown';
 import { selectionToolbar } from './selection-toolbar';
+import { useDocumentLinks } from './use-document-links';
 import { useMarkdownHighlights } from './use-markdown-highlights';
 import { useRevisionReview, type RevisionBinding } from './use-revision-review';
 import { attachWritingAids, createWordCounter, WordCount } from './writing-aids';
@@ -65,6 +65,8 @@ export interface MarkdownDocumentProps {
   /** Registers the surface's held edit with the document runtime. */
   holdEdits(flush: () => void): () => void;
   mode: MarkdownViewMode;
+  /** The active project's single-dollar parsing preference. */
+  mathMode?: boolean | undefined;
   name: string;
   /** Ask Agent on the selection toolbar, with the exact selection. Absent
    *  where no Agent sits beside the document. */
@@ -92,6 +94,7 @@ export function MarkdownDocument({
   dirty,
   holdEdits,
   mode,
+  mathMode = false,
   name,
   onAskAgent,
   referencedPassages,
@@ -115,11 +118,9 @@ export function MarkdownDocument({
   const readOnlyRef = useRef(readOnly);
   const valueRef = useRef(value);
   const activeRef = useRef(active);
-  const navigateRef = useRef(onNavigate);
-  const openExternalRef = useRef(onOpenExternal);
-  const sourceRef = useRef(source);
   const observedValueRef = useRef(value);
   const frontmatterRef = useRef(splitLeadingYamlFrontmatter(value).source);
+  const mathModeRef = useRef(mathMode);
   const suppressChangeRef = useRef(false);
   const headingSnapshotRef = useRef<{
     document: ProseMirrorDocument;
@@ -131,7 +132,7 @@ export function MarkdownDocument({
   const [activeHeading, setActiveHeading] = useState<string | null>(null);
   const [creationState, setCreationState] = useState<CreationState>('creating');
   const [headings, setHeadings] = useState<DocumentHeading[]>([]);
-  const [linkFailure, setLinkFailure] = useState(false);
+  const linkFailure = useDocumentLinks(hostRef, source, onNavigate, onOpenExternal);
   const [wordCounter] = useState(createWordCounter);
   const {
     active: reviewActive,
@@ -153,12 +154,10 @@ export function MarkdownDocument({
     state.pendingAnchor?.tabId === tabId ? state.pendingAnchor.id : null,
   );
   activeRef.current = active;
-  navigateRef.current = onNavigate;
-  openExternalRef.current = onOpenExternal;
-  sourceRef.current = source;
   onChangeRef.current = onChange;
   holdEditsRef.current = holdEdits;
   readOnlyRef.current = readOnly;
+  mathModeRef.current = mathMode;
   valueRef.current = value;
 
   useEffect(() => {
@@ -189,7 +188,7 @@ export function MarkdownDocument({
       .addFeature(toolbar, selectionToolbar({ askAgent: askAgentRun }))
       .addFeature(table)
       .addFeature(codeMirror, { copyText: 'Copy code', languages })
-      .addFeature(math);
+      .addFeature(math, mathModeRef);
     attachHeadingAnchors(editor);
     const releaseHighlights = attachHighlights(editor);
     const releaseReview = attachReview(editor);
@@ -251,6 +250,10 @@ export function MarkdownDocument({
   }, [askAgentRun, attachHighlights, attachReview, attempt, navigation, tabId, wordCounter]);
 
   useEffect(() => {
+    if (creationState === 'ready' && editorRef.current) refreshMath(editorRef.current);
+  }, [creationState, mathMode]);
+
+  useEffect(() => {
     editorRef.current?.setReadonly(readOnly);
   }, [readOnly]);
 
@@ -274,30 +277,6 @@ export function MarkdownDocument({
       refreshHeadingsRef.current();
     });
   }, [creationState, dirty, reviewActive, value]);
-
-  useEffect(() => {
-    const host = hostRef.current;
-    if (!host) return;
-    const routeLink = (event: MouseEvent) => {
-      const anchor = (event.target as Element | null)?.closest<HTMLAnchorElement>('a');
-      if (!anchor) return;
-      event.preventDefault();
-      const target = resolveDocumentLink(anchor.getAttribute('href') ?? '', sourceRef.current);
-      if (target.kind === 'anchor') {
-        navigateRef.current({ anchor: target.id, source: sourceRef.current });
-      } else if (target.kind === 'source') {
-        navigateRef.current({ anchor: target.anchor, source: target.source });
-      } else if (target.kind === 'external') {
-        setLinkFailure(false);
-        void openExternalRef
-          .current(target.href)
-          .then((opened) => setLinkFailure(!opened))
-          .catch(() => setLinkFailure(true));
-      }
-    };
-    host.addEventListener('click', routeLink);
-    return () => host.removeEventListener('click', routeLink);
-  }, []);
 
   useEffect(() => {
     if (!active || creationState !== 'ready') return;
@@ -384,7 +363,7 @@ export function MarkdownDocument({
         <MarkdownOpenFailure onRetry={() => setAttempt((current) => current + 1)} />
       )}
       {reviewBar ?? <div className="markdown-reading-control">{readingControl}</div>}
-      <LinkFailureNotice failed={linkFailure} onDismiss={() => setLinkFailure(false)} />
+      <LinkFailureNotice failed={linkFailure.failed} onDismiss={linkFailure.dismiss} />
       <div
         className={cn('markdown-crepe', readOnly && 'markdown-crepe-readonly')}
         data-review-reversed={reviewReversed || undefined}

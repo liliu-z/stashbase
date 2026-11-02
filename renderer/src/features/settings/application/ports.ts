@@ -59,6 +59,17 @@ export interface AppearancePort {
   update(change: AppearanceChange, signal: AbortSignal): Promise<AppearancePreferences>;
 }
 
+/** A setting owned by a registered project's local application identity, not
+ * by its source files. The snake_case field mirrors config.json deliberately. */
+export interface ProjectMathPort {
+  load(scope: string, signal: AbortSignal): Promise<{ scope: string; math_mode: boolean }>;
+  update(
+    scope: string,
+    mathMode: boolean,
+    signal: AbortSignal,
+  ): Promise<{ scope: string; math_mode: boolean }>;
+}
+
 /** What this computer offers the appearance settings: its installed fonts and
  *  the languages its spellchecker knows. Both stay on the device. */
 export interface SystemTextPort {

@@ -11,7 +11,7 @@ import { agentProcessClosed, retireAgentProcess } from './agent-process.ts';
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import type { WebSocket } from 'ws';
-import { resolveAgentRuntimeInstructions } from './agent-runtime-instructions.ts';
+import { projectMathMode, resolveAgentRuntimeInstructions } from './agent-runtime-instructions.ts';
 import {
   consumeAgentTurnFailure,
   simulatedTurnFailureScript,
@@ -587,7 +587,7 @@ export class CodexSession implements AttributedAgentSession {
       // Keep the chosen Persona distinct from StashBase's internal
       // project-routing policy even though Codex receives their composition
       // through one native developer-instructions field.
-      developerInstructions: resolveAgentRuntimeInstructions(this.persona),
+      developerInstructions: resolveAgentRuntimeInstructions(this.persona, projectMathMode(cwd)),
     };
     const result = await this.request(
       this.resumeThreadId ? 'thread/resume' : 'thread/start',

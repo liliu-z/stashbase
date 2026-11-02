@@ -1,10 +1,26 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
 
 import { AgentMarkdown } from './markdown';
 
-afterEach(cleanup);
+afterEach(() => {
+  document.getSelection()?.removeAllRanges();
+  cleanup();
+});
+
+function copySelection(container: HTMLElement, range: Range): string {
+  const selection = document.getSelection();
+  selection?.removeAllRanges();
+  selection?.addRange(range);
+  const setData = vi.fn();
+  const root = container.firstElementChild;
+  if (!(root instanceof HTMLElement)) throw new Error('Expected Markdown container.');
+  fireEvent.copy(root, { clipboardData: { setData } });
+  expect(setData).toHaveBeenCalledOnce();
+  expect(setData.mock.calls[0]?.[0]).toBe('text/plain');
+  return setData.mock.calls[0]?.[1] as string;
+}
 
 describe('Agent Markdown', () => {
   it('renders structured GFM instead of exposing source punctuation', () => {
@@ -78,7 +94,7 @@ Keep ${'`\\(x\\)`'} as code.`}
       />,
     );
 
-    expect(container.querySelectorAll('.katex-display')).toHaveLength(2); // dom-contract: KaTeX's display-mode wrapper
+    expect(container.querySelectorAll('.katex-display')).toHaveLength(3); // dom-contract: KaTeX's display-mode wrapper
     expect(container.querySelectorAll('math')).toHaveLength(4); // dom-contract: KaTeX's accessible MathML output
     expect(screen.getByText(String.raw`\(x\)`).tagName).toBe('CODE');
     expect(container.textContent).not.toContain('$$');
@@ -105,6 +121,122 @@ Keep ${'`\\(x\\)`'} as code.`}
 
     expect(container.querySelectorAll('math')).toHaveLength(0); // dom-contract: KaTeX renders no MathML for plain prose
     expect(container.textContent).toContain('$4 per month billed annually or $5');
+  });
+
+  it('updates existing formulas when math mode changes, keeping escaped and unpaired dollars literal', () => {
+    const markdown = String.raw`Square $x^2$ costs \$10 or \$20. Unpaired $.`;
+    const { container, rerender } = render(<AgentMarkdown markdown={markdown} />);
+    expect(container.querySelectorAll('math')).toHaveLength(0); // dom-contract: KaTeX's accessible MathML output
+    rerender(<AgentMarkdown mathMode markdown={markdown} />);
+    expect(container.querySelectorAll('math')).toHaveLength(1); // dom-contract: KaTeX's accessible MathML output
+    expect(container.textContent).toContain('$10 or $20. Unpaired $.');
+    rerender(<AgentMarkdown markdown={markdown} />);
+    expect(container.querySelectorAll('math')).toHaveLength(0); // dom-contract: KaTeX's accessible MathML output
+    expect(container.textContent).toContain('$x^2$');
+  });
+
+  it.each([false, true])('keeps inline and fenced code literal (Math %s)', (mathMode) => {
+    const code = String.raw`\(x^2\) \[x^2\] $x^2$ \$10`;
+    const markdown = `Outside \\(x^2\\).\n\n\`${code}\`\n\n~~~text\n${code}\n~~~\n\n\`\`\`js\n${code}\n\`\`\``;
+    const { container } = render(<AgentMarkdown mathMode={mathMode} markdown={markdown} />);
+    expect(container.querySelectorAll('math')).toHaveLength(1); // dom-contract: KaTeX's accessible MathML output
+    expect(screen.getAllByText(code).map((node) => node.textContent?.trim())).toEqual([
+      code,
+      code,
+      code,
+    ]);
+  });
+
+  it.each([false, true])('copies selected math with its original syntax (Math %s)', (mathMode) => {
+    const formulas = [
+      String.raw`\(x^2\)`,
+      String.raw`$$\frac{1}{2}$$`,
+      '$$\n\\begin{matrix}a & b \\\\ c & d\\end{matrix}\n$$',
+      '\\[\n\\frac{1}{2}\n\\]',
+      '```latex\n\\frac{1}{2}\n```',
+      ...(mathMode ? ['$x^2$'] : []),
+    ];
+    for (const markdown of formulas) {
+      const rendered = render(
+        <AgentMarkdown mathMode={mathMode} markdown={`Before.\n\n${markdown}\n\nAfter.`} />,
+      );
+      const formula = rendered.container.querySelector('.katex-html'); // dom-contract: a drag selects KaTeX's visual glyphs inside its source wrapper
+      if (!formula) throw new Error(`Expected a rendered formula for ${markdown}.`);
+      // A normal drag starts and ends in the formula's glyphs, inside the
+      // KaTeX wrapper. The source must survive without selecting that wrapper.
+      const range = document.createRange();
+      range.selectNodeContents(formula);
+      const copied = copySelection(rendered.container, range);
+      expect(copied).toBe(markdown);
+      rendered.unmount();
+      const pasted = render(<AgentMarkdown mathMode={mathMode} markdown={copied} />);
+      expect(pasted.container.querySelectorAll('math')).toHaveLength(1); // dom-contract: KaTeX's accessible MathML output
+      pasted.unmount();
+    }
+  });
+
+  it('copies selected prose and math without flattening paragraphs, lists, or dollar escapes', () => {
+    const markdown = String.raw`Price \$10 to \$20; formula $x^2$.
+
+- First $$\frac{1}{2}$$.
+- **Second** item.
+
+$$
+\begin{matrix}a & b \\ c & d\end{matrix}
+$$`;
+    const rendered = render(<AgentMarkdown mathMode markdown={markdown} />);
+    const root = rendered.container.firstElementChild;
+    if (!root) throw new Error('Expected Markdown container.');
+    const range = document.createRange();
+    range.selectNodeContents(root);
+    const copied = copySelection(rendered.container, range);
+    expect(copied).toBe(markdown);
+    const pasted = render(<AgentMarkdown mathMode markdown={copied} />);
+    expect(pasted.container.querySelectorAll('math')).toHaveLength(3); // dom-contract: KaTeX's accessible MathML output
+    expect(pasted.container.querySelectorAll('.katex-display')).toHaveLength(1); // dom-contract: KaTeX's display-mode wrapper
+    expect(within(pasted.container).getAllByRole('listitem')).toHaveLength(2);
+    expect(pasted.container.textContent).toContain('Price $10 to $20');
+  });
+
+  it('keeps partial prose selection exact around a formula and escaped dollars', () => {
+    const markdown = String.raw`Before \$10 &amp; $x^2$ then \$20 after.`;
+    const { container } = render(<AgentMarkdown mathMode markdown={markdown} />);
+    const first = screen.getByText(/^Before/u).firstChild;
+    const last = screen.getByText(/ after\.$/u).firstChild;
+    if (!first || !last) throw new Error('Expected prose around the formula.');
+    const range = document.createRange();
+    range.setStart(first, 'Before '.length);
+    range.setEnd(last, (last.textContent ?? '').indexOf(' after.'));
+    expect(copySelection(container, range)).toBe(String.raw`\$10 &amp; $x^2$ then \$20`);
+  });
+
+  it.each([
+    '- First\n  continued $x$ tail',
+    '> First\n> continued $x$ tail',
+    '> - First\n>   continued $x$ tail',
+  ])('maps selections across stripped continuation prefixes: %s', (markdown) => {
+    const { container } = render(<AgentMarkdown mathMode markdown={markdown} />);
+    const first = screen.getByText(/^First/u).firstChild;
+    const last = screen.getByText('tail').firstChild;
+    if (!first || !last) throw new Error('Expected prose around the formula.');
+    const range = document.createRange();
+    range.setStart(first, (first.textContent ?? '').indexOf('continued') + 2);
+    range.setEnd(last, (last.textContent ?? '').length);
+    expect(copySelection(container, range)).toBe('ntinued $x$ tail');
+    const root = container.firstElementChild;
+    if (!root) throw new Error('Expected Markdown container.');
+    range.selectNodeContents(root);
+    expect(copySelection(container, range)).toBe(markdown);
+  });
+
+  it('keeps invalid formula source available when copying its visible error', () => {
+    const markdown = String.raw`$\frac{1}{$`;
+    const { container } = render(<AgentMarkdown mathMode markdown={markdown} />);
+    const formula = container.querySelector('.katex-error'); // dom-contract: KaTeX exposes malformed formulas as source text
+    if (!formula) throw new Error('Expected formula error.');
+    const range = document.createRange();
+    range.selectNodeContents(formula);
+    expect(copySelection(container, range)).toBe(markdown);
   });
 
   it('opens only project-resolved file references and keeps refused paths inert', async () => {

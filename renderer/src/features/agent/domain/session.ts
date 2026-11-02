@@ -1,4 +1,6 @@
-/** Pure session transitions keep transport state separate from turn outcomes. */
+/** The reducer and selectors keep transport state separate from turn outcomes.
+ * Transcript work belongs to session-transcript; one exhaustive switch owns
+ * the connection, composer, catalog and project scope. */
 import { supportedEffort } from './model-choice';
 import {
   agentActiveTurn,
@@ -22,10 +24,6 @@ export {
   agentWorkStatus,
   agentSessionIsBusy,
 } from './session-selectors';
-/** The Agent session reducer and the selectors that read its state. Every
- *  action lands in one exhaustive switch: transcript work is delegated to
- *  `session-transcript`, the connection moves as one discriminated union, and
- *  the composer, catalog and scope fields are edited in place. */
 import {
   type AgentActiveTurn,
   type AgentConnection,

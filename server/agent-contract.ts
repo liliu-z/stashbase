@@ -19,6 +19,7 @@ import { claudeUpgradeOffer } from './claude-model-catalog.ts';
 import { filesystemPath } from './filesystem-path.ts';
 import { trackAgentTurns } from './turn-changes.ts';
 import { trackChatPersona } from './agent-persona.ts';
+import { trackProjectRuntimeInstructions } from './agent-runtime-instructions.ts';
 import type { AgentModelCatalog, AgentUpgradeOffer } from '../shared/agent-runtime.ts';
 
 /** The renderer↔server wire vocabulary lives in `shared/agent-protocol.ts` so
@@ -317,7 +318,10 @@ export function attachAgentRuntime(id: string, ws: WebSocket, options: AgentConn
   }
   // Before the adapter registers its listeners, so its first prompt already
   // waits for the baseline. `server/turn-changes.ts` owns why this is the seam.
-  if (options.folder) trackAgentTurns(ws, options.folder);
+  if (options.folder) {
+    trackAgentTurns(ws, options.folder);
+    trackProjectRuntimeInstructions(ws, options.folder);
+  }
   trackChatPersona(ws, adapter.id, options);
   adapter.attach(ws, options);
 }

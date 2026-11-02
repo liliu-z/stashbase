@@ -15,6 +15,7 @@ export const settingsQueryKeys = {
   billingPlans: ['settings', 'billing-plans'] as const,
   billingStatus: ['settings', 'billing-status'] as const,
   appearance: ['settings', 'appearance'] as const,
+  projectMath: (scope: string | null) => ['settings', 'project-math', scope] as const,
   embedder: ['settings', 'embedder'] as const,
   mcpAccess: ['settings', 'mcp-access'] as const,
   systemFonts: ['settings', 'system-fonts'] as const,

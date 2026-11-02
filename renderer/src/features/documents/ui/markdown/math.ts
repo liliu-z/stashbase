@@ -1,24 +1,21 @@
-/**
- * Math for the Markdown surface, opened only by two dollars or a ```math /
- * ```latex fence — the rule the agent transcript follows.
- *
- * Crepe's own LaTeX feature reads single dollars as math and offers no switch,
- * so ordinary prices ("$0.10–$0.50") lost their dollar signs and turned
- * italic. Single dollars stay text here; a note written with `$x$` shows its
- * source instead of a formula.
- */
+/** Source-backed math protects TeX before Markdown decoding, while the
+ * presentation-only toggle preserves editing state and Undo/Redo. */
 import { codeBlockConfig } from '@milkdown/kit/component/code-block';
-import type { Editor } from '@milkdown/kit/core';
+import { remarkStringifyOptionsCtx, type Editor } from '@milkdown/kit/core';
 import { codeBlockSchema } from '@milkdown/kit/preset/commonmark';
-import { $nodeSchema, $remark, $view } from '@milkdown/kit/utils';
-import { renderToString } from 'katex';
-import remarkMath from 'remark-math';
+import { $markSchema, $remark } from '@milkdown/kit/utils';
 
-/** Crepe's theme styles inline math by this node name. */
-const MATH_INLINE = 'math_inline';
+import { remarkMathSyntax } from '@/shared/runtime/markdown-math';
+
+import { mathSourceCommands } from './math-commands';
+import { configureMathSourceLinks, mathSourceLinks } from './math-links';
+import { mathPresentation, proseParser, renderMath, type MathModeRef } from './math-presentation';
+import type { RemarkParser } from './math-prose';
+
+export { refreshMath, type MathModeRef } from './math-presentation';
+
+const MATH_SOURCE = 'math_source';
 const MATH_LANGUAGES = new Set(['latex', 'math']);
-
-const KATEX_OPTIONS = { throwOnError: false, trust: false, maxExpand: 1000, maxSize: 20 };
 
 interface MarkdownNode {
   type: string;
@@ -27,16 +24,51 @@ interface MarkdownNode {
   children?: MarkdownNode[];
 }
 
-const remarkDoubleDollarMath = $remark('remarkDoubleDollarMath', () => remarkMath, {
-  singleDollarTextMath: false,
-});
+const mathSourceSchema = $markSchema(MATH_SOURCE, () => ({
+  inclusive: false,
+  attrs: { prose: { default: false }, references: { default: '' } },
+  toDOM: (mark) => [
+    'span',
+    {
+      'data-math-source-text': '',
+      'data-math-prose': String(mark.attrs.prose),
+      'data-math-references': String(mark.attrs.references),
+    },
+    0,
+  ],
+  parseDOM: [
+    {
+      tag: 'span[data-math-source-text]',
+      getAttrs: (element) => ({
+        prose: element.getAttribute('data-math-prose') === 'true',
+        references: element.getAttribute('data-math-references') ?? '',
+      }),
+    },
+  ],
+  parseMarkdown: {
+    match: (node) => node.type === 'mathSource',
+    runner: (state, node, type) => {
+      state.openMark(type, {
+        prose: node.prose === true,
+        references: typeof node.references === 'string' ? node.references : '',
+      });
+      state.addText(typeof node.value === 'string' ? node.value : '');
+      state.closeMark(type);
+    },
+  },
+  toMarkdown: {
+    match: (mark) => mark.type.name === MATH_SOURCE,
+    runner: (state, mark, node) => {
+      state.withMark(mark, 'mathSource', node.text ?? '');
+      return true;
+    },
+  },
+}));
 
-/** A `$$` block arrives as a LaTeX code block, so it edits and previews like
- *  one and saves back as `$$`. */
 function mathBlocksToCode(node: MarkdownNode): void {
   node.children?.forEach((child, index, siblings) => {
     if (child.type === 'math') {
-      siblings[index] = { type: 'code', lang: 'LaTeX', value: child.value ?? '' };
+      siblings[index] = { ...child, type: 'code', lang: 'LaTeX', value: child.value ?? '' };
     } else {
       mathBlocksToCode(child);
     }
@@ -45,42 +77,6 @@ function mathBlocksToCode(node: MarkdownNode): void {
 
 const remarkMathBlockAsCode = $remark('remarkMathBlockAsCode', () => () => (tree) => {
   mathBlocksToCode(tree as MarkdownNode);
-});
-
-const mathInlineSchema = $nodeSchema(MATH_INLINE, () => ({
-  group: 'inline',
-  inline: true,
-  atom: true,
-  attrs: { value: { default: '' } },
-  parseDOM: [
-    {
-      tag: `span[data-type="${MATH_INLINE}"]`,
-      getAttrs: (dom) => ({ value: (dom as HTMLElement).dataset.value ?? '' }),
-    },
-  ],
-  toDOM: (node) => ['span', { 'data-type': MATH_INLINE, 'data-value': node.attrs.value as string }],
-  parseMarkdown: {
-    match: (node) => node.type === 'inlineMath',
-    runner: (state, node, type) => {
-      state.addNode(type, { value: node.value as string });
-    },
-  },
-  toMarkdown: {
-    match: (node) => node.type.name === MATH_INLINE,
-    runner: (state, node) => {
-      state.addNode('inlineMath', undefined, node.attrs.value as string);
-    },
-  },
-}));
-
-/** Shows the formula; the source stays in `data-value` for copy and parse. */
-const mathInlineView = $view(mathInlineSchema.node, () => (node, view) => {
-  const value = node.attrs.value as string;
-  const dom = view.dom.ownerDocument.createElement('span');
-  dom.dataset.type = MATH_INLINE;
-  dom.dataset.value = value;
-  dom.innerHTML = renderToString(value, KATEX_OPTIONS);
-  return { dom };
 });
 
 const mathBlockSchema = codeBlockSchema.extendSchema((previous) => (context) => {
@@ -102,20 +98,34 @@ const mathBlockSchema = codeBlockSchema.extendSchema((previous) => (context) => 
 });
 
 /** Add after `codeMirror`, whose preview hook this wraps. */
-export function math(editor: Editor): void {
+export function math(editor: Editor, mode: boolean | MathModeRef = false): void {
+  let parser: RemarkParser | undefined;
+  const getParser = (context: import('@milkdown/kit/ctx').Ctx) =>
+    (parser ??= proseParser(context, false));
   editor
     .config((context) => {
+      configureMathSourceLinks(context, getParser);
       context.update(codeBlockConfig.key, (previous) => ({
         ...previous,
         renderPreview: (language, content, applyPreview) =>
           MATH_LANGUAGES.has(language.toLowerCase()) && content.length > 0
-            ? renderToString(content, { ...KATEX_OPTIONS, displayMode: true })
+            ? renderMath(content, true)
             : previous.renderPreview(language, content, applyPreview),
       }));
+      context.update(remarkStringifyOptionsCtx, (previous) => ({
+        ...previous,
+        handlers: {
+          ...previous.handlers,
+          mathSource: (node: { type: string; value?: unknown }) =>
+            typeof node.value === 'string' ? node.value : '',
+        },
+      }));
     })
-    .use(remarkDoubleDollarMath)
+    .use($remark('remarkMathSource', () => remarkMathSyntax, { sourceText: true }))
     .use(remarkMathBlockAsCode)
-    .use(mathInlineSchema)
-    .use(mathInlineView)
+    .use(mathSourceSchema)
+    .use(mathPresentation(mode, getParser))
+    .use(mathSourceCommands(getParser))
+    .use(mathSourceLinks(getParser))
     .use(mathBlockSchema);
 }

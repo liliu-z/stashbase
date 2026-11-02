@@ -17,6 +17,7 @@ import {
   accountPort,
   agentRuntimePort,
   appearancePort,
+  projectMathPort,
   embedderPort,
   mcpAccessPort,
 } from './settings';
@@ -60,6 +61,7 @@ export function appDependencies(overrides: Partial<AppDependencies> = {}): AppDe
       accountApi: accountPort(),
       agentRuntimeApi: agentRuntimePort(),
       appearanceApi: appearancePort(),
+      projectMathApi: projectMathPort(),
       setAppearance: async () => undefined,
       systemTextApi: { listFonts: async () => [], spellcheckLanguages: async () => [] },
       telemetryApi: {

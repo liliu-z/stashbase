@@ -14,6 +14,7 @@ import type {
   AgentRuntimePort,
   AppearancePort,
   McpAccessPort,
+  ProjectMathPort,
 } from '@/features/settings/application/ports';
 import type { HostedAccount } from '@/features/settings/domain/account';
 import type { AgentAllowance, AgentRuntime } from '@/features/settings/domain/agent-catalog';
@@ -221,6 +222,18 @@ export function appearancePort(overrides: Partial<AppearancePort> = {}): Appeara
   return {
     load: vi.fn(async () => saved),
     update: vi.fn(async (change) => (saved = { ...saved, ...change })),
+    ...overrides,
+  };
+}
+
+export function projectMathPort(overrides: Partial<ProjectMathPort> = {}): ProjectMathPort {
+  const values = new Map<string, boolean>();
+  return {
+    load: vi.fn(async (scope) => ({ scope, math_mode: values.get(scope) ?? false })),
+    update: vi.fn(async (scope, mathMode) => {
+      values.set(scope, mathMode);
+      return { scope, math_mode: mathMode };
+    }),
     ...overrides,
   };
 }

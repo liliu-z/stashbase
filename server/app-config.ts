@@ -88,6 +88,9 @@ export function isEmbedderProvider(value: unknown): value is EmbedderProvider {
 }
 
 export interface AppConfigFile {
+  /** Local-only project settings. They deliberately follow the registered
+   * directory identity rather than project files or Markdown frontmatter. */
+  projectSettings?: Array<{ scope: string; math_mode?: boolean }>;
   /** The last explicit Agent choice, inherited by projects without their own. */
   lastSelectedAgent?: 'stashbase' | 'codex' | 'claude' | 'antigravity';
   /** Per-Agent defaults for projects without an explicit model or effort choice. */

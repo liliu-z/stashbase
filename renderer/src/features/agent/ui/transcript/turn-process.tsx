@@ -1,3 +1,5 @@
+/** Folds completed-turn progress while retaining conversation-local choices
+ * and respecting the reader's current focus and scroll position. */
 import { ChevronRight } from 'lucide-react';
 import {
   Fragment,

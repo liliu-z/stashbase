@@ -57,7 +57,7 @@ import {
 } from '@anthropic-ai/claude-agent-sdk';
 import { logger, errorMessage } from './log.ts';
 import { getCurrentFolder, normalizeWindowId, registeredRootForAbs, runWithWindowId } from './folder.ts';
-import { resolveAgentRuntimeInstructions } from './agent-runtime-instructions.ts';
+import { projectMathMode, resolveAgentRuntimeInstructions } from './agent-runtime-instructions.ts';
 import { agentCliEnv, commandDir, resolveAgentCli } from './agent-cli.ts';
 import { agentCliLaunch } from './agent-cli-launch.ts';
 import { ensureClaudeFolderTrust } from './agent-rules.ts';
@@ -467,7 +467,7 @@ export class AgentSession implements AttributedAgentSession {
           systemPrompt: {
             type: 'preset',
             preset: 'claude_code',
-            append: resolveAgentRuntimeInstructions(this.persona),
+            append: resolveAgentRuntimeInstructions(this.persona, projectMathMode(cwd)),
           },
           // Resuming a past session loads its conversation history so the
           // user can continue it. The transcript itself is rendered from

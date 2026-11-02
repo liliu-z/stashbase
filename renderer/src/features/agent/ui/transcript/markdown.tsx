@@ -3,16 +3,17 @@ import { memo, type ComponentProps } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
-import remarkMath from 'remark-math';
 
 import 'katex/dist/katex.min.css';
 import { parseCitationHref } from '@/features/agent/domain/citation';
 import { useTouchPrimary } from '@/lib/use-touch-primary';
 import { cn } from '@/lib/utils';
 import type { SourceReference } from '@/shared/domain/source-reference';
+import { remarkMathSyntax } from '@/shared/runtime/markdown-math';
 import { MARKDOWN_PROSE_CLASS } from '@/shared/ui/markdown-prose';
 
 import { CopyAction } from './copy-action';
+import { copyRenderedMathSource, preserveMarkdownSource } from './markdown-copy';
 
 function isHttpUrl(href: string): boolean {
   try {
@@ -21,34 +22,6 @@ function isHttpUrl(href: string): boolean {
   } catch {
     return false;
   }
-}
-
-/** Code spans and fences, then existing `$$` math, then `\[ \]` and `\( \)`.
- *  A doubled backslash (`\\[2pt]`) is a LaTeX row break, not an opener. */
-const LATEX_DELIMITERS =
-  /(?<!`)(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)|\$\$[\s\S]*?\$\$|(?<!\\)\\\[([\s\S]+?)\\\]|(?<!\\)\\\(([^\n]+?)\\\)/gu;
-
-/**
- * Many models write LaTeX between `\[ \]` and `\( \)`. Markdown reads those as
- * escaped brackets and drops the backslashes, so the formula showed as source.
- * They become the double-dollar math the transcript renders; a `\[` that owns
- * its line becomes a display block at the same indentation.
- */
-function withDollarMath(markdown: string): string {
-  return markdown.replace(
-    LATEX_DELIMITERS,
-    (match, _code, display: string | undefined, inline: string | undefined, offset: number) => {
-      if (inline !== undefined) return `$$${inline}$$`;
-      if (display === undefined) return match;
-      const indent = markdown.slice(markdown.lastIndexOf('\n', offset - 1) + 1, offset);
-      const end = offset + match.length;
-      const lineEnd = markdown.indexOf('\n', end);
-      const rest = markdown.slice(end, lineEnd === -1 ? undefined : lineEnd);
-      return indent.trim() || rest.trim()
-        ? `$$${display}$$`
-        : `$$\n${indent}${display.trim()}\n${indent}$$`;
-    },
-  );
 }
 
 interface SyntaxNode {
@@ -161,25 +134,29 @@ function markdownComponents({
 }
 
 export const AgentMarkdown = memo(function AgentMarkdown({
+  mathMode = false,
   markdown,
   onOpenExternal,
   onOpenSource,
   sourceFor,
 }: MarkdownLinks & {
+  mathMode?: boolean | undefined;
   markdown: string;
 }) {
   return (
-    <div className={MARKDOWN_PROSE_CLASS}>
+    <div
+      className={MARKDOWN_PROSE_CLASS}
+      onCopy={(event) => copyRenderedMathSource(event, markdown)}
+    >
       <ReactMarkdown
         components={markdownComponents({ onOpenExternal, onOpenSource, sourceFor })}
-        // Single-dollar text math would swallow ordinary prices ("$4 ... $5");
-        // math still opens with two dollars or a ```math fence.
-        remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: false }]]}
+        remarkPlugins={[remarkGfm, [remarkMathSyntax, { singleDollarTextMath: mathMode }]]}
         rehypePlugins={[
+          preserveMarkdownSource,
           [rehypeKatex, { trust: false, strict: 'ignore', maxExpand: 1000, maxSize: 20 }],
         ]}
       >
-        {withDollarMath(markdown)}
+        {markdown}
       </ReactMarkdown>
     </div>
   );

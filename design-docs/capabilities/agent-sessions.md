@@ -50,6 +50,13 @@ After a Default turn, the app may prepare a local runtime for the next chat to
 reduce connection delay. This creates no conversation, sends no model request,
 and consumes no agent credits. Each chat still receives its own runtime and
 permissions, with current model and tool choices checked before use.
+The project's Math setting also belongs to those instructions: Math off uses
+`\(...\)` inline and `$$` display blocks; Math on uses `$...$` inline and escapes
+literal dollars as `\$`. This applies to replies and Markdown file writes.
+A successfully saved change applies to the next turn in every existing chat,
+including background chats and queued follow-ups. It preserves the conversation
+and lets a running turn finish with its existing instructions. An unused
+prewarmed runtime must match the saved Math setting before it can be reused.
 
 ## Submission and Execution
 

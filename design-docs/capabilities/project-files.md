@@ -270,11 +270,24 @@ passage is sent.
 Markdown frontmatter is outside the prose editor. A turn review that would change it is
 refused with a visible reason; its metadata is never silently omitted from a review.
 
-Markdown math uses double-dollar delimiters or `math` / `latex` fenced blocks.
-Single-dollar amounts remain ordinary text in Documents and Chat, including
-when a Markdown document is saved. Chat replies also render LaTeX's `\[ \]` and
-`\( \)` delimiters, which many models write, outside code. Documents does not
-treat them as math.
+Markdown math always supports double-dollar delimiters, `math` / `latex`
+fenced blocks, and LaTeX's `\[ \]` and `\( \)` delimiters outside code. The
+**Math** switch beside Reading text is local to the current project: off by
+default, it keeps single-dollar text literal; on, it makes `$...$` inline math.
+An escaped `\$` stays a literal dollar sign in either mode. The setting applies
+to Documents and Chat, does not add frontmatter or project files, and does not
+travel when a folder is copied. It changes rendering only: Markdown source and
+saved Chat messages retain their original delimiters.
+Changing Math retains unsaved edits, Undo/Redo, selection and reading position.
+Formula source, including matrix row separators and escaped dollar signs,
+survives editing, saving and reopening; untouched blocks keep their source.
+In the editor, placing the caret in a formula exposes its editable source.
+Chat selection-copy retains Markdown structure and formula source, including
+when the selection begins or ends inside a rendered formula. Copying a complete
+reply continues to copy its original Markdown. Other applications' rendered
+clipboard formats require separate verification.
+The switch reports a refused save and restores the confirmed value; a failed
+initial read offers Retry rather than presenting a writable guessed setting.
 
 File diffs, save-conflict comparisons, and agent tool approvals have their own
 flows. Other editable formats currently have no inline revision surface.

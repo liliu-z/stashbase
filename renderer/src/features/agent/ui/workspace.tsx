@@ -1,9 +1,8 @@
 /** Conversation surface. Reads session state and invokes runtime actions. */
-import { useCallback, useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useStore } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
 
-import type { QueuedMessage } from '@/components/ui/input-message';
 import type { AgentCatalogPort } from '@/features/agent/application/ports';
 import type { AgentSessionRuntime } from '@/features/agent/application/session-runtime';
 import { honoredAccessMode } from '@/features/agent/domain/access';
@@ -54,6 +53,7 @@ function ChatWorkspace({
   catalog,
   catalogPort,
   header = true,
+  mathMode = false,
   persona: personaApi,
   scheduledTasks,
   tools: toolsApi,
@@ -217,6 +217,7 @@ function ChatWorkspace({
               onProcessToggle={pauseFollowing}
               focusBlockId={focusBlockId}
               key={activeId}
+              mathMode={mathMode}
               modelRefresh={modelRefresh}
               onEditPrompt={composerShown ? editPrompt : undefined}
               onOpenExternal={onOpenExternal}
@@ -256,7 +257,7 @@ function ChatWorkspace({
               environment={scopeEnvironment}
               maxRows={6}
               minRows={3}
-              onQueueChange={(queue: QueuedMessage[]) =>
+              onQueueChange={(queue) =>
                 active.setQueue(queue.map(({ id, text }) => ({ id, text })))
               }
               onRefreshSkills={active.refreshSkills}
@@ -354,9 +355,7 @@ function ChatWorkspace({
         startedAt={access.startedAt}
         preparation={access.preparation}
         failure={access.failure}
-        onConfirm={() => {
-          void access.confirm();
-        }}
+        onConfirm={() => void access.confirm()}
         onCancel={access.cancel}
         onOpenSignIn={onOpenExternal}
         onStopWaiting={access.stopWaiting}
@@ -372,9 +371,7 @@ function ChatWorkspace({
         }
         onRetry={
           preferences.failure
-            ? () => {
-                void runtime.loadPreferences();
-              }
+            ? () => void runtime.loadPreferences()
             : catalog.error
               ? catalog.refresh
               : undefined

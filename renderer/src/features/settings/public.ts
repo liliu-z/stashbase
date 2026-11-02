@@ -4,6 +4,7 @@ export {
   type AgentRuntimePort,
   type AppearancePort,
   type McpAccessPort,
+  type ProjectMathPort,
   type SystemTextPort,
 } from './application/ports';
 export { type EmbedderPort } from './application/embedder-port';
@@ -12,6 +13,7 @@ export { createAgentRuntimeAdapter } from './infrastructure/agent-runtime-api';
 export { createMcpAccessAdapter } from './infrastructure/mcp-access-api';
 export { createEmbedderAdapter } from './infrastructure/embedder-api';
 export { createAppearanceAdapter } from './infrastructure/appearance-api';
+export { createProjectMathAdapter } from './infrastructure/project-math-api';
 export { createSystemTextAdapter } from './infrastructure/system-text';
 export { useSearchKeyConfigured } from './hooks/use-embedder';
 export { useAccountView } from './hooks/account-context';
@@ -26,5 +28,6 @@ export type { TelemetryPort } from './application/telemetry-port';
 export { createTelemetryAdapter } from './infrastructure/telemetry-api';
 export { LocalComponentRecovery } from './ui/general/local-component-recovery';
 export { ReadingTextMenu } from './ui/appearance/reading-text-menu';
+export { useProjectMath } from './hooks/use-project-math';
 
 export { useRefreshAgentAllowance } from './hooks/use-refresh-agent-allowance';
