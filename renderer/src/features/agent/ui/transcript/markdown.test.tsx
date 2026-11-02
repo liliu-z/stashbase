@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
 
@@ -169,9 +169,6 @@ Keep ${'`\\(x\\)`'} as code.`}
       const copied = copySelection(rendered.container, range);
       expect(copied).toBe(markdown);
       rendered.unmount();
-      const pasted = render(<AgentMarkdown mathMode={mathMode} markdown={copied} />);
-      expect(pasted.container.querySelectorAll('math')).toHaveLength(1); // dom-contract: KaTeX's accessible MathML output
-      pasted.unmount();
     }
   });
 
@@ -191,11 +188,6 @@ $$`;
     range.selectNodeContents(root);
     const copied = copySelection(rendered.container, range);
     expect(copied).toBe(markdown);
-    const pasted = render(<AgentMarkdown mathMode markdown={copied} />);
-    expect(pasted.container.querySelectorAll('math')).toHaveLength(3); // dom-contract: KaTeX's accessible MathML output
-    expect(pasted.container.querySelectorAll('.katex-display')).toHaveLength(1); // dom-contract: KaTeX's display-mode wrapper
-    expect(within(pasted.container).getAllByRole('listitem')).toHaveLength(2);
-    expect(pasted.container.textContent).toContain('Price $10 to $20');
   });
 
   it('keeps partial prose selection exact around a formula and escaped dollars', () => {

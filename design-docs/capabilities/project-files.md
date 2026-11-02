@@ -272,7 +272,7 @@ refused with a visible reason; its metadata is never silently omitted from a rev
 
 Markdown math always supports double-dollar delimiters, `math` / `latex`
 fenced blocks, and LaTeX's `\[ \]` and `\( \)` delimiters outside code. The
-**Math** switch beside Reading text is local to the current project: off by
+**Math** toggle beside Reading text is local to the current project: off by
 default, it keeps single-dollar text literal; on, it makes `$...$` inline math.
 An escaped `\$` stays a literal dollar sign in either mode. The setting applies
 to Documents and Chat, does not add frontmatter or project files, and does not
@@ -289,9 +289,12 @@ spacing, and their editable source wraps within the document pane. Placing the
 caret in an inline formula exposes its editable source.
 Chat selection-copy retains Markdown structure and formula source, including
 when the selection begins or ends inside a rendered formula. Copying a complete
-reply continues to copy its original Markdown. Other applications' rendered
-clipboard formats require separate verification.
-The switch reports a refused save and restores the confirmed value; a failed
+reply continues to copy its original Markdown. Pasting that reply, a mixed
+passage or a selected formula into Documents preserves its TeX and Markdown
+structure. The pasted formulas remain editable and render after saving and
+reopening, just like formulas written directly into the file.
+Other applications' rendered clipboard formats require separate verification.
+The toggle reports a refused save and restores the confirmed value; a failed
 initial read offers Retry rather than presenting a writable guessed setting.
 
 File diffs, save-conflict comparisons, and agent tool approvals have their own

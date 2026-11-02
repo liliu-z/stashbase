@@ -77,6 +77,9 @@ pnpm test:renderer src/features/settings/domain/appearance.test.ts
 # One host regression; broader boundary suites are in the journey map
 node --import tsx --import ./server/__tests__/isolated-home.ts --test server/text-file-transaction.test.ts
 
+# Chat formulas, Agent-written Markdown and copy/paste into Documents
+pnpm test:renderer src/app/composition/layout/math-workflow.test.tsx
+
 # Story interactions and structural accessibility
 pnpm test:renderer:a11y
 ```
@@ -87,6 +90,13 @@ renderer audit for CI and architecture/toolchain changes, including coverage,
 accessibility, static checks, and both builds. Ordinary local UI work uses the
 core gate, formatting/lint, and affected tests.
 Build and lint commands do only their named work.
+
+For interactive math checks, run `pnpm storybook` and open
+**Compositions / Math workflow / Chat To Document**. Chat and Documents share
+`renderer/src/test/fixtures/math.ts`: compare rendering, switch Math, edit a
+formula, or copy a reply/selection into **Paste target**, then **Save and reopen**.
+**Saved Markdown** exposes the saved source. This Story uses a controlled Agent
+and in-memory files; provider output and disk writes require separate checks.
 
 Host test workers automatically suppress production telemetry, including when
 `STASHBASE_PACKAGED=1` is inherited. The shared isolated fixture also suppresses

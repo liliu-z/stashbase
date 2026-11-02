@@ -974,6 +974,8 @@ Reading controls share a project write across retained document menus, wait for
 it before a new read, and retain rollback/error presentation after the initiating
 menu unmounts. The existing Reading text menu tests also cover initial-read retry
 and refreshing another desktop window's change when returning to the window.
+The shared Chat-to-document fixture and save/reopen evidence are owned by
+[J07](#j07-converge).
 
 **HTML engagement:** native `electron/window/lifecycle.ts` input-presence events
 cross the narrow window preload/adapter without keys, positions or document
@@ -1838,6 +1840,8 @@ isolated macOS Electron source pass exercised real Chromium ranges for mixed
 paragraph/list/matrix selections and selections inside inline/display glyphs.
 External application paste behavior and real-provider continuation are not
 established by these checks; see J01.
+The actual Chat-to-Documents copy/paste composition is covered in
+[J07](#j07-converge).
 
 **Model and effort across projects (2026-10-29):** `server/routes/agent-preferences.ts`
 atomically saves each agent's last explicit model and effort alongside the project
@@ -3568,6 +3572,31 @@ refund begins at first uncertainty; this evidence does not prove live-provider
 pricing or a newly packaged desktop journey.
 
 ## J07: Converge
+
+**Shared math workflow (2026-11-02):**
+`renderer/src/test/fixtures/math.ts` supplies one Markdown sample to the
+`app/composition/layout/math-workflow.test.tsx` regression and
+**Compositions / Math workflow / Chat To Document** Story. It contains inline
+math, fractions, an integral, a matrix, a fenced sum and a long formula alongside
+escaped prices, a formatted list and literal code. The composition drives the
+real App through streamed Chat output, opening a controlled Agent-written file,
+one project Math toggle across both surfaces, a formula source edit, Copy response,
+and copying a selection inside matrix glyphs. Real document paste, autosave and
+close/reopen preserve TeX, matrix rows and surrounding Markdown. Controlled
+session and versioned storage ports do not establish provider behavior or disk
+writes. The interactive Story composes the public Chat and Documents workspaces
+side by side and provides an empty paste target, save/reopen and saved source.
+It uses the production renderers with in-memory files, without adding a second
+formula implementation.
+
+An isolated macOS Electron pass used the real system clipboard for the whole
+reply, a selection inside a formula glyph, and mixed prose/display-formula
+selections. Native paste into Documents followed by save/reopen preserved the
+formulas and surrounding content; ordinary list-marker normalization remained
+valid Markdown. The two rendered surfaces were visually inspected together.
+The same sample also passed real MCP HTTP `write_file`/`read_file` with an exact
+disk-byte comparison, then opened in the source application. These checks used
+controlled Agent output, not a live provider or packaged distribution.
 
 **Interactive notes (2026-10-28):** `create_interactive_note` shares the blank
 starter with New tab, returning a new directory, HTML entry, and JSON data paths.
