@@ -7,6 +7,8 @@ import { HtmlDocument } from './document';
 
 let userActivationDescriptor: PropertyDescriptor | undefined;
 
+const frames = () => screen.getAllByTitle<HTMLIFrameElement>('dashboard.html HTML preview');
+
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -142,5 +144,68 @@ describe('HTML document', () => {
     expect(onOpenExternal).toHaveBeenCalledWith('https://example.com/guide');
 
     fireEvent.load(frame);
+  });
+
+  it('keeps the shown page until its replacement is ready, at the same reading position', async () => {
+    const navigation = createDocumentNavigationRuntime('tab-1');
+    const page = (version: string) => (
+      <HtmlDocument
+        active
+        name="dashboard.html"
+        navigation={navigation}
+        onNavigate={vi.fn()}
+        onOpenExternal={vi.fn(async () => true)}
+        resource={{ kind: 'source', url: `data:text/html,${version}`, version }}
+        source={{ folderPath: '/project', path: 'dashboard.html' }}
+        tabId="tab-1"
+      />
+    );
+    const view = render(page('one'));
+    const [shown] = frames();
+    const shownWindow = shown?.contentWindow;
+    if (!shown || !shownWindow) throw new Error('HTML preview frame has no content window.');
+    fireEvent.load(shown);
+    act(() => {
+      globalThis.dispatchEvent(
+        new MessageEvent('message', {
+          data: { type: 'stashbase-scroll-position', x: 0, y: 420 },
+          source: shownWindow,
+        }),
+      );
+    });
+
+    view.rerender(page('two'));
+    const [, replacement] = frames();
+    const replacementWindow = replacement?.contentWindow;
+    if (!replacement || !replacementWindow) throw new Error('No replacement frame.');
+    // Neither page takes input while one replaces the other.
+    expect(frames()[0]).toBe(shown);
+    expect(shown.closest('[inert]')).not.toBeNull();
+    expect(replacement.closest('[inert]')).not.toBeNull();
+    const postMessage = vi.spyOn(replacementWindow, 'postMessage');
+    fireEvent.load(replacement);
+    await waitFor(() =>
+      expect(postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'stashbase-scroll-restore', x: 0, y: 420 }),
+        '*',
+      ),
+    );
+    expect(frames()).toHaveLength(2);
+    expect(screen.queryByText('Updated')).toBeNull();
+
+    const restore = postMessage.mock.calls.find(
+      ([message]) => (message as Record<string, unknown>).type === 'stashbase-scroll-restore',
+    )?.[0] as Record<string, unknown>;
+    act(() => {
+      globalThis.dispatchEvent(
+        new MessageEvent('message', {
+          data: { reqId: restore.reqId, type: 'stashbase-scroll-restored' },
+          source: replacementWindow,
+        }),
+      );
+    });
+    expect(screen.getByRole('status').textContent).toBe('Updated');
+    expect(replacement.closest('[inert]')).toBeNull();
+    await waitFor(() => expect(frames()).toEqual([replacement]));
   });
 });

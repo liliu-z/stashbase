@@ -3,7 +3,7 @@
  * markup never runs in the renderer, and every link it offers is routed back
  * through the workspace's navigation callbacks.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { useStore } from 'zustand';
 
 import type { HtmlDataSession } from '@/features/documents/application/html-data-session';
@@ -11,9 +11,13 @@ import type { DocumentNavigationRuntime } from '@/features/documents/application
 import type { DocumentAsset } from '@/features/documents/application/ports';
 import { resolveDocumentLink } from '@/features/documents/domain/link-target';
 import { LinkFailureNotice } from '@/features/documents/ui/link-failure-notice';
+import { cn } from '@/lib/utils';
 import type { SourceReference } from '@/shared/domain/source-reference';
 
 import { createHtmlFrameFindController } from './find-controller';
+import { scrollPosition, usePageReady, type ScrollPosition } from './page-ready';
+import { usePreviewLayers } from './preview-layers';
+import { PreviewUpdateStatus } from './update-status';
 import { useHtmlDataBridge } from './use-data-bridge';
 
 interface FrameLinkMessage {
@@ -53,6 +57,10 @@ export interface SandboxedHtmlFrameProps {
   navigation: DocumentNavigationRuntime;
   onNavigate(target: { anchor?: string | undefined; source: SourceReference }): void;
   onOpenExternal(href: string): Promise<boolean>;
+  /** Called once a page loading behind another is ready to replace it. */
+  onReady?: (() => void) | undefined;
+  /** The reading position: the active page records it, a replacement restores it. */
+  scrollRef?: RefObject<ScrollPosition | null> | undefined;
   source: SourceReference;
   tabId: string;
   trustedLinks?: boolean;
@@ -71,13 +79,18 @@ export function SandboxedHtmlFrame({
   navigation,
   onNavigate,
   onOpenExternal,
+  onReady,
+  scrollRef,
   source,
   tabId,
   trustedLinks = false,
   url,
 }: SandboxedHtmlFrameProps) {
   const frameRef = useRef<HTMLIFrameElement | null>(null);
-  useHtmlDataBridge(frameRef, data, url, active);
+  const ready = usePageReady(frameRef, onReady, scrollRef);
+  useHtmlDataBridge(frameRef, data, url, active, ready.requests);
+  const activeRef = useRef(active);
+  activeRef.current = active;
   const loadedRef = useRef(false);
   const ownerRef = useRef(Symbol(tabId));
   const [linkFailed, setLinkFailed] = useState(false);
@@ -130,6 +143,11 @@ export function SandboxedHtmlFrame({
         else if (message.dir === 'next') navigation.findNext();
         return;
       }
+      if (message.type === 'stashbase-scroll-position') {
+        const position = scrollPosition(message);
+        if (scrollRef && position) scrollRef.current = position;
+        return;
+      }
 
       const link = frameLinkMessage(message);
       if (!link || (!trustedLinks && !hasUserActivation())) return;
@@ -167,7 +185,7 @@ export function SandboxedHtmlFrame({
       release();
       controller.dispose();
     };
-  }, [active, navigation, onNavigate, onOpenExternal, source, tabId, trustedLinks, url]);
+  }, [active, navigation, onNavigate, onOpenExternal, scrollRef, source, tabId, trustedLinks, url]);
 
   useEffect(() => {
     if (!active || !loadedRef.current || !pendingAnchor) return;
@@ -185,6 +203,10 @@ export function SandboxedHtmlFrame({
       { theme: resolvedViewerTheme(), type: 'stashbase-theme' },
       '*',
     );
+    ready.loaded();
+    // A replacement loading behind the shown page takes anchors and Find
+    // once it is shown.
+    if (!activeRef.current) return;
     const state = navigation.store.getState();
     if (state.pendingAnchor?.tabId === tabId) {
       frameRef.current?.contentWindow?.postMessage(
@@ -220,20 +242,46 @@ export function HtmlDocument({
   onNavigate,
   onOpenExternal,
   resource,
+  revision = 0,
   source,
   tabId,
-}: Omit<SandboxedHtmlFrameProps, 'trustedLinks' | 'url'> & { resource: DocumentAsset }) {
+}: Omit<SandboxedHtmlFrameProps, 'onReady' | 'scrollRef' | 'trustedLinks' | 'url'> & {
+  resource: DocumentAsset;
+  /** Counts data changes made outside the page; each one loads it again. */
+  revision?: number | undefined;
+}) {
+  // The URL carries the source version and path; a renamed page loads again too.
+  const preview = usePreviewLayers(`${resource.url}#${revision}`, resource.url, active);
+  const scrollRef = useRef<ScrollPosition | null>(null);
   return (
-    <SandboxedHtmlFrame
-      active={active}
-      data={data}
-      name={name}
-      navigation={navigation}
-      onNavigate={onNavigate}
-      onOpenExternal={onOpenExternal}
-      source={source}
-      tabId={tabId}
-      url={resource.url}
-    />
+    <div className="relative min-h-0 flex-1 overflow-hidden">
+      {preview.layers.map((layer) => (
+        <div
+          className={cn(
+            'absolute inset-0 flex flex-col transition-opacity duration-base',
+            layer.state === 'loading' && 'pointer-events-none opacity-0',
+          )}
+          // The page being replaced takes no input, so nothing typed into it
+          // is missing from the page that replaces it.
+          inert={layer.state !== 'shown' || preview.replacing}
+          key={layer.id}
+        >
+          <SandboxedHtmlFrame
+            active={active && layer.state === 'shown'}
+            data={data}
+            name={name}
+            navigation={navigation}
+            onNavigate={onNavigate}
+            onOpenExternal={onOpenExternal}
+            onReady={() => preview.reveal(layer.id)}
+            scrollRef={scrollRef}
+            source={source}
+            tabId={tabId}
+            url={layer.url}
+          />
+        </div>
+      ))}
+      <PreviewUpdateStatus status={preview.status} />
+    </div>
   );
 }

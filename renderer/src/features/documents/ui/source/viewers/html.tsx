@@ -30,12 +30,12 @@ export default function HtmlViewer({
           {(resource, revision) => (
             <HtmlDocument
               active={active}
-              key={`${resource.version}:${revision}`}
               name={name}
               navigation={navigation}
               onNavigate={onNavigate}
               onOpenExternal={onOpenExternal}
               resource={resource}
+              revision={revision}
               data={runtime.htmlData}
               source={runtime.scope.source}
               tabId={runtime.scope.id}
@@ -83,7 +83,7 @@ function BoundPreview({
   const refreshFailed = useStore(data.store, (state) => state.refreshFailed);
   useDocumentRefresh(active && document !== null, data.refresh);
   // A new page loads the shared draft again, so HTML and data changes both
-  // replace the page at once.
+  // load a replacement page.
   return (
     <>
       {refreshFailed && <RefreshFailedBanner onRetry={() => void data.refresh()} />}

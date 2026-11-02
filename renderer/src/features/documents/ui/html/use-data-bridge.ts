@@ -4,11 +4,14 @@ import { useEffect, useRef, type RefObject } from 'react';
 import { htmlDataFailureMessage } from '@/features/documents/application/failure-messages';
 import type { HtmlDataSession } from '@/features/documents/application/html-data-session';
 
+import type { PageLoadObserver } from './page-ready';
+
 export function useHtmlDataBridge(
   frame: RefObject<HTMLIFrameElement | null>,
   data: HtmlDataSession | undefined,
   url: string,
   active: boolean,
+  loads?: PageLoadObserver,
 ): void {
   const activeRef = useRef(active);
   activeRef.current = active;
@@ -39,6 +42,8 @@ export function useHtmlDataBridge(
         return;
       }
       pending++;
+      const loading = request.method === 'load';
+      if (loading) loads?.started();
       void (async () => {
         try {
           if (disposed) return;
@@ -58,6 +63,7 @@ export function useHtmlDataBridge(
           reply(undefined, htmlDataFailureMessage(error));
         } finally {
           pending--;
+          if (loading) loads?.settled();
         }
       })();
     };
@@ -66,5 +72,5 @@ export function useHtmlDataBridge(
       disposed = true;
       globalThis.removeEventListener('message', receive);
     };
-  }, [data, frame, url]);
+  }, [data, frame, loads, url]);
 }

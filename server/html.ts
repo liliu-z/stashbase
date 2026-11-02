@@ -350,6 +350,40 @@ function addScrollBootstrap(html: string): string {
     return true;
   }
 
+  // A newer version of this page replaces the frame. The parent keeps the
+  // reading position the page last reported and hands it to the replacement,
+  // which confirms once it has scrolled there (or as near as its content
+  // allows within a few frames) and painted.
+  var scrollQueued = false;
+  window.addEventListener('scroll', function() {
+    if (scrollQueued) return;
+    scrollQueued = true;
+    requestAnimationFrame(function() {
+      scrollQueued = false;
+      try {
+        window.parent.postMessage({
+          type: 'stashbase-scroll-position',
+          x: window.scrollX,
+          y: window.scrollY
+        }, '*');
+      } catch (_) {}
+    });
+  }, { passive: true });
+  function restoreScroll(x, y, reqId) {
+    var tries = 0;
+    function attempt() {
+      try { window.scrollTo({ left: x, top: y, behavior: 'instant' }); } catch (_) {}
+      var off = Math.abs(window.scrollX - x) > 1 || Math.abs(window.scrollY - y) > 1;
+      if (off && ++tries < 10) { requestAnimationFrame(attempt); return; }
+      requestAnimationFrame(function() {
+        try {
+          window.parent.postMessage({ type: 'stashbase-scroll-restored', reqId: reqId }, '*');
+        } catch (_) {}
+      });
+    }
+    attempt();
+  }
+
   window.addEventListener('message', function(e) {
     if (!e || e.source !== window.parent || !e.data) return;
     var d = e.data;
@@ -368,6 +402,10 @@ function addScrollBootstrap(html: string): string {
     if (d.type === 'stashbase-scroll') {
       var el = document.getElementById(d.id);
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    if (d.type === 'stashbase-scroll-restore') {
+      restoreScroll(Number(d.x) || 0, Number(d.y) || 0, d.reqId);
       return;
     }
     if (d.type === 'stashbase-chunk-highlight') {
