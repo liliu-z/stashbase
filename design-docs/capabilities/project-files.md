@@ -278,6 +278,16 @@ An escaped `\$` stays a literal dollar sign in either mode. The setting applies
 to Documents and Chat, does not add frontmatter or project files, and does not
 travel when a folder is copied. It changes rendering only: Markdown source and
 saved Chat messages retain their original delimiters.
+Changing Math retains unsaved edits, Undo/Redo, selection and reading position.
+Formula source, including matrix row separators and escaped dollar signs,
+survives editing, saving and reopening; untouched blocks keep their source.
+In the editor, placing the caret in a formula exposes its editable source.
+Chat selection-copy retains Markdown structure and formula source, including
+when the selection begins or ends inside a rendered formula. Copying a complete
+reply continues to copy its original Markdown. Other applications' rendered
+clipboard formats require separate verification.
+The switch reports a refused save and restores the confirmed value; a failed
+initial read offers Retry rather than presenting a writable guessed setting.
 
 File diffs, save-conflict comparisons, and agent tool approvals have their own
 flows. Other editable formats currently have no inline revision surface.

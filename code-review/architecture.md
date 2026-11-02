@@ -622,9 +622,14 @@ stable status without download, retry, or a new durable demand latch.
   persona applies from the next turn. Gallery personas are Gallery index data;
   the composition layer adds them through the agent's library, since the
   features do not import each other. Brainstorming needs no sources/wiki/index.
-  A Math-mode change safely reconnects an idle existing Chat to the same native
-  conversation so its next turn receives the new formatting instruction; an
-  active turn is allowed to finish unchanged.
+  A successful Math-mode save notifies every bound runtime socket through
+  `agent-contract.ts`'s shared attachment seam. Each renderer session owns its
+  instruction refresh, including sessions without a mounted Chat: it resumes
+  the same native conversation when idle, or after the active turn and before
+  advancing queued work. Preparing a prompt retains its snapshot across this
+  refresh. Optimistic UI changes never restart a runtime. Default's prewarmed
+  process captures one Math value for both its identity and startup prompt;
+  changing the saved value prevents reuse of a spare with different instructions.
 - Default receives explicit transient attachment references in the prompt
   protocol. `server/routes/attach.ts` binds uploads to an explicit registered
   project and records their digest; `server/agent-attachments.ts` validates
@@ -1400,19 +1405,30 @@ registered host boundaries; renderer shared types are a different layer.
   synchronizer; anchor updates must not reparse prose or interrupt IME composition.
   The sole double-cast exemption is its Find controller's structural DOM corpus and guarded
   CSS Highlight probe; other exceptions need their code-owned rationale.
-- Markdown's `math.ts` owns the document math rule and code-block preview.
-  `$$`, explicit `math` / `latex` fences, and `\[ \]` / `\( \)` outside code
-  always parse as math. Its project-scoped `singleDollarTextMath` option and
-  the transcript's matching `markdown.tsx` option enable `$...$` only when
-  Math is on; code stays literal and source is never rewritten by a toggle.
-  KaTeX output carries its formula source for transcript selection-copy, while
-  the reply action copies the original Markdown text.
+- `shared/runtime/markdown-math.ts` owns the math syntax shared by Documents
+  and Chat. It recognizes delimiters before CommonMark consumes formula escapes,
+  preserving source positions and leaving code literal. `$$`, explicit `math` /
+  `latex` fences, and `\[ \]` / `\( \)` always render as math; the project setting
+  controls single dollars. Documents retains complete inline source where math
+  and ordinary Markdown can overlap, including the source across price
+  delimiters. Its presentation uses the ordinary Markdown parser; formatting
+  commands edit that same source through existing ProseMirror transactions.
+  Changing Math redraws decorations, preserving the editor, history and
+  source-block mapping. A caret inside a formula exposes its source for correction.
+  Chat's `markdown-copy.ts` maps rendered text and formula selections back to the
+  original Markdown positions, preserving delimiters, escapes and block structure;
+  a selection inside KaTeX copies the formula's source. The reply action copies
+  the original Markdown text.
 - `projectSettings[].math_mode` in the local application config is keyed by the
   resolved registered-folder identity. It defaults off, follows neither source
   files nor frontmatter, and is forgotten when the project is removed. The
-  reading control owns its local optimistic write; app composition fans its
-  cached value into Documents and Chat without changing source or transcript
-  storage.
+  QueryClient owns one pending Math write per project across retained reading
+  controls. Reads mounted during a write wait for it, refused writes roll back
+  and report failure, and all completions retain their original project key.
+  Returning to a desktop window refreshes the project's persisted setting;
+  retained controls share that request.
+  App composition fans the cached value into Documents and Chat without changing
+  source or transcript storage.
 - Inline review runs Milkdown's diff plugin, registered directly by
   `revision-adapter.ts`. `@milkdown/plugin-diff` is patched under `patches/` so a
   per-change Reject also resolves a pure deletion, which holds no span in the
