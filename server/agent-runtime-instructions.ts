@@ -1,6 +1,25 @@
+import type { WebSocket } from 'ws';
 import { resolveAgentPersona } from './agent-persona.ts';
 import { readAppConfig } from './app-config.ts';
 import { filesystemPath } from './filesystem-path.ts';
+
+const projectSessions = new Map<WebSocket, string>();
+
+/** All runtime sockets share this notification, including chats whose UI is
+ * not mounted. A successful settings write invalidates their native prompts;
+ * the session owner waits for an active turn before resuming the conversation. */
+export function trackProjectRuntimeInstructions(ws: WebSocket, scope: string): void {
+  projectSessions.set(ws, scope);
+  ws.once('close', () => projectSessions.delete(ws));
+}
+
+export function projectRuntimeInstructionsChanged(scope: string): void {
+  for (const [ws, project] of projectSessions) {
+    if (ws.readyState !== ws.OPEN || !filesystemPath.equal(project, scope)) continue;
+    try { ws.send(JSON.stringify({ t: 'instructions-changed' })); }
+    catch { projectSessions.delete(ws); } // A failed socket cannot retain a subscription.
+  }
+}
 
 /** Product-owned conversation and tool-routing policy shared by all Agent
  * runtimes. This policy is not part of the user-chosen Persona. How the Agent

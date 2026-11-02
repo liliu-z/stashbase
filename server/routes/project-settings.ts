@@ -4,6 +4,7 @@
 import type express from 'express';
 
 import { readAppConfigStrict, writeAppConfigStrict } from '../app-config.ts';
+import { projectRuntimeInstructionsChanged } from '../agent-runtime-instructions.ts';
 import { exactRegisteredFolderRootAsync } from '../folder.ts';
 import { filesystemPath } from '../filesystem-path.ts';
 import { sendError } from '../http.ts';
@@ -48,12 +49,14 @@ export function mount(app: express.Express): void {
       if (!scope) return res.status(404).json({ error: 'Project is no longer registered.' });
       const config = readAppConfigStrict();
       const existing = config.projectSettings ?? [];
+      const previous = existing.find((entry) => filesystemPath.equal(entry.scope, scope))?.math_mode ?? false;
       const saved = projectMathSettingsSchema.parse({ scope, math_mode: parsed.data.math_mode });
       config.projectSettings = [
         ...existing.filter((entry) => !filesystemPath.equal(entry.scope, scope)),
         saved,
       ];
       writeAppConfigStrict(config);
+      if (previous !== saved.math_mode) projectRuntimeInstructionsChanged(scope);
       res.json(saved);
     } catch (error) {
       sendError(res, error);

@@ -1,5 +1,5 @@
 /** Conversation surface. Reads session state and invokes runtime actions. */
-import { useCallback, useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useStore } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -124,13 +124,6 @@ function ChatWorkspace({
   const modelRefresh = useAgentModelRefresh(active, catalog.refresh);
   const activeTurn = agentTurnIsActive(state.connection);
   const busy = agentSessionIsBusy(active.store.getState());
-  const appliedMathMode = useRef(mathMode);
-  useEffect(() => {
-    if (appliedMathMode.current === mathMode) return;
-    if (busy) return;
-    appliedMathMode.current = mathMode;
-    if (active.store.getState().nativeSessionId) active.reconnect();
-  }, [active, busy, mathMode]);
   const armedSkill = agentSkills(state.skillCatalog).find((skill) => skill.id === state.skill);
   const empty = state.transcript.length === 0;
   const persona = useAgentPersona(
@@ -360,9 +353,7 @@ function ChatWorkspace({
         startedAt={access.startedAt}
         preparation={access.preparation}
         failure={access.failure}
-        onConfirm={() => {
-          void access.confirm();
-        }}
+        onConfirm={() => void access.confirm()}
         onCancel={access.cancel}
         onOpenSignIn={onOpenExternal}
         onStopWaiting={access.stopWaiting}
@@ -378,9 +369,7 @@ function ChatWorkspace({
         }
         onRetry={
           preferences.failure
-            ? () => {
-                void runtime.loadPreferences();
-              }
+            ? () => void runtime.loadPreferences()
             : catalog.error
               ? catalog.refresh
               : undefined

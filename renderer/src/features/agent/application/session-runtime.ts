@@ -27,22 +27,16 @@ import {
   queueWith,
   type PendingPrompt,
 } from '@/features/agent/application/session/prompts';
+import { createSessionRetry } from '@/features/agent/application/session/retry';
 import type {
   AgentSessionRuntime,
   AgentSessionRuntimeOptions,
 } from '@/features/agent/application/session/runtime-contract';
 import { createAgentUsage } from '@/features/agent/application/session/usage';
-import {
-  addContextItem,
-  removeContextItem,
-  validateContext,
-  staleContext,
-} from '@/features/agent/domain/context';
+import { addContextItem, removeContextItem } from '@/features/agent/domain/context';
 import {
   agentScopesEqual,
-  agentSessionIsBusy,
   agentSessionIsBlank,
-  agentTurnFailureIsRetryable,
   agentTurnIsActive,
   createAgentSessionState,
   transitionAgentSession,
@@ -78,6 +72,8 @@ export function createAgentSessionRuntime({
   const transientFiles = new Map<string, File>();
   let disposed = false;
   let started = false;
+  let instructionsChanged = false;
+  let resumeQueueAfterInstructions = false;
   let blockSequence = 0;
   let restoreEntry: Parameters<AgentSessionRuntime['restore']>[0] | null = null;
 
@@ -89,6 +85,8 @@ export function createAgentSessionRuntime({
   });
   const nextBlockId = (kind: string) => `${id}-${kind}-${++blockSequence}`;
   const transition = (action: Parameters<typeof transitionAgentSession>[1]) => {
+    // Every fresh connection reads the durable project setting on the host.
+    if (action.kind === 'connect') instructionsChanged = false;
     usage.action(action);
     store.setState((current) => transitionAgentSession(current, action), true);
     if (action.kind === 'fail' || action.kind === 'close' || action.kind === 'schedule-reconnect')
@@ -96,7 +94,25 @@ export function createAgentSessionRuntime({
     if (action.kind === 'settle-turn') controls.dispose();
     if (action.kind === 'submit-prompt' || action.kind === 'delivery') dispatcher.settleHeld();
     // A follow-up the runtime handed back after its turn ended goes next too.
+    if (action.kind === 'settle-turn' && reconnectForInstructions()) return;
     if (action.kind === 'settle-turn' || action.kind === 'steer-returned') controls.advanceQueue();
+  };
+
+  const reconnectForInstructions = (prepared = false): boolean => {
+    const current = state();
+    if (
+      !instructionsChanged ||
+      disposed ||
+      agentTurnIsActive(current.connection) ||
+      current.delivery === 'unknown' ||
+      current.delivery === 'stopping' ||
+      (current.delivery === 'preparing' && !prepared)
+    )
+      return false;
+    resumeQueueAfterInstructions = true;
+    started = true;
+    transport.open({ attempt: 0, resume: current.nativeSessionId ?? undefined });
+    return true;
   };
 
   const notifyFilesChanged = (changed: string[]) => {
@@ -118,6 +134,14 @@ export function createAgentSessionRuntime({
       )
     )
       return false;
+    if (instructionsChanged) {
+      // Context preparation may have started before the settings write. Keep
+      // its accepted snapshot across the reconnect, then send it only once.
+      ledger.hold(prompt);
+      if (reconnectForInstructions(true)) return true;
+      ledger.takeHeld();
+      return false;
+    }
     const titleHint = promptTitleHint(current, prompt);
     const sent = transport.send({
       kind: 'prompt',
@@ -159,7 +183,14 @@ export function createAgentSessionRuntime({
   const transport = createAgentTransport({
     telemetryTurnId: () => usage.correlation().telemetryTurnId,
     disposed: () => disposed,
-    onEvent: (event) => applyAgentSessionEvent(eventContext, event),
+    onEvent(event) {
+      if (event.kind === 'ready' && reconnectForInstructions(true)) return;
+      applyAgentSessionEvent(eventContext, event);
+      if (event.kind === 'ready' && resumeQueueAfterInstructions) {
+        resumeQueueAfterInstructions = false;
+        controls.advanceQueue();
+      }
+    },
     port,
     scheduler,
     signal: controller.signal,
@@ -172,6 +203,10 @@ export function createAgentSessionRuntime({
     nextBlockId,
     notifyFilesChanged,
     notifyFolderMayHaveChanged,
+    refreshInstructions() {
+      instructionsChanged = true;
+      reconnectForInstructions();
+    },
     state,
     submit,
     transition,
@@ -237,49 +272,17 @@ export function createAgentSessionRuntime({
       started = true;
       transport.open({ attempt: 0, resume: state().nativeSessionId ?? undefined });
     },
-    retry(errorBlockId) {
-      const current = state();
-      if (disposed || agentSessionIsBusy(current) || current.delivery === 'unknown') return false;
-      const failure = current.transcript.find(
-        (block) => block.kind === 'error' && block.id === errorBlockId,
-      );
-      if (failure?.kind !== 'error' || failure.retryablePrompt === undefined) return false;
-      if (current.connection.kind !== 'live') return false;
-      if (!agentTurnFailureIsRetryable(failure.failure)) return false;
-      usage.start();
-      const turn = ledger.turnFor(errorBlockId);
-      const stale = staleContext(
-        validateContext(turn?.context ?? [], {
-          listing: null,
-          readiness: {},
-          ...environment(),
-          scope: current.scope,
-          hasUpload: (path) => transientFiles.has(path),
-        }),
-      );
-      if (stale.length) {
-        usage.finish('blocked', 'context_invalid');
-        transition({
-          kind: 'set-context-issue',
-          message: stale[0]?.reason ?? 'Review the request context before retrying.',
-        });
-        return false;
-      }
-      const sent = transport.send({
-        kind: 'prompt',
-        ...usage.correlation(),
-        skill: turn?.skill ?? null,
-        ...attachmentFields(current.agent, turn?.context),
-        text: failure.retryablePrompt,
-      });
-      if (!sent) usage.finish('blocked');
-      if (sent) {
-        transition({ kind: 'delivery', value: 'idle' });
-        transition({ id: errorBlockId, kind: 'settle-error' });
-        transition({ kind: 'turn-started' });
-      }
-      return sent;
-    },
+    retry: createSessionRetry({
+      state,
+      disposed: () => disposed,
+      reconnectForInstructions,
+      usage,
+      ledger,
+      environment,
+      transientFiles,
+      transport,
+      transition,
+    }),
     editPrompt: controls.editPrompt,
     addContext(item) {
       if (disposed) return;
@@ -290,12 +293,8 @@ export function createAgentSessionRuntime({
       transition({ context: removeContextItem(state().context, key), kind: 'set-context' });
     },
     requestComposerFocus: controls.requestComposerFocus,
-    fileForTransient(path) {
-      return transientFiles.get(path);
-    },
-    attachFiles(files) {
-      return dispatcher.attach(files);
-    },
+    fileForTransient: (path) => transientFiles.get(path),
+    attachFiles: dispatcher.attach,
     steer(text) {
       void dispatcher.steer(text);
     },

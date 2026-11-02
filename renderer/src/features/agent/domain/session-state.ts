@@ -231,6 +231,7 @@ type AgentSessionStateEvent =
  *  the clock it settled at, or an ending that also has to settle the
  *  transport. */
 type AgentSessionStreamEvent =
+  | { kind: 'instructions-changed' }
   | { kind: 'text'; delta: string }
   | { kind: 'thinking'; delta: string }
   | { kind: 'notice'; message: string }
