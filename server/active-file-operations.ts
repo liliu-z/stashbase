@@ -216,7 +216,10 @@ export async function resolveExistingAsync(relPath: string): Promise<string | nu
 export async function deleteFileAsync(relPath: string): Promise<boolean> {
   let target: string;
   try { target = await resolveSafeAsync(relPath, 'existing', 'file'); }
-  catch { return false; }
+  catch (err: unknown) {
+    if (errorCode(err) === 'ENOENT') return false;
+    throw err;
+  }
   try {
     await fs.promises.unlink(target);
   } catch (err: any) {

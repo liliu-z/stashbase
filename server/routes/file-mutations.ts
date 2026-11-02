@@ -41,7 +41,7 @@ export function mountFileMutationRoutes(app: express.Express): void {
     if (!(await guardExplicitFolder(req, res))) return;
     const name = (req.params as any)[0] as string;
     try {
-      const result = await deleteProjectFile(toSourcePath(name), { allowOpaque: true });
+      const result = await deleteProjectFile(toSourcePath(name));
       res.json({ alreadyGone: result.alreadyGone, indexWarning: result.indexWarning });
     } catch (err: unknown) {
       sendError(res, err);

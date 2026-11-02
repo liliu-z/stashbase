@@ -12,7 +12,7 @@ import {
   renameOnDiskAsync,
 } from './active-file-operations.ts';
 import { filesystemPath } from './filesystem-path.ts';
-import { isSameExistingPathAsync, resolveSafe } from './file-paths.ts';
+import { isSameExistingPathAsync, resolveSafe, resolveSafeAsync } from './file-paths.ts';
 import { runWithFolderRoot } from './folder.ts';
 import { detectFormat, detectViewerFormat, isConvertibleSource } from './format.ts';
 import { contentSizeError, isRetrievalEligiblePath, shouldIndexFilePath } from './indexable.ts';
@@ -24,7 +24,7 @@ import {
 } from './project-file-access.ts';
 import { readProjectFile } from './project-file-reader.ts';
 import { applyRenamePlanAsync, planRenameLinksAsync, type RenameEntry } from './links.ts';
-import { errorMessage, logger } from './log.ts';
+import { errorCode, errorMessage, logger } from './log.ts';
 import { bundleRenameEntryAsync } from './rename-helpers.ts';
 import { indexer } from './state.ts';
 import { noteTreeChanged } from './watcher.ts';
@@ -214,15 +214,30 @@ export async function moveProjectFile(
 
 export async function deleteProjectFile(
   rawPath: unknown,
-  opts: { allowOpaque?: boolean } = {},
 ): Promise<{ path: string; alreadyGone: boolean; indexWarning?: string }> {
   const target = await normalizeProjectFilePath(rawPath);
+  validateProjectWritableFolderRel(target.folderRel);
   return runWithFolderRoot(target.folderRoot, async () => {
-    if (!detectViewerFormat(target.folderRel) && !opts.allowOpaque) {
-      throw routeError('unsupported format', 415, 'UNSUPPORTED_FORMAT');
+    // Deletion owns a source path, not its preview or text format. Validate
+    // containment even for missing files before cancelling work or cleaning up.
+    const sourcePath = await resolveSafeAsync(target.folderRel, 'creatable', 'file');
+    let stat: fs.Stats | undefined;
+    try { stat = await fs.promises.lstat(sourcePath); }
+    catch (err: unknown) {
+      if (errorCode(err) !== 'ENOENT') throw err;
     }
-    if (pathEntryExistsNoFollow(target.folderRel) && !isRegularFileNoFollow(target.folderRel)) {
+    if (stat && !stat.isFile()) {
       throw routeError('source is not a regular file', 415, 'UNSUPPORTED_FORMAT');
+    }
+    if (stat) {
+      const [physicalRoot, physicalSource] = await Promise.all([
+        fs.promises.realpath(target.folderRoot),
+        fs.promises.realpath(sourcePath),
+      ]);
+      const physicalRel = await filesystemPath.relativeAsync(physicalRoot, physicalSource);
+      if (!physicalRel) throw routeError('file escapes folder through symlink', 403);
+      // A directory alias must not hide a protected segment such as .git.
+      validateProjectWritableFolderRel(physicalRel);
     }
     await prepareFileOperation(target.folderRel);
     const removed = await deleteFileAsync(target.folderRel);
@@ -250,15 +265,6 @@ export async function deleteProjectFile(
 function isRegularFileNoFollow(folderRel: string): boolean {
   try {
     return fs.lstatSync(resolveSafe(folderRel)).isFile();
-  } catch {
-    return false;
-  }
-}
-
-function pathEntryExistsNoFollow(folderRel: string): boolean {
-  try {
-    fs.lstatSync(resolveSafe(folderRel));
-    return true;
   } catch {
     return false;
   }

@@ -247,6 +247,12 @@ test('quoted imported filenames remain readable, writable, and deletable', async
       assert.equal(await readTextAsync(name), 'updated');
       assert.equal(await deleteFileAsync(name), true);
       assert.equal(await readTextAsync(name), null);
+      assert.equal(await deleteFileAsync(name), false);
+      await assert.rejects(deleteFileAsync('../outside.mjs'), /invalid segment/);
+      if (process.platform !== 'win32') {
+        fs.symlinkSync(path.dirname(root), path.join(root, 'escape'));
+        await assert.rejects(deleteFileAsync('escape'), /symlink/);
+      }
     });
   } finally {
     fs.rmSync(root, { recursive: true, force: true });

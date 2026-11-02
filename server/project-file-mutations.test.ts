@@ -364,7 +364,6 @@ $$`;
     path: opaqueSource,
     new_path: path.join(root, 'Archive', 'script.ts'),
   }), /415|UNSUPPORTED_FORMAT/);
-  await assert.rejects(callTool(base, token, 'delete_file', { path: opaqueSource }), /415|UNSUPPORTED_FORMAT/);
   assert.equal(fs.readFileSync(opaqueSource, 'utf8'), 'export const value = 1;');
 
   const opaqueTarget = path.join(root, 'Archive', 'script.ts');
@@ -372,9 +371,63 @@ $$`;
   assert.equal(workbenchMoved.path, opaqueTarget.replace(/\\/g, '/'));
   assert.equal(fs.existsSync(opaqueSource), false);
   assert.equal(fs.readFileSync(opaqueTarget, 'utf8'), 'export const value = 1;');
-  const workbenchDeleted = await projectMutations.deleteProjectFile(opaqueTarget, { allowOpaque: true });
+  const workbenchDeleted = await projectMutations.deleteProjectFile(opaqueTarget);
   assert.equal(workbenchDeleted.alreadyGone, false);
   assert.equal(fs.existsSync(opaqueTarget), false);
+
+  await t.test('deletes exact generic file paths without interpreting their contents', async () => {
+    const script = path.join(root, 'Data', 'build (test).mjs');
+    await callTool(base, token, 'write_file', { path: script, content: 'export const value = 1;\n' });
+    const sibling = `${script}.md`;
+    fs.writeFileSync(sibling, '# User-owned sibling\n');
+    const genericFiles = [
+      [script, null],
+      [path.join(root, 'Data', '.env'), Buffer.from('TOKEN=example\n')],
+      [path.join(root, 'Data', 'Makefile'), Buffer.from('build:\n\techo hello\n')],
+      [path.join(root, 'Data', 'unknown.blob'), Buffer.from([0x00, 0xff, 0x80])],
+    ] as const;
+    for (const [sourcePath, bytes] of genericFiles) {
+      if (bytes) fs.writeFileSync(sourcePath, bytes);
+      const result = await callTool(base, token, 'delete_file', { path: sourcePath });
+      assert.equal(result.alreadyGone, false);
+      assert.equal(fs.existsSync(sourcePath), false);
+      const repeated = await callTool(base, token, 'delete_file', { path: sourcePath });
+      assert.equal(repeated.alreadyGone, true);
+    }
+    assert.equal(fs.readFileSync(sibling, 'utf8'), '# User-owned sibling\n');
+  });
+
+  await t.test('generic deletion refuses protected paths, other projects and non-files', async () => {
+    const protectedFile = path.join(root, '.git', 'keep.mjs');
+    fs.mkdirSync(path.dirname(protectedFile), { recursive: true });
+    fs.writeFileSync(protectedFile, 'keep');
+    await assert.rejects(callTool(base, token, 'delete_file', { path: protectedFile }), /INVALID_FILE_WRITE/);
+    assert.equal(fs.readFileSync(protectedFile, 'utf8'), 'keep');
+
+    const directory = path.join(root, 'Data', 'directory.mjs');
+    fs.mkdirSync(directory);
+    await assert.rejects(callTool(base, token, 'delete_file', { path: directory }), /not a regular file/);
+    assert.equal(fs.statSync(directory).isDirectory(), true);
+
+    const other = path.join(testHome, 'Other project');
+    const outside = path.join(other, 'keep.mjs');
+    fs.mkdirSync(other);
+    fs.writeFileSync(outside, 'keep');
+    await folder.openProjectFolder(other);
+    folder.clearCurrentFolder();
+    await assert.rejects(createHttpProjectOperations(base, 'file-telemetry-window', 'file-telemetry-session').delete(outside), { code: 'PROJECT_SCOPE_MISMATCH' });
+    assert.equal(fs.readFileSync(outside, 'utf8'), 'keep');
+    if (process.platform !== 'win32') {
+      const protectedAlias = path.join(root, 'git-alias');
+      fs.symlinkSync(path.dirname(protectedFile), protectedAlias);
+      await assert.rejects(callTool(base, token, 'delete_file', { path: path.join(protectedAlias, 'keep.mjs') }), /INVALID_FILE_WRITE/);
+      assert.equal(fs.readFileSync(protectedFile, 'utf8'), 'keep');
+      const escape = path.join(root, 'escape');
+      fs.symlinkSync(other, escape);
+      await assert.rejects(callTool(base, token, 'delete_file', { path: path.join(escape, 'keep.mjs') }), /symlink/);
+      assert.equal(fs.readFileSync(outside, 'utf8'), 'keep');
+    }
+  });
 
   const audioSource = path.join(root, 'Recordings', 'meeting.wav');
   const audioTarget = path.join(root, 'Archive', 'meeting.wav');

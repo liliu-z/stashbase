@@ -441,7 +441,9 @@ const BUILTIN_TOOLS = [
     {
       name: 'delete_file',
       description:
-        'Delete a visible file by absolute path. Also removes note bundles or ' +
+        'Delete an ordinary project file by exact absolute path, regardless of extension or contents, ' +
+        'including code, configuration, and binary files. Requires deletion authorization; ' +
+        'directories and protected paths are refused. Also removes note bundles or ' +
         'PDF/image derived artifacts owned by that file, and removes its MFS search projection.',
       inputSchema: {
         type: 'object',
