@@ -7,12 +7,13 @@ import { CrepeBuilder } from '@milkdown/crepe/builder';
 import { codeMirror } from '@milkdown/crepe/feature/code-mirror';
 import { editorViewCtx } from '@milkdown/kit/core';
 import { joinBackward } from '@milkdown/kit/prose/commands';
-import { redo, undo, undoDepth } from '@milkdown/kit/prose/history';
+import { redo, undo } from '@milkdown/kit/prose/history';
 import { TextSelection } from '@milkdown/kit/prose/state';
+import { within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vite-plus/test';
 
 import { watchMarkdownChanges } from './changes';
-import { math, refreshMath, type MathModeRef } from './math';
+import { math } from './math';
 
 const live: CrepeBuilder[] = [];
 
@@ -26,12 +27,12 @@ afterEach(async () => {
   for (const editor of live.splice(0)) await editor.destroy();
 });
 
-async function open(source: string, mathMode: boolean | MathModeRef = false) {
+async function open(source: string) {
   const host = document.createElement('div');
   document.body.append(host);
   const editor = new CrepeBuilder({ root: host, defaultValue: source })
     .addFeature(codeMirror)
-    .addFeature(math, mathMode);
+    .addFeature(math);
   const saved: string[] = [];
   const changes = watchMarkdownChanges(editor, {
     accepts: () => true,
@@ -55,6 +56,73 @@ describe('math', () => {
     expect(markdown()).toBe(source);
   });
 
+  it.each(['open', 'type'] as const)(
+    'reads only a tight single-dollar formula beside prices (%s)',
+    async (entry) => {
+      const source = 'Costs $5, or $50-$100, and $x^2$ is a formula; $ y $ is not.';
+      const { host, view, markdown } = await open(entry === 'open' ? `${source}\n` : '');
+      if (entry === 'type')
+        for (const character of source) {
+          const { from, to } = view.state.selection;
+          const handled = view.someProp('handleTextInput', (handler) =>
+            handler(view, from, to, character, () => view.state.tr.insertText(character, from, to)),
+          );
+          if (!handled) view.dispatch(view.state.tr.insertText(character));
+        }
+      view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 1)));
+      const formulas = [...host.querySelectorAll<HTMLElement>('[data-type="math_inline"]')]; // dom-contract: the published formula decoration exposes the source rendered by KaTeX.
+      expect(formulas.map((formula) => formula.dataset.value)).toEqual(['x^2']);
+      expect(visibleText(host)).toContain('Costs $5, or $50-$100, and');
+      expect(markdown()).toBe(`${source}\n`);
+    },
+  );
+
+  it.each(['open', 'type'] as const)(
+    'keeps a misread formula as text from the caret, one or all at once (%s)',
+    async (entry) => {
+      const source = 'Pay $a$ or $b$.';
+      const { host, view, markdown } = await open(entry === 'open' ? `${source}\n` : '');
+      if (entry === 'type')
+        for (const character of source) {
+          const { from, to } = view.state.selection;
+          const handled = view.someProp('handleTextInput', (handler) =>
+            handler(view, from, to, character, () => view.state.tr.insertText(character, from, to)),
+          );
+          if (!handled) view.dispatch(view.state.tr.insertText(character));
+        }
+      view.focus();
+      const offer = () => host.querySelector<HTMLElement>('[role="toolbar"][aria-label="Formula"]');
+      view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 2)));
+      expect(offer()?.dataset.show).toBe('false');
+
+      view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 7)));
+      expect(offer()?.dataset.show).toBe('true');
+      const button = (name: string) => {
+        const found = within(offer() ?? host).getByRole('button', { name });
+        found.click();
+      };
+      button('Show as text');
+      expect(markdown()).toBe('Pay \\$a\\$ or $b$.\n');
+      view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 1)));
+      const shown = () =>
+        [...host.querySelectorAll<HTMLElement>('[data-type="math_inline"]')].map(
+          // dom-contract: the published formula decoration exposes the source rendered by KaTeX.
+          (formula) => formula.dataset.value,
+        );
+      expect(shown()).toEqual(['b']);
+      expect(visibleText(host)).toContain('Pay $a$ or');
+      expect(undo(view.state, view.dispatch)).toBe(true);
+      expect(markdown()).toBe(`${source}\n`);
+
+      view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 7)));
+      button('Show all as text (2)');
+      expect(markdown()).toBe('Pay \\$a\\$ or \\$b\\$.\n');
+      expect(offer()?.dataset.show).toBe('false');
+      expect(undo(view.state, view.dispatch)).toBe(true);
+      expect(markdown()).toBe(`${source}\n`);
+    },
+  );
+
   it('renders inline math opened by two dollars and saves it unchanged', async () => {
     const source = 'Energy is $$E=mc^2$$ here.\n';
     const { host, markdown } = await open(source);
@@ -66,9 +134,9 @@ describe('math', () => {
     expect(markdown()).toBe(source);
   });
 
-  it('uses single dollars for inline math only when the project enables math mode', async () => {
+  it('renders a tight single-dollar formula beside escaped dollar amounts', async () => {
     const source = 'Energy is $E=mc^2$ here, while \\$10 stays a dollar amount.\n';
-    const { host, markdown } = await open(source, true);
+    const { host, markdown } = await open(source);
 
     const formula = host.querySelector<HTMLElement>('[data-type="math_inline"]'); // dom-contract: the published formula decoration exposes the source rendered by KaTeX.
     expect(formula?.dataset.value).toBe('E=mc^2');
@@ -76,32 +144,7 @@ describe('math', () => {
     expect(markdown()).toBe(source);
   });
 
-  it('refreshes Math in place without clearing an existing undo step', async () => {
-    const mathMode: MathModeRef = { current: false };
-    const source = 'Energy is $E=mc^2$ here.\n';
-    const { editor, host, markdown } = await open(source, mathMode);
-    const view = editor.editor.action((context) => context.get(editorViewCtx));
-    view.dispatch(view.state.tr.insertText('Draft: ', 1));
-    const historyBeforeToggle = undoDepth(view.state);
-    const selectionBeforeToggle = view.state.selection;
-
-    mathMode.current = true;
-    refreshMath(editor);
-
-    expect(host.querySelector<HTMLElement>('[data-type="math_inline"]')?.dataset.value).toBe(
-      // dom-contract: the published formula decoration exposes the source rendered by KaTeX.
-      'E=mc^2',
-    );
-    expect(markdown()).toBe(`Draft: ${source}`);
-    expect(undoDepth(view.state)).toBe(historyBeforeToggle);
-    expect(view.state.selection).toEqual(selectionBeforeToggle);
-    expect(undo(view.state, view.dispatch)).toBe(true);
-    expect(markdown()).toBe(source);
-    expect(redo(view.state, view.dispatch)).toBe(true);
-    expect(markdown()).toBe(`Draft: ${source}`);
-  });
-
-  it('renders LaTeX bracket delimiters outside code without enabling single dollars', async () => {
+  it('renders LaTeX bracket delimiters outside code', async () => {
     const source = 'Inline \\(x^2\\).\n\n\\[\n\\frac{1}{2}\n\\]\n\nKeep `\\(x\\)` as code.\n';
     const { host, markdown } = await open(source);
 
@@ -119,7 +162,7 @@ describe('math', () => {
 
   it('reopens an externally updated formula for native input after reading mode', async () => {
     const source = 'Before.\n\n$$\nx^2\n$$\n\nAfter.\n';
-    const { editor, view, host, markdown } = await open(source, true);
+    const { editor, view, host, markdown } = await open(source);
     const preview = host.querySelector<HTMLElement>('[aria-label="Edit formula"]');
     preview?.click();
     const element = host.querySelector<HTMLElement>('.cm-editor'); // dom-contract: formula input remains the native CodeMirror editor.
@@ -149,19 +192,19 @@ describe('math', () => {
     String.raw`Bracket \(\{x\} + a*b*c\) here.`,
   ])('preserves formula meaning and escaping after editing %s', async (body) => {
     const source = `${body}\n`;
-    const { host, view, changes, saved } = await open(source, true);
+    const { host, view, changes, saved } = await open(source);
     expect(host.querySelector('.katex-error')).toBeNull(); // dom-contract: these supported formulas remain valid TeX.
     view.dispatch(view.state.tr.insertText('New: ', 1));
     changes.flush();
     expect(saved.at(-1)).toBe(`New: ${source}`);
-    const reopened = await open(saved.at(-1) ?? '', true);
+    const reopened = await open(saved.at(-1) ?? '');
     expect(reopened.host.querySelector('.katex-error')).toBeNull(); // dom-contract: saved text renders the same supported formulas.
     expect(reopened.markdown()).toBe(`New: ${source}`);
   });
 
   it('keeps literal-dollar escaping beside entities and bracket formulas', async () => {
     const source = String.raw`Inline \(x\), literal \*star\* &amp; tax \$10 and \$20.` + '\n';
-    const { host, view, changes, saved } = await open(source, true);
+    const { host, view, changes, saved } = await open(source);
     expect(visibleText(host)).toContain(', literal *star* & tax');
     expect(host.querySelectorAll('[data-type="math_inline"]')).toHaveLength(1); // dom-contract: dollars remain prose.
     view.dispatch(view.state.tr.insertText('New: ', 1));
@@ -176,7 +219,7 @@ describe('math', () => {
       '\n\n' +
       String.raw`\[\frac{1}{2}\]` +
       '\n\nSecond paragraph.\n';
-    const { view, changes, saved } = await open(source, true);
+    const { view, changes, saved } = await open(source);
     let position = 1;
     for (let index = 0; index < 3; index += 1) position += view.state.doc.child(index).nodeSize;
     view.dispatch(view.state.tr.insertText('New: ', position));
@@ -188,7 +231,7 @@ describe('math', () => {
     'preserves newly %s source through save, reopen and undo',
     async (entry) => {
       const source = String.raw`Product $a*b*c$, subscript $x_i + y_j$, set $\{x\}$, matrix $\begin{pmatrix}a & b \\ c & d\end{pmatrix}$, and \$10.`;
-      const { view, changes, saved, markdown } = await open('', true);
+      const { view, changes, saved, markdown } = await open('');
       if (entry === 'paste') view.pasteText(source);
       else
         for (const character of source) {
@@ -200,7 +243,7 @@ describe('math', () => {
         }
       changes.flush();
       expect(saved.at(-1)).toBe(source + '\n');
-      const reopened = await open(saved.at(-1) ?? '', true);
+      const reopened = await open(saved.at(-1) ?? '');
       expect(reopened.markdown()).toBe(source + '\n');
       expect(undo(view.state, view.dispatch)).toBe(true);
       expect(markdown()).toBe('');
@@ -209,8 +252,8 @@ describe('math', () => {
     },
   );
 
-  it('lets the reader correct a displayed formula and edit ordinary prices with Math off', async () => {
-    const { host, view, markdown } = await open('Formula $x$ here.\n', true);
+  it('lets the reader correct a displayed formula and edit ordinary prices', async () => {
+    const { host, view, markdown } = await open('Formula $x$ here.\n');
     const formula = host.querySelector<HTMLElement>('[data-type="math_inline"]'); // dom-contract: the published formula decoration exposes the source rendered by KaTeX.
     formula?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
     expect(host.querySelector('[data-type="math_inline"]')).toBeNull(); // dom-contract: the formula exposes editable source after a click.
@@ -224,7 +267,7 @@ describe('math', () => {
     expect(price.markdown()).toBe('Cost $11 and $20.\n');
   });
 
-  it('keeps all inline code and non-math fences literal in either mode', async () => {
+  it('keeps all inline code and non-math fences literal', async () => {
     const source =
       'Formula \\(y\\), keep `' +
       String.raw`$x$ \(x\) \[x\]` +
@@ -233,26 +276,24 @@ describe('math', () => {
       '\n~~~\n\n    ' +
       String.raw`\(x\)` +
       '\n';
-    for (const mode of [false, true]) {
-      const { host } = await open(source, mode);
-      expect(host.querySelectorAll('[data-type="math_inline"]')).toHaveLength(1); // dom-contract: only the formula outside code receives a decoration.
-      expect(host.textContent).toContain(String.raw`$x$ \(x\) \[x\]`);
-    }
+    const { host } = await open(source);
+    expect(host.querySelectorAll('[data-type="math_inline"]')).toHaveLength(1); // dom-contract: only the formula outside code receives a decoration.
+    expect(host.textContent).toContain(String.raw`$x$ \(x\) \[x\]`);
   });
 
   it('keeps escaped literal delimiters literal after an unrelated edit', async () => {
     const source = String.raw`Literal \\(x\\) and &#36;x&#36;. Other prose.` + '\n';
-    const { host, view, changes, saved } = await open(source, true);
+    const { host, view, changes, saved } = await open(source);
     expect(host.querySelector('[data-type="math_inline"]')).toBeNull(); // dom-contract: decoded escapes/entities are not formulas.
     view.dispatch(view.state.tr.insertText('New: ', 1));
     changes.flush();
     expect(host.querySelector('[data-type="math_inline"]')).toBeNull(); // dom-contract: an unrelated edit does not reinterpret literals.
-    const reopened = await open(saved.at(-1) ?? '', true);
+    const reopened = await open(saved.at(-1) ?? '');
     expect(reopened.host.querySelector('[data-type="math_inline"]')).toBeNull(); // dom-contract: saving does not turn literals into formulas.
   });
 
   it('restores repaired math and keeps subsequent source edits consistent on reopen', async () => {
-    const { view, host, markdown } = await open('$x$\n', true);
+    const { view, host, markdown } = await open('$x$\n');
     view.dispatch(view.state.tr.delete(3, 4));
     expect(host.querySelector('[data-type="math_inline"]')).toBeNull(); // dom-contract: unfinished formula stays editable text.
     view.dispatch(view.state.tr.insertText('$', 3));
@@ -261,38 +302,31 @@ describe('math', () => {
     view.dispatch(view.state.tr.insertText('*y*', 2));
     view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 1)));
     expect(host.querySelector('em')?.textContent).toBe('y'); // dom-contract: ordinary Markdown formatting is represented by semantic inline tags.
-    const reopened = await open(markdown(), true);
+    const reopened = await open(markdown());
     expect(reopened.host.querySelector('em')?.textContent).toBe('y'); // dom-contract: ordinary Markdown formatting is represented by semantic inline tags.
     expect(visibleText(host)).toBe(visibleText(reopened.host));
   });
 
   it('uses toolbar formatting in the same formula before and after reopening', async () => {
-    const { view, host, markdown } = await open('$x+1$\n', true);
+    const { view, host, markdown } = await open('$x+1$\n');
     const strong = view.state.schema.marks.strong;
     if (!strong) throw new Error('Missing strong mark');
     view.dispatch(view.state.tr.addMark(2, 3, strong.create()));
     const before = host.querySelector<HTMLElement>('[data-type="math_inline"]')?.dataset.value; // dom-contract: the published formula decoration exposes the source rendered by KaTeX.
-    const reopened = await open(markdown(), true);
+    const reopened = await open(markdown());
     expect(
       reopened.host.querySelector<HTMLElement>('[data-type="math_inline"]')?.dataset.value, // dom-contract: the published formula decoration exposes the source rendered by KaTeX.
     ).toBe(before);
     expect(before).toContain('**x**');
   });
-  it('keeps ordinary inline Markdown and references editable when Math is off', async () => {
+  it('keeps ordinary inline Markdown and references editable beside dollar amounts', async () => {
     const source =
       'Cost $10 **per item or $20 per pack**, [guide][id], `code $x$` and \\$30.\n\n[id]: guide.md "Guide"\n';
-    const mode: MathModeRef = { current: false };
-    const { editor, host, view, changes, saved } = await open(source, mode);
+    const { host, view, changes, saved } = await open(source);
     expect(host.querySelector('strong')?.textContent).toBe('per item or $20 per pack'); // dom-contract: ordinary Markdown formatting is represented by semantic inline tags.
     expect(host.querySelector('a')?.getAttribute('href')).toBe('guide.md'); // dom-contract: Milkdown anchors carry the saved link target.
     expect(host.querySelector('code')?.textContent).toBe('code $x$'); // dom-contract: inline-code DOM must contain literal source.
     expect(visibleText(host)).toContain('$30.');
-    const selection = view.state.selection;
-    mode.current = true;
-    refreshMath(editor);
-    mode.current = false;
-    refreshMath(editor);
-    expect(view.state.selection).toEqual(selection);
     view.dispatch(view.state.tr.insertText('New: ', 1));
     changes.flush();
     expect(saved.at(-1)).toBe('New: ' + source);
@@ -344,7 +378,7 @@ describe('math', () => {
     ).toBe('x');
     expect(reopened.host.querySelector('img')?.getAttribute('src')).toBe('figure.png'); // dom-contract: the existing image schema exposes its source on the rendered image.
   });
-  it('preserves ordinary formatting typed across currency delimiters with Math off', async () => {
+  it('preserves ordinary formatting typed across currency delimiters', async () => {
     const source = 'Cost $10 **per item or $20 per pack**.';
     const { host, view, markdown } = await open('');
     for (const character of source) {
@@ -446,7 +480,7 @@ describe('math', () => {
   ])(
     'keeps pasted $kind semantics inside an existing source paragraph',
     async ({ kind, value, source }) => {
-      const { view, host, markdown } = await open('Formula $y$ and code: ', true);
+      const { view, host, markdown } = await open('Formula $y$ and code: ');
       view.dispatch(
         view.state.tr.setSelection(
           TextSelection.create(view.state.doc, view.state.doc.content.size - 1),
@@ -461,7 +495,7 @@ describe('math', () => {
       view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 1)));
       expect(host.querySelectorAll('[data-type="math_inline"]')).toHaveLength(1); // dom-contract: the published formula decoration exposes the source rendered by KaTeX.
       expect(markdown()).toContain(source);
-      const reopened = await open(markdown(), true);
+      const reopened = await open(markdown());
       expect(reopened.host.querySelectorAll('[data-type="math_inline"]')).toHaveLength(1); // dom-contract: the published formula decoration exposes the source rendered by KaTeX.
       expect(reopened.host.querySelector('em')).toBeNull(); // dom-contract: ordinary Markdown formatting is represented by semantic inline tags.
     },
@@ -469,7 +503,7 @@ describe('math', () => {
   it.each([false, true])(
     'pastes literal TeX into a formula (unfinished: %s) through the clipboard',
     async (unfinished) => {
-      const { view, host, markdown } = await open('Formula $x$ here.\n', true);
+      const { view, host, markdown } = await open('Formula $x$ here.\n');
       view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 10, 11)));
       if (unfinished) view.dispatch(view.state.tr.delete(11, 12));
       const text = String.raw`\{x\} + a*b*c`;

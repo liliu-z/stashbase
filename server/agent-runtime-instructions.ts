@@ -1,25 +1,4 @@
-import type { WebSocket } from 'ws';
 import { resolveAgentPersona } from './agent-persona.ts';
-import { readAppConfig } from './app-config.ts';
-import { filesystemPath } from './filesystem-path.ts';
-
-const projectSessions = new Map<WebSocket, string>();
-
-/** All runtime sockets share this notification, including chats whose UI is
- * not mounted. A successful settings write invalidates their native prompts;
- * the session owner waits for an active turn before resuming the conversation. */
-export function trackProjectRuntimeInstructions(ws: WebSocket, scope: string): void {
-  projectSessions.set(ws, scope);
-  ws.once('close', () => projectSessions.delete(ws));
-}
-
-export function projectRuntimeInstructionsChanged(scope: string): void {
-  for (const [ws, project] of projectSessions) {
-    if (ws.readyState !== ws.OPEN || !filesystemPath.equal(project, scope)) continue;
-    try { ws.send(JSON.stringify({ t: 'instructions-changed' })); }
-    catch { projectSessions.delete(ws); } // A failed socket cannot retain a subscription.
-  }
-}
 
 /** Product-owned conversation and tool-routing policy shared by all Agent
  * runtimes. This policy is not part of the user-chosen Persona. How the Agent
@@ -41,35 +20,21 @@ const STASHBASE_AGENT_RUNTIME_POLICY = [
 /** One role for bundled and native runtimes; a chosen Persona can narrow it. */
 const STASHBASE_AGENT_ROLE = "You are an agent working in StashBase, a writing workspace for thinking, research, drafting, and revision. Projects contain ordinary local files, including code and configuration when the task calls for them. Follow the user's requested scope, format, language, and working style. Distinguish evidence from assumptions and never invent sources. Complete the requested work and explain any remaining blocker concisely.";
 
-/** The formatting convention follows the bound project but remains local app
- * data, exactly like the renderer's Markdown parsing preference. */
-export function projectMathMode(scope: string | null | undefined): boolean {
-  if (!scope) return false;
-  return readAppConfig().projectSettings?.some(
-    (entry) => filesystemPath.equal(entry.scope, scope) && entry.math_mode === true,
-  ) ?? false;
-}
-
-export function mathFormattingInstructions(mathMode: boolean): string {
-  return mathMode
-    ? 'Math formatting: This project has Math on. Use `$...$` for inline formulas and `$$` blocks for display formulas. Escape literal dollar signs as `\\$`.'
-    : 'Math formatting: This project has Math off. Use `\\(...\\)` for inline formulas and `$$` blocks for display formulas. Dollar amounts can use ordinary `$`.';
-}
+/** Inline math follows the renderer's Pandoc-style dollar rule, so ordinary
+ * prices stay literal without escaping. */
+const STASHBASE_MATH_FORMATTING = 'Math formatting: Use `$...$` for inline formulas, with no space just inside the dollar signs, and `$$` blocks for display formulas. Write dollar amounts such as $5 or $50-$100 normally.';
 
 /** Compose the shared role, optional Persona text, and product policy. */
-export function composeAgentRuntimeInstructions(persona?: string, mathMode = false): string {
+export function composeAgentRuntimeInstructions(persona?: string): string {
   return [
     STASHBASE_AGENT_ROLE,
     persona,
     STASHBASE_AGENT_RUNTIME_POLICY,
-    mathFormattingInstructions(mathMode),
+    STASHBASE_MATH_FORMATTING,
   ].filter(Boolean).join('\n\n');
 }
 
 /** Resolve the Chat's Persona id before composing a native session's prompt. */
-export function resolveAgentRuntimeInstructions(
-  persona: string | undefined,
-  mathMode = false,
-): string {
-  return composeAgentRuntimeInstructions(resolveAgentPersona(persona), mathMode);
+export function resolveAgentRuntimeInstructions(persona: string | undefined): string {
+  return composeAgentRuntimeInstructions(resolveAgentPersona(persona));
 }

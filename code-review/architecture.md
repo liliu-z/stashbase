@@ -620,9 +620,8 @@ stable status without download, retry, or a new durable demand latch.
   skill contents, or a project-file edit. Product authoring guidance distinguishes
   Markdown text notes from HTML interactive notes and directs blank HTML creation
   through `create_interactive_note`; other workflows belong to loaded project instructions.
-  The same composition reads the bound project's local `math_mode` and directs
-  every built-in runtime to use `\(...\)` with Math off or `$...$` with Math on,
-  without putting that preference in a project file.
+  The same composition directs every built-in runtime to write inline formulas
+  as tight `$...$` and dollar amounts as ordinary text, matching the shared rule.
   `server/agent-persona.ts` owns the library: one Markdown file per persona in
   app data, seeded once from `assets/agent-personas/`, plus the record of each
   native session's persona. The Chat's persona id travels on its connection;
@@ -633,14 +632,6 @@ stable status without download, retry, or a new durable demand latch.
   persona applies from the next turn. Gallery personas are Gallery index data;
   the composition layer adds them through the agent's library, since the
   features do not import each other. Brainstorming needs no sources/wiki/index.
-  A successful Math-mode save notifies every bound runtime socket through
-  `agent-contract.ts`'s shared attachment seam. Each renderer session owns its
-  instruction refresh, including sessions without a mounted Chat: it resumes
-  the same native conversation when idle, or after the active turn and before
-  advancing queued work. Preparing a prompt retains its snapshot across this
-  refresh. Optimistic UI changes never restart a runtime. Default's prewarmed
-  process captures one Math value for both its identity and startup prompt;
-  changing the saved value prevents reuse of a spare with different instructions.
 - Default receives explicit transient attachment references in the prompt
   protocol. `server/routes/attach.ts` binds uploads to an explicit registered
   project and records their digest; `server/agent-attachments.ts` validates
@@ -1438,14 +1429,19 @@ registered host boundaries; renderer shared types are a different layer.
 - `shared/runtime/markdown-math.ts` owns the math syntax shared by Documents
   and Chat. It recognizes delimiters before CommonMark consumes formula escapes,
   preserving source positions and leaving code literal. `$$`, explicit `math` /
-  `latex` fences, and `\[ \]` / `\( \)` always render as math; the project setting
-  controls single dollars. Documents retains complete inline source where math
+  `latex` fences, and `\[ \]` / `\( \)` always render as math. A single-dollar
+  span is math only when its opening `$` is followed by a non-space and the next
+  `$` closes it: preceded by a non-space and not followed by a digit
+  (`dollarOpens` / `dollarCloses`), so prices stay text. Documents'
+  `math-source.ts` applies the same rule to newly typed and pasted source; while
+  typing, a run that starts with a digit and reaches a space reads as a price,
+  so Markdown input rules still apply after it. Documents retains complete inline source where math
   and ordinary Markdown can overlap, including the source across price
   delimiters. Its presentation uses the ordinary Markdown parser; formatting
   commands edit that same source through existing ProseMirror transactions.
-  Changing Math redraws decorations, preserving the editor, history and
-  source-block mapping. A caret inside an inline formula exposes its source for
-  correction. Documents' `ui/markdown/math-blocks.ts` owns block formula disclosure
+  A caret inside an inline formula exposes its source for correction; for a
+  single-dollar formula, `math-text-offer.ts` also offers Show as text and Show
+  all as text, which escape the dollar signs in one transaction. Documents' `ui/markdown/math-blocks.ts` owns block formula disclosure
   and rendering around the existing CodeMirror node view, which retains source
   edits, selection and history. Source stays open only while the editor selection
   is inside the formula; arrows at an adjacent textblock edge move the selection
@@ -1457,16 +1453,6 @@ registered host boundaries; renderer shared types are a different layer.
   original Markdown positions, preserving delimiters, escapes and block structure;
   a selection inside KaTeX copies the formula's source. The reply action copies
   the original Markdown text.
-- `projectSettings[].math_mode` in the local application config is keyed by the
-  resolved registered-folder identity. It defaults off, follows neither source
-  files nor frontmatter, and is forgotten when the project is removed. The
-  QueryClient owns one pending Math write per project across retained reading
-  controls. Reads mounted during a write wait for it, refused writes roll back
-  and report failure, and all completions retain their original project key.
-  Returning to a desktop window refreshes the project's persisted setting;
-  retained controls share that request.
-  App composition fans the cached value into Documents and Chat without changing
-  source or transcript storage.
 - Inline review runs Milkdown's diff plugin, registered directly by
   `revision-adapter.ts`. `@milkdown/plugin-diff` is patched under `patches/` so a
   per-change Reject also resolves a pure deletion, which holds no span in the

@@ -22,8 +22,6 @@ export interface AgentWorkspaceProps {
    *  names the chat then, and the Chats panel beside it manages the history
    *  and New chat. */
   header?: boolean | undefined;
-  /** Project-local Markdown parsing preference for the transcript. */
-  mathMode?: boolean | undefined;
   /** The reader's persona library. */
   persona: AgentPersonaPort;
   /** The project's scheduled tasks, shown in the chat's place on request. */

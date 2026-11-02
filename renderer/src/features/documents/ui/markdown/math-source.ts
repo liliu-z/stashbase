@@ -7,6 +7,8 @@ import { Fragment, type Node as ProseMirrorNode } from '@milkdown/kit/prose/mode
 import type { EditorState, Transaction } from '@milkdown/kit/prose/state';
 import { Mapping } from '@milkdown/kit/prose/transform';
 
+import { dollarCloses, dollarOpens } from '@/shared/runtime/markdown-math';
+
 const MATH_SOURCE = 'math_source';
 
 /** Ranges in the editor's literal formula source. The parser protects this text
@@ -17,6 +19,9 @@ export interface MathSourceRange {
   value: string;
   kind: 'single' | 'inline' | 'display' | 'dollar';
 }
+
+const codeAt = (text: string, index: number) =>
+  index < 0 || index >= text.length ? null : (text.codePointAt(index) ?? null);
 
 export function mathSourceRanges(text: string, includeOpen = false): MathSourceRange[] {
   const ranges: MathSourceRange[] = [];
@@ -64,7 +69,9 @@ export function mathSourceRanges(text: string, includeOpen = false): MathSourceR
     if (text[at] !== '$') continue;
     while (text[at + 1] === '$') at += 1;
     const size = at - start + 1;
+    if (size === 1 && !dollarOpens(codeAt(text, at + 1))) continue;
     let matched = false;
+    let refused = false;
     let end = at + 1;
     while (end < text.length) {
       if (text[end] === '\\') {
@@ -77,7 +84,16 @@ export function mathSourceRanges(text: string, includeOpen = false): MathSourceR
       }
       const closing = end;
       while (text[end] === '$') end += 1;
-      if (end - closing !== size) continue;
+      const closes =
+        size === 1
+          ? end - closing === 1 && dollarCloses(codeAt(text, closing - 1), codeAt(text, end))
+          : end - closing === size;
+      // The first `$` after a single-dollar opening closes it or it is text.
+      if (!closes && size === 1) {
+        refused = true;
+        break;
+      }
+      if (!closes) continue;
       ranges.push({
         from: start,
         to: end,
@@ -88,7 +104,7 @@ export function mathSourceRanges(text: string, includeOpen = false): MathSourceR
       matched = true;
       break;
     }
-    if (!matched && includeOpen) {
+    if (!matched && !refused && includeOpen) {
       ranges.push({
         from: start,
         to: text.length,
@@ -99,6 +115,13 @@ export function mathSourceRanges(text: string, includeOpen = false): MathSourceR
     }
   }
   return ranges;
+}
+
+/** A formula still being typed suspends Markdown input until it closes. A
+ *  single-dollar run that starts with a digit and has reached a space reads
+ *  as a price instead, so "$10 **each**" still formats as it is typed. */
+export function typingFormula(range: MathSourceRange): boolean {
+  return range.kind !== 'single' || !/^\d/u.test(range.value) || !/\s/u.test(range.value);
 }
 
 export function sourceRanges(doc: ProseMirrorNode, protectedOnly = true): MathSourceRange[] {

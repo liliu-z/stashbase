@@ -30,8 +30,6 @@ export interface AgentEventContext {
   notifyFilesChanged(paths: string[]): void;
   /** Reports that a settled turn may have changed files it never named. */
   notifyFolderMayHaveChanged(): void;
-  /** A persisted project change must reach the next native turn. */
-  refreshInstructions(): void;
   state(): AgentSessionState;
   /** Sends a held prompt; false when the socket refused it. */
   submit(prompt: PendingPrompt): boolean;
@@ -100,9 +98,6 @@ function applyToolFinished(
 export function applyAgentSessionEvent(context: AgentEventContext, event: AgentSessionEvent): void {
   const { nextBlockId, transition, transport } = context;
   switch (event.kind) {
-    case 'instructions-changed':
-      context.refreshInstructions();
-      return;
     case 'ready':
       transition(event);
       transport.syncAccessMode();

@@ -416,6 +416,7 @@ html[data-focus-mode='on'] .markdown-crepe:focus-within .ProseMirror > :not(.is-
    top of it: a border inside that ring drew two lines, which read as one
    thick outline. */
 .markdown-crepe .milkdown-toolbar,
+.markdown-crepe .markdown-math-offer,
 .markdown-crepe .markdown-heading-menu,
 .markdown-crepe .milkdown-slash-menu,
 .markdown-crepe .milkdown-link-edit > .link-edit,
@@ -515,6 +516,50 @@ html[data-focus-mode='on'] .markdown-crepe:focus-within .ProseMirror > :not(.is-
     height: 1px;
     margin: 4px 0;
   }
+}
+
+/* A single-dollar formula's offer to stay text: the selection toolbar's
+   surface and words, placed above the formula while the caret is in it. */
+.markdown-crepe .markdown-math-offer {
+  position: absolute;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  max-width: calc(100cqi - 16px);
+  padding: 3px;
+  border-radius: 10px;
+}
+
+.markdown-crepe .markdown-math-offer[data-show='false'] {
+  display: none;
+}
+
+.markdown-math-offer-item {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding-inline: 8px;
+  border-radius: 7px;
+}
+
+.markdown-math-offer-item[hidden],
+.markdown-math-offer-divider[hidden] {
+  display: none;
+}
+
+.markdown-math-offer-item:hover {
+  background: var(--hover);
+}
+
+.markdown-math-offer-item:hover .markdown-toolbar-label {
+  color: var(--foreground);
+}
+
+.markdown-math-offer-divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: var(--border);
 }
 
 /* The words among the glyphs (Heading, Ask Agent): the item widens to the word,

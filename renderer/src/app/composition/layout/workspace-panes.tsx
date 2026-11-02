@@ -33,7 +33,6 @@ import {
   LocalComponentRecovery,
   ReadingTextMenu,
   useAccountView,
-  useProjectMath,
 } from '@/features/settings/public';
 import type { WorkspaceRuntime, WorkspaceSessionController } from '@/features/workspace/public';
 import { isExternalSource } from '@/shared/domain/external-source';
@@ -92,10 +91,6 @@ export function WorkspacePanes({
 }: WorkspacePanesProps) {
   const referencedPassages = useReferencedPassages(agent.runtime);
   const dependencies = useDependencies();
-  const projectMath = useProjectMath(
-    dependencies.settings.projectMathApi,
-    workspace?.scope.folder.path ?? null,
-  );
   // Files dropped on the workspace open in place and go to the chat beside
   // them; Files keeps the copy.
   const externalFiles = useExternalFiles({
@@ -145,7 +140,6 @@ export function WorkspacePanes({
             catalog={dependencies.agent.catalog}
             accountSignedIn={account.account?.signedIn ?? false}
             header={mode === 'documents'}
-            mathMode={projectMath.enabled}
             persona={dependencies.agent.persona}
             scheduledTasks={dependencies.agent.scheduledTasks}
             tools={dependencies.agent.tools}
@@ -178,7 +172,6 @@ export function WorkspacePanes({
                   assetApi={dependencies.documents.adapters.asset}
                   docxPreviewApi={dependencies.documents.adapters.docxPreview}
                   genericPreviewApi={dependencies.documents.adapters.genericPreview}
-                  mathMode={projectMath.enabled}
                   recordUsage={dependencies.recordUsage}
                   onInputActivity={dependencies.onInputActivity}
                   onAskAgent={onAskAgent}
@@ -216,11 +209,7 @@ export function WorkspacePanes({
                     )
                   }
                   renderReadingControl={() => (
-                    <ReadingTextMenu
-                      appearanceApi={dependencies.settings.appearanceApi}
-                      mathApi={dependencies.settings.projectMathApi}
-                      projectPath={workspace?.scope.folder.path ?? null}
-                    />
+                    <ReadingTextMenu appearanceApi={dependencies.settings.appearanceApi} />
                   )}
                   revealLabel={dependencies.workspace.revealLabel}
                   runtime={documents}

@@ -18,7 +18,7 @@ import {
   type MarkdownNode,
   type RemarkParser,
 } from './math-prose';
-import { inlineMathSource, mathSourceRanges } from './math-source';
+import { inlineMathSource, mathSourceRanges, typingFormula } from './math-source';
 
 const MATH_SOURCE = 'math_source';
 
@@ -142,7 +142,6 @@ export function pasteMathSource(
   parseMarkdown: (source: string) => ProseMirrorNode | undefined,
   parser: RemarkParser,
   serialize: (doc: ProseMirrorNode) => string,
-  mode: boolean,
 ): boolean {
   const data = event.clipboardData;
   if (!view.editable || !data || data.getData('text/html') || data.getData('vscode-editor-data'))
@@ -164,7 +163,7 @@ export function pasteMathSource(
     const open = !complete.some((closed) => closed.from === range.from && closed.to === range.to);
     return (
       range.kind !== 'dollar' &&
-      (range.kind !== 'single' || mode) &&
+      (!open || typingFormula(range)) &&
       (inside(range.from, range.to) ||
         (open &&
           $from.sameParent($to) &&

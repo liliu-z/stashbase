@@ -82,8 +82,6 @@ describe('Agent session API', () => {
     expect(invalid).not.toHaveBeenCalled();
     receive({ data: JSON.stringify({ t: 'turn-end', isError: false }) });
     expect(onEvent).toHaveBeenLastCalledWith({ kind: 'turn-ended', isError: false });
-    receive({ data: JSON.stringify({ t: 'instructions-changed' }) });
-    expect(onEvent).toHaveBeenLastCalledWith({ kind: 'instructions-changed' });
     receive({
       data: JSON.stringify({
         t: 'exit',

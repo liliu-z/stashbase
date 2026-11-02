@@ -134,13 +134,11 @@ function markdownComponents({
 }
 
 export const AgentMarkdown = memo(function AgentMarkdown({
-  mathMode = false,
   markdown,
   onOpenExternal,
   onOpenSource,
   sourceFor,
 }: MarkdownLinks & {
-  mathMode?: boolean | undefined;
   markdown: string;
 }) {
   return (
@@ -150,7 +148,7 @@ export const AgentMarkdown = memo(function AgentMarkdown({
     >
       <ReactMarkdown
         components={markdownComponents({ onOpenExternal, onOpenSource, sourceFor })}
-        remarkPlugins={[remarkGfm, [remarkMathSyntax, { singleDollarTextMath: mathMode }]]}
+        remarkPlugins={[remarkGfm, remarkMathSyntax]}
         rehypePlugins={[
           preserveMarkdownSource,
           [rehypeKatex, { trust: false, strict: 'ignore', maxExpand: 1000, maxSize: 20 }],

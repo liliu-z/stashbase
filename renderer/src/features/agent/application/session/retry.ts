@@ -15,7 +15,6 @@ import type { createAgentUsage } from './usage';
 export function createSessionRetry({
   state,
   disposed,
-  reconnectForInstructions,
   usage,
   ledger,
   environment,
@@ -25,7 +24,6 @@ export function createSessionRetry({
 }: {
   state(): AgentSessionState;
   disposed(): boolean;
-  reconnectForInstructions(): boolean;
   usage: ReturnType<typeof createAgentUsage>;
   ledger: AgentPromptLedger;
   environment(): AgentSessionEnvironment | null;
@@ -42,7 +40,6 @@ export function createSessionRetry({
     if (failure?.kind !== 'error' || failure.retryablePrompt === undefined) return false;
     if (current.connection.kind !== 'live') return false;
     if (!agentTurnFailureIsRetryable(failure.failure)) return false;
-    if (reconnectForInstructions()) return false;
     usage.start();
     const turn = ledger.turnFor(errorBlockId);
     const stale = staleContext(

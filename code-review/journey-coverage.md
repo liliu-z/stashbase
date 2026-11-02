@@ -68,18 +68,6 @@ PAC-selected CONNECT for credits after sign-in; the fixture refuses that tunnel,
 so it sends no credentials to a provider. This does not establish real provider
 login, the affected user's network, or Windows/Linux OS proxy behavior.
 
-**Project Math instructions (2026-11-02):** the controlled session recovery
-scenario exercises Default, Claude, Codex and Antigravity when a persisted
-project setting changes while a chat is idle, connecting, preparing context or
-running a turn with a queued follow-up. The bundled OpenCode smoke also rejects
-a spare process prepared with the old Math setting. These checks establish
-instruction refresh and send ordering under controlled transports. The built
-macOS app also opened in the persistent private `verify:onboarding --agent codex
---built` profile: Codex, Claude and Antigravity were not installed, and Default
-required an account. Fresh native installation, real provider sign-in, completed
-provider replies and remote conversation continuity remain unverified for this
-change.
-
 **Codex approval verification (2026-10-29):** a fresh build launched with
 `verify:onboarding --agent codex --built` in the persistent private profile.
 Welcome and Settings > Agents loaded; Codex reports Not installed. No signed-in
@@ -938,22 +926,21 @@ Host/services: `server/folder.ts`, `server/github-import.ts`, `server/project-fi
 
 ## J03: Documents
 
-**Project Math source preservation (2026-11-02):**
+**Math source preservation (2026-11-02):**
 `shared/runtime/markdown-math.ts` tokenizes formulas before Markdown consumes
 TeX escapes and retains source positions. Documents' `ui/markdown/math.ts`
 keeps complete inline source where dollar delimiters overlap ordinary Markdown;
 `math-prose.ts` presents ordinary formatting with the existing parser and schema,
 and `math-commands.ts` routes formatting through existing editor transactions.
-Math changes update presentation without replacing the document or its history.
 The existing math/source-save tests cover braces, matrix row separators, literal
 escapes/entities, typing, paste, save/reopen, untouched blocks, code, and repaired
 delimiters. Focused prose/command checks cover formatting across price delimiters,
 links/images, existing link-edit controls, formatting shortcuts and caret typing;
 clipboard references, paragraph joins and block-prefix input retain source
 meaning. A built macOS Electron pass verified rendered TeX braces and matrix row
-separators, literal inline code, normal bold text across prices with Math off,
-byte-identical saves after toggles, a save changing only the edited paragraph,
-Undo/Redo across toggles and reopening the saved file. The rendered document was
+separators, literal inline code, normal bold text across prices, a save
+changing only the edited paragraph and reopening the saved file; that pass
+predates the single-dollar rule below. The rendered document was
 visually inspected. These checks do not establish external clipboard
 interoperability or packaged distribution behavior.
 Documents' `ui/markdown/math-blocks.ts` now presents block formulas without code
@@ -973,12 +960,21 @@ and the saved formula after reopening. A follow-up external file update while
 reading retained the same editors, refreshed the formula and allowed native
 input and saving on return to editing. This is source-runtime evidence, not
 packaged distribution acceptance.
-Reading controls share a project write across retained document menus, wait for
-it before a new read, and retain rollback/error presentation after the initiating
-menu unmounts. The existing Reading text menu tests also cover initial-read retry
-and refreshing another desktop window's change when returning to the window.
 The shared Chat-to-document fixture and save/reopen evidence are owned by
 [J07](#j07-converge).
+
+**Single-dollar rule (2026-11-02):** single-dollar
+math follows `dollarOpens` / `dollarCloses` in Chat and Documents. Transcript
+Markdown tests cover prices, ranges such as `$50-$100`, a price beside a formula,
+spaces inside the dollars and a digit after the closing dollar. `math.test.ts`
+covers the same text opened and typed, bold typed after a price, and Show as
+text / Show all as text with one Undo, for opened and typed formulas. The Chat
+to Documents workflow keeps unescaped prices as text in both surfaces and on
+save. An isolated macOS Electron source pass (renderer from the working tree
+through Vite) opened a note with prices, `$HOME/$PATH` and two formulas: prices
+stayed text, the caret in the misread formula showed the offer above it in light
+and dark themes, and Show as text saved `\$HOME/\$PATH` with the other formulas
+intact. Packaged distribution behavior is not established.
 
 **HTML engagement:** native `electron/window/lifecycle.ts` input-presence events
 cross the narrow window preload/adapter without keys, positions or document
@@ -1823,22 +1819,12 @@ unknown, and tool output never enters the emitted diagnostic. Historical unknown
 reports cannot recover their missing reasons, and this does not establish the
 cause of shell failures or WebSocket 1006 closures.
 
-**Project Math and source copying (2026-11-02):**
-`server/agent-runtime-instructions.ts` tracks the project for every attached
-runtime socket. The settings route notifies those sockets only after a changed
-value is durably saved; `application/session-runtime.ts` owns refreshing idle
-and background conversations, or reconnecting after the current turn before
-releasing queued work. Prepared and initially connecting prompts remain owned
-and send once. `opencode-runtime.ts` captures the same setting for a spare's
-identity and startup instructions. Existing route, session-recovery and native
-smoke tests cover persistence failure, project isolation, background chats,
-queue ordering, initial connection and prewarm reuse.
-
+**Math source copying (2026-11-02):**
 `ui/transcript/markdown-copy.ts` retains Markdown source positions before KaTeX
 replaces formula DOM. A selection inside formula glyphs copies the original
 delimiters; selections crossing prose retain escaped prices, paragraphs, lists
 and display formulas. Existing transcript/Markdown tests cover Copy response,
-partial list and blockquote continuation selections and mode changes. An
+partial list and blockquote continuation selections. An
 isolated macOS Electron source pass exercised real Chromium ranges for mixed
 paragraph/list/matrix selections and selections inside inline/display glyphs.
 External application paste behavior and real-provider continuation are not
@@ -3583,7 +3569,7 @@ pricing or a newly packaged desktop journey.
 math, fractions, an integral, a matrix, a fenced sum and a long formula alongside
 escaped prices, a formatted list and literal code. The composition drives the
 real App through streamed Chat output, opening a controlled Agent-written file,
-one project Math toggle across both surfaces, a formula source edit, Copy response,
+unescaped prices that stay text in both surfaces, a formula source edit, Copy response,
 and copying a selection inside matrix glyphs. Real document paste, autosave and
 close/reopen preserve TeX, matrix rows and surrounding Markdown. Controlled
 session and versioned storage ports do not establish provider behavior or disk

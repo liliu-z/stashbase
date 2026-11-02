@@ -271,14 +271,16 @@ Markdown frontmatter is outside the prose editor. A turn review that would chang
 refused with a visible reason; its metadata is never silently omitted from a review.
 
 Markdown math always supports double-dollar delimiters, `math` / `latex`
-fenced blocks, and LaTeX's `\[ \]` and `\( \)` delimiters outside code. The
-**Math** toggle beside Reading text is local to the current project: off by
-default, it keeps single-dollar text literal; on, it makes `$...$` inline math.
-An escaped `\$` stays a literal dollar sign in either mode. The setting applies
-to Documents and Chat, does not add frontmatter or project files, and does not
-travel when a folder is copied. It changes rendering only: Markdown source and
-saved Chat messages retain their original delimiters.
-Changing Math retains unsaved edits, Undo/Redo, selection and reading position.
+fenced blocks, and LaTeX's `\[ \]` and `\( \)` delimiters outside code. Single
+dollars follow the rule other Markdown tools use, so prices stay text without
+a setting: `$...$` is inline math when the opening `$` is followed by a
+non-space and the next `$` closes it, preceded by a non-space and not followed
+by a digit. `$x^2$` is a formula; "$5 and $10" and "$50-$100" are prices. An
+escaped `\$` is always a literal dollar sign. The same rule applies in Documents
+and Chat, and rendering never changes the Markdown source or saved Chat messages.
+While the caret is in a single-dollar formula, **Show as text** keeps that one
+as text and **Show all as text** does so for every single-dollar formula in the
+document. Both escape the dollar signs in the file, and one Undo restores them.
 Formula source, including matrix row separators and escaped dollar signs,
 survives editing, saving and reopening; untouched blocks keep their source.
 Reading mode shows block formulas without source or preview labels. In the

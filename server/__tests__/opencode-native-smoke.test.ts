@@ -28,7 +28,7 @@ import {
 } from '../opencode-runtime.ts';
 import { telemetry } from '../telemetry.ts';
 import { telemetryEventSchema, type TelemetryEvent } from '../../shared/protocols/http/telemetry.ts';
-import { readAppConfigStrict, setHostedAccountSession, writeAppConfigStrict } from '../app-config.ts';
+import { setHostedAccountSession } from '../app-config.ts';
 import { setDefaultAgentTool } from '../default-agent-tools.ts';
 import { parseToolCatalog } from '../agent-tool-catalog.ts';
 
@@ -872,19 +872,6 @@ test('prewarmed native chats retain attribution, refresh configuration and relea
   second.endTurn();
   await new Promise<void>(resolve => setImmediate(resolve));
 
-  // Let the spare finish with Math off, then change only that project setting.
-  const warmDeadline = Date.now() + 15_000;
-  while (starts.filter(event => event.purpose === 'prewarm' && event.outcome === 'success').length < 2) {
-    assert.ok(Date.now() < warmDeadline, 'the second spare did not start');
-    await new Promise<void>(resolve => setTimeout(resolve, 25));
-  }
-  writeAppConfigStrict({ ...readAppConfigStrict(), projectSettings: [{ scope: root, math_mode: true }] });
-  const math = createOpenCodeSessionRuntime(context);
-  const mathClient = await math.client(root);
-  const mathConfig = (await mathClient.config.get({ throwOnError: true })).data;
-  assert.match(mathConfig.agent!['stashbase-folder']!.prompt!, /This project has Math on/);
-  await math.close();
-
   // A saved choice made after warm-up must reach the new chat even when
   // the service's profiles themselves did not change.
   setDefaultAgentTool(toolCatalog, 'writer', { enabled: true });
@@ -900,7 +887,7 @@ test('prewarmed native chats retain attribution, refresh configuration and relea
   const fourthClient = await fourth.client(root);
   const fourthConfig = (await fourthClient.config.get({ throwOnError: true })).data;
   assert.equal(fourthConfig.provider!.stashbase!.models!['stashbase-agent-default']!.limit!.output, 4096);
-  assert.equal(reads, 5, 'a new chat must revalidate the service catalog before using a spare');
+  assert.equal(reads, 4, 'a new chat must revalidate the service catalog before using a spare');
   await assert.rejects(fourth.client(path.dirname(root)), /another project/);
   // Drive the production history owner through a real native startup timeout
   // and successful retry. Readiness and retirement must have separate timings.

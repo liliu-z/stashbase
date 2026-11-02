@@ -16,6 +16,8 @@ export const MATH_MARKDOWN = [
   '',
   `Energy is $${MATH_TEX.inline}$; the example costs \\$10, not \\$20.`,
   '',
+  'Plans cost $10 or $50-$100 a year.',
+  '',
   'A fraction followed by an integral:',
   '',
   '$$',

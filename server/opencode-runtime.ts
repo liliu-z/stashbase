@@ -24,7 +24,7 @@ import type { Config as NativeConfig } from '@opencode-ai/sdk/v2/types';
 import { getHostedAccountSession } from './app-config.ts';
 import { ensureMcpLauncher } from './agent-mcp.ts';
 import { resolveAgentPersona } from './agent-persona.ts';
-import { composeAgentRuntimeInstructions, projectMathMode } from './agent-runtime-instructions.ts';
+import { composeAgentRuntimeInstructions } from './agent-runtime-instructions.ts';
 import { agentCliPath } from './agent-cli.ts';
 import { appDataRoot } from './local-data.ts';
 import { logger } from './log.ts';
@@ -224,13 +224,12 @@ export function buildOpenCodeConfig(
   profiles: readonly HostedAgentProfile[] = [],
   directory?: string,
   tools: readonly EnabledAgentTool[] = [],
-  mathMode = projectMathMode(directory),
 ): Config & Pick<NativeConfig, 'skills'> {
   // The tools that are on add how to brief them and each one's standing
   // rule to the main agent's instructions; the tools' own models never see
   // them.
   const runtimeInstructions = [
-    composeAgentRuntimeInstructions(persona, mathMode),
+    composeAgentRuntimeInstructions(persona),
     defaultAgentToolInstructions(tools),
   ].filter(Boolean).join('\n\n');
   const toolPermissions = Object.fromEntries(tools.map(({ tool }) => [`stashbase_${tool.agent.toolName}`, 'allow']));
@@ -332,9 +331,8 @@ function openCodeConfig(
   profiles: readonly HostedAgentProfile[],
   directory: string,
   tools: readonly EnabledAgentTool[],
-  mathMode: boolean | undefined,
 ): Config {
-  return buildOpenCodeConfig(model, ensureMcpLauncher(), mcpEnvironment, persona, profiles, directory, tools, mathMode);
+  return buildOpenCodeConfig(model, ensureMcpLauncher(), mcpEnvironment, persona, profiles, directory, tools);
 }
 
 class OpenCodeRuntime {
@@ -354,7 +352,6 @@ class OpenCodeRuntime {
     private readonly profiles: () => readonly HostedAgentProfile[] = () => [],
     private readonly tools: () => readonly EnabledAgentTool[] = () => [],
     private readonly purpose: 'history' | 'chat' | 'prewarm' = 'chat',
-    private readonly mathMode?: boolean,
   ) {
     runtimes.add(this);
   }
@@ -494,7 +491,7 @@ class OpenCodeRuntime {
       if (!model) throw new Error('The agent model broker is not running.');
       // Private-directory/config preparation can be slow independently of the
       // native spawn call. Neither belongs to the ready-announcement deadline.
-      const env = openCodeRuntimeEnvironment(openCodeConfig(model, this.mcpEnvironment, this.persona, this.profiles(), directory, this.tools(), this.mathMode), username, password);
+      const env = openCodeRuntimeEnvironment(openCodeConfig(model, this.mcpEnvironment, this.persona, this.profiles(), directory, this.tools()), username, password);
       stage = 'spawn';
       advanceTiming('spawn_ms');
       const child = ownAgentProcess(spawn(executable, [
@@ -621,10 +618,9 @@ interface PreparedOpenCode {
 
 const warmSlot = new OpenCodeWarmSlot<PreparedOpenCode>();
 
-function startupKey(context: OpenCodeContext, persona: string | undefined, mathMode: boolean): string {
+function startupKey(context: OpenCodeContext, persona: string | undefined): string {
   return JSON.stringify([
     context.windowId, context.directory, persona, getHostedAccountSession()?.userId,
-    mathMode,
     // Instruction contents are read natively at prompt time. Its selected
     // path is process configuration and must still be the project's first.
     ['AGENTS.md', 'CLAUDE.md', 'CONTEXT.md'].find((name) => fs.existsSync(path.join(context.directory, name))),
@@ -637,8 +633,7 @@ function startupKey(context: OpenCodeContext, persona: string | undefined, mathM
 export function createOpenCodeSessionRuntime(context: OpenCodeContext): OpenCodeSessionRuntime {
   const persona = resolveAgentPersona(context.persona);
   const choices = context.crew ? crewChatChoices(context.crew) : undefined;
-  const mathMode = projectMathMode(context.directory);
-  const key = startupKey(context, persona, mathMode);
+  const key = startupKey(context, persona);
   const prepared = warmSlot.take(key);
   const attributionId = prepared?.attributionId ?? crypto.randomUUID();
   let profiles: readonly HostedAgentProfile[] = [];
@@ -652,7 +647,7 @@ export function createOpenCodeSessionRuntime(context: OpenCodeContext): OpenCode
   const makeRuntime = () => new OpenCodeRuntime({
     STASHBASE_WINDOW_ID: context.windowId,
     STASHBASE_AGENT_SESSION_ID: attributionId,
-  }, persona, true, attributionId, () => profiles, () => tools, 'chat', mathMode);
+  }, persona, true, attributionId, () => profiles, () => tools);
   let sessionRuntime = prepared?.runtime ?? makeRuntime();
   const relayExit = (error: Error) => { for (const listener of listeners) listener(error); };
   let stopExitListener = () => {};
@@ -700,18 +695,13 @@ export function createOpenCodeSessionRuntime(context: OpenCodeContext): OpenCode
   })();
 
   function warmNext(): void {
-    if (closed || !getHostedAccountSession()) return;
-    // The project can change while this chat's turn runs. Capture one value
-    // for both the spare's key and the config it will receive after startup.
-    const nextMathMode = projectMathMode(context.directory);
-    const nextKey = startupKey(context, persona, nextMathMode);
-    if (warmSlot.refresh(nextKey)) return;
+    if (closed || !getHostedAccountSession() || warmSlot.refresh(key)) return;
     const nextId = crypto.randomUUID();
     const nextRuntime = new OpenCodeRuntime({
       STASHBASE_WINDOW_ID: context.windowId, STASHBASE_AGENT_SESSION_ID: nextId,
-    }, persona, true, nextId, () => profiles, () => tools, 'prewarm', nextMathMode);
+    }, persona, true, nextId, () => profiles, () => tools, 'prewarm');
     const next: PreparedOpenCode = {
-      key: nextKey, windowId: context.windowId, directory: context.directory,
+      key, windowId: context.windowId, directory: context.directory,
       attributionId: nextId, profiles, tools, runtime: nextRuntime,
       ready: Promise.resolve(), close: (reason) => nextRuntime.close(reason),
     };

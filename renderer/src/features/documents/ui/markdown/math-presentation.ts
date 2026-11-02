@@ -1,10 +1,9 @@
 /**
  * Presents source-backed inline Markdown and formulas without replacing the
  * editor document. Parsed runs are cached by immutable textblock identity;
- * mode and selection changes repaint decorations without changing history.
+ * selection changes repaint decorations without changing history.
  */
 import {
-  editorViewCtx,
   editorViewOptionsCtx,
   parserCtx,
   remarkCtx,
@@ -30,6 +29,7 @@ import {
   mathSourceRanges,
   sourceRanges,
   protectMathSource,
+  typingFormula,
   type MathSourceRange,
 } from './math-source';
 
@@ -46,19 +46,22 @@ export function renderMath(source: string, displayMode: boolean): string {
   });
 }
 
-export interface MathModeRef {
-  current: boolean;
-}
 interface ProseRun {
   from: number;
   source: string;
-  off: ProseNode;
-  on: ProseNode;
+  tree: ProseNode;
 }
 interface MathPresentation {
   ranges: MathSourceRange[];
   prose: ProseRun[];
   decorations: DecorationSet;
+}
+
+/** The single-dollar formulas the editor presents, by document position. */
+export function singleDollarFormulas(state: EditorState): MathSourceRange[] {
+  return (mathDecorationKey.getState(state)?.ranges ?? []).filter(
+    (range) => range.kind === 'single',
+  );
 }
 
 function mathWidget(ownerDocument: Document, range: MathSourceRange): HTMLElement {
@@ -77,15 +80,13 @@ function decorations(
   ranges: MathSourceRange[],
   prose: ProseRun[],
   parser: RemarkParser,
-  mode: boolean,
   from: number,
   to: number,
 ): DecorationSet {
   const output = prose.flatMap((run) =>
-    mathProseDecorations(run.source, run.from, parser, from, to, mode ? run.on : run.off),
+    mathProseDecorations(run.source, run.from, parser, from, to, run.tree),
   );
   for (const range of ranges) {
-    if (range.kind === 'single' && !mode) continue;
     // An insertion point inside a formula reveals its editable source. Range
     // selections retain their rendered text, including when copying a passage.
     if (from === to && from > range.from && from < range.to) continue;
@@ -107,25 +108,15 @@ function decorations(
 }
 
 export function mathPresentation(
-  mode: boolean | MathModeRef,
   getParser: (context: import('@milkdown/kit/ctx').Ctx) => RemarkParser,
 ) {
-  const readMode = () => (typeof mode === 'boolean' ? mode : mode.current);
   return $prose((context) => {
     const parser = getParser(context);
-    const onParser = proseParser(context, true);
     context.update(editorViewOptionsCtx, (previous) => ({
       ...previous,
       handlePaste: (view, event, slice) =>
         previous.handlePaste?.(view, event, slice) ||
-        pasteMathSource(
-          view,
-          event,
-          context.get(parserCtx),
-          parser,
-          context.get(serializerCtx),
-          readMode(),
-        ),
+        pasteMathSource(view, event, context.get(parserCtx), parser, context.get(serializerCtx)),
     }));
     const cache = new WeakMap<ProseMirrorNode, Omit<ProseRun, 'from'>>();
     const presentation = (doc: ProseMirrorNode) => {
@@ -148,11 +139,7 @@ export function mathPresentation(
         if (!run) {
           const source = node.textContent;
           const references = String(sourceMark.attrs.references ?? '');
-          run = {
-            source,
-            off: parseMathProse(source, parser, references),
-            on: parseMathProse(source, onParser, references),
-          };
+          run = { source, tree: parseMathProse(source, parser, references) };
           cache.set(node, run);
         }
         prose.push({ ...run, from: position + 1 });
@@ -168,7 +155,7 @@ export function mathPresentation(
           }
           syntax.children?.forEach(visit);
         };
-        visit(run.on);
+        visit(run.tree);
         return false;
       });
       // New source entered into an ordinary semantic paragraph can use the
@@ -208,7 +195,6 @@ export function mathPresentation(
         content.ranges,
         content.prose,
         parser,
-        readMode(),
         state.selection.from,
         state.selection.to,
       ),
@@ -228,7 +214,7 @@ export function mathPresentation(
         },
       },
       // Protect completed, newly typed source just as opening/pasting Markdown
-      // does. This joins the user's transaction; toggling never changes marks.
+      // does. This joins the user's transaction.
       appendTransaction: (transactions, oldState, state) =>
         protectMathSource(transactions, state, oldState, context.get(serializerCtx)),
       props: {
@@ -251,7 +237,7 @@ export function mathPresentation(
             return true;
           }
           const active = mathSourceRanges(before, true).find((range) => range.to === before.length);
-          if (!active || (active.kind === 'single' && !readMode())) return false;
+          if (!active || !typingFormula(active)) return false;
           view.dispatch(view.state.tr.insertText(text, from, to));
           return true;
         },
@@ -277,23 +263,12 @@ export function mathPresentation(
   });
 }
 
-/** Repaint only: preserve document content, selection and Undo/Redo. */
-export function refreshMath(editor: import('@milkdown/crepe/builder').CrepeBuilder): void {
-  editor.editor.action((context) => {
-    const view = context.get(editorViewCtx);
-    view.dispatch(view.state.tr.setMeta(mathDecorationKey, true).setMeta('addToHistory', false));
-  });
-}
-
-export function proseParser(
-  context: import('@milkdown/kit/ctx').Ctx,
-  singleDollarTextMath: boolean,
-): RemarkParser {
+export function proseParser(context: import('@milkdown/kit/ctx').Ctx): RemarkParser {
   // Unified copies plugin parameter objects by reference. Reset the clone's
   // tuple before configuring it so the editor's parser keeps its own options.
   return context
     .get(remarkCtx)()
     .data({})
     .use(remarkMathSyntax, false)
-    .use(remarkMathSyntax, { sourceText: false, singleDollarTextMath });
+    .use(remarkMathSyntax, { sourceText: false });
 }

@@ -74,8 +74,6 @@ export function sessionEvent(event: AgentServerEvent): AgentSessionEvent | null 
   switch (event.t) {
     case 'ready':
       return { kind: 'ready' };
-    case 'instructions-changed':
-      return { kind: 'instructions-changed' };
     case 'session-id':
       return { id: event.id, kind: 'identified' };
     case 'session-title':

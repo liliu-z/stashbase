@@ -53,7 +53,6 @@ it('routes ordinary Markdown links inside prices through the document boundary',
       canChangeMode
       dirty={false}
       holdEdits={() => () => undefined}
-      mathMode={false}
       mode="reading"
       name="prices.md"
       navigation={createDocumentNavigationRuntime('prices')}
@@ -96,7 +95,6 @@ it('reads formula blocks without source and preserves editing history across mod
       canChangeMode
       dirty={false}
       holdEdits={() => () => undefined}
-      mathMode
       mode={readOnly ? 'reading' : 'writer'}
       name="formula.md"
       navigation={navigation}

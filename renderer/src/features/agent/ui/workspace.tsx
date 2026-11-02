@@ -53,7 +53,6 @@ function ChatWorkspace({
   catalog,
   catalogPort,
   header = true,
-  mathMode = false,
   persona: personaApi,
   scheduledTasks,
   tools: toolsApi,
@@ -217,7 +216,6 @@ function ChatWorkspace({
               onProcessToggle={pauseFollowing}
               focusBlockId={focusBlockId}
               key={activeId}
-              mathMode={mathMode}
               modelRefresh={modelRefresh}
               onEditPrompt={composerShown ? editPrompt : undefined}
               onOpenExternal={onOpenExternal}

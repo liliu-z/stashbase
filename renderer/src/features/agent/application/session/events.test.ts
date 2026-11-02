@@ -37,7 +37,6 @@ function harness(initial?: Partial<AgentSessionState>) {
   } satisfies AgentTransport;
   let blocks = 0;
   const context: AgentEventContext = {
-    refreshInstructions: vi.fn(),
     ledger: createPromptLedger(),
     nextBlockId: (kind) => `${kind}-${++blocks}`,
     notifyFilesChanged: vi.fn(),

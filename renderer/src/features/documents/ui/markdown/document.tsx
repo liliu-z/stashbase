@@ -34,7 +34,7 @@ import { writeToClipboard } from '@/shared/ui/clipboard';
 
 import { watchMarkdownChanges } from './changes';
 import { listItemSemantics } from './list-items';
-import { math, refreshMath } from './math';
+import { math } from './math';
 import { MarkdownOpenFailure } from './open-failure';
 
 import '@milkdown/crepe/theme/common/style.css';
@@ -67,8 +67,6 @@ export interface MarkdownDocumentProps {
   /** Registers the surface's held edit with the document runtime. */
   holdEdits(flush: () => void): () => void;
   mode: MarkdownViewMode;
-  /** The active project's single-dollar parsing preference. */
-  mathMode?: boolean | undefined;
   name: string;
   /** Ask Agent on the selection toolbar, with the exact selection. Absent
    *  where no Agent sits beside the document. */
@@ -96,7 +94,6 @@ export function MarkdownDocument({
   dirty,
   holdEdits,
   mode,
-  mathMode = false,
   name,
   onAskAgent,
   referencedPassages,
@@ -122,7 +119,6 @@ export function MarkdownDocument({
   const activeRef = useRef(active);
   const observedValueRef = useRef(value);
   const frontmatterRef = useRef(splitLeadingYamlFrontmatter(value).source);
-  const mathModeRef = useRef(mathMode);
   const suppressChangeRef = useRef(false);
   const headingSnapshotRef = useRef<{
     document: ProseMirrorDocument;
@@ -159,7 +155,6 @@ export function MarkdownDocument({
   onChangeRef.current = onChange;
   holdEditsRef.current = holdEdits;
   readOnlyRef.current = readOnly;
-  mathModeRef.current = mathMode;
   valueRef.current = value;
 
   useEffect(() => {
@@ -191,7 +186,7 @@ export function MarkdownDocument({
       .addFeature(toolbar, selectionToolbar({ askAgent: askAgentRun }))
       .addFeature(table)
       .addFeature(codeMirror, { copyText: 'Copy code', languages })
-      .addFeature(math, mathModeRef);
+      .addFeature(math);
     editor.editor.config((ctx) =>
       ctx.update(editorViewOptionsCtx, (previous) => ({
         ...previous,
@@ -264,10 +259,6 @@ export function MarkdownDocument({
       releaseHeldEdits();
     };
   }, [askAgentRun, attachHighlights, attachReview, attempt, navigation, tabId, wordCounter]);
-
-  useEffect(() => {
-    if (creationState === 'ready' && editorRef.current) refreshMath(editorRef.current);
-  }, [creationState, mathMode]);
 
   useEffect(() => {
     editorRef.current?.setReadonly(readOnly);

@@ -6,7 +6,6 @@ import { useEffect, useState, type ComponentProps } from 'react';
 import { expect, waitFor, within } from 'storybook/test';
 
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
 import {
   AgentWorkspace,
   useAgentWorkspaceRuntime,
@@ -137,7 +136,6 @@ function createFixture(onSaved: (path: string, content: string) => void) {
 }
 
 function MathWorkflowSession({ onReset }: { onReset(): void }) {
-  const [mathMode, setMathMode] = useState(true);
   const [saved, setSaved] = useState({ path: SAMPLE.path, content: MATH_MARKDOWN });
   const [fixture] = useState(() => createFixture((path, content) => setSaved({ path, content })));
   const agent = useAgentWorkspaceRuntime({
@@ -172,7 +170,6 @@ function MathWorkflowSession({ onReset }: { onReset(): void }) {
       <div className="flex w-full min-w-0 flex-col gap-4">
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="mr-auto text-ui-20 font-semibold">Math workflow</h1>
-          <Switch checked={mathMode} label="Math" onToggle={() => setMathMode((value) => !value)} />
           <Button onClick={onReset} size="compact" variant="ghost">
             Reset
           </Button>
@@ -192,7 +189,6 @@ function MathWorkflowSession({ onReset }: { onReset(): void }) {
             <div className="h-[44rem]">
               <AgentWorkspace
                 catalog={catalog}
-                mathMode={mathMode}
                 onOpenAgentSettings={ignore}
                 onOpenAppSettings={ignore}
                 onOpenExternal={ignore}
@@ -226,7 +222,6 @@ function MathWorkflowSession({ onReset }: { onReset(): void }) {
                   assetApi={{ load: unavailable }}
                   docxPreviewApi={{ load: unavailable }}
                   genericPreviewApi={{ load: unavailable }}
-                  mathMode={mathMode}
                   onReveal={unavailable}
                   revealLabel="Reveal file"
                   runtime={fixture.documents}

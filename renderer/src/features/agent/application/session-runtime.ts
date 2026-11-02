@@ -72,8 +72,6 @@ export function createAgentSessionRuntime({
   const transientFiles = new Map<string, File>();
   let disposed = false;
   let started = false;
-  let instructionsChanged = false;
-  let resumeQueueAfterInstructions = false;
   let blockSequence = 0;
   let restoreEntry: Parameters<AgentSessionRuntime['restore']>[0] | null = null;
 
@@ -85,8 +83,6 @@ export function createAgentSessionRuntime({
   });
   const nextBlockId = (kind: string) => `${id}-${kind}-${++blockSequence}`;
   const transition = (action: Parameters<typeof transitionAgentSession>[1]) => {
-    // Every fresh connection reads the durable project setting on the host.
-    if (action.kind === 'connect') instructionsChanged = false;
     usage.action(action);
     store.setState((current) => transitionAgentSession(current, action), true);
     if (action.kind === 'fail' || action.kind === 'close' || action.kind === 'schedule-reconnect')
@@ -94,25 +90,7 @@ export function createAgentSessionRuntime({
     if (action.kind === 'settle-turn') controls.dispose();
     if (action.kind === 'submit-prompt' || action.kind === 'delivery') dispatcher.settleHeld();
     // A follow-up the runtime handed back after its turn ended goes next too.
-    if (action.kind === 'settle-turn' && reconnectForInstructions()) return;
     if (action.kind === 'settle-turn' || action.kind === 'steer-returned') controls.advanceQueue();
-  };
-
-  const reconnectForInstructions = (prepared = false): boolean => {
-    const current = state();
-    if (
-      !instructionsChanged ||
-      disposed ||
-      agentTurnIsActive(current.connection) ||
-      current.delivery === 'unknown' ||
-      current.delivery === 'stopping' ||
-      (current.delivery === 'preparing' && !prepared)
-    )
-      return false;
-    resumeQueueAfterInstructions = true;
-    started = true;
-    transport.open({ attempt: 0, resume: current.nativeSessionId ?? undefined });
-    return true;
   };
 
   const notifyFilesChanged = (changed: string[]) => {
@@ -134,14 +112,6 @@ export function createAgentSessionRuntime({
       )
     )
       return false;
-    if (instructionsChanged) {
-      // Context preparation may have started before the settings write. Keep
-      // its accepted snapshot across the reconnect, then send it only once.
-      ledger.hold(prompt);
-      if (reconnectForInstructions(true)) return true;
-      ledger.takeHeld();
-      return false;
-    }
     const titleHint = promptTitleHint(current, prompt);
     const sent = transport.send({
       kind: 'prompt',
@@ -184,12 +154,7 @@ export function createAgentSessionRuntime({
     telemetryTurnId: () => usage.correlation().telemetryTurnId,
     disposed: () => disposed,
     onEvent(event) {
-      if (event.kind === 'ready' && reconnectForInstructions(true)) return;
       applyAgentSessionEvent(eventContext, event);
-      if (event.kind === 'ready' && resumeQueueAfterInstructions) {
-        resumeQueueAfterInstructions = false;
-        controls.advanceQueue();
-      }
     },
     port,
     scheduler,
@@ -203,10 +168,6 @@ export function createAgentSessionRuntime({
     nextBlockId,
     notifyFilesChanged,
     notifyFolderMayHaveChanged,
-    refreshInstructions() {
-      instructionsChanged = true;
-      reconnectForInstructions();
-    },
     state,
     submit,
     transition,
@@ -275,7 +236,6 @@ export function createAgentSessionRuntime({
     retry: createSessionRetry({
       state,
       disposed: () => disposed,
-      reconnectForInstructions,
       usage,
       ledger,
       environment,

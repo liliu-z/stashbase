@@ -13,7 +13,7 @@ import { typeInto } from '@/test/dom';
 import { agentSessionPort } from '@/test/fakes/agent';
 import { appDependencies } from '@/test/fakes/app';
 import { documentAdapters, sourceApi, textSource } from '@/test/fakes/documents';
-import { accountPort, projectMathPort, SIGNED_IN_ACCOUNT } from '@/test/fakes/settings';
+import { accountPort, SIGNED_IN_ACCOUNT } from '@/test/fakes/settings';
 import { filesApi, listing, projectApi, projectRegistrySnapshot } from '@/test/fakes/workspace';
 import { MATH_MARKDOWN, MATH_TEX } from '@/test/fixtures/math';
 import { settleMarkdownListener } from '@/test/milkdown';
@@ -30,14 +30,6 @@ function mathWorkflow() {
   const saves: Array<{ path: string; content: string }> = [];
   dependencies.agent.session = session.port;
   dependencies.settings.accountApi = accountPort(SIGNED_IN_ACCOUNT);
-  let mathMode = true;
-  dependencies.settings.projectMathApi = projectMathPort({
-    load: vi.fn(async (scope) => ({ scope, math_mode: mathMode })),
-    update: vi.fn(async (scope, value) => {
-      mathMode = value;
-      return { scope, math_mode: value };
-    }),
-  });
   dependencies.project.api = projectApi({
     load: vi.fn(async () =>
       projectRegistrySnapshot({
@@ -100,15 +92,6 @@ async function reopenFile(name: string, user: ReturnType<typeof userEvent.setup>
     expect(screen.queryByRole('document', { name: `${name} Markdown content` })).toBeNull(),
   );
   return openFile(name, user);
-}
-
-async function toggleMath(surface: HTMLElement, user: ReturnType<typeof userEvent.setup>) {
-  const control = within(surface).getByLabelText(/^Math$/u);
-  await waitFor(() => {
-    expect(control.hasAttribute('disabled')).toBe(false);
-    expect(control.getAttribute('aria-disabled')).not.toBe('true');
-  });
-  await user.click(control);
 }
 
 async function paste(surface: HTMLElement, clipboardData: DataTransfer) {
@@ -193,14 +176,11 @@ it('keeps formulas through Chat, Agent writing, document edits and copy-paste/sa
   let written = await documentSurface('Written.md');
   expect(formulas(written)).toEqual(formulas(chat));
 
-  // One project toggle updates both live surfaces without rewriting the file.
-  await toggleMath(written, user);
-  const explicit = Object.values(MATH_TEX).filter((tex) => tex !== MATH_TEX.inline);
-  await waitFor(() => expect(formulas(chat)).toEqual(explicit));
-  expect(formulas(written)).toEqual(explicit);
-  await toggleMath(written, user);
-  await waitFor(() => expect(formulas(chat)).toEqual(Object.values(MATH_TEX)));
-  expect(formulas(written)).toEqual(formulas(chat));
+  // Unescaped dollar amounts stay text in both surfaces, and opening the
+  // file does not rewrite them.
+  const prices = /^Plans cost \$10 or \$50-\$100 a year\.$/u;
+  expect(within(chat).getByText(prices)).toBeTruthy();
+  expect(within(written).getByText(prices)).toBeTruthy();
   await act(settleMarkdownListener);
   expect(fixture.saves).toEqual([]);
 

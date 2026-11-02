@@ -123,22 +123,24 @@ Keep ${'`\\(x\\)`'} as code.`}
     expect(container.textContent).toContain('$4 per month billed annually or $5');
   });
 
-  it('updates existing formulas when math mode changes, keeping escaped and unpaired dollars literal', () => {
-    const markdown = String.raw`Square $x^2$ costs \$10 or \$20. Unpaired $.`;
-    const { container, rerender } = render(<AgentMarkdown markdown={markdown} />);
-    expect(container.querySelectorAll('math')).toHaveLength(0); // dom-contract: KaTeX's accessible MathML output
-    rerender(<AgentMarkdown mathMode markdown={markdown} />);
-    expect(container.querySelectorAll('math')).toHaveLength(1); // dom-contract: KaTeX's accessible MathML output
-    expect(container.textContent).toContain('$10 or $20. Unpaired $.');
-    rerender(<AgentMarkdown markdown={markdown} />);
-    expect(container.querySelectorAll('math')).toHaveLength(0); // dom-contract: KaTeX's accessible MathML output
-    expect(container.textContent).toContain('$x^2$');
+  it.each([
+    ['$5 and $10 stay prices.', [], '$5 and $10'],
+    ['$50-$100, $50/$100 and $50$100 stay prices.', [], '$50-$100, $50/$100 and $50$100'],
+    ['Costs $5, and $x^2$ is a formula.', ['x^2'], '$5, and'],
+    [String.raw`Square $x^2$ costs \$10 or \$20. Unpaired $.`, ['x^2'], '$10 or $20. Unpaired $.'],
+    ['$ x $ has spaces inside.', [], '$ x $'],
+    ['$x$1 is followed by a digit.', [], '$x$1'],
+  ])('reads a single-dollar formula only when it is written tight: %s', (markdown, tex, text) => {
+    const { container } = render(<AgentMarkdown markdown={markdown} />);
+    const formulas = [...container.querySelectorAll('annotation')].map((node) => node.textContent); // dom-contract: KaTeX's MathML annotation holds the TeX source
+    expect(formulas).toEqual(tex);
+    expect(container.textContent).toContain(text);
   });
 
-  it.each([false, true])('keeps inline and fenced code literal (Math %s)', (mathMode) => {
+  it('keeps inline and fenced code literal', () => {
     const code = String.raw`\(x^2\) \[x^2\] $x^2$ \$10`;
     const markdown = `Outside \\(x^2\\).\n\n\`${code}\`\n\n~~~text\n${code}\n~~~\n\n\`\`\`js\n${code}\n\`\`\``;
-    const { container } = render(<AgentMarkdown mathMode={mathMode} markdown={markdown} />);
+    const { container } = render(<AgentMarkdown markdown={markdown} />);
     expect(container.querySelectorAll('math')).toHaveLength(1); // dom-contract: KaTeX's accessible MathML output
     expect(screen.getAllByText(code).map((node) => node.textContent?.trim())).toEqual([
       code,
@@ -147,19 +149,17 @@ Keep ${'`\\(x\\)`'} as code.`}
     ]);
   });
 
-  it.each([false, true])('copies selected math with its original syntax (Math %s)', (mathMode) => {
+  it('copies selected math with its original syntax', () => {
     const formulas = [
       String.raw`\(x^2\)`,
       String.raw`$$\frac{1}{2}$$`,
       '$$\n\\begin{matrix}a & b \\\\ c & d\\end{matrix}\n$$',
       '\\[\n\\frac{1}{2}\n\\]',
       '```latex\n\\frac{1}{2}\n```',
-      ...(mathMode ? ['$x^2$'] : []),
+      '$x^2$',
     ];
     for (const markdown of formulas) {
-      const rendered = render(
-        <AgentMarkdown mathMode={mathMode} markdown={`Before.\n\n${markdown}\n\nAfter.`} />,
-      );
+      const rendered = render(<AgentMarkdown markdown={`Before.\n\n${markdown}\n\nAfter.`} />);
       const formula = rendered.container.querySelector('.katex-html'); // dom-contract: a drag selects KaTeX's visual glyphs inside its source wrapper
       if (!formula) throw new Error(`Expected a rendered formula for ${markdown}.`);
       // A normal drag starts and ends in the formula's glyphs, inside the
@@ -181,7 +181,7 @@ Keep ${'`\\(x\\)`'} as code.`}
 $$
 \begin{matrix}a & b \\ c & d\end{matrix}
 $$`;
-    const rendered = render(<AgentMarkdown mathMode markdown={markdown} />);
+    const rendered = render(<AgentMarkdown markdown={markdown} />);
     const root = rendered.container.firstElementChild;
     if (!root) throw new Error('Expected Markdown container.');
     const range = document.createRange();
@@ -192,7 +192,7 @@ $$`;
 
   it('keeps partial prose selection exact around a formula and escaped dollars', () => {
     const markdown = String.raw`Before \$10 &amp; $x^2$ then \$20 after.`;
-    const { container } = render(<AgentMarkdown mathMode markdown={markdown} />);
+    const { container } = render(<AgentMarkdown markdown={markdown} />);
     const first = screen.getByText(/^Before/u).firstChild;
     const last = screen.getByText(/ after\.$/u).firstChild;
     if (!first || !last) throw new Error('Expected prose around the formula.');
@@ -207,7 +207,7 @@ $$`;
     '> First\n> continued $x$ tail',
     '> - First\n>   continued $x$ tail',
   ])('maps selections across stripped continuation prefixes: %s', (markdown) => {
-    const { container } = render(<AgentMarkdown mathMode markdown={markdown} />);
+    const { container } = render(<AgentMarkdown markdown={markdown} />);
     const first = screen.getByText(/^First/u).firstChild;
     const last = screen.getByText('tail').firstChild;
     if (!first || !last) throw new Error('Expected prose around the formula.');
@@ -223,7 +223,7 @@ $$`;
 
   it('keeps invalid formula source available when copying its visible error', () => {
     const markdown = String.raw`$\frac{1}{$`;
-    const { container } = render(<AgentMarkdown mathMode markdown={markdown} />);
+    const { container } = render(<AgentMarkdown markdown={markdown} />);
     const formula = container.querySelector('.katex-error'); // dom-contract: KaTeX exposes malformed formulas as source text
     if (!formula) throw new Error('Expected formula error.');
     const range = document.createRange();

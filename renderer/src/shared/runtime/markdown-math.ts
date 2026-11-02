@@ -31,7 +31,24 @@ const captureAndExit: FromHandler = function (token) {
   this.exit(token);
 };
 
-function sourceMath(singleDollar: boolean): Construct {
+/** Single-dollar math keeps prices literal, as Pandoc and Obsidian do. The
+ * opening `$` is followed by a non-space, and the next `$` must close the
+ * formula: it follows a non-space and is not followed by a digit. So
+ * "$5 and $10" and "$50-$100" stay text while `$x^2$` is a formula. Codes are
+ * micromark's, where line endings and tabs are negative, or code points. */
+export function dollarOpens(next: number | null): boolean {
+  return !isSpace(next);
+}
+
+export function dollarCloses(previous: number | null, next: number | null): boolean {
+  return !isSpace(previous) && !(next !== null && next >= 48 && next <= 57);
+}
+
+function isSpace(code: number | null): boolean {
+  return code === null || code <= 32 || /\s/u.test(String.fromCodePoint(code));
+}
+
+function sourceMath(): Construct {
   return {
     name: 'stashbaseMath',
     tokenize(effects, ok, nok) {
@@ -39,6 +56,8 @@ function sourceMath(singleDollar: boolean): Construct {
       let multiline = false;
       let dollars = 0;
       let closingDollars = 0;
+      let previous: number | null = null;
+      let beforeClosing: number | null = null;
       // remark-math registers these handlers at runtime but does not export
       // the corresponding token-map augmentation from its public types.
       type Token = Parameters<typeof effects.enter>[0];
@@ -60,7 +79,7 @@ function sourceMath(singleDollar: boolean): Construct {
           effects.consume(code);
           return dollarOpening;
         }
-        if (dollars === 1 && !singleDollar) return nok(code);
+        if (dollars === 1 && !dollarOpens(code)) return nok(code);
         return content(code);
       }
       function opening(code: number | null): ReturnType<State> {
@@ -81,14 +100,17 @@ function sourceMath(singleDollar: boolean): Construct {
           effects.enter('lineEnding');
           effects.consume(code);
           effects.exit('lineEnding');
+          previous = code;
           return afterLine;
         }
         effects.consume(code);
         if (code === 92) return afterSlash;
         if (code === 36 && dollars) {
+          beforeClosing = previous;
           closingDollars = 1;
           return dollarClosing;
         }
+        previous = code;
         return content;
       }
       function dollarClosing(code: number | null): ReturnType<State> {
@@ -96,6 +118,12 @@ function sourceMath(singleDollar: boolean): Construct {
           closingDollars += 1;
           effects.consume(code);
           return dollarClosing;
+        }
+        // The first `$` after a single-dollar opening closes it or it is text.
+        if (dollars === 1) {
+          return closingDollars === 1 && dollarCloses(beforeClosing, code)
+            ? finish(code)
+            : nok(code);
         }
         return closingDollars === dollars ? finish(code) : content(code);
       }
@@ -107,6 +135,7 @@ function sourceMath(singleDollar: boolean): Construct {
         if (code === null || (!multiline && code < -2)) return nok(code);
         if (code < -2) return content(code);
         effects.consume(code);
+        previous = code;
         return content;
       }
       function afterLine(code: number | null): ReturnType<State> {
@@ -124,7 +153,6 @@ function sourceMath(singleDollar: boolean): Construct {
 }
 
 export interface MathSyntaxOptions {
-  singleDollarTextMath?: boolean;
   /** Editors retain editable source text, including delimiters and escapes. */
   sourceText?: boolean;
 }
@@ -133,8 +161,7 @@ export interface MathSyntaxOptions {
  * survive so copying and saving can retain the original spelling. */
 export const remarkMathSyntax = function (this: Parser, options: MathSyntaxOptions = {}) {
   const sourceText = options.sourceText ?? false;
-  const singleDollar = sourceText || options.singleDollarTextMath === true;
-  remarkMath.call(this, { singleDollarTextMath: singleDollar });
+  remarkMath.call(this, { singleDollarTextMath: true });
   const data = dataOf(this);
   if (sourceText) {
     data.fromMarkdownExtensions ??= [];
@@ -158,7 +185,7 @@ export const remarkMathSyntax = function (this: Parser, options: MathSyntaxOptio
     }
   }
   const syntax = data.micromarkExtensions?.at(-1);
-  if (syntax) syntax.text = { 36: sourceMath(singleDollar), 92: sourceMath(singleDollar) };
+  if (syntax) syntax.text = { 36: sourceMath(), 92: sourceMath() };
   return (tree: MathNode, file: { value: unknown }) => {
     const source = String(file.value);
     // Definitions are resolved away by the editor's ordinary remark pipeline.
@@ -213,8 +240,9 @@ export const remarkMathSyntax = function (this: Parser, options: MathSyntaxOptio
         delete node.children;
       } else if (sourceText && node.children && typeof node.data?.mathSource === 'string') {
         const raw = node.data.mathSource;
-        // Keep the complete inline run when syntax could change interpretation
-        // with Math. Ordinary Markdown is presented from this same raw source.
+        // Keep the complete inline run when a dollar or TeX delimiter could
+        // change its interpretation. Ordinary Markdown is presented from this
+        // same raw source.
         if (/\$|\\[([]|&(?:dollar|#0*36|#x0*24);/iu.test(raw)) {
           node.children = [
             { type: 'mathSource', value: raw, prose: true, references: definitions.join('\n') },
