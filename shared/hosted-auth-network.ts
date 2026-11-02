@@ -3,6 +3,8 @@ export const AUTH_BASE_URL = 'https://api.stashbase.ai/api/auth';
 export const AUTH_REQUEST_LIMIT = 64 * 1024;
 export const AUTH_RESPONSE_LIMIT = 1024 * 1024;
 export const AUTH_TIMEOUT_MS = 10_000;
+export const ALLOWANCE_RELAY_PATH = '/agent-usage';
+export const ALLOWANCE_API_URL = 'https://api.stashbase.ai/v1/agent/usage?include=reservations';
 export const AUTH_PATHS = new Set([
   '/electron/token', '/get-session', '/token', '/sign-out',
   '/email/send', '/desktop/email/verify', '/account/methods', '/account/otp/send',

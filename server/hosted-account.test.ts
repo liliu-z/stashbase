@@ -228,6 +228,39 @@ test('a stalled billing response times out and a later attempt can recover', () 
   assert.deepEqual(JSON.parse(result.stdout), { error: 'TimeoutError', plans: [] });
 });
 
+test('desktop credit refresh uses the same native transport as sign-in without a direct network fallback', () => {
+  const result = runIsolated(`
+    const { createAuthNetworkBridge } = await import('./electron/account/auth-network.ts');
+    const calls = [];
+    let creditReads = 0;
+    const bridge = await createAuthNetworkBridge({ fetch: async (url, init) => {
+      calls.push({ url: String(url), authorization: new Headers(init.headers).get('authorization'), version: new Headers(init.headers).get('x-stashbase-client-version') });
+      if (String(url).endsWith('/v1/agent/usage?include=reservations')) {
+        if (++creditReads === 1) return Response.json({ code: 'auth_required' }, { status: 401 });
+        return Response.json({ remainingPercent: 75, reservedPercent: 10 });
+      }
+      return authReply(url);
+    } });
+    process.env.STASHBASE_AUTH_NETWORK_PORT = String(bridge.port);
+    process.env.STASHBASE_AUTH_NETWORK_TOKEN = bridge.token;
+    globalThis.fetch = async () => { throw new Error('Direct network access is unavailable; use the system proxy'); };
+    try {
+      const account = await import('./server/hosted-account.ts');
+      const started = account.beginHostedOAuth('google', 'http://127.0.0.1:8090');
+      await account.exchangeHostedOAuthCode(started.flowId, 'fixture-code');
+      const allowance = await account.fetchHostedAgentAllowance();
+      process.stdout.write(JSON.stringify({ allowance, calls }));
+    } finally { bridge.close(); }
+  `);
+  assert.equal(result.status, 0, result.stderr);
+  const { allowance, calls } = JSON.parse(result.stdout);
+  assert.equal(allowance.remainingPercent, 75);
+  assert.equal(allowance.reservedPercent, 10);
+  const usage = calls.filter((call: { url: string }) => call.url.endsWith('/v1/agent/usage?include=reservations'));
+  assert.equal(usage.length, 2, 'one native 401 refresh retries the credit read once');
+  assert.ok(usage.every((call: { authorization: string; version: string }) => call.authorization === `Bearer ${apiToken('access-1')}` && call.version));
+});
+
 test('OAuth PKCE session persists locally and authenticates Agent allowance requests', () => {
   const result = runIsolated(`
     const calls = [];

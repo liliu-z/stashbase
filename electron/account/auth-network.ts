@@ -3,11 +3,12 @@ import http from 'node:http';
 import {
   AUTH_PATHS, AUTH_REQUEST_LIMIT, AUTH_RESPONSE_LIMIT, AUTH_TIMEOUT_MS,
   AUTH_BASE_URL, USAGE_RELAY_PATH, USAGE_REQUEST_LIMIT, authMethod, authNetworkError, usageBatchUrl,
+  ALLOWANCE_RELAY_PATH, ALLOWANCE_API_URL,
 } from '../../shared/hosted-auth-network.ts';
 import destination from '../../server/telemetry-destination.json' with { type: 'json' };
 
 /** A bounded, process-private relay to Chromium's system-proxy-aware session.
- * It carries hosted Auth operations and usage batches to their fixed destinations.
+ * It carries hosted Auth, credit reads and usage batches to fixed destinations.
  * No renderer IPC, arbitrary destination, redirects, cookies or session storage. */
 export async function createAuthNetworkBridge(options: { fetch: typeof fetch; usageUrl?: string | undefined }) {
   const token = crypto.randomBytes(32).toString('hex');
@@ -22,7 +23,8 @@ export async function createAuthNetworkBridge(options: { fetch: typeof fetch; us
       return;
     }
     const usage = request.url === USAGE_RELAY_PATH;
-    if (request.method !== 'POST' || (request.url !== '/' && !usage) || (usage && !usageUrl)) {
+    const allowance = request.url === ALLOWANCE_RELAY_PATH;
+    if (request.method !== 'POST' || (request.url !== '/' && !usage && !allowance) || (usage && !usageUrl)) {
       response.writeHead(404).end(); return;
     }
     if (pending.size >= 8) { response.writeHead(503).end(); return; }
@@ -51,6 +53,17 @@ export async function createAuthNetworkBridge(options: { fetch: typeof fetch; us
       if (usage) {
         if (!input || typeof input !== 'object' || !Array.isArray(input.batch)) { response.writeHead(400).end(); return; }
         target = { url: usageUrl!, init: { method: 'POST', headers: { 'content-type': 'application/json' }, body: raw } };
+      } else if (allowance) {
+        if (!input || typeof input.accessToken !== 'string' || !input.accessToken || input.accessToken.length > 16_384
+          || typeof input.clientVersion !== 'string' || !/^[\w.+-]{1,64}$/.test(input.clientVersion)
+          || Object.keys(input).some(key => key !== 'accessToken' && key !== 'clientVersion')) {
+          response.writeHead(400).end(); return;
+        }
+        target = { url: ALLOWANCE_API_URL, init: { method: 'GET', headers: {
+          authorization: `Bearer ${input.accessToken}`,
+          'x-stashbase-client-version': input.clientVersion,
+          'cache-control': 'no-store',
+        } } };
       } else {
         if (!input || !AUTH_PATHS.has(input.path)
           || (input.body !== undefined && typeof input.body !== 'string')

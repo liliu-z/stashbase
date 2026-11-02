@@ -1,8 +1,58 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createAuthNetworkBridge } from '../electron/account/auth-network.ts';
-import { createHostedAuthRequest, createHostedUsageFetch } from './hosted-auth-transport.ts';
-import { AUTH_REQUEST_LIMIT, AUTH_RESPONSE_LIMIT, AUTH_BASE_URL, USAGE_RELAY_PATH, USAGE_REQUEST_LIMIT } from '../shared/hosted-auth-network.ts';
+import { createHostedAuthRequest, createHostedUsageFetch, createHostedAllowanceRequest } from './hosted-auth-transport.ts';
+import { AUTH_REQUEST_LIMIT, AUTH_RESPONSE_LIMIT, AUTH_BASE_URL, USAGE_RELAY_PATH, USAGE_REQUEST_LIMIT, ALLOWANCE_API_URL, ALLOWANCE_RELAY_PATH } from '../shared/hosted-auth-network.ts';
+
+test('credit relay admits only the fixed authenticated read and preserves HTTP failures and cancellation', async t => {
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+  let entered!: () => void;
+  let aborted!: () => void;
+  let stall = false;
+  const bridge = await createAuthNetworkBridge({ fetch: async (url, init) => {
+    calls.push({ url: String(url), init });
+    if (stall) {
+      entered();
+      return new Promise((_resolve, reject) => init?.signal?.addEventListener('abort', () => {
+        aborted(); reject(init.signal?.reason);
+      }, { once: true }));
+    }
+    return Response.json({ code: 'auth_required' }, { status: 401, headers: { 'x-request-id': 'credits-request', 'set-cookie': 'private-cookie' } });
+  } });
+  t.after(() => bridge.close());
+  const request = createHostedAllowanceRequest({ port: String(bridge.port), token: bridge.token, required: true });
+  const response = await request({ accessToken: 'fixture-api-token', clientVersion: '2.18.4', signal: AbortSignal.timeout(2000) });
+  assert.equal(response.status, 401);
+  assert.deepEqual(await response.json(), { code: 'auth_required' });
+  assert.equal(response.headers.get('x-request-id'), 'credits-request');
+  assert.equal(response.headers.get('set-cookie'), null);
+  assert.equal(calls[0].url, ALLOWANCE_API_URL);
+  assert.equal(calls[0].init?.method, 'GET');
+  assert.equal(new Headers(calls[0].init?.headers).get('authorization'), 'Bearer fixture-api-token');
+  assert.equal(new Headers(calls[0].init?.headers).get('x-stashbase-client-version'), '2.18.4');
+  assert.equal(calls[0].init?.redirect, 'error');
+  assert.equal(calls[0].init?.credentials, 'omit');
+  const url = `http://127.0.0.1:${bridge.port}${ALLOWANCE_RELAY_PATH}`;
+  const headers = { 'x-stashbase-auth-network-token': bridge.token };
+  const valid = { accessToken: 'fixture-api-token', clientVersion: '2.18.4' };
+  for (const body of [{ ...valid, url: 'https://attacker.example' }, { ...valid, path: '/v1/billing/checkout' }, { ...valid, clientVersion: 'bad\r\nheader' }, { ...valid, accessToken: '' }]) {
+    assert.equal((await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) })).status, 400);
+  }
+  assert.equal((await fetch(url, { method: 'POST', body: JSON.stringify(valid) })).status, 403);
+  assert.equal((await fetch(url, { method: 'POST', headers: { ...headers, origin: 'https://attacker.example' }, body: JSON.stringify(valid) })).status, 403);
+  await assert.rejects(createHostedAllowanceRequest({ required: true })({ ...valid, signal: AbortSignal.timeout(1000) }), /AUTH_BRIDGE_UNAVAILABLE/);
+  assert.equal(calls.length, 1);
+  stall = true;
+  const started = new Promise<void>(resolve => { entered = resolve; });
+  const stopped = new Promise<void>(resolve => { aborted = resolve; });
+  const controller = new AbortController();
+  const result = request({ ...valid, signal: controller.signal });
+  const rejection = assert.rejects(result, { name: 'AbortError' });
+  await started;
+  controller.abort();
+  await Promise.all([stopped, rejection]);
+  assert.equal(calls.length, 2, 'cancelled credit reads are not retried');
+});
 
 test('desktop auth uses only the native transport for exchange, refresh, profile and logout', async t => {
   const calls: Array<{ url: string; init?: RequestInit }> = [];

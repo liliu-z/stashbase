@@ -2,6 +2,7 @@ import http from 'node:http';
 import {
   AUTH_PATHS, AUTH_REQUEST_LIMIT, AUTH_RESPONSE_LIMIT, AUTH_TIMEOUT_MS,
   AUTH_BASE_URL, USAGE_RELAY_PATH, USAGE_REQUEST_LIMIT, authMethod, authNetworkError,
+  ALLOWANCE_RELAY_PATH, ALLOWANCE_API_URL,
 } from '../shared/hosted-auth-network.ts';
 
 type NativeBridge = { port?: string | undefined; token?: string | undefined; required: boolean };
@@ -98,6 +99,30 @@ export function createHostedUsageFetch(bridge: NativeBridge): typeof fetch {
   }) as typeof fetch;
 }
 
+/** Credits must follow the same system proxy as the sign-in that granted them.
+ * The native hop accepts only a token/version for one fixed, read-only endpoint. */
+export function createHostedAllowanceRequest(bridge: NativeBridge) {
+  return async (options: { accessToken: string; clientVersion: string; signal: AbortSignal }): Promise<Response> => {
+    try {
+      if (!relayAvailable(bridge)) return await fetch(ALLOWANCE_API_URL, {
+        signal: options.signal,
+        headers: { authorization: `Bearer ${options.accessToken}`, 'x-stashbase-client-version': options.clientVersion },
+        redirect: 'error', credentials: 'omit',
+      });
+      const body = JSON.stringify({ accessToken: options.accessToken, clientVersion: options.clientVersion });
+      if (Buffer.byteLength(body) > AUTH_REQUEST_LIMIT) throw { code: 'AUTH_REQUEST_TOO_LARGE' };
+      return await relay(bridge, ALLOWANCE_RELAY_PATH, body, options.signal);
+    } catch (error) {
+      // Keep original Node network causes in standalone development; native
+      // errors have already crossed a boundary that admits only safe codes.
+      if (options.signal.aborted) throw options.signal.reason;
+      if (!bridge.required && !bridge.port && !bridge.token) throw error;
+      const detail = authNetworkError(options.signal.aborted ? options.signal.reason : error);
+      throw Object.assign(new Error(`Could not refresh Agent credits. Check your connection and system proxy. (${detail.code})`, { cause: detail }), { code: detail.code });
+    }
+  };
+}
+
 const nativeBridge: NativeBridge = {
   port: process.env.STASHBASE_AUTH_NETWORK_PORT,
   token: process.env.STASHBASE_AUTH_NETWORK_TOKEN,
@@ -105,6 +130,7 @@ const nativeBridge: NativeBridge = {
 };
 export const hostedAuthRequest = createHostedAuthRequest(nativeBridge);
 export const hostedUsageFetch = createHostedUsageFetch(nativeBridge);
+export const hostedAllowanceRequest = createHostedAllowanceRequest(nativeBridge);
 // Do not pass the process-private capability to Agent or tool subprocesses.
 delete process.env.STASHBASE_AUTH_NETWORK_PORT;
 delete process.env.STASHBASE_AUTH_NETWORK_TOKEN;

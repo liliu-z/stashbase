@@ -267,6 +267,8 @@ opening the account menu, returning to the window, and finishing a Default Agent
 turn (including failures and cancellations); poll while the signed-in surface is
 mounted so other-device usage and settlement become visible. A stalled credit
 refresh has a bounded wait, preserves sign-in, and can recover on a later read.
+Desktop credit refresh uses the same system proxy as sign-in, including PAC;
+it must not require a separate direct Internet connection after successful login.
 A failed refresh
 must not present an old percentage as current. Display temporarily reserved
 credits separately from available credits: active requests and unconfirmed fees

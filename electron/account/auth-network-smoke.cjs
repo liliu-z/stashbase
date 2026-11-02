@@ -45,6 +45,15 @@ app.whenReady().then(async () => {
   // the configured proxy. Relay destination restrictions have their own tests.
   assert.ok(tunnels.includes('api.stashbase.ai:443'),
     `Chromium must send Auth through the PAC-selected proxy; observed ${JSON.stringify(tunnels)}`);
+  const beforeCredits = tunnels.length;
+  const credits = await fetch(`http://127.0.0.1:${bridge.port}/agent-usage`, {
+    method: 'POST', headers: { 'x-stashbase-auth-network-token': bridge.token },
+    body: JSON.stringify({ accessToken: 'fixture-only', clientVersion: '2.18.4' }),
+  });
+  assert.equal(credits.status, 502);
+  assert.equal((await credits.json()).errorCode, 'ERR_TUNNEL_CONNECTION_FAILED');
+  assert.ok(tunnels.slice(beforeCredits).includes('api.stashbase.ai:443'),
+    'Credit refresh must use the PAC-selected proxy after sign-in too');
   // Usage batches take the same proxy-aware route to the configured ingestion
   // host. The proxy refuses the tunnel, so the fixture never reaches it.
   const usage = await fetch(`http://127.0.0.1:${bridge.port}/usage`, {
@@ -62,7 +71,7 @@ app.whenReady().then(async () => {
   const unavailable = await send();
   assert.equal(unavailable.status, 502);
   assert.equal((await unavailable.json()).errorCode, 'ERR_PROXY_CONNECTION_FAILED');
-  console.log('Auth native smoke passed: PAC CONNECT routing for Auth and usage, proxy changes, concrete Chromium failures.');
+  console.log('Auth native smoke passed: PAC CONNECT routing for Auth, credits and usage, proxy changes, concrete Chromium failures.');
 }).then(() => finish(0), error => { console.error(error); finish(1); });
 
 function finish(code) {

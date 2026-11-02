@@ -49,6 +49,17 @@ The map is navigation, not proof that every caller has been reviewed.
 
 ## J01: Onboarding
 
+**Credit proxy continuity (2026-11-02):** a controlled account flow signs in
+through the private Chromium relay while direct Node access is refused. Its
+subsequent credit read reproduced a direct-fetch failure. `hosted-account.ts`
+now routes that read through `hosted-auth-transport.ts` and the native bridge's
+fixed Agent usage endpoint. Regressions retain token/version forwarding, 401
+status and request ID, cancellation/deadlines, no direct fallback and rejection
+of arbitrary destinations/headers. The native Auth smoke also checks a separate
+PAC-selected CONNECT for credits after sign-in; the fixture refuses that tunnel,
+so it sends no credentials to a provider. This does not establish real provider
+login, the affected user's network, or Windows/Linux OS proxy behavior.
+
 **Codex approval verification (2026-10-29):** a fresh build launched with
 `verify:onboarding --agent codex --built` in the persistent private profile.
 Welcome and Settings > Agents loaded; Codex reports Not installed. No signed-in

@@ -24,7 +24,7 @@ import {
   type HostedAccountSession,
 } from './app-config.ts';
 import { normalizeHostedDisplayName, parseGoogleAvatarUrl } from './hosted-account-profile.ts';
-import { hostedAuthRequest } from './hosted-auth-transport.ts';
+import { hostedAuthRequest, hostedAllowanceRequest } from './hosted-auth-transport.ts';
 import { AUTH_BASE_URL } from '../shared/hosted-auth-network.ts';
 
 export const STASHBASE_API_URL = 'https://api.stashbase.ai';
@@ -533,13 +533,7 @@ export async function fetchHostedAgentAllowance(
       error => { signal.removeEventListener('abort', abort); reject(error); },
     );
   });
-  const response = await fetch(`${STASHBASE_API_URL}/v1/agent/usage?include=reservations`, {
-    signal,
-    headers: {
-      authorization: `Bearer ${token}`,
-      'x-stashbase-client-version': CLIENT_VERSION,
-    },
-  });
+  const response = await hostedAllowanceRequest({ accessToken: token, clientVersion: CLIENT_VERSION, signal });
   const payload = await jsonBody<HostedAgentAllowance & ErrorPayload>(response);
   // jsonBody intentionally hides unreadable upstream bodies; cancellation is
   // not an unreadable success and must reach the route's recovery path.

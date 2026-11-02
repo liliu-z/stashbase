@@ -962,9 +962,14 @@ data migration is not required by [maintenance policy](../MAINTENANCE.md#previou
   an in-memory Chromium session in system-proxy mode; Node retains PKCE, session
   persistence and flow retirement. The process-private relay binds IPv4 loopback
   on an ephemeral port, requires a per-launch capability, rejects browser Origins,
-    and admits only the fixed Better Auth operations listed in
+  and admits only the fixed Better Auth operations listed in
   `shared/hosted-auth-network.ts` on `api.stashbase.ai`: desktop exchange,
   session/token reads, logout, email-code login, and explicit account linking.
+  Its credit-read route accepts only the host's API token and client version,
+  forwarding one fixed Agent usage GET through the same Chromium session.
+  It accepts no URL, path, method or caller-supplied headers. Credit deadlines,
+  the one 401 refresh and account-state ownership remain in Node; a required
+  native transport cannot fall back to direct Node fetch.
   Its separate usage route forwards analytics batches only to the ingestion URL
   derived from `server/telemetry-destination.json`; it refuses that route when the
   destination is unset and never accepts a caller-supplied host.
