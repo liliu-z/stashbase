@@ -65,10 +65,17 @@ ordinary text. This applies to replies and Markdown file writes.
   modifies those files through native tools under the selected runtime's
   permissions, without requiring import or moving the conversation. Native
   writes remain available; Default asks for them in Ask, Edit, and Auto, while
-  Plan refuses changes. Project text edits use project file tools; Claude
-  refuses a native write whose target resolves inside the project, in every
+  Plan refuses changes. Project text content changes use project file tools; Claude
+  refuses a native text write whose target resolves inside the project, in every
   mode, and directs the agent to those tools. External
   files do not become project search results or participate in project turn review.
+- An authorized project file deletion prefers the project deletion tool. If
+  that tool is unavailable or explicitly cannot handle the file type, the agent
+  can delete the same exact path with native tools under runtime permissions.
+  A permission denial, protected-path or project-scope refusal, or source
+  conflict cannot be bypassed that way. An uncertain result requires checking
+  whether the file still exists before retrying. This fallback does not change
+  the project-tool requirement for text content edits and writes.
 
 - Capture text, context, and choices on Send. Clear only the accepted snapshot.
   Refused delivery retains it; uncertain delivery forbids automatic resend.
@@ -87,23 +94,30 @@ ordinary text. This applies to replies and Markdown file writes.
   always queues, since a skill starts a turn.
   Waiting for a background subagent and processing its result remain part of
   that turn; an interim reply must not show Completed or release queued work.
-- Validate context before sending. Opening a document does not attach it; missing
-  or changed context needs replacement, refresh, or explicit removal.
+- Validate context before sending. Missing or changed context needs replacement,
+  refresh, or explicit removal.
+- Dragging an ordinary file from Files into the composer explicitly attaches
+  its exact path, including code and configuration formats outside automatic
+  context. The runtime reads it with its available tools and permissions;
+  attaching it neither indexes it nor changes its contents. The draft shows a
+  removable file card; sent and restored messages retain the file identity even
+  for unknown extensions.
 - A file dropped on the workspace outside the message box does attach, to the
   chat beside it, without a click and without opening the pane, when that chat
   can use it: an external file, or a file of the chat's own project that its
   listing shows. Another project's file, or one the tree hides, opens without
-  attaching. It shows as the
-  suggestion's chip, attached, since opening it is what made it context. An attachment added that way leaves the
-  draft when the file's tab closes; one the reader adds by hand stays. An
+  attaching. It shows as a document context chip. An attachment added that way
+  leaves the draft when the file's tab closes; one the reader adds by hand stays. An
   [external file](project-files.md#external-files) attaches by its absolute path,
   and each runtime reads it with its own tools under its own permissions, so
   Default asks before reading outside the project. Project MCP tools keep
   refusing it.
-- The agent pane beside Documents suggests the document in front of the reader,
-  including an external file, as a quiet chip. One click attaches it like a mention; dismissing it hides the
-  suggestion until another document comes to the front. Chat mode shows no
-  suggestion, since no document is on screen there.
+- The agent pane beside Documents includes the readable document in front of
+  the reader as visible context, including an external file. Removing it excludes
+  it until another document comes to the front. Sending, queueing, or sending a
+  follow-up captures the document shown at that moment; later navigation cannot
+  change that request or its retry. Chat mode and New tab add no current document
+  because no document is on screen there. Files explicitly attached to a draft stay attached.
 - A **passage** is selected text bound as context, from **Ask agent** on a
   Markdown selection or on selected table cells. A table passage starts with
   where it is, the sheet and range, then its rows as a Markdown table that

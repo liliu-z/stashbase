@@ -97,6 +97,11 @@ preview, content editing, and rename/delete are separate permissions.
   replacement; atomic writes preserve existing file permissions. Generic text
   never enters indexing or automatic context merely because a tool can edit it.
   Paths remain literal; tools never complete a filename with a document suffix.
+- `deleteProjectFile` owns deletion for both Workbench and Agent/MCP. It validates
+  writable project scope, realpath containment, and regular-file identity without
+  consulting preview/text format gates. Deletion needs no content read; only a
+  missing source produces `alreadyGone`, never an access or containment failure.
+  Runtime deletion approval remains separate from format support.
 - XLSX remains a generic file to the editor. `spreadsheet-preview.ts` parses a
   bounded source snapshot in a cancellable worker and returns display strings and
   formula cells to the generic preview route, including exact-file external grants,
@@ -664,7 +669,11 @@ stable status without download, retry, or a new durable demand latch.
   offers a preview URL after checking the real path within transient storage;
   the preview route repeats that check. Remote context tiles fall back to a named
   card on load failure, covering deletion between restoration and image loading.
-- Context/attachments are explicit. Validate source identity before send; stale
+- Context/attachments are visible and removable. The composer derives the current
+  document from the visible Documents environment and captures it into session
+  context before submission, access setup, a new queue entry, or steering. Merely
+  opening a document does not mutate the session's draft. Existing queued requests
+  and retries keep their captured context. Validate source identity before send; stale
   context blocks it. The queue captures prompt, context, skill, and id, and Retry
   uses that exact submission after checking locally available context. Sessions,
   not mounted composers, hold follow-ups sent into a running turn as pending
@@ -679,6 +688,12 @@ stable status without download, retry, or a new durable demand latch.
   resend. Clear only the accepted draft snapshot, never newer input. Explicit
   queue/message reuse refuses to overwrite another draft. A reused prompt starts a new turn rather
   than truncating history. Historical metadata cannot restore attachment bytes.
+- Explicit file-tree drags carry ordinary file identity independently of retrieval
+  eligibility. Generic sources bind as file cards; `agentContextFile` resolves
+  their exact path without reading bytes. Actual reads retain the text/file tool's
+  scope, format and permission checks. History restores explicit absolute generic
+  paths as name-only cards, with no preview grant, and strips only generated
+  representation hints rather than filename parentheses.
 - Models/effort/modes follow runtime capabilities. Catalogs seed drafts, not live
   identity. No catalog-order default or global CLI rewrite; active turns freeze
   changes. Skills use native invocation, not concatenated skill-file contents.
@@ -1377,12 +1392,17 @@ registered host boundaries; renderer shared types are a different layer.
 - Refresh keeps usable content. Clean editors may adopt newer source; dirty ones
   retain drafts for conflict. Optimistic metadata rollback uses the last confirmed
   value and ignores superseded failures. Network failure is not scope retirement.
-  Window focus refreshes the current folder listing immediately and requests
-  folder-explicit reconciliation through preparation commands. Focus passes are
-  throttled and do not overlap; folder switches and closure retire their refresh
-  completions and failure notices through a scope lifetime signal. Browsing does
-  not depend on reconciliation succeeding. Host tree
-  revisions signal app writes and reconciliation, not filesystem events.
+  `use-folder-refresh.ts` owns one listing poll per window, every five seconds
+  while the page is visible and a project is open. It pauses while hidden,
+  refreshes immediately on return, and retires its timer on project switch,
+  closure, or unmount. Every window focus refreshes the listing before applying
+  the throttle to folder-explicit reconciliation through preparation commands.
+  Focus and periodic listing reads share an in-flight request; mutation-driven
+  invalidations still cancel older reads. Reconciliation remains throttled and
+  does not overlap; folder switches and closure retire its completions and
+  failure notices through a scope lifetime signal. Listing polls never start
+  reconciliation, and browsing does not depend on indexing succeeding. Host
+  tree revisions signal app writes and reconciliation, not filesystem events.
   Documents owns its external-source refresh in `use-document-refresh.ts`:
   only the active, visible document polls, with an immediate check on activation,
   window focus, and return from hidden. App composition also deactivates viewers

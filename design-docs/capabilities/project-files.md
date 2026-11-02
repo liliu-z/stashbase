@@ -52,8 +52,10 @@ larger pages sooner.
   content, known binary containers, invalid encoding, and non-regular files
   cannot be overwritten as text. Saved text retains BOM, line endings, and
   existing file permissions. Generic text does not acquire indexing or automatic
-  context eligibility. Directory discovery retains its visibility rules; an
-  omitted file can be read explicitly by its exact path.
+  context eligibility. It can be
+  [explicitly attached to Chat](agent-sessions.md#submission-and-execution)
+  by dragging its visible file row into the composer. Directory discovery retains
+  its visibility rules; an omitted file can be read explicitly by its exact path.
 - Workbench rename, move, and delete apply to ordinary visible files, including
   generic files. Dragging a file or folder onto a folder in Files moves it there
   under its own name; a folder moves with everything inside it and never into
@@ -67,6 +69,12 @@ larger pages sooner.
   copies the entry's path, from the disk root or from the project folder, in
   the platform's own separators. Protected entries offer only these location
   actions; derived data remains hidden.
+- Authorized Agent/MCP deletion accepts exact paths to ordinary project files,
+  including code, configuration, extensionless names, and binary files. Deleting
+  a file does not require preview, text decoding, or search support. Project scope,
+  protected-path rules, and runtime deletion permissions still apply; directories
+  and symbolic links are not ordinary file targets. A missing file is reported
+  as already gone, while access failures remain errors.
 - Renaming or deleting a source never migrates or deletes neighboring files
   merely because their names match retired extraction formats. Current derived
   data is owned separately in AppData.
@@ -89,9 +97,13 @@ larger pages sooner.
   that agents write with the ordinary file tools. It joins Files only with hidden files
   shown and is never retrieval-eligible. [Scheduled Tasks](scheduled-tasks.md#the-file-is-the-source-the-list-is-its-view)
   owns how the task list reads and edits it.
-- Returning focus to StashBase refreshes the open project's Files tree and
-  reconciles external additions, renames, and deletions. Browsing those changes
-  does not wait for search indexing, and the refresh preserves open documents.
+- While StashBase is visible, the open project's Files tree periodically checks
+  for external additions, renames, and deletions. Returning focus or becoming
+  visible refreshes the listing immediately, including quick returns from another
+  app. Focus also requests search reconciliation; its throttle never suppresses
+  a listing refresh. Browsing does not wait for indexing, and refresh preserves
+  open documents. Periodic listing checks pause while the page is hidden and
+  stop when the project closes.
 - Files lists names and file metadata only; it never reads a file to show its
   row. A cloud-only file, such as one iCloud's Optimize Mac Storage has moved
   off the disk, downloads when it is opened, not when the tree loads.

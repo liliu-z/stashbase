@@ -883,14 +883,25 @@ Host/services: `server/folder.ts`, `server/github-import.ts`, `server/project-fi
   behavior for large mixed-format folders or with an embedding provider.
 - **AI Eval:** not required.
 - **Release Check:** real OS folder picker, file drop, and packaged public Git import.
-- **External tree refresh (2026-10-08):**
+- **External tree refresh (updated 2026-11-02):**
   `renderer/src/app/composition/folder/use-folder-refresh.ts` refreshes the active
-  listing and reconciles the explicit folder on window focus, even without a
-  visibility or tree-version change. `use-folder-focus-refresh.test.tsx` covers
-  external additions/renames/deletions, throttling, overlapping focus, sync failure,
-  project switch/closure, late success/failure completion, and listener cleanup.
+  listing on every window focus before throttling explicit-folder reconciliation.
+  One five-second listing poll also discovers external changes while the page
+  stays visible; hiding pauses it, and becoming visible refreshes immediately.
+  Polling never starts search reconciliation. `use-folder-focus-refresh.test.tsx`
+  covers additions/renames/deletions without focus, quick returns within the sync
+  throttle, hidden/visible transitions, shared slow reads, sync failure,
+  project switch/closure, late success/failure completion, and timer/listener cleanup.
   Scope retirement aborts the focus request so a retired project's failure cannot
-  replace the current project's notice. The regression was
+  replace the current project's notice. An isolated macOS Electron pass against
+  the source host and renderer observed real external additions, renames and
+  deletions within the next listing poll, with no focus events. The open Markdown
+  document and its unsaved text survived every update; the test held its save
+  request so disk bytes remained unchanged. Repeated synthetic window-focus
+  events refreshed a new file during the sync throttle without another sync.
+  The rendered tree and retained draft were visually checked. Native Windows
+  external edits, physical rapid app switching and packaged behavior remain
+  unverified. The earlier focus-refresh regression was
   reproduced in the running macOS app: `li-kb/journal` existed on disk and in
   the host listing, but the Files tree retained its earlier three entries.
   A built macOS runtime pass opened a temporary project and kept its Markdown
@@ -3252,12 +3263,24 @@ Temporary original files still are not durable historical attachments.
 ordinary local files from the picker, drop, and clipboard instead of limiting the
 composer to images and PDFs. Focused renderer tests cover an arbitrary MIME type,
 an image preview, and a text-file card; history tests keep unknown-extension files
-inside transient attachment storage as name-only cards while leaving arbitrary
-external paths in the transcript. Runtime interpretation of binary formats remains
+as name-only cards while leaving arbitrary image paths without a preview grant
+in the transcript. Runtime interpretation of binary formats remains
 provider-dependent and is not established by local upload acceptance.
 Validation: `pnpm check:web` passed all 12 renderer gates; the agent server
 tests (now in `pnpm test:server`) passed 204 tests; the attachment route test, host typecheck, and documentation
 checks passed.
+
+**Explicit project code context (2026-11-02):** `file-tree-rows.tsx` gives every
+ordinary file a source drag identity, independently of indexing eligibility.
+`context-composer.tsx` binds generic formats as file cards without changing prose;
+`agentContextFile` resolves their exact source path without opening bytes.
+`agent-history-attachments.ts` restores absolute generic paths as name-only cards
+and preserves filename parentheses when removing prepared-document hints.
+The file-tree/drop and workspace-context suites plus `project-file-reader.test.ts`
+and `codex-history.test.ts` passed 55 focused checks. `pnpm check`, renderer
+formatting/lint, and documentation checks passed. `BoundContext` includes the
+code-file card; visual inspection, packaged pointer dragging and a real-provider
+read of the dropped code file remain unproven in this run.
 
 **Intent:** [J06](../design-docs/journeys/README.md#j06-start-and-continue-an-agent-chat).
 
@@ -3491,13 +3514,29 @@ binds it to the chat in the passage's folder and leaves a composer focus request
 mounting. `server/agent-history-attachments.ts` lifts the block back out of
 Claude, Codex, and Default (OpenCode) history, and `infrastructure/session-api.ts` turns a replayed
 quote under the chat's folder into the same passage chip. The composer's
-suggestion of the document in front comes from `activeSource`, which
-`use-agent-environment.ts` publishes only in Documents; `domain/draft-context.ts`
-decides what is offered and `use-suggested-source.ts` holds the dismissal.
+current document comes from `activeSource`, which
+`use-agent-environment.ts` publishes only in Documents with New tab closed;
+`domain/draft-context.ts`
+decides what is included and `use-current-source.ts` holds the dismissal and
+captures the source before sending, access setup, a new queue entry, or steering.
+Until that action it is derived context, so opening a document keeps empty chats
+blank. The same context tiles show it before and after submission; a later
+document switch does not change a queued request or retry.
 `context.test.ts`, `session-runtime.context.test.ts`, `ask-about.test.ts`,
 `session-api.test.ts`, `codex-history.test.ts`, `context-composer.test.tsx`,
 `selection-markdown.test.ts`, and `use-agent-environment.test.tsx` own these rules.
-A driven built-app pass (2026-09-25, Linux, isolated home, folder dialog stubbed
+The current-document change (2026-11-02) passed 54 focused tests, including
+composer-to-wire inclusion, removal, setup handoff, frozen queue context, steering,
+and keeping Stop available with an empty draft. The shell regression in
+`app.test.tsx` (2026-11-03) proved that New tab excludes a retained background
+document from the outbound prompt and that selecting the document restores its
+context; all seven app tests passed. Types, core host checks, onboarding
+composition, controlled bundled runtime, formatting, lint, and docs checks passed;
+the localhost hook check needed a rerun outside the sandbox. The
+`CurrentDocument` workspace Story provides the changed composition. Its visual
+review was blocked by unavailable browser access and native screen capture errors;
+a real-provider turn receiving the automatically included document remains unproven.
+A prior driven built-app pass (2026-09-25, Linux, isolated home, folder dialog stubbed
 in the main process) opened a Markdown file beside the agent pane: the pane
 offered it as a dashed suggestion; a selection showed Ask agent on the
 toolbar; Ask agent bound "tide rises twice" as a passage chip and moved the
@@ -3630,9 +3669,26 @@ permissions, rejected binary/invalid/oversized/special sources, protected paths,
 project scope and symlink escape. Generic text calls no index operation, and
 the Documents save gate still refuses it. Runtime instructions and MCP tool
 descriptions explicitly allow requested programming and preserve filenames.
-Directory discovery, generic move/delete, automatic context and search
+Directory discovery, generic move, automatic context and search
 eligibility retain their separate capabilities. These tests do not establish
 live-provider tool selection or packaged behavior.
+
+**Generic file deletion (2026-11-02):** `deleteProjectFile` now shares one
+format-independent deletion path between Workbench and Agent/MCP. It validates
+project scope, writable paths, realpath containment, and regular-file identity
+before cancelling source work or changing files. `project-file-mutations.test.ts`
+exercises real MCP deletion of .mjs files, dotfiles, extensionless names and binary
+files, repeat deletion, untouched neighboring files, and protected-path
+(including directory aliases), cross-project, directory and symlink-escape
+refusal. `active-file-operations.test.ts`
+checks that invalid paths and containment failures are errors rather than
+reported as already gone. Shared runtime instructions prefer `delete_file` but
+allow native deletion of the same authorized path when the tool is unavailable
+or explicitly lacks file-type support. Permission/protected-path/scope refusals
+and source conflicts cannot be bypassed; uncertain outcomes require a fresh
+existence check. Adapter tests establish delivery and existing permission
+configuration, not provider compliance. Live-provider fallback and packaged
+deletion remain unverified.
 
 A controlled Electron pass using the built server and renderer in an isolated
 profile created, read and edited `.env` and a Python source through MCP. The

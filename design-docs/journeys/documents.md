@@ -32,7 +32,9 @@ source mutations, saving, and release guarantees.
    Select any Markdown and choose Ask agent to bind that passage to the chat
    beside the document; the chat pane opens if it was hidden. Cells, rows, or
    columns selected in a CSV or XLSX table bind the same way, with their sheet
-   and range. The pane also suggests the document in front, which attaches only on a click.
+   and range. The pane includes the current readable document with the next
+   message; remove its context chip to exclude it, following
+   [Agent context](../capabilities/agent-sessions.md#submission-and-execution).
 4. Return to live work with edits, undo, selection, and reading position intact.
    Relaunch restores kept tabs from saved files and reports missing files individually.
 
