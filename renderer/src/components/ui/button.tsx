@@ -32,6 +32,7 @@ const buttonVariants = cva(
     'group relative isolate inline-flex cursor-pointer items-center justify-center whitespace-nowrap outline-none',
     'transition-colors duration-fast',
     'disabled:pointer-events-none disabled:opacity-50',
+    'aria-disabled:pointer-events-none aria-disabled:opacity-50',
     FOCUS_RING,
   ],
   {
@@ -40,7 +41,9 @@ const buttonVariants = cva(
         primary: 'text-background',
         secondary: 'text-foreground',
         tertiary: 'text-foreground',
-        ghost: 'text-muted-foreground hover:text-foreground',
+        // A pressed toggle wears ink, so its state reads in the label as well
+        // as in the `active` fill behind it.
+        ghost: 'text-muted-foreground hover:text-foreground aria-pressed:text-foreground',
       },
       // Only the icon-only square is a shape decision. Height, type step and
       // padding all come from the size ladder (see size-context), so this
@@ -84,6 +87,10 @@ interface ButtonProps
    *  external open piece of UI (a popover, dropdown, etc.) so it reads as
    *  engaged while the menu is showing. */
   active?: boolean;
+  /** Keep focus while disabled, announced through `aria-disabled`: for a
+   *  toggle that is briefly disabled by its own press, so the keyboard user
+   *  is not dropped to the page. */
+  focusableWhenDisabled?: boolean;
 }
 
 /** The variant names, taken from the one place they are declared. Both maps
@@ -146,6 +153,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       leadingIcon: LeadingIcon,
       trailingIcon: TrailingIcon,
       active = false,
+      focusableWhenDisabled = false,
       disabled,
       children,
       style,
@@ -299,6 +307,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref as React.Ref<HTMLButtonElement>}
         className={rootClassName}
         disabled={disabled || loading}
+        focusableWhenDisabled={focusableWhenDisabled}
         style={style}
         {...props}
       >

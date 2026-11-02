@@ -4,13 +4,14 @@
  *  app-wide Appearance preferences, edited through the same optimistic write
  *  and the same segmented picker as their Settings rows, so the two can never
  *  disagree. The panel stays open while the reader tries presets; a refused
- *  save rolls the choice back and names the failure inside it. */
+ *  save rolls the choice back and names the failure inside it. Beside it, the
+ *  project's Math mode is a ghost toggle of the same step. Both are glyphs
+ *  alone, named by their tooltips, so the bar stays quiet over the page. */
 import { Popover } from '@base-ui/react/popover';
-import { ALargeSmall, ChevronDown } from 'lucide-react';
+import { Sigma } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Elevated } from '@/components/ui/elevated';
-import { Switch } from '@/components/ui/switch';
 import { Tooltip } from '@/components/ui/tooltip';
 import type { AppearancePort, ProjectMathPort } from '@/features/settings/application/ports';
 import {
@@ -24,17 +25,30 @@ import {
 import { useAppearance } from '@/features/settings/hooks/use-appearance';
 import { useProjectMath } from '@/features/settings/hooks/use-project-math';
 import { PresetChoice } from '@/features/settings/ui/appearance/preset-choice';
-import type { IconComponentProps } from '@/lib/icon-context';
 import { useShape } from '@/lib/shape-context';
 import { SizeProvider } from '@/lib/size-context';
 import { cn } from '@/lib/utils';
 import { FailureNotice } from '@/shared/ui/failure-notice';
 
-/** `ALargeSmall` draws its letters in the middle third of its frame, so at
- *  the button's icon step the large A stood shorter than the label's
- *  lowercase. Drawn larger, it reaches just under the label's capitals. */
-function ReadingTextGlyph(props: IconComponentProps) {
-  return <ALargeSmall {...props} size={22} />;
+/** "Aa" set in the face the document is read in, the way the panel sets each
+ *  preset in its own face, so the glyph itself shows the current choice.
+ *  Faces differ in cap height, so it is sized by its capitals: they stand as
+ *  tall as the neighbouring icon in Serif, Sans, or an installed writing font
+ *  alike. */
+function ReadingTextGlyph() {
+  return (
+    <span
+      aria-hidden
+      className="block leading-none [text-box:trim-both_cap_alphabetic]"
+      style={{
+        fontFamily: 'var(--writing-font, var(--font-reading))',
+        fontSize: 14,
+        fontSizeAdjust: 'cap-height 0.72',
+      }}
+    >
+      Aa
+    </span>
+  );
 }
 
 export function ReadingTextMenu({
@@ -55,21 +69,20 @@ export function ReadingTextMenu({
   const font =
     installed ??
     READING_FONT_CHOICES.find((choice) => choice.value === preferences?.readingFont)?.label;
+  const readingTextName = font ? `Reading text: ${font}` : 'Reading text';
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1">
       <Popover.Root>
-        <Tooltip content="Reading text" side="bottom">
+        <Tooltip content={readingTextName} side="bottom">
           <Popover.Trigger
             render={
               <Button
-                aria-label={font ? `Reading text: ${font}` : 'Reading text'}
+                aria-label={readingTextName}
                 disabled={preferences === null}
-                leadingIcon={ReadingTextGlyph}
-                size="compact"
-                trailingIcon={ChevronDown}
+                size="icon-compact"
                 variant="ghost"
               >
-                {font}
+                <ReadingTextGlyph />
               </Button>
             }
           />
@@ -118,17 +131,19 @@ export function ReadingTextMenu({
           </Popover.Positioner>
         </Popover.Portal>
       </Popover.Root>
-      <Tooltip
-        content="Math mode for this project. Use $...$ for formulas and \\$ for a literal dollar sign."
-        side="bottom"
-      >
-        <Switch
-          checked={math.enabled}
+      <Tooltip content="Math" side="bottom">
+        <Button
+          active={math.enabled}
+          aria-label="Math"
+          aria-pressed={math.enabled}
           disabled={math.unavailable || math.loading || math.saving || projectPath === null}
-          label="Math"
-          onToggle={() => math.setEnabled(!math.enabled)}
-          size="compact"
-        />
+          focusableWhenDisabled
+          onClick={() => math.setEnabled(!math.enabled)}
+          size="icon-compact"
+          variant="ghost"
+        >
+          <Sigma aria-hidden="true" />
+        </Button>
       </Tooltip>
       {math.failure && (
         <>

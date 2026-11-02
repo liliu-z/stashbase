@@ -82,7 +82,7 @@ describe('ReadingTextMenu', () => {
     expect(document.documentElement.dataset.readingFont).toBe('serif');
   });
 
-  it('places the project Math switch beside the reading control and persists only this project setting', async () => {
+  it('places the project Math toggle beside the reading control and persists only this project setting', async () => {
     const mathApi = projectMathPort();
     withQueryClient(
       <ReadingTextMenu
@@ -93,14 +93,14 @@ describe('ReadingTextMenu', () => {
     );
 
     const user = userEvent.setup();
-    const control = await screen.findByRole('switch', { name: 'Math' });
-    expect(control.getAttribute('aria-checked')).toBe('false');
+    const control = await screen.findByRole('button', { name: 'Math' });
+    expect(control.getAttribute('aria-pressed')).toBe('false');
     await user.click(control);
 
     await waitFor(() =>
       expect(mathApi.update).toHaveBeenCalledWith('/project-a', true, expect.any(AbortSignal)),
     );
-    expect(control.getAttribute('aria-checked')).toBe('true');
+    expect(control.getAttribute('aria-pressed')).toBe('true');
     expect(screen.queryByRole('dialog', { name: 'Reading text' })).toBeNull();
   });
 
@@ -119,9 +119,14 @@ describe('ReadingTextMenu', () => {
       <ReadingTextMenu appearanceApi={appearanceApi} mathApi={mathApi} projectPath="/project" />,
     );
     const user = userEvent.setup();
-    const control = await screen.findByRole('switch', { name: 'Math' });
+    const control = await screen.findByRole('button', { name: 'Math' });
     await user.click(control);
     await waitFor(() => expect(mathApi.update).toHaveBeenCalledTimes(1));
+    expect(control.matches(':focus')).toBe(true);
+    // The pending button keeps keyboard focus without admitting another save.
+    await user.keyboard('{Enter} ');
+    expect(mathApi.update).toHaveBeenCalledTimes(1);
+    expect(control.matches(':focus')).toBe(true);
     const readsBeforeSwitch = vi.mocked(mathApi.load).mock.calls.length;
 
     withQueryClient(
@@ -129,10 +134,10 @@ describe('ReadingTextMenu', () => {
       first.client,
     );
     await waitFor(() => {
-      const controls = screen.getAllByRole('switch', { name: 'Math' });
+      const controls = screen.getAllByRole('button', { name: 'Math' });
       expect(controls).toHaveLength(2);
       for (const next of controls) {
-        expect(next.getAttribute('aria-checked')).toBe('true');
+        expect(next.getAttribute('aria-pressed')).toBe('true');
         expect(next.getAttribute('aria-disabled')).toBe('true');
       }
     });
@@ -140,8 +145,8 @@ describe('ReadingTextMenu', () => {
     first.unmount();
     await act(async () => rejectSave?.(new Error('EPIPE')));
     await waitFor(() => {
-      for (const next of screen.getAllByRole('switch', { name: 'Math' })) {
-        expect(next.getAttribute('aria-checked')).toBe('false');
+      for (const next of screen.getAllByRole('button', { name: 'Math' })) {
+        expect(next.getAttribute('aria-pressed')).toBe('false');
         expect(next.getAttribute('aria-disabled')).not.toBe('true');
       }
     });
@@ -158,11 +163,11 @@ describe('ReadingTextMenu', () => {
       <ReadingTextMenu appearanceApi={appearancePort()} mathApi={mathApi} projectPath="/project" />,
     );
     const retry = await screen.findByRole('button', { name: 'Retry Math setting' });
-    expect(screen.getByRole('switch', { name: 'Math' }).getAttribute('aria-disabled')).toBe('true');
+    expect(screen.getByRole('button', { name: 'Math' }).getAttribute('aria-disabled')).toBe('true');
     await userEvent.click(retry);
     await waitFor(() => {
       expect(screen.queryByRole('status')).toBeNull();
-      expect(screen.getByRole('switch', { name: 'Math' }).getAttribute('aria-disabled')).not.toBe(
+      expect(screen.getByRole('button', { name: 'Math' }).getAttribute('aria-disabled')).not.toBe(
         'true',
       );
     });
@@ -174,14 +179,14 @@ describe('ReadingTextMenu', () => {
       <ReadingTextMenu appearanceApi={appearancePort()} mathApi={mathApi} projectPath="/project" />,
     );
     await waitFor(() =>
-      expect(screen.getByRole('switch', { name: 'Math' }).getAttribute('aria-disabled')).not.toBe(
+      expect(screen.getByRole('button', { name: 'Math' }).getAttribute('aria-disabled')).not.toBe(
         'true',
       ),
     );
     vi.mocked(mathApi.load).mockResolvedValue({ scope: '/project', math_mode: true });
     act(() => window.dispatchEvent(new Event('focus')));
     await waitFor(() =>
-      expect(screen.getByRole('switch', { name: 'Math' }).getAttribute('aria-checked')).toBe(
+      expect(screen.getByRole('button', { name: 'Math' }).getAttribute('aria-pressed')).toBe(
         'true',
       ),
     );
