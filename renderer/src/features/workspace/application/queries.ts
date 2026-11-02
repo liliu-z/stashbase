@@ -41,8 +41,12 @@ export async function retireWorkspaceQueries(
 /** The one place the open folder's listing is invalidated. Every caller that
  *  wants the tree re-read goes through here, so a new reason to refresh adds
  *  a call site rather than another spelling of the same key. */
-export function refreshFolderListing(queryClient: QueryClient, folderPath: string): Promise<void> {
-  return queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.files(folderPath) });
+export function refreshFolderListing(
+  queryClient: QueryClient,
+  folderPath: string,
+  options: { cancelRefetch?: boolean } = {},
+): Promise<void> {
+  return queryClient.invalidateQueries({ queryKey: workspaceQueryKeys.files(folderPath) }, options);
 }
 
 export function filesQuery(api: FilesPort, folderPath: string) {

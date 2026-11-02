@@ -2,7 +2,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef } from 'react';
 
 import type { AgentFilesChanged } from '@/features/agent/public';
+import { refreshFolderListing } from '@/features/workspace/public';
 import type { SourceReference } from '@/shared/domain/source-reference';
+import { usePageVisible } from '@/shared/runtime/use-page-visible';
 import { useRequestSignals } from '@/shared/runtime/use-request-signals';
 import { useWindowFocus } from '@/shared/runtime/use-window-focus';
 
@@ -44,6 +46,8 @@ export interface FolderRefresh {
  * ran work it could not see into; those are refreshed directly and then
  * reconciled, and nothing here selects a file on its behalf. Returning focus to
  * the window also re-reads the listing and reconciles external filesystem edits.
+ * While visible, one listing poll discovers external changes without requiring
+ * a focus change or running search reconciliation on every tick.
  */
 export function useFolderRefresh({
   folderPath,
@@ -52,6 +56,8 @@ export function useFolderRefresh({
   treeVersion,
 }: FolderRefreshOptions): FolderRefresh {
   const queryClient = useQueryClient();
+  const visible = usePageVisible();
+  const previouslyVisible = useRef(visible);
   const openSignal = useRequestSignals<'focus'>();
   const focusSync = useRef<{
     signal: AbortSignal;
@@ -71,14 +77,29 @@ export function useFolderRefresh({
     };
   }, [folderPath, openSignal]);
 
+  const refreshExternalListing = useCallback(() => {
+    if (!folderPath) return;
+    // Focus and polling share a pending read. Mutation-driven invalidations
+    // still cancel older reads so a pre-mutation snapshot cannot win.
+    void refreshFolderListing(queryClient, folderPath, { cancelRefetch: false });
+  }, [folderPath, queryClient]);
+
+  useEffect(() => {
+    const returned = visible && !previouslyVisible.current;
+    previouslyVisible.current = visible;
+    if (!folderPath || !visible) return;
+    if (returned) refreshExternalListing();
+    const timer = setInterval(refreshExternalListing, 5_000);
+    return () => clearInterval(timer);
+  }, [folderPath, refreshExternalListing, visible]);
+
   const onFocus = useCallback(() => {
     const attempt = focusSync.current;
-    if (!folderPath || !attempt || Date.now() - attempt.lastRefreshedAt < 5_000) {
-      return;
-    }
-    attempt.lastRefreshedAt = Date.now();
+    if (!folderPath || !attempt) return;
     // Browsing disk changes must not wait for indexing or its availability.
-    refreshFolder(queryClient, folderPath, { listing: true, status: false });
+    refreshExternalListing();
+    if (Date.now() - attempt.lastRefreshedAt < 5_000) return;
+    attempt.lastRefreshedAt = Date.now();
     if (attempt.pending) return;
     attempt.pending = true;
     void syncFolder(folderPath, attempt.signal).finally(() => {
@@ -86,7 +107,7 @@ export function useFolderRefresh({
       if (focusSync.current !== attempt) return;
       refreshFolder(queryClient, folderPath, { listing: true, status: true });
     });
-  }, [folderPath, queryClient, syncFolder]);
+  }, [folderPath, queryClient, refreshExternalListing, syncFolder]);
 
   useWindowFocus(onFocus, folderPath !== null);
 

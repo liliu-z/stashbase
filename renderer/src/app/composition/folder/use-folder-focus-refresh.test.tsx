@@ -14,6 +14,7 @@ import { useFolderRefresh } from './use-folder-refresh';
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   vi.useRealTimers();
 });
 
@@ -54,15 +55,15 @@ async function focus() {
 }
 
 describe('folder refresh on application focus', () => {
-  it('shows external changes on focus even when visibility and tree revision have not changed', async () => {
+  it('shows changes on quick returns even while another sync is throttled', async () => {
     const { result, setDisk, control } = mount();
     await advance();
     expect(result.current.listing?.files.map((file) => file.path)).toEqual(['notes.md']);
+    await focus();
 
     setDisk(listing(['notes.md', 'journal/entry.md'], ['journal', 'empty']));
-    await advance(10_000);
+    await advance(1_000);
     expect(result.current.listing?.folders).toEqual([]);
-    expect(control.sync).not.toHaveBeenCalled();
 
     await focus();
     expect(result.current.listing?.folders.map((folder) => folder.path)).toEqual([
@@ -72,10 +73,97 @@ describe('folder refresh on application focus', () => {
     expect(control.sync).toHaveBeenCalledExactlyOnceWith(FIRST, expect.any(AbortSignal));
 
     setDisk(listing(['archive/entry.md'], ['archive']));
-    await advance(5_000);
+    await advance(1_000);
     await focus();
     expect(result.current.listing?.folders.map((folder) => folder.path)).toEqual(['archive']);
     expect(result.current.listing?.files.map((file) => file.path)).toEqual(['archive/entry.md']);
+    expect(control.sync).toHaveBeenCalledTimes(1);
+  });
+
+  it('periodically shows external additions, renames and deletions without starting sync', async () => {
+    const { result, setDisk, control } = mount();
+    await advance();
+
+    setDisk(listing(['notes.md', 'journal/entry.md'], ['journal']));
+    await advance(5_001);
+    expect(result.current.listing?.files.map((file) => file.path)).toEqual([
+      'notes.md',
+      'journal/entry.md',
+    ]);
+
+    setDisk(listing(['archive/renamed.md'], ['archive']));
+    await advance(5_001);
+    expect(result.current.listing?.files.map((file) => file.path)).toEqual(['archive/renamed.md']);
+    expect(result.current.listing?.folders.map((folder) => folder.path)).toEqual(['archive']);
+    expect(control.sync).not.toHaveBeenCalled();
+  });
+
+  it('pauses checks while hidden and refreshes immediately when visible again', async () => {
+    const { result, setDisk, control, files } = mount();
+    await advance();
+    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    act(() => document.dispatchEvent(new Event('visibilitychange')));
+    const readsBeforeHidden = vi.mocked(files.load).mock.calls.length;
+
+    setDisk(listing(['changed-while-hidden.md']));
+    await advance(15_001);
+    expect(files.load).toHaveBeenCalledTimes(readsBeforeHidden);
+    expect(result.current.listing?.files.map((file) => file.path)).toEqual(['notes.md']);
+
+    visibility.mockReturnValue('visible');
+    act(() => document.dispatchEvent(new Event('visibilitychange')));
+    await advance();
+    expect(result.current.listing?.files.map((file) => file.path)).toEqual([
+      'changed-while-hidden.md',
+    ]);
+    expect(control.sync).not.toHaveBeenCalled();
+  });
+
+  it('shares a slow listing read across checks and quick focus returns', async () => {
+    const control = preparationControlApi({
+      sync: vi.fn(() => new Promise<boolean>(() => {})),
+    });
+    const { result, files } = mount(control);
+    await advance();
+    let finish: ((value: ReturnType<typeof listing>) => void) | undefined;
+    let signal: AbortSignal | undefined;
+    vi.mocked(files.load)
+      .mockClear()
+      .mockImplementation((_folder, captured) => {
+        signal = captured;
+        return new Promise((resolve) => (finish = resolve));
+      });
+
+    await advance(5_001);
+    await focus();
+    await focus();
+    await advance(10_001);
+    await focus();
+    expect(files.load).toHaveBeenCalledTimes(1);
+    expect(signal?.aborted).toBe(false);
+    expect(control.sync).toHaveBeenCalledTimes(1);
+
+    await act(async () => finish?.(listing(['slow-result.md'])));
+    await advance();
+    expect(result.current.listing?.files.map((file) => file.path)).toEqual(['slow-result.md']);
+  });
+
+  it('polls only the selected project and stops after project closure', async () => {
+    const { rerender, files, control } = mount();
+    await advance();
+    rerender(workspace(SECOND));
+    await advance();
+    vi.mocked(files.load).mockClear();
+
+    await advance(10_001);
+    expect(files.load).toHaveBeenCalled();
+    expect(vi.mocked(files.load).mock.calls.every(([folder]) => folder === SECOND)).toBe(true);
+
+    rerender(null);
+    vi.mocked(files.load).mockClear();
+    await advance(10_001);
+    expect(files.load).not.toHaveBeenCalled();
+    expect(control.sync).not.toHaveBeenCalled();
   });
 
   it('throttles repeated focus and never stacks a second focus sync while one is pending', async () => {
@@ -178,11 +266,14 @@ describe('folder refresh on application focus', () => {
     expect(result.current.failure).toBeNull();
   });
 
-  it('removes its focus listener on unmount', async () => {
-    const { unmount, control } = mount();
+  it('removes its focus listener and polling on unmount', async () => {
+    const { unmount, control, files } = mount();
     await advance();
     unmount();
+    vi.mocked(files.load).mockClear();
+    await advance(10_001);
     await focus();
+    expect(files.load).not.toHaveBeenCalled();
     expect(control.sync).not.toHaveBeenCalled();
   });
 });

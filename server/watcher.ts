@@ -7,8 +7,10 @@
  * an Agent turn that ran a shell command, a subagent, or another tool whose
  * writes name no file. There is no debounce window, no self-write suppression
  * TTL, and no watcher-vs-import race gate. External edits made while the
- * app is open are reconciled on the next event point; on focus the renderer also
- * refreshes its listing immediately so browsing does not wait for indexing.
+ * app is open are reconciled on the next event point. Separately, the renderer
+ * polls its listing while visible and refreshes it immediately on focus or
+ * return from hidden. Those listing reads do not start reconciliation, so
+ * browsing does not wait for indexing.
  * Everything the app (or an agent via API) writes is indexed on its own write path.
  *
  * What remains is a monotonic counter the renderer polls through
