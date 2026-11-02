@@ -90,6 +90,8 @@ renderer audit for CI and architecture/toolchain changes, including coverage,
 accessibility, static checks, and both builds. Ordinary local UI work uses the
 core gate, formatting/lint, and affected tests.
 Build and lint commands do only their named work.
+Use `test:renderer:a11y` for Story accessibility: its dedicated Vite configuration
+loads real styles for computed visibility checks.
 
 For interactive math checks, run `pnpm storybook` and open
 **Compositions / Math workflow / Chat To Document**. Chat and Documents share

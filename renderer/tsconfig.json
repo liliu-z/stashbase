@@ -34,5 +34,5 @@
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", ".storybook", "vite.config.ts"]
+  "include": ["src", ".storybook", "vite.config.ts", "vite.a11y.config.ts"]
 }

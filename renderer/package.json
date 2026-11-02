@@ -8,14 +8,14 @@
     "build": "vp build",
     "storybook": "storybook dev --port 6006 --no-open",
     "build:storybook": "storybook build --output-dir ../dist/storybook",
-    "format": "vp fmt src .storybook vite.config.ts --check",
-    "lint": "vp lint --deny-warnings --config ../.oxlintrc.json src .storybook vite.config.ts",
+    "format": "vp fmt src .storybook vite.config.ts vite.a11y.config.ts --check",
+    "lint": "vp lint --deny-warnings --config ../.oxlintrc.json src .storybook vite.config.ts vite.a11y.config.ts",
     "test": "vp test run --exclude src/stories.a11y.test.tsx",
     "typecheck": "tsc --noEmit",
     "test:coverage": "vp test run --coverage --exclude src/stories.a11y.test.tsx",
     "check:unused": "knip --no-progress --directory .. --workspace renderer",
     "check:dupes": "jscpd --config .jscpd.json src",
-    "test:a11y": "vp test run src/stories.a11y.test.tsx"
+    "test:a11y": "vp test run --config vite.a11y.config.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

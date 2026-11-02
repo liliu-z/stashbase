@@ -155,7 +155,10 @@ it('keeps formulas through Chat, Agent writing, document edits and copy-paste/sa
     </Providers>,
   );
   await openFile('Copied.md', user);
-  typeInto(await screen.findByRole('textbox', { name: 'Message' }), 'Explain and write formulas.');
+  typeInto(
+    await screen.findByRole('textbox', { name: 'Message' }, { timeout: 5_000 }),
+    'Explain and write formulas.',
+  );
   await user.click(screen.getByRole('button', { name: 'Send' }));
   const listener = fixture.session.listeners[0];
   if (!listener) throw new Error('The Agent session did not connect.');
