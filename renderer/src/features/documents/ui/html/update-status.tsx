@@ -1,9 +1,11 @@
 /** Tells the reader that a preview took a newer version, and while one is
- *  slow to load, that it is coming. It covers the page, so it is a small
- *  floating pill that takes no input and leaves on its own. */
+ *  slow to load, that it is coming. It covers a page of any colour, so it is
+ *  an ink pill like a tooltip, ringed in paper so it stands out from a page
+ *  of its own tone. It takes no input and leaves on its own. */
 import { Check, LoaderCircle } from 'lucide-react';
 import { useState } from 'react';
 
+import { fontWeights } from '@/lib/font-weight';
 import { cn } from '@/lib/utils';
 
 import type { PreviewStatus } from './preview-layers';
@@ -24,18 +26,19 @@ export function PreviewUpdateStatus({ status }: { status: PreviewStatus | null }
         <span
           aria-hidden={status === null || undefined}
           className={cn(
-            'flex items-center gap-1.5 rounded-full border border-border/50 bg-background py-1 pr-3 pl-2.5 text-caption text-muted-foreground shadow-sm transition-opacity duration-slow starting:opacity-0',
+            'flex items-center gap-1.5 rounded-full bg-foreground py-1.5 pr-3.5 pl-3 text-caption text-background shadow-md ring-1 ring-background/25 transition-[opacity,translate] duration-slow starting:-translate-y-1 starting:opacity-0',
             status === null && 'opacity-0',
           )}
+          style={{ fontVariationSettings: fontWeights.medium }}
         >
           {shown === 'updating' ? (
             <LoaderCircle
               aria-hidden="true"
               className="size-3.5 motion-safe:animate-spin"
-              strokeWidth={1.5}
+              strokeWidth={2}
             />
           ) : (
-            <Check aria-hidden="true" className="size-3.5" strokeWidth={1.5} />
+            <Check aria-hidden="true" className="size-3.5" strokeWidth={2} />
           )}
           {LABEL[shown]}
         </span>

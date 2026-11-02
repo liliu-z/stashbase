@@ -18,8 +18,9 @@ export interface PreviewLayer {
 
 /** A quick reload shows no wait at all. */
 const SLOW_MS = 400;
-/** How long "Updated" stays once the reader can see it. */
-const UPDATED_MS = 2_000;
+/** How long "Updated" stays once the reader can see it: long enough to be
+ *  seen by a reader who was looking at the chat when the page changed. */
+const UPDATED_MS = 5_000;
 /** Outlasts the replacement's fade before the page beneath is removed. */
 const RETIRE_MS = 400;
 
