@@ -3712,6 +3712,9 @@ Host/services: `server/project-file-mutations.ts`, `server/text-file-transaction
 - **Composition Test:** `agent-convergence.test.tsx` exercises both a Chat file
   result's Open action and a reply's local file link: each selects Documents,
   shows the file, and retains the same conversation and unfinished follow-up.
+  Its context port resolves the visible document before the Agent connects;
+  preparation status remains pending so writes must still reach the tree
+  independently of indexing.
 - **Driven Runtime Pass:** isolated built-app window-authorized write/edit
   (2026-09-14) persists literal replacements with version checks. It proves the
   file boundary, not a real conversation producing a requested draft/revision.

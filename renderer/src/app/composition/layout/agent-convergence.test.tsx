@@ -10,11 +10,11 @@ import type { AgentSessionPort } from '@/features/agent/public';
 import { DocumentSaveError } from '@/features/documents/test-support';
 import {
   agentCatalogPort,
+  agentContextPort,
   agentPersonaApi,
   agentToolsApi,
   agentSessionPort,
   BUILT_IN_AGENT,
-  pendingAgentContextPort,
 } from '@/test/fakes/agent';
 import { appDependencies } from '@/test/fakes/app';
 import { documentAdapters, documentsApi, sourceApi } from '@/test/fakes/documents';
@@ -174,7 +174,7 @@ function harness(): Harness {
   const dependencies = appDependencies({
     agent: {
       catalog: agentCatalogPort([BUILT_IN_AGENT]),
-      context: pendingAgentContextPort(),
+      context: agentContextPort(),
       persona: agentPersonaApi(),
       tools: agentToolsApi(),
       session: session.port,
@@ -284,6 +284,7 @@ async function converge(test: Harness): Promise<AgentConnectionListener> {
   });
   await user.click(screen.getByRole('button', { name: 'Send' }));
 
+  await waitFor(() => expect(test.listeners).toHaveLength(1));
   const listener = test.listeners[0];
   if (!listener) throw new Error('The Agent session never connected.');
   act(() => listener.onEvent({ kind: 'ready' }));
