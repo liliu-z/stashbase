@@ -316,19 +316,27 @@ describe('Agent transcript copy affordance', () => {
     ]);
   });
 
-  it('hides Copy while the turn streams and shows one afterwards', () => {
-    const { rerender } = renderTranscript(turn, true);
+  it('hides Copy while the turn streams and copies original math source afterwards', async () => {
+    const user = userEvent.setup();
+    const text = String.raw`Price \$10: \(x^2\).` + '\n\n$$\n\\frac{1}{2}\n$$';
+    const mathTurn: AgentTranscriptBlock[] = [
+      ...turn.slice(0, -1),
+      { id: 'a2', kind: 'assistant', text },
+    ];
+    const { rerender } = renderTranscript(mathTurn, true);
     expect(screen.queryByRole('button', { name: 'Copy response' })).toBeNull();
     rerender(
       <AgentTranscript
         activeTurn={false}
-        blocks={turn}
+        blocks={mathTurn}
         onOpenExternal={vi.fn()}
         onPermission={vi.fn(() => true)}
         onRetry={vi.fn(() => true)}
       />,
     );
     expect(screen.getAllByRole('button', { name: 'Copy response' })).toHaveLength(1);
+    await user.click(screen.getByRole('button', { name: 'Copy response' }));
+    expect(await navigator.clipboard.readText()).toBe(text);
   });
 });
 

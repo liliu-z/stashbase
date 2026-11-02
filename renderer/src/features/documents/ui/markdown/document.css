@@ -222,7 +222,7 @@ html[data-focus-mode='on'] .markdown-crepe:focus-within .ProseMirror > :not(.is-
   line-height: inherit;
 }
 
-/* Single-dollar math remains source text in the editor model. Its matching
+/* Math remains editable source text in the editor model. Its matching
    widget is the visible formula, which lets a Math toggle preserve selection
    and undo history instead of rebuilding the editor. */
 .markdown-crepe .stashbase-math-source {

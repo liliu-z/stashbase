@@ -1,18 +1,19 @@
 /** Render Agent Markdown with source citations, math, and independently copyable blocks. */
-import { memo, type ClipboardEvent, type ComponentProps } from 'react';
+import { memo, type ComponentProps } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
-import remarkMath from 'remark-math';
 
 import 'katex/dist/katex.min.css';
 import { parseCitationHref } from '@/features/agent/domain/citation';
 import { useTouchPrimary } from '@/lib/use-touch-primary';
 import { cn } from '@/lib/utils';
 import type { SourceReference } from '@/shared/domain/source-reference';
+import { remarkMathSyntax } from '@/shared/runtime/markdown-math';
 import { MARKDOWN_PROSE_CLASS } from '@/shared/ui/markdown-prose';
 
 import { CopyAction } from './copy-action';
+import { copyRenderedMathSource, preserveMarkdownSource } from './markdown-copy';
 
 function isHttpUrl(href: string): boolean {
   try {
@@ -23,91 +24,10 @@ function isHttpUrl(href: string): boolean {
   }
 }
 
-/** Code spans and fences, then existing `$$` math, then `\[ \]` and `\( \)`.
- *  A doubled backslash (`\\[2pt]`) is a LaTeX row break, not an opener. */
-const LATEX_DELIMITERS =
-  /(?<!`)(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)|\$\$[\s\S]*?\$\$|(?<!\\)\\\[([\s\S]+?)\\\]|(?<!\\)\\\(([^\n]+?)\\\)/gu;
-
-/**
- * Many models write LaTeX between `\[ \]` and `\( \)`. Markdown reads those as
- * escaped brackets and drops the backslashes, so the formula showed as source.
- * They become the double-dollar math the transcript renders; a `\[` that owns
- * its line becomes a display block at the same indentation.
- */
-function withDollarMath(markdown: string): string {
-  return markdown.replace(
-    LATEX_DELIMITERS,
-    (match, _code, display: string | undefined, inline: string | undefined, offset: number) => {
-      if (inline !== undefined) return `$$${inline}$$`;
-      if (display === undefined) return match;
-      const indent = markdown.slice(markdown.lastIndexOf('\n', offset - 1) + 1, offset);
-      const end = offset + match.length;
-      const lineEnd = markdown.indexOf('\n', end);
-      const rest = markdown.slice(end, lineEnd === -1 ? undefined : lineEnd);
-      return indent.trim() || rest.trim()
-        ? `$$${display}$$`
-        : `$$\n${indent}${display.trim()}\n${indent}$$`;
-    },
-  );
-}
-
 interface SyntaxNode {
   type: string;
   value?: string;
   children?: SyntaxNode[];
-}
-
-interface HtmlNode {
-  type?: string;
-  tagName?: string;
-  properties?: Record<string, unknown>;
-  value?: string;
-  children?: HtmlNode[];
-}
-
-function textValue(node: HtmlNode): string {
-  return node.value ?? node.children?.map(textValue).join('') ?? '';
-}
-
-function katexSource(node: HtmlNode): string | null {
-  if (node.tagName === 'annotation' && node.properties?.encoding === 'application/x-tex') {
-    return textValue(node);
-  }
-  for (const child of node.children ?? []) {
-    const source = katexSource(child);
-    if (source !== null) return source;
-  }
-  return null;
-}
-
-/** Keep KaTeX's visual DOM separate from the source that a reader copies. */
-function preserveKatexSource() {
-  return (tree: HtmlNode) => {
-    const visit = (node: HtmlNode): void => {
-      const classes = node.properties?.className;
-      const classList = Array.isArray(classes) ? classes : typeof classes === 'string' ? [classes] : [];
-      if (node.tagName === 'span' && classList.includes('katex')) {
-        const source = katexSource(node);
-        if (source !== null) node.properties = { ...node.properties, dataMathSource: source };
-      }
-      node.children?.forEach(visit);
-    };
-    visit(tree);
-  };
-}
-
-function copyRenderedMathSource(event: ClipboardEvent<HTMLDivElement>): void {
-  const selection = event.currentTarget.ownerDocument.getSelection();
-  if (!selection || selection.rangeCount === 0) return;
-  const fragment = selection.getRangeAt(0).cloneContents();
-  const formulas = fragment.querySelectorAll<HTMLElement>('[data-math-source]');
-  if (formulas.length === 0) return;
-  for (const formula of formulas) {
-    const source = formula.dataset.mathSource;
-    if (source !== undefined) formula.replaceWith(event.currentTarget.ownerDocument.createTextNode(`$${source}$`));
-  }
-  event.clipboardData.setData('text/plain', fragment.textContent ?? '');
-  event.preventDefault();
 }
 
 function textOf(node: SyntaxNode | undefined): string {
@@ -224,16 +144,19 @@ export const AgentMarkdown = memo(function AgentMarkdown({
   markdown: string;
 }) {
   return (
-    <div className={MARKDOWN_PROSE_CLASS} onCopy={copyRenderedMathSource}>
+    <div
+      className={MARKDOWN_PROSE_CLASS}
+      onCopy={(event) => copyRenderedMathSource(event, markdown)}
+    >
       <ReactMarkdown
         components={markdownComponents({ onOpenExternal, onOpenSource, sourceFor })}
-        remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: mathMode }]]}
+        remarkPlugins={[remarkGfm, [remarkMathSyntax, { singleDollarTextMath: mathMode }]]}
         rehypePlugins={[
+          preserveMarkdownSource,
           [rehypeKatex, { trust: false, strict: 'ignore', maxExpand: 1000, maxSize: 20 }],
-          preserveKatexSource,
         ]}
       >
-        {withDollarMath(markdown)}
+        {markdown}
       </ReactMarkdown>
     </div>
   );

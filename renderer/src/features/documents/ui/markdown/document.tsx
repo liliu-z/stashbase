@@ -22,7 +22,6 @@ import { TabsSubtle, TabsSubtleItem } from '@/components/ui/tabs-subtle';
 import { startMarkdownEditorCreation } from '@/features/documents/application/markdown-editor-lifecycle';
 import type { DocumentNavigationRuntime } from '@/features/documents/application/navigation-runtime';
 import type { MarkdownViewMode } from '@/features/documents/domain/document';
-import { resolveDocumentLink } from '@/features/documents/domain/link-target';
 import { splitLeadingYamlFrontmatter } from '@/features/documents/domain/markdown';
 import type { DocumentHeading } from '@/features/documents/domain/outline';
 import type { DocumentSelection } from '@/features/documents/domain/selection';
@@ -52,6 +51,7 @@ import {
 } from './outline-adapter';
 import { useAskAgent } from './selection-markdown';
 import { selectionToolbar } from './selection-toolbar';
+import { useDocumentLinks } from './use-document-links';
 import { useMarkdownHighlights } from './use-markdown-highlights';
 import { useRevisionReview, type RevisionBinding } from './use-revision-review';
 import { attachWritingAids, createWordCounter, WordCount } from './writing-aids';
@@ -118,9 +118,6 @@ export function MarkdownDocument({
   const readOnlyRef = useRef(readOnly);
   const valueRef = useRef(value);
   const activeRef = useRef(active);
-  const navigateRef = useRef(onNavigate);
-  const openExternalRef = useRef(onOpenExternal);
-  const sourceRef = useRef(source);
   const observedValueRef = useRef(value);
   const frontmatterRef = useRef(splitLeadingYamlFrontmatter(value).source);
   const mathModeRef = useRef(mathMode);
@@ -135,7 +132,7 @@ export function MarkdownDocument({
   const [activeHeading, setActiveHeading] = useState<string | null>(null);
   const [creationState, setCreationState] = useState<CreationState>('creating');
   const [headings, setHeadings] = useState<DocumentHeading[]>([]);
-  const [linkFailure, setLinkFailure] = useState(false);
+  const linkFailure = useDocumentLinks(hostRef, source, onNavigate, onOpenExternal);
   const [wordCounter] = useState(createWordCounter);
   const {
     active: reviewActive,
@@ -157,9 +154,6 @@ export function MarkdownDocument({
     state.pendingAnchor?.tabId === tabId ? state.pendingAnchor.id : null,
   );
   activeRef.current = active;
-  navigateRef.current = onNavigate;
-  openExternalRef.current = onOpenExternal;
-  sourceRef.current = source;
   onChangeRef.current = onChange;
   holdEditsRef.current = holdEdits;
   readOnlyRef.current = readOnly;
@@ -253,8 +247,7 @@ export function MarkdownDocument({
       stopCreation();
       releaseHeldEdits();
     };
-  }, [
-    askAgentRun, attachHighlights, attachReview, attempt, navigation, tabId, wordCounter]);
+  }, [askAgentRun, attachHighlights, attachReview, attempt, navigation, tabId, wordCounter]);
 
   useEffect(() => {
     if (creationState === 'ready' && editorRef.current) refreshMath(editorRef.current);
@@ -284,30 +277,6 @@ export function MarkdownDocument({
       refreshHeadingsRef.current();
     });
   }, [creationState, dirty, reviewActive, value]);
-
-  useEffect(() => {
-    const host = hostRef.current;
-    if (!host) return;
-    const routeLink = (event: MouseEvent) => {
-      const anchor = (event.target as Element | null)?.closest<HTMLAnchorElement>('a');
-      if (!anchor) return;
-      event.preventDefault();
-      const target = resolveDocumentLink(anchor.getAttribute('href') ?? '', sourceRef.current);
-      if (target.kind === 'anchor') {
-        navigateRef.current({ anchor: target.id, source: sourceRef.current });
-      } else if (target.kind === 'source') {
-        navigateRef.current({ anchor: target.anchor, source: target.source });
-      } else if (target.kind === 'external') {
-        setLinkFailure(false);
-        void openExternalRef
-          .current(target.href)
-          .then((opened) => setLinkFailure(!opened))
-          .catch(() => setLinkFailure(true));
-      }
-    };
-    host.addEventListener('click', routeLink);
-    return () => host.removeEventListener('click', routeLink);
-  }, []);
 
   useEffect(() => {
     if (!active || creationState !== 'ready') return;
@@ -394,7 +363,7 @@ export function MarkdownDocument({
         <MarkdownOpenFailure onRetry={() => setAttempt((current) => current + 1)} />
       )}
       {reviewBar ?? <div className="markdown-reading-control">{readingControl}</div>}
-      <LinkFailureNotice failed={linkFailure} onDismiss={() => setLinkFailure(false)} />
+      <LinkFailureNotice failed={linkFailure.failed} onDismiss={linkFailure.dismiss} />
       <div
         className={cn('markdown-crepe', readOnly && 'markdown-crepe-readonly')}
         data-review-reversed={reviewReversed || undefined}
