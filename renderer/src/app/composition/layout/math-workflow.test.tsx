@@ -217,7 +217,7 @@ it('keeps formulas through Chat, Agent writing, document edits and copy-paste/sa
     editor.focus();
     editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: revised } });
   });
-  await user.click(within(written).getByRole('button', { name: 'Done editing formula' }));
+  fireEvent.keyDown(editor.contentDOM, { key: 'ArrowDown', code: 'ArrowDown' });
   await waitFor(() =>
     expect(fixture.sources.get('Written.md')?.content).toBe(
       MATH_MARKDOWN.replace(MATH_TEX.fraction, revised),

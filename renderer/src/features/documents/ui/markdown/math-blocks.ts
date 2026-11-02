@@ -1,15 +1,16 @@
 /**
  * Formula blocks own only their disclosure and preview. Milkdown's CodeMirror
- * node view still owns source edits, selection and ProseMirror history; mode
- * changes refresh the disclosure without reparsing or editing the document.
+ * node view still owns source edits, selection and ProseMirror history. Source
+ * stays open while the document selection is inside the formula; mode changes
+ * refresh the disclosure without reparsing or editing the document.
  */
 import { EditorView as CodeMirror } from '@codemirror/view';
 import { CodeMirrorBlock } from '@milkdown/kit/component/code-block';
 import { nodeViewCtx } from '@milkdown/kit/core';
 import { codeBlockSchema } from '@milkdown/kit/preset/commonmark';
 import type { Node as ProseMirrorNode } from '@milkdown/kit/prose/model';
-import { Plugin, TextSelection } from '@milkdown/kit/prose/state';
-import type { NodeView } from '@milkdown/kit/prose/view';
+import { Plugin, Selection, TextSelection } from '@milkdown/kit/prose/state';
+import type { EditorView, NodeView } from '@milkdown/kit/prose/view';
 import { $prose, $view } from '@milkdown/kit/utils';
 
 import { renderMath } from './math-presentation';
@@ -22,7 +23,6 @@ class MathBlock implements NodeView {
   readonly dom: HTMLElement;
   private readonly preview: HTMLElement;
   private readonly source: HTMLElement;
-  private readonly done: HTMLButtonElement;
   private editing = false;
   private editable: boolean;
 
@@ -34,7 +34,6 @@ class MathBlock implements NodeView {
     this.dom = owner.createElement('div');
     this.preview = owner.createElement('div');
     this.source = owner.createElement('div');
-    this.done = owner.createElement('button');
     this.editable = block.view.editable;
     // The upstream node view mounts CodeMirror lazily. Configure it before that
     // mount, and keep its raw placeholder hidden even when it is off screen.
@@ -47,12 +46,6 @@ class MathBlock implements NodeView {
     this.dom.contentEditable = 'false';
     this.preview.className = 'stashbase-math-block-preview';
     this.source.className = 'stashbase-math-block-source';
-    this.done.type = 'button';
-    this.done.textContent = 'Done editing formula';
-    this.done.addEventListener('click', () => {
-      this.collapse();
-      this.preview.focus();
-    });
     this.preview.addEventListener('click', () => this.edit());
     this.preview.addEventListener('keydown', (event) => {
       if (event.key !== 'Enter' && event.key !== ' ') return;
@@ -65,7 +58,7 @@ class MathBlock implements NodeView {
       this.collapse();
       this.preview.focus();
     });
-    this.source.append(block.dom, this.done);
+    this.source.append(block.dom);
     this.dom.append(this.preview, this.source);
     this.render();
     this.sync();
@@ -83,6 +76,14 @@ class MathBlock implements NodeView {
     this.editing = false;
     this.source.hidden = true;
     this.preview.hidden = false;
+  }
+
+  private containsSelection(): boolean {
+    const position = this.block.getPos();
+    if (position === undefined) return false;
+    const { from, to } = this.block.view.state.selection;
+    // The bounds admit a node selection of the whole formula.
+    return from >= position && to <= position + this.block.node.nodeSize;
   }
 
   private edit(): void {
@@ -110,7 +111,8 @@ class MathBlock implements NodeView {
       this.preview.removeAttribute('aria-label');
       this.preview.removeAttribute('tabindex');
     }
-    if (!view.editable || !this.editing) this.collapse();
+    // Source closes when the caret leaves the formula, as well as on Escape.
+    if (!view.editable || !this.editing || !this.containsSelection()) this.collapse();
   }
 
   setSelection(anchor: number, head: number): void {
@@ -159,6 +161,40 @@ class MathBlock implements NodeView {
   }
 }
 
+const ARROWS = {
+  ArrowDown: 'down',
+  ArrowLeft: 'left',
+  ArrowRight: 'right',
+  ArrowUp: 'up',
+} as const;
+
+/**
+ * Native caret motion skips a rendered formula. An arrow at the edge of the
+ * adjacent textblock enters its source instead, mirroring CodeMirror's exit.
+ */
+function enterFormula(view: EditorView, event: KeyboardEvent): boolean {
+  const direction = ARROWS[event.key as keyof typeof ARROWS];
+  const { selection } = view.state;
+  if (
+    !direction ||
+    event.shiftKey ||
+    event.altKey ||
+    event.ctrlKey ||
+    event.metaKey ||
+    !(selection instanceof TextSelection) ||
+    !selection.empty ||
+    !view.endOfTextblock(direction)
+  )
+    return false;
+  const forward = direction === 'down' || direction === 'right';
+  const { $head } = selection;
+  const edge = view.state.doc.resolve(forward ? $head.after() : $head.before());
+  const target = Selection.findFrom(edge, forward ? 1 : -1);
+  if (!(target instanceof TextSelection) || !isMath(target.$head.parent)) return false;
+  view.dispatch(view.state.tr.setSelection(target).scrollIntoView());
+  return true;
+}
+
 /** Register after codeMirror so non-math blocks keep their existing view. */
 export function mathBlocks() {
   const blocks = new Set<MathBlock>();
@@ -182,7 +218,11 @@ export function mathBlocks() {
       };
     }),
     $prose(
-      () => new Plugin({ view: () => ({ update: () => blocks.forEach((block) => block.sync()) }) }),
+      () =>
+        new Plugin({
+          props: { handleKeyDown: enterFormula },
+          view: () => ({ update: () => blocks.forEach((block) => block.sync()) }),
+        }),
     ),
   ];
 }

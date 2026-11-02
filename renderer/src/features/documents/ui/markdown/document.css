@@ -275,22 +275,6 @@ html[data-focus-mode='on'] .markdown-crepe:focus-within .ProseMirror > :not(.is-
   display: none;
 }
 
-.markdown-crepe .stashbase-math-block-source > button {
-  display: block;
-  margin: 4px 0 0 auto;
-  padding: 4px 8px;
-  border-radius: var(--shape-input-radius, 8px);
-  color: var(--muted-foreground);
-  font-family: var(--font-sans);
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.markdown-crepe .stashbase-math-block-source > button:hover {
-  color: var(--foreground);
-  background: var(--hover);
-}
-
 /* One family for headings and prose, so hierarchy comes from size alone; the
    serif's optical-size axis also gives large headings a tighter display cut. */
 .markdown-crepe .milkdown .ProseMirror :is(h1, h2, h3, h4, h5, h6) {

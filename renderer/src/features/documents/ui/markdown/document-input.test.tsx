@@ -138,7 +138,6 @@ it('reads formula blocks without source and preserves editing history across mod
   expect(ordinary?.closest('.stashbase-math-block')).toBeNull(); // dom-contract: only math receives collapsed-source behavior.
 
   fireEvent.click(preview);
-  await screen.findByRole('button', { name: 'Done editing formula' });
   expect(source.hidden).toBe(false);
   rendered.rerender(document(true));
   expect(
@@ -147,7 +146,6 @@ it('reads formula blocks without source and preserves editing history across mod
   expect(within(list).getAllByRole('listitem')).toEqual(items);
   expect(source.hidden).toBe(true);
   expect(screen.queryByRole('button', { name: 'Edit formula' })).toBeNull();
-  expect(screen.queryByRole('button', { name: 'Done editing formula' })).toBeNull();
   fireEvent.click(preview);
   expect(source.hidden).toBe(true);
   rendered.rerender(document(false));
@@ -169,7 +167,8 @@ it('reads formula blocks without source and preserves editing history across mod
   });
   await act(settleMarkdownListener);
   expect(onChange).toHaveBeenLastCalledWith(value.replace(formula, 'x^2'));
-  fireEvent.click(screen.getByRole('button', { name: 'Done editing formula' }));
+  // Leaving with the caret closes the source; Undo still works from the formula.
+  fireEvent.keyDown(editor.contentDOM, { key: 'ArrowDown', code: 'ArrowDown' });
   expect(source.hidden).toBe(true);
   fireEvent.keyDown(preview, { key: 'z', code: 'KeyZ', ctrlKey: true });
   await act(settleMarkdownListener);
@@ -187,4 +186,13 @@ it('reads formula blocks without source and preserves editing history across mod
   fireEvent.keyDown(editor.contentDOM, { key: 'z', code: 'KeyZ', ctrlKey: true, shiftKey: true });
   await act(settleMarkdownListener);
   expect(onChange).toHaveBeenLastCalledWith(value.replace(formula, 'x^2'));
+
+  // Arrows move the caret out of the source and back in, like ordinary text.
+  fireEvent.keyDown(editor.contentDOM, { key: 'ArrowUp', code: 'ArrowUp' });
+  expect(source.hidden).toBe(true);
+  fireEvent.keyDown(screen.getByRole('textbox', { name: 'Markdown editor' }), {
+    key: 'ArrowRight',
+    code: 'ArrowRight',
+  });
+  expect(source.hidden).toBe(false);
 });

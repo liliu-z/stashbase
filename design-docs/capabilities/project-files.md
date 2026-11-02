@@ -282,9 +282,10 @@ Changing Math retains unsaved edits, Undo/Redo, selection and reading position.
 Formula source, including matrix row separators and escaped dollar signs,
 survives editing, saving and reopening; untouched blocks keep their source.
 Reading mode shows block formulas without source or preview labels. In the
-editor, block formulas also start rendered; clicking or entering a formula with
-the keyboard opens its source. Done or Escape returns to the formula, and
-entering reading mode always closes the source. Formula blocks use compact
+editor, block formulas also start rendered. The caret decides which view shows:
+clicking a formula, or arrowing into it from adjacent text, opens its source, and
+moving the caret out returns to the rendered formula. Escape also closes the
+source, and entering reading mode always does. Formula blocks use compact
 spacing, and their editable source wraps within the document pane. Placing the
 caret in an inline formula exposes its editable source.
 Chat selection-copy retains Markdown structure and formula source, including
