@@ -580,6 +580,14 @@ stable status without download, retry, or a new durable demand latch.
 - History restore joins repeated requests for the same project/agent/native id.
   Mounted titles carry a manual-rename flag; first submissions supply a fallback
   title hint. Rename mutations serialize before publishing confirmed titles.
+  Codex's live-session owner reserves each native thread id across windows.
+  Replacement resume waits for the prior local writer's bounded retirement and
+  verified process-tree closure. An active owner is refused without stopping it;
+  a failed retirement remains fenced until actual closure. Native writer conflicts
+  from other applications remain visible and never trigger lock removal or replay.
+  Codex history lists coalesce per project and retry a transport failure once,
+  only after the shared reader is fully retired. Failed retirement fences the
+  pool too; mutation requests and user turns never receive this list retry.
 - Native history is authoritative. Native cwd determines project ownership; no
   override store or live session migration exists. Antigravity is the exception:
   it exposes no history interface, so `server/antigravity-history.ts` records the

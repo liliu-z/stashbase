@@ -1,11 +1,11 @@
-import { retireAgentProcess } from './agent-process.ts';
+import { agentProcessClosed, retireAgentProcess } from './agent-process.ts';
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnCodexAppServerProcess } from './codex-app-server-process.ts';
 import { filesystemPath } from './filesystem-path.ts';
-import { errorMessage } from './log.ts';
+import { errorMessage, logger } from './log.ts';
 import {
   httpError,
   objectValue,
@@ -43,17 +43,31 @@ export type CodexSessionBlock =
  * previewable thumbnail. */
 export type CodexAttachment = RestoredAttachment;
 
-export async function listCodexSessions(folder: string): Promise<CodexSessionRow[]> {
-  const cwd = folder;
-  const result = await withTemporaryCodexAppServer(cwd, (request) => request('thread/list', {
-    limit: 100,
-    sortKey: 'updated_at',
-    sortDirection: 'desc',
-    archived: false,
-    cwd: folder,
-  })) as JsonObject;
-  const data = Array.isArray(result.data) ? result.data : [];
-  return data.map(codexThreadToRow).filter((row): row is CodexSessionRow => !!row);
+const historyLists = new Map<string, Promise<CodexSessionRow[]>>();
+const log = logger('codex-history');
+
+export function listCodexSessions(folder: string): Promise<CodexSessionRow[]> {
+  const key = filesystemPath.identity(folder);
+  const pending = historyLists.get(key);
+  if (pending) return pending;
+  const read = async () => {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const result = await withTemporaryCodexAppServer(folder, request => request('thread/list', {
+          limit: 100, sortKey: 'updated_at', sortDirection: 'desc', archived: false, cwd: folder,
+        })) as JsonObject;
+        const data = Array.isArray(result.data) ? result.data : [];
+        return data.map(codexThreadToRow).filter((row): row is CodexSessionRow => !!row);
+      } catch (error) {
+        // Only this read-only entry is replayable. The pool has already
+        // awaited retirement; neither history mutations nor prompts retry.
+        if (attempt > 0 || !isCodexHistoryTransportError(error)) throw error;
+      }
+    }
+  };
+  const result = read().finally(() => { if (historyLists.get(key) === result) historyLists.delete(key); });
+  historyLists.set(key, result);
+  return result;
 }
 
 export async function getCodexSessionMessages(threadId: string, folder: string): Promise<CodexSessionBlock[]> {
@@ -117,6 +131,7 @@ class CodexHistoryAppServer {
   private proc: ChildProcessWithoutNullStreams;
   private appServer: CodexAppServerConnection;
   private closed = false;
+  private retirement: Promise<void> | undefined;
 
   constructor(readonly cwd: string, private onClose: () => void) {
     this.proc = spawnCodexAppServerProcess(cwd, {}, { purpose: 'history' });
@@ -131,9 +146,11 @@ class CodexHistoryAppServer {
       },
       onExit: () => {
         this.closed = true;
-        this.onClose();
       },
     });
+    // Map eviction must follow final process-tree closure, not just socket or
+    // RPC closure. A timed-out retirement keeps replacement fenced until then.
+    void agentProcessClosed(this.proc).then(this.onClose);
     this.ready = this.appServer.initialize().then(() => undefined);
   }
 
@@ -146,11 +163,12 @@ class CodexHistoryAppServer {
     return this.appServer.rpc.request(method, params);
   }
 
-  dispose(): void {
-    if (this.closed) return;
+  dispose(): Promise<void> {
+    if (this.retirement) return this.retirement;
     this.closed = true;
     this.appServer.close(new Error('Codex app-server history client closed.'));
-    void retireAgentProcess(this.proc);
+    this.retirement = retireAgentProcess(this.proc);
+    return this.retirement;
   }
 }
 
@@ -169,6 +187,11 @@ async function withSharedCodexHistoryAppServer<T>(
 ): Promise<T> {
   const key = filesystemPath.identity(cwd);
   let entry = codexHistoryClients.get(key);
+  while (entry?.client.isClosed()) {
+    await entry.client.dispose();
+    if (codexHistoryClients.get(key) === entry) codexHistoryClients.delete(key);
+    entry = codexHistoryClients.get(key);
+  }
   if (!entry || entry.client.isClosed()) {
     const client = new CodexHistoryAppServer(cwd, () => {
       const cur = codexHistoryClients.get(key);
@@ -189,7 +212,7 @@ async function withSharedCodexHistoryAppServer<T>(
     return await fn((method, params) => entry!.client.request(method, params));
   } catch (err) {
     if (entry.client.isClosed() || isCodexHistoryTransportError(err)) {
-      entry.client.dispose();
+      await entry.client.dispose();
       if (codexHistoryClients.get(key) === entry) codexHistoryClients.delete(key);
     }
     throw err;
@@ -199,8 +222,7 @@ async function withSharedCodexHistoryAppServer<T>(
       entry.idleTimer = setTimeout(() => {
         const cur = codexHistoryClients.get(key);
         if (cur === entry && cur.refs === 0) {
-          cur.client.dispose();
-          codexHistoryClients.delete(key);
+          void cur.client.dispose().catch(error => log.warn('Codex history retirement failed:', error));
         }
       }, HISTORY_APP_SERVER_IDLE_MS);
       entry.idleTimer.unref?.();

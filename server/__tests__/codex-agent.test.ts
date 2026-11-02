@@ -1,6 +1,7 @@
 import './isolated-home.ts';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -19,6 +20,7 @@ import { agentPersonaLibrary } from '../agent-persona.ts';
 import { composeAgentRuntimeInstructions } from '../agent-runtime-instructions.ts';
 import { clearCurrentFolder, runWithWindowId, openProjectFolder } from '../folder.ts';
 import { attachAgentDiagnostics } from '../error-reporting.ts';
+import { ownAgentProcess } from '../agent-process.ts';
 import { errorDiagnostic, telemetryEventSchema, type TelemetryEvent } from '../../shared/protocols/http/telemetry.ts';
 
 class FakeCodexProcess extends EventEmitter {
@@ -118,6 +120,90 @@ async function settle(): Promise<void> {
   await new Promise((resolve) => setImmediate(resolve));
   await new Promise((resolve) => setImmediate(resolve));
 }
+
+test('Codex reconnect waits for the previous thread writer to finish retiring', { skip: process.platform === 'win32', timeout: 10_000 }, async (t) => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-codex-writer-'));
+  const lock = path.join(folder, 'writer-test.lock');
+  const release = path.join(folder, 'release');
+  const stopping = path.join(folder, 'stopping');
+  const nativeSource = `
+    const fs = require('node:fs');
+    const readline = require('node:readline');
+    let ownedFile;
+    process.on('SIGTERM', () => {
+      fs.writeFileSync(${JSON.stringify(stopping)}, 'stopping');
+      const timer = setInterval(() => {
+        if (!fs.existsSync(${JSON.stringify(release)})) return;
+        clearInterval(timer);
+        if (ownedFile) fs.rmSync(ownedFile, { force: true });
+        process.exit(0);
+      }, 5);
+    });
+    readline.createInterface({ input: process.stdin }).on('line', line => {
+      const request = JSON.parse(line);
+      if (request.id == null) return;
+      let result = {};
+      if (request.method === 'model/list' || request.method === 'skills/list') result = { data: [] };
+      if (request.method === 'thread/resume') {
+        const lock = require('node:path').join(${JSON.stringify(folder)}, request.params.threadId + '.lock');
+        if (fs.existsSync(lock)) {
+          process.stdout.write(JSON.stringify({ id: request.id, error: { code: -32600, message: 'thread writer-test already has an active writer' } }) + '\\n');
+          return;
+        }
+        fs.writeFileSync(lock, 'owned');
+        ownedFile = lock;
+        result = { thread: { id: request.params.threadId } };
+      }
+      process.stdout.write(JSON.stringify({ id: request.id, result }) + '\\n');
+    });
+  `;
+  await runWithWindowId('writer-window', () => openProjectFolder(folder));
+  const children: ChildProcessWithoutNullStreams[] = [];
+  const sessions: CodexSession[] = [];
+  const createSession = (threadId = 'writer-test') => {
+    const ws = new FakeWebSocket();
+    const session = new CodexSession(ws as unknown as WebSocket, 'writer-window', undefined, threadId, undefined, undefined, folder, undefined,
+      () => {
+        const child = ownAgentProcess(spawn(process.execPath, ['-e', nativeSource], { detached: true, stdio: 'pipe' }), { runtime: 'codex', purpose: 'chat' });
+        children.push(child);
+        return child;
+      });
+    sessions.push(session);
+    session.begin();
+    return { session, ws };
+  };
+  const waitFor = async (predicate: () => boolean) => {
+    const deadline = Date.now() + 3000;
+    while (!predicate() && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 5));
+    assert.ok(predicate(), 'native fixture did not reach the expected state');
+  };
+  t.after(async () => {
+    fs.writeFileSync(release, 'release');
+    for (const session of sessions) session.dispose();
+    await Promise.all(children.map(child => child.exitCode != null ? undefined : new Promise(resolve => child.once('close', resolve))));
+    runWithWindowId('writer-window', () => clearCurrentFolder());
+    fs.rmSync(folder, { recursive: true, force: true });
+  });
+  const first = createSession();
+  await waitFor(() => first.ws.sent.some(value => JSON.parse(value).t === 'ready'));
+  const duplicate = createSession();
+  await waitFor(() => duplicate.ws.sent.some(value => JSON.parse(value).t === 'exit'));
+  assert.match(duplicate.ws.sent.join('\n'), /already open in another StashBase chat/);
+  assert.ok(fs.existsSync(lock), 'an active writer must not be stopped or stolen');
+  const unrelated = createSession('unrelated-thread');
+  await waitFor(() => unrelated.ws.sent.some(value => JSON.parse(value).t === 'ready'));
+  fs.rmSync(stopping, { force: true });
+  first.ws.close();
+  await waitFor(() => fs.existsSync(stopping));
+  const replacement = createSession();
+  await waitFor(() => replacement.ws.sent.some(value => JSON.parse(value).t === 'skills'));
+  await new Promise(resolve => setTimeout(resolve, 100));
+  assert.equal(replacement.ws.sent.some(value => ['ready', 'exit'].includes(JSON.parse(value).t)), false,
+    `replacement must wait instead of colliding with the retiring writer: ${replacement.ws.sent.join('\n')}`);
+  fs.writeFileSync(release, 'release');
+  await waitFor(() => replacement.ws.sent.some(value => JSON.parse(value).t === 'ready'));
+  assert.equal(replacement.ws.sent.some(value => JSON.parse(value).t === 'exit'), false);
+});
 
 test('closing Codex during startup discovery stops work without a late skills failure', async (t) => {
   for (const method of ['model/list', 'skills/list']) await t.test(method, async (t) => {

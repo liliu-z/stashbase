@@ -8,10 +8,83 @@ import { PassThrough } from 'node:stream';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { codexThreadHasContent, codexThreadToBlocks } from './codex-history.ts';
+import { codexThreadHasContent, codexThreadToBlocks, listCodexSessions } from './codex-history.ts';
 import { nativeTimesByUuid, transcriptToBlocks } from './claude-history.ts';
 import { codexHistoryActions } from './codex-history-adapter.ts';
 import { sendError } from './http.ts';
+import { agentProcessClosed } from './agent-process.ts';
+
+for (const recovery of ['healthy', 'stalled'] as const) test(`concurrent Codex history lists wait for retirement and bound a ${recovery} retry`, { skip: process.platform === 'win32', timeout: 10_000 }, async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-codex-list-'));
+  const binary = path.join(root, 'codex');
+  fs.writeFileSync(binary, 'fixture'); fs.chmodSync(binary, 0o700);
+  const release = path.join(root, 'release');
+  const stopping = path.join(root, 'stopping');
+  const listRequests = path.join(root, 'lists');
+  const previousBin = process.env.STASHBASE_CODEX_BIN;
+  process.env.STASHBASE_CODEX_BIN = binary;
+  const spawn = childProcess.spawn;
+  const children: childProcess.ChildProcessWithoutNullStreams[] = [];
+  let initializing = true;
+  const realTimeout = setTimeout;
+  t.mock.method(globalThis, 'setTimeout', ((...args: Parameters<typeof setTimeout>) => {
+    const [fn, ms, ...rest] = args;
+    return realTimeout(fn, ms === 30_000 && !initializing ? 200 : ms, ...rest);
+  }) as typeof setTimeout);
+  t.mock.method(childProcess, 'spawn', ((command: string) => {
+    assert.equal(command, binary);
+    assert.ok(children.every(child => child.exitCode != null || child.signalCode != null), 'replacement cannot overlap the retiring reader');
+    initializing = true;
+    const first = children.length === 0;
+    const child = spawn(process.execPath, ['-e', `
+      const fs = require('node:fs');
+      const readline = require('node:readline');
+      process.on('SIGTERM', () => {
+        fs.writeFileSync(${JSON.stringify(stopping)}, 'stopping');
+        const timer = setInterval(() => {
+          if (fs.existsSync(${JSON.stringify(release)})) { clearInterval(timer); process.exit(0); }
+        }, 5);
+      });
+      readline.createInterface({ input: process.stdin }).on('line', line => {
+        const request = JSON.parse(line);
+        if (request.id == null) return;
+        if (request.method === 'thread/list') fs.appendFileSync(${JSON.stringify(listRequests)}, 'list\\n');
+        if (request.method === 'thread/list' && ${first || recovery === 'stalled'}) return;
+        const result = request.method === 'thread/list' ? { data: [{ id: 'history-thread', cwd: ${JSON.stringify(root)}, preview: 'Saved work', updatedAt: 123 }] } : {};
+        process.stdout.write(JSON.stringify({ id: request.id, result }) + '\\n');
+      });
+    `], { detached: true, stdio: 'pipe' });
+    children.push(child);
+    // Shorten the list deadline only after the real child has initialized;
+    // process startup under load is not the stalled-read scenario.
+    child.stdout.once('data', () => { initializing = false; });
+    return child;
+  }) as typeof childProcess.spawn);
+  syncBuiltinESMExports();
+  t.after(async () => {
+    fs.writeFileSync(release, 'release');
+    for (const child of children) if (child.exitCode == null && child.signalCode == null) child.kill('SIGTERM');
+    await Promise.all(children.map(child => agentProcessClosed(child)));
+    t.mock.restoreAll(); syncBuiltinESMExports();
+    if (previousBin === undefined) delete process.env.STASHBASE_CODEX_BIN;
+    else process.env.STASHBASE_CODEX_BIN = previousBin;
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+  const result = Promise.all([listCodexSessions(root), listCodexSessions(root)])
+    .then(value => ({ value, error: '' }), error => ({ value: [], error: String(error) }));
+  const deadline = Date.now() + 3000;
+  while (!fs.existsSync(stopping) && Date.now() < deadline) await new Promise(resolve => realTimeout(resolve, 5));
+  assert.ok(fs.existsSync(stopping));
+  assert.equal(children.length, 1);
+  fs.writeFileSync(release, 'release');
+  const settled = await result;
+  if (recovery === 'healthy') {
+    assert.equal(settled.error, '');
+    assert.deepEqual(settled.value.map(rows => rows.map(row => row.id)), [['history-thread'], ['history-thread']]);
+  } else assert.match(settled.error, /Codex app-server request timed out: thread\/list/);
+  assert.equal(children.length, 2);
+  assert.equal(fs.readFileSync(listRequests, 'utf8'), 'list\nlist\n', 'concurrent list callers share each physical read and its one retry');
+});
 
 test('missing Codex is an installation prerequisite for history, not an empty result or server failure', async (t) => {
   t.mock.method(fs, 'accessSync', () => {

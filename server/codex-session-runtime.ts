@@ -1,7 +1,7 @@
 import { AGENT_SESSION_CLOSE } from '../shared/agent-protocol.ts';
 import { setAgentProcessSnapshot, updateAgentDiagnosticContext, markAgentDiagnosticClosing, agentDiagnosticStage, beginAgentDiagnosticTurn, reportAgentRuntimeError } from './error-reporting.ts';
 import { isStashbaseWorkspaceEdit, isWorkspaceFileChange } from './agent-file-permissions.ts';
-import { retireAgentProcess } from './agent-process.ts';
+import { agentProcessClosed, retireAgentProcess } from './agent-process.ts';
 /**
  * Live Codex WebSocket session runtime.
  *
@@ -73,6 +73,14 @@ import { errorMessage, logger } from './log.ts';
 
 const log = logger('codex-agent');
 
+interface CodexThreadWriter {
+  proc: ChildProcessWithoutNullStreams;
+  retirement?: Promise<void>;
+}
+// Native thread ids are global to Codex's store, including across windows.
+// A disconnected socket does not release the process's native writer yet.
+const threadWriters = new Map<string, CodexThreadWriter>();
+
 interface PendingApproval {
   requestId: JsonRpcId;
   method: string;
@@ -91,6 +99,7 @@ export class CodexSession implements AttributedAgentSession {
   private appServerReady = false;
   private processGeneration = 0;
   private retirement: Promise<void> = Promise.resolve();
+  private threadWriter: CodexThreadWriter | undefined;
   private proc: ChildProcessWithoutNullStreams | null = null;
   private cwd: string | null = null;
   /** The library persona this Chat runs under, read when its thread starts. */
@@ -249,6 +258,8 @@ export class CodexSession implements AttributedAgentSession {
       onExit: (error) => {
         // A retired generation's exit belongs to nobody once a newer one exists.
         if (this.appServer !== appServer) return;
+        this.retirement = retireAgentProcess(proc, 'process_exit');
+        if (this.threadWriter?.proc === proc) this.threadWriter.retirement = this.retirement;
         this.appServer = null;
         this.proc = null;
         if (!this.closed) {
@@ -565,6 +576,8 @@ export class CodexSession implements AttributedAgentSession {
     if (!cwd) throw new Error('No folder open.');
     await this.ensureAppServer();
     const isNewThread = !this.resumeThreadId;
+    if (this.resumeThreadId) await this.claimThreadWriter(this.resumeThreadId);
+    if (this.closed) throw new Error('Codex session closed.');
     const access = codexAccessOptions(this.accessMode);
     const common = {
       cwd,
@@ -585,6 +598,7 @@ export class CodexSession implements AttributedAgentSession {
     const thread = result.thread as JsonObject | undefined;
     const id = stringValue(thread?.id);
     if (!id) throw new Error('Codex app-server did not return a thread id.');
+    if (isNewThread) await this.claimThreadWriter(id);
     const shouldSendSessionId = this.threadId !== id;
     this.threadId = id;
     this.threadAccessMode = this.accessMode;
@@ -615,6 +629,29 @@ export class CodexSession implements AttributedAgentSession {
       }
     }
     return id;
+  }
+
+  private async claimThreadWriter(threadId: string): Promise<void> {
+    const proc = this.proc;
+    if (!proc) throw new Error('Codex app-server is not running.');
+    while (!this.closed) {
+      const previous = threadWriters.get(threadId);
+      if (!previous) {
+        const writer: CodexThreadWriter = { proc };
+        threadWriters.set(threadId, writer);
+        this.threadWriter = writer;
+        void agentProcessClosed(proc).then(() => {
+          if (threadWriters.get(threadId) === writer) threadWriters.delete(threadId);
+        });
+        return;
+      }
+      if (previous.proc === proc) return;
+      if (!previous.retirement) throw new Error('This Codex conversation is already open in another StashBase chat. Close it before reconnecting.');
+      // Retirement has a bounded deadline and resolves only after verified
+      // pipe/process-tree closure. A failure keeps the old writer fenced.
+      await previous.retirement;
+    }
+    throw new Error('Codex session closed.');
   }
 
   private async interrupt(): Promise<void> {
@@ -1033,7 +1070,11 @@ export class CodexSession implements AttributedAgentSession {
     this.proc = null;
     if (appServer) updateAgentDiagnosticContext(this.ws, { pending_rpc_methods: appServer.pendingMethods() });
     appServer?.close(new Error('Codex session closed.'));
-    if (proc) this.retirement = retireAgentProcess(proc);
+    if (proc) {
+      this.retirement = retireAgentProcess(proc);
+      if (this.threadWriter?.proc === proc) this.threadWriter.retirement = this.retirement;
+    }
+    this.threadWriter = undefined;
   }
 
   private handleAppServerExit(error: Error): void {

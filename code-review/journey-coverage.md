@@ -49,6 +49,14 @@ The map is navigation, not proof that every caller has been reviewed.
 
 ## J01: Onboarding
 
+**Codex lifecycle verification (2026-11-02):** the fresh built app and host
+launched with `verify:onboarding --agent codex --built` in the persistent private
+profile. `/api/terminal/clis` reports Codex uninstalled, with no discovered host
+CLI. Real sign-in, a completed first reply and login reuse remain unverified.
+J06 records isolated official-binary history reads and the controlled process
+fixtures for writer handoff and bounded list recovery; these do not replace that
+provider acceptance flow.
+
 **Credit proxy continuity (2026-11-02):** a controlled account flow signs in
 through the private Chromium relay while direct Node access is refused. Its
 subsequent credit read reproduced a direct-fetch failure. `hosted-account.ts`
@@ -1735,6 +1743,22 @@ Host/services: `server/retrieval/index.ts`, `server/indexer.mfs.ts`, `python/sta
   evaluation does not establish ranking quality.
 
 ## J06: Agent
+
+**Codex ownership and history recovery (2026-11-02):** a real child-process
+fixture reproduces `already has an active writer` when a replacement resumes
+before the disconnected process finishes retiring. `codex-session-runtime.ts`
+now reserves native thread ids across windows and waits for the previous local
+writer's verified closure. The fixture also refuses an active duplicate without
+stealing its writer and permits an unrelated thread. A second real-process
+fixture reproduces concurrent `thread/list` failures after one shared-reader
+timeout; `codex-history.ts` coalesces these reads and awaits retirement before
+one read-only retry. It covers both a healthy replacement and a second stall,
+with no third attempt. Existing history scope/mutation and turn-timeout checks
+remain. An isolated official Codex 0.166.0 binary reads an empty private project's
+history through the production owner without login or model requests. These
+checks establish local ownership/recovery defects, not the internal cause of the
+historical native query stall, every upstream writer conflict, a completed live
+provider reply or Windows-native process behavior.
 
 **Structured tool failure categories (2026-11-02):** Codex MCP error objects
 become JSON in the shared tool-result protocol. The previous prose-prefix-only

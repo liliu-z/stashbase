@@ -10,6 +10,9 @@ actual capabilities through this common experience.
 
 - A conversation belongs to a project, agent, and native session. Restore it once;
   duplicate titles are valid. Automatic naming never replaces a manual title.
+- Codex conversations keep one local native writer across windows. Reconnecting
+  waits for a retiring writer to exit; opening an already-owned conversation
+  explains the conflict without interrupting its current chat or replaying work.
 - A completely blank chat may be reused. Drafts, context, queued requests, and
   started transcripts remain reachable when navigating or switching modes.
 - Changing agent before the first send preserves the draft and clears the skill
