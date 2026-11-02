@@ -4,7 +4,7 @@
  * `revision-engine.test.ts` proves what the diff plugin does; this proves the
  * surface and the domain agree about it.
  */
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useEffect, useRef, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
@@ -133,7 +133,22 @@ async function openSurface(props: Parameters<typeof Surface>[0]) {
   return view;
 }
 
-const acceptControls = () => screen.queryAllByRole('button', { name: 'Undo' });
+// Pending controls stay mounted while CSS hides the cards away from the pointer.
+const acceptControls = () =>
+  screen
+    .queryAllByRole('button', { hidden: true })
+    .filter((button) => button.textContent === 'Undo');
+
+function hoverFirstChange(): HTMLElement {
+  const card = acceptControls()[0]?.closest('.milkdown-diff-controls'); // dom-contract: the diff widget follows the changed prose whose hover reveals its actions.
+  const change = card?.previousElementSibling;
+  if (!change) throw new Error('Expected changed prose before the pending revision controls.');
+  // happy-dom cannot hit-test painted text. Supply that browser result, then
+  // let the production mouse handler resolve and reveal the matching card.
+  vi.spyOn(document, 'elementFromPoint').mockReturnValue(change);
+  fireEvent.mouseMove(change, { clientX: 10, clientY: 10 });
+  return screen.getByRole('button', { name: 'Undo' });
+}
 
 afterEach(cleanup);
 
@@ -145,6 +160,7 @@ describe('a revision review on the Markdown surface', () => {
 
     rerender(<Surface proposal={PROPOSAL} />);
     await waitFor(() => expect(acceptControls()).toHaveLength(2));
+    expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull();
     expect(screen.getByRole('group', { name: 'Changes from this turn' })).not.toBeNull();
     expect(screen.getByRole('status').textContent).toBe('2 changes from this turn');
   });
@@ -155,12 +171,12 @@ describe('a revision review on the Markdown surface', () => {
     await openSurface({ onDocumentChange: (value) => changes.push(value), proposal: PROPOSAL });
     await waitFor(() => expect(acceptControls()).toHaveLength(2));
 
-    await user.click(acceptControls()[0] as HTMLElement);
+    await user.click(hoverFirstChange());
     await waitFor(() =>
       expect(screen.getByRole('status').textContent).toBe('1 change from this turn'),
     );
 
-    await user.click(acceptControls()[0] as HTMLElement);
+    await user.click(hoverFirstChange());
     await waitFor(() =>
       expect(screen.queryByRole('group', { name: 'Changes from this turn' })).toBeNull(),
     );

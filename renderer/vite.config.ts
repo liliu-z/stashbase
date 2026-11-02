@@ -95,6 +95,8 @@ export default defineConfig({
   },
   test: {
     environment: 'happy-dom',
+    // Story accessibility reads visibility from the same styles as the browser.
+    css: true,
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     setupFiles: ['src/test/setup.ts'],
     coverage: {

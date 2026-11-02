@@ -144,7 +144,8 @@ describe('story accessibility', () => {
     for (const [storyName, Story] of stories) {
       it(`${name} · ${storyName} has no accessibility violations`, async () => {
         expect(await scoreStory(Story), `${name} · ${storyName}`).toEqual([]);
-      }, 20_000);
+        // Full workspace stories include rich editors and their actual stylesheets.
+      }, 60_000);
     }
   }
 });
