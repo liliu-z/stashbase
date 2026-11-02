@@ -1,5 +1,5 @@
 import { EditorView } from '@codemirror/view';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vite-plus/test';
 
 import { createDocumentNavigationRuntime } from '@/features/documents/application/navigation-runtime';
@@ -87,7 +87,7 @@ it('routes ordinary Markdown links inside prices through the document boundary',
 
 it('reads formula blocks without source and preserves editing history across mode changes', async () => {
   const formula = String.raw`\frac{1}{2} + \begin{pmatrix}a & b \\ c & d\end{pmatrix}`;
-  const value = `A formula:\n\n$$\n${formula}\n$$\n\n\`\`\`js\nconsole.log("ordinary");\n\`\`\`\n\nAfter formula.\n`;
+  const value = `A formula:\n\n$$\n${formula}\n$$\n\n\`\`\`js\nconsole.log("ordinary");\n\`\`\`\n\n- Keep the explanation.\n- Keep the next step.\n\nAfter formula.\n`;
   const onChange = vi.fn();
   const navigation = createDocumentNavigationRuntime('formula');
   const document = (readOnly: boolean) => (
@@ -115,6 +115,16 @@ it('reads formula blocks without source and preserves editing history across mod
   await waitFor(() =>
     expect(screen.getByRole('document').getAttribute('data-markdown-state')).toBe('ready'),
   );
+  const list = within(screen.getByRole('document')).getByRole('list');
+  const items = within(list).getAllByRole('listitem');
+  expect(items).toHaveLength(2);
+  const firstItem = items[0];
+  if (!firstItem) throw new Error('Expected the explanation as the first list item.');
+  expect(firstItem.parentElement).toBe(list);
+  expect(within(firstItem).getByText('Keep the explanation.')).not.toBeNull();
+  expect(
+    screen.getByRole('textbox', { name: 'Markdown editor' }).getAttribute('aria-readonly'),
+  ).toBe('false');
   const preview = screen.getByRole('button', { name: 'Edit formula' });
   const block = preview.closest<HTMLElement>('.stashbase-math-block'); // dom-contract: formula block presentation is separate from the ordinary code-block view.
   const source = block?.querySelector<HTMLElement>('.stashbase-math-block-source'); // dom-contract: collapsed source remains mounted to preserve CodeMirror and undo state.
@@ -131,6 +141,10 @@ it('reads formula blocks without source and preserves editing history across mod
   await screen.findByRole('button', { name: 'Done editing formula' });
   expect(source.hidden).toBe(false);
   rendered.rerender(document(true));
+  expect(
+    screen.getByRole('textbox', { name: 'Markdown editor' }).getAttribute('aria-readonly'),
+  ).toBe('true');
+  expect(within(list).getAllByRole('listitem')).toEqual(items);
   expect(source.hidden).toBe(true);
   expect(screen.queryByRole('button', { name: 'Edit formula' })).toBeNull();
   expect(screen.queryByRole('button', { name: 'Done editing formula' })).toBeNull();

@@ -1430,6 +1430,9 @@ registered host boundaries; renderer shared types are a different layer.
   the live document without mutating editor DOM. The outline adapter owns heading
   anchors through ProseMirror decorations, replacing Milkdown's heading-id state
   synchronizer; anchor updates must not reparse prose or interrupt IME composition.
+  The editor's accessible name and read-only state come from public view
+  attributes. `ui/markdown/list-items.ts` exposes one list-item role on each native
+  node view's outer wrapper, preserving its content DOM and editing lifecycle.
   The sole double-cast exemption is its Find controller's structural DOM corpus and guarded
   CSS Highlight probe; other exceptions need their code-owned rationale.
 - `shared/runtime/markdown-math.ts` owns the math syntax shared by Documents

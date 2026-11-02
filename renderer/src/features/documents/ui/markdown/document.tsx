@@ -13,6 +13,7 @@ import { listItem } from '@milkdown/crepe/feature/list-item';
 import { placeholder } from '@milkdown/crepe/feature/placeholder';
 import { table } from '@milkdown/crepe/feature/table';
 import { toolbar } from '@milkdown/crepe/feature/toolbar';
+import { editorViewOptionsCtx } from '@milkdown/kit/core';
 import { replaceAll } from '@milkdown/kit/utils';
 import { BookOpen, PenLine } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -32,6 +33,7 @@ import { prefersReducedMotion } from '@/shared/runtime/appearance-surface';
 import { writeToClipboard } from '@/shared/ui/clipboard';
 
 import { watchMarkdownChanges } from './changes';
+import { listItemSemantics } from './list-items';
 import { math, refreshMath } from './math';
 import { MarkdownOpenFailure } from './open-failure';
 
@@ -176,6 +178,7 @@ export function MarkdownDocument({
       .addFeature(placeholder, { mode: 'block', text: 'Start writing… or type /' })
       .addFeature(cursor)
       .addFeature(listItem)
+      .addFeature(listItemSemantics)
       .addFeature(linkTooltip, {
         inputPlaceholder: 'Paste a URL or file path…',
         onCopyLink: (href) =>
@@ -189,6 +192,19 @@ export function MarkdownDocument({
       .addFeature(table)
       .addFeature(codeMirror, { copyText: 'Copy code', languages })
       .addFeature(math, mathModeRef);
+    editor.editor.config((ctx) =>
+      ctx.update(editorViewOptionsCtx, (previous) => ({
+        ...previous,
+        attributes: (state) => ({
+          ...(typeof previous.attributes === 'function'
+            ? previous.attributes(state)
+            : previous.attributes),
+          'aria-label': 'Markdown editor',
+          'aria-multiline': 'true',
+          'aria-readonly': String(readOnlyRef.current),
+        }),
+      })),
+    );
     attachHeadingAnchors(editor);
     const releaseHighlights = attachHighlights(editor);
     const releaseReview = attachReview(editor);
