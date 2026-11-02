@@ -13,6 +13,30 @@ import { registerAttributedAgentSession, unregisterAttributedAgentSession } from
 import { withAgentProjectScope } from './project-request-scope.ts';
 import { filesystemPath } from './filesystem-path.ts';
 
+test('explicit generic context keeps exact source paths without reading their bytes', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-generic-context-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  await registerProjectFolderAsync(root);
+  const names = ['build notes (local).mjs', '.env', 'Makefile'];
+  for (const name of names) fs.writeFileSync(path.join(root, name), 'source text');
+  const open = t.mock.method(fs.promises, 'open', async () => {
+    throw new Error('Context resolution must not open source bytes.');
+  });
+  for (const name of names) {
+    const source = path.join(root, name);
+    const context = await agentContextFile(source);
+    assert.equal(context.path, filesystemPath.absolute(source));
+    assert.equal(context.sourcePath, name);
+    assert.equal(context.readPath, name);
+    assert.equal(context.sourceFormat, 'generic');
+    assert.equal(context.kind, 'direct');
+    assert.equal(context.available, true);
+    fs.unlinkSync(source);
+    await assert.rejects(agentContextFile(source), { status: 404 });
+  }
+  assert.equal(open.mock.callCount(), 0);
+});
+
 test('prepared reads and context require a current source and complete output, including legacy derived paths', async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-prepared-read-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));

@@ -17,7 +17,7 @@ import {
   type AgentContextItem,
   type AgentScopeListing,
 } from './context';
-import { suggestedContextSource } from './draft-context';
+import { currentContextSource } from './draft-context';
 import { renderPromptContext } from './prompt-context';
 
 const listing: AgentScopeListing = {
@@ -273,7 +273,7 @@ describe('external files', () => {
     );
   });
 
-  it('is offered while in front, but not as a generic file or once bound', () => {
+  it('is included while in front, but not as a generic file or once bound', () => {
     const environment = (path: string) => ({
       activeSource: externalSource('grant-one-abcdefghijklmn', path),
       folderPath: '/Library/Research',
@@ -281,12 +281,12 @@ describe('external files', () => {
       readiness: {},
       versions: {},
     });
-    expect(suggestedContextSource(environment('/Users/reader/report.pdf'), [])?.path).toBe(
+    expect(currentContextSource(environment('/Users/reader/report.pdf'), [])?.path).toBe(
       '/Users/reader/report.pdf',
     );
-    expect(suggestedContextSource(environment('/Users/reader/data.csv'), [])).toBeNull();
+    expect(currentContextSource(environment('/Users/reader/data.csv'), [])).toBeNull();
     expect(
-      suggestedContextSource(environment('/Users/reader/Desktop/report.pdf'), [
+      currentContextSource(environment('/Users/reader/Desktop/report.pdf'), [
         outside('grant-two-abcdefghijklmn'),
       ]),
     ).toBeNull();

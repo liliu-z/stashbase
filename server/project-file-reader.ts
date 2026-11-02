@@ -60,8 +60,8 @@ export async function agentContextFile(rawPath: unknown): Promise<AgentContextFi
   const target = await normalizeProjectFilePath(rawPath);
   const folderName = path.basename(target.folderRoot);
   return runWithFolderRoot(target.folderRoot, async () => {
-    const sourceFormat = detectViewerFormat(target.folderRel);
-    if (!sourceFormat || sourceFormat === 'audio') throw routeError('unsupported format', 415, 'UNSUPPORTED_FORMAT');
+    const sourceFormat = detectViewerFormat(target.folderRel) ?? 'generic';
+    if (sourceFormat === 'audio') throw routeError('unsupported format', 415, 'UNSUPPORTED_FORMAT');
     if (!(await pathExistsAsync(target.folderRel))) throw routeError('not found', 404);
 
     if (sourceFormat !== 'pdf' && sourceFormat !== 'docx') {
@@ -75,7 +75,9 @@ export async function agentContextFile(rawPath: unknown): Promise<AgentContextFi
         available: true,
         reason: sourceFormat === 'image'
           ? 'Images are read as the source image; OCR text is used for search indexing.'
-          : 'Structured text files are the readable source.',
+          : sourceFormat === 'generic'
+            ? 'The runtime reads this source using its available tools.'
+            : 'Structured text files are the readable source.',
       };
     }
 

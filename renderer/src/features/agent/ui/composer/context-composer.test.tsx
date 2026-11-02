@@ -2,13 +2,14 @@ import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
 
+import type { QueuedMessage } from '@/components/ui/input-message';
 import {
   createAgentSessionRuntime,
   type AgentSessionRuntime,
 } from '@/features/agent/application/session-runtime';
 import { passageContextItem, type AgentScopeEnvironment } from '@/features/agent/domain/context';
 import type { SourceReference } from '@/shared/domain/source-reference';
-import { typeInto } from '@/test/dom';
+import { pressKey, typeInto } from '@/test/dom';
 import { agentContextPort, agentSessionPort, type FakeAgentSession } from '@/test/fakes/agent';
 
 import { AgentContextComposer } from './context-composer';
@@ -38,7 +39,13 @@ afterEach(() => {
 });
 
 function renderComposer(
-  overrides: { skills?: boolean; activeSource?: SourceReference | null } = {},
+  overrides: {
+    skills?: boolean;
+    activeSource?: SourceReference | null;
+    status?: 'idle' | 'streaming';
+    steering?: boolean;
+    holdSend?: boolean;
+  } = {},
 ) {
   const port: FakeAgentSession = agentSessionPort();
   const session = createAgentSessionRuntime({
@@ -51,8 +58,13 @@ function renderComposer(
   });
   runtimes.push(session);
   const spies = {
-    onQueueChange: vi.fn(),
+    onQueueChange: vi.fn((queue: QueuedMessage[]) =>
+      session.setQueue(queue.map(({ id, text }) => ({ id, text }))),
+    ),
     onRefreshSkills: vi.fn(),
+    onSend: vi.fn((text: string, options?: { queuedId?: string }) => {
+      if (!overrides.holdSend) void session.sendPrompt(text, options);
+    }),
     onSkillChange: vi.fn(),
     onStop: vi.fn(),
   };
@@ -60,11 +72,14 @@ function renderComposer(
     <AgentContextComposer
       attachments
       environment={{ ...environment, activeSource }}
-      queue={[]}
+      onSteer={overrides.steering ? session.steer : undefined}
+      queue={session.store
+        .getState()
+        .queuedPrompts.map(({ id, text }) => ({ id, text, files: [] }))}
       placeholder="Ask about Research…"
       session={session}
       skills={overrides.skills ?? true}
-      status="idle"
+      status={overrides.status ?? 'idle'}
       {...spies}
     />
   );
@@ -167,46 +182,180 @@ describe('Agent context composer', () => {
     expect(session.store.getState().context).toEqual([]);
   });
 
-  it('offers the document in front of the reader and binds it only on a click', async () => {
+  it('sends the visible document with the request without a separate attach action', async () => {
     const notes = { folderPath: SCOPE.path, path: 'notes.md' };
-    const { session } = renderComposer({ activeSource: notes });
+    const { field, port, session } = renderComposer({ activeSource: notes });
 
+    expect(screen.getByRole('button', { name: 'Remove notes.md' })).not.toBeNull();
     expect(session.store.getState().context).toEqual([]);
-    await userEvent.click(screen.getByRole('button', { name: 'Attach notes.md' }));
+    expect(session.isBlank()).toBe(true);
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Send' }).disabled).toBe(true);
+    act(() => port.listeners[0]?.onEvent({ kind: 'ready' }));
+    typeInto(field, 'What does this page say?');
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }));
 
-    expect(session.store.getState()).toMatchObject({
-      context: [expect.objectContaining({ kind: 'source', source: notes })],
-      draft: '@notes.md ',
-    });
     await waitFor(() =>
-      expect(screen.queryByRole('button', { name: 'Attach notes.md' })).toBeNull(),
+      expect(port.sent).toContainEqual(
+        expect.objectContaining({
+          kind: 'prompt',
+          text: 'What does this page say?\n\nAttached files:\n- /project/Research/notes.md',
+        }),
+      ),
+    );
+    expect(session.store.getState().transcript).toContainEqual(
+      expect.objectContaining({
+        context: [expect.objectContaining({ kind: 'source', source: notes })],
+        kind: 'user',
+        text: 'What does this page say?',
+      }),
     );
   });
 
-  it('keeps a dismissed suggestion hidden until another document comes forward', async () => {
+  it('excludes a removed current document until another document comes forward', async () => {
     const notes = { folderPath: SCOPE.path, path: 'notes.md' };
     const essay = { folderPath: SCOPE.path, path: 'drafts/essay.md' };
-    const { showDocument } = renderComposer({ activeSource: notes });
+    const { field, port, showDocument } = renderComposer({ activeSource: notes });
 
-    await userEvent.click(screen.getByRole('button', { name: "Don't suggest notes.md" }));
+    await userEvent.click(screen.getByRole('button', { name: 'Remove notes.md' }));
     await waitFor(() =>
-      expect(screen.queryByRole('button', { name: 'Attach notes.md' })).toBeNull(),
+      expect(screen.queryByRole('button', { name: 'Remove notes.md' })).toBeNull(),
+    );
+    act(() => port.listeners[0]?.onEvent({ kind: 'ready' }));
+    typeInto(field, 'Brainstorm an idea');
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+    await waitFor(() =>
+      expect(port.sent).toContainEqual(
+        expect.objectContaining({ kind: 'prompt', text: 'Brainstorm an idea' }),
+      ),
     );
 
     showDocument(essay);
-    expect(screen.getByRole('button', { name: 'Attach essay.md' })).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Remove essay.md' })).not.toBeNull();
     showDocument(notes);
-    expect(screen.getByRole('button', { name: 'Attach notes.md' })).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Remove notes.md' })).not.toBeNull();
   });
 
-  it('suggests nothing without a listed, readable document from this folder', () => {
+  it('includes no current document without a listed, readable source from this folder', () => {
     const { showDocument } = renderComposer({ activeSource: null });
     showDocument({ folderPath: SCOPE.path, path: 'data.bin' });
     showDocument({ folderPath: SCOPE.path, path: 'unlisted.md' });
     showDocument({ folderPath: '/project/Plans', path: 'notes.md' });
 
     for (const name of ['data.bin', 'unlisted.md', 'notes.md'])
-      expect(screen.queryByRole('button', { name: `Attach ${name}` })).toBeNull();
+      expect(screen.queryByRole('button', { name: `Remove ${name}` })).toBeNull();
+  });
+
+  it('captures the visible document before a first-send access gate can hold the request', async () => {
+    const notes = { folderPath: SCOPE.path, path: 'notes.md' };
+    const { field, onSend, port, session, showDocument } = renderComposer({
+      activeSource: notes,
+      holdSend: true,
+    });
+    let contextAtSend = session.store.getState().context;
+    onSend.mockImplementation(() => {
+      contextAtSend = session.store.getState().context;
+    });
+    typeInto(field, 'Read this page');
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+    expect(onSend).toHaveBeenCalledWith('Read this page', undefined);
+    expect(contextAtSend).toEqual([expect.objectContaining({ kind: 'source', source: notes })]);
+    showDocument({ folderPath: SCOPE.path, path: 'drafts/essay.md' });
+    act(() => port.listeners[0]?.onEvent({ kind: 'ready' }));
+    await act(() => session.sendPrompt('Read this page'));
+    expect(port.sent).toContainEqual(
+      expect.objectContaining({
+        kind: 'prompt',
+        text: 'Read this page\n\nAttached files:\n- /project/Research/notes.md',
+      }),
+    );
+  });
+
+  it('keeps a queued request bound to the document visible when it was queued', async () => {
+    const notes = { folderPath: SCOPE.path, path: 'notes.md' };
+    const { field, port, session, showDocument } = renderComposer({
+      activeSource: notes,
+      status: 'streaming',
+    });
+    typeInto(field, 'Read this later');
+    await userEvent.click(screen.getByRole('button', { name: 'Queue message' }));
+    const queued = session.store.getState().queuedPrompts[0];
+    if (!queued) throw new Error('The current draft was not queued.');
+    expect(queued.context).toEqual([expect.objectContaining({ kind: 'source', source: notes })]);
+    showDocument({ folderPath: SCOPE.path, path: 'drafts/essay.md' });
+    act(() => port.listeners[0]?.onEvent({ kind: 'ready' }));
+    await act(() => session.sendPrompt('Read this later', { queuedId: queued.id }));
+
+    expect(port.sent).toContainEqual(
+      expect.objectContaining({
+        kind: 'prompt',
+        text: 'Read this later\n\nAttached files:\n- /project/Research/notes.md',
+      }),
+    );
+    expect(session.store.getState().context).toEqual([]);
+  });
+
+  it('does not capture a different current document when removing a queued request', async () => {
+    const { field, session, showDocument } = renderComposer({
+      activeSource: { folderPath: SCOPE.path, path: 'notes.md' },
+      status: 'streaming',
+    });
+    typeInto(field, 'Read this later');
+    await userEvent.click(screen.getByRole('button', { name: 'Queue message' }));
+    showDocument({ folderPath: SCOPE.path, path: 'drafts/essay.md' });
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Remove queued message: Read this later' }),
+    );
+
+    expect(session.store.getState().queuedPrompts).toEqual([]);
+    expect(session.store.getState().context).toEqual([]);
+  });
+
+  it('includes the current document in a follow-up sent to the running turn', async () => {
+    const { field, port, session } = renderComposer({
+      activeSource: { folderPath: SCOPE.path, path: 'notes.md' },
+      status: 'streaming',
+      steering: true,
+    });
+    act(() => port.listeners[0]?.onEvent({ kind: 'ready' }));
+    await act(() => session.sendPrompt('Start writing'));
+    act(() => port.listeners[0]?.onEvent({ kind: 'turn-started' }));
+    expect(screen.getByRole('button', { name: 'Stop' })).not.toBeNull();
+    typeInto(field, 'Use this page too');
+    await userEvent.click(screen.getByRole('button', { name: 'Send now' }));
+
+    await waitFor(() =>
+      expect(port.sent).toContainEqual(
+        expect.objectContaining({
+          kind: 'steer',
+          text: 'Use this page too\n\nAttached files:\n- /project/Research/notes.md',
+        }),
+      ),
+    );
+  });
+
+  it('keeps a removed bound current source excluded in both tile and inline forms', async () => {
+    const notes = { folderPath: SCOPE.path, path: 'notes.md' };
+    const { field, session, showDocument } = renderComposer({ activeSource: notes });
+    act(() => {
+      session.addContext({ boundVersion: null, format: 'md', kind: 'source', source: notes });
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Remove notes.md' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Remove notes.md' })).toBeNull(),
+    );
+    expect(session.store.getState().context).toEqual([]);
+
+    showDocument(null);
+    showDocument(notes);
+    typeInto(field, '@not');
+    await userEvent.click(await screen.findByRole('option', { name: /notes\.md/u }));
+    pressKey(field, 'Backspace');
+    pressKey(field, 'Backspace');
+    expect(session.store.getState().context).toEqual([]);
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Remove notes.md' })).toBeNull(),
+    );
   });
 
   it('shows a passage as a removable chip and takes focus when asked', async () => {

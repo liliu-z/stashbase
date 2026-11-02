@@ -26,6 +26,7 @@ const LISTING = listing(
   [
     listingFile({ path: 'docs/plan.md' }),
     listingFile({ format: 'generic', path: 'archive.zip' }),
+    listingFile({ format: 'generic', path: 'build.mjs' }),
     listingFile({ format: 'generic', kind: 'symlink', path: 'linked-file' }),
     listingFile({ format: 'pdf', path: 'deep/nested/paper.pdf' }),
     listingFile({ format: 'txt', path: '.env' }),
@@ -287,13 +288,16 @@ describe('file tree row drag source', () => {
     expect(onDragEnd).toHaveBeenCalledOnce();
   });
 
-  it('moves a generic file without offering it to Chat as a source', () => {
-    const { onDragStart } = renderRow(rowFor('archive.zip'));
+  it('allows a generic code file to be explicitly attached to Chat', () => {
+    const { onDragStart } = renderRow(rowFor('build.mjs'));
     const dataTransfer = new DataTransfer();
 
     expect(rowElement().getAttribute('draggable')).toBe('true');
     fireDrag(rowElement(), 'dragstart', dataTransfer);
-    expect(dataTransfer.types).not.toContain(SOURCE_DRAG_MIME);
+    expect(JSON.parse(dataTransfer.getData(SOURCE_DRAG_MIME) || 'null')).toEqual({
+      folderPath: RESEARCH_FOLDER.path,
+      path: 'build.mjs',
+    });
     expect(dataTransfer.effectAllowed).toBe('copyMove');
     expect(onDragStart).toHaveBeenCalledOnce();
   });

@@ -379,25 +379,31 @@ test('restores a non-image document attachment as a name-only card', () => {
   }]);
 });
 
-test('restores a derived-file attachment line, dropping its context hint', () => {
-  const blocks = codexThreadToBlocks({
-    turns: [{
-      items: [{
-        type: 'userMessage',
-        content: [{
-          type: 'text',
-          text: 'what does it argue?\n\nAttached files:\n- /Users/me/notes/report.pdf (for text context, use mcp__stashbase__read_file with path /Users/me/notes/report.html; it returns the derived text representation for this pdf)',
+test('restores folder-relative document attachments, dropping available and unavailable derived hints', () => {
+  const hints = [
+    'for text context, use mcp__stashbase__read_file with path /Users/me/notes/report.pdf; it returns the derived text representation for this pdf',
+    'derived text is not available yet; Current prepared text is unavailable; retry after preparation completes or reprocess the source.',
+  ];
+  for (const hint of hints) {
+    const blocks = codexThreadToBlocks({
+      turns: [{
+        items: [{
+          type: 'userMessage',
+          content: [{
+            type: 'text',
+            text: `what does it argue?\n\nAttached files:\n- papers/report (final).pdf (${hint})`,
+          }],
         }],
       }],
-    }],
-  });
+    });
 
-  assert.deepEqual(blocks, [{
-    kind: 'user',
-    id: 'c0',
-    text: 'what does it argue?',
-    attachments: [{ path: '/Users/me/notes/report.pdf', name: 'report.pdf' }],
-  }]);
+    assert.deepEqual(blocks, [{
+      kind: 'user',
+      id: 'c0',
+      text: 'what does it argue?',
+      attachments: [{ path: 'papers/report (final).pdf', name: 'report (final).pdf' }],
+    }]);
+  }
 });
 
 test('restores a non-image document card for a Claude SDK transcript', () => {
@@ -414,14 +420,15 @@ test('restores a non-image document card for a Claude SDK transcript', () => {
   }]);
 });
 
-test('leaves an unrecognised attachment path in the prose', () => {
+test('restores generic and extensionless file references as name-only cards', () => {
+  const sources = ['/Users/me/project/build notes (local).mjs', '/Users/me/project/.env', '/etc/passwd'];
   const blocks = codexThreadToBlocks({
     turns: [{
       items: [{
         type: 'userMessage',
         content: [{
           type: 'text',
-          text: 'keep this\n\nAttached files:\n- /etc/passwd',
+          text: `review these\n\nAttached files:\n${sources.map(source => `- ${source}`).join('\n')}`,
         }],
       }],
     }],
@@ -430,8 +437,17 @@ test('leaves an unrecognised attachment path in the prose', () => {
   assert.deepEqual(blocks, [{
     kind: 'user',
     id: 'c0',
-    text: 'keep this\n\nAttached files:\n- /etc/passwd',
+    text: 'review these',
+    attachments: sources.map(source => ({ path: source, name: path.basename(source) })),
   }]);
+});
+
+test('leaves attachment-like prose without an absolute file path untouched', () => {
+  const text = 'keep this\n\nAttached files:\n- build notes (local).mjs';
+  const blocks = codexThreadToBlocks({
+    turns: [{ items: [{ type: 'userMessage', content: [{ type: 'text', text }] }] }],
+  });
+  assert.deepEqual(blocks, [{ kind: 'user', id: 'c0', text }]);
 });
 
 test('turn startedAt/completedAt become user/assistant timestamps in ms', () => {

@@ -89,7 +89,7 @@ export function rowIsRestricted(row: TreeRow): boolean {
   return row.node.type === 'folder' ? folderIsRestricted(row.node) : fileIsRestricted(row.node);
 }
 
-/** A file the project will not index, so it never joins Search or Chat context. */
+/** A file excluded from Search and automatic Chat context. */
 function rowIsGeneric(row: TreeRow): boolean {
   return row.node.type === 'file' && row.node.format === 'generic';
 }
@@ -185,9 +185,8 @@ export function FileTreeRow({
 }: FileTreeRowProps) {
   const restricted = rowIsRestricted(row);
   const editable = !restricted;
-  const generic = rowIsGeneric(row);
-  // Any entry the tree may rename can move into another folder. Only a file
-  // Chat can read also carries its source identity for the composer.
+  // Any editable entry can move. Every ordinary file can also be explicitly
+  // attached to Chat; its runtime decides how to read it.
   const draggable = !restricted;
   const trailingIcon = restricted ? ExternalLink : marker ? MARKER_ICONS[marker.kind] : undefined;
   const element = useRef<HTMLButtonElement | null>(null);
@@ -280,7 +279,7 @@ export function FileTreeRow({
           writeTreeDrag(
             event.dataTransfer,
             row.node.path,
-            row.node.type === 'file' && !generic ? { folderPath, path: row.node.path } : null,
+            row.node.type === 'file' ? { folderPath, path: row.node.path } : null,
           );
           onDragStart(row);
         }}

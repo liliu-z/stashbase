@@ -42,8 +42,7 @@ import { MentionRowsListbox, useMentionRows } from './context-rows';
 import { DraftSourceTiles, isVisualSource } from './context-tiles';
 import { useComposerFocusRequest } from './focus';
 import { MentionEditor, type MentionEditorHandle, type MentionEditorProps } from './mention-editor';
-import { SuggestedSourceChip } from './suggested-source-chip';
-import { useSuggestedSource } from './use-suggested-source';
+import { useCurrentSource } from './use-current-source';
 
 /** Native picker hint for an Agent that accepts transient local files. The
  * selected runtime decides what it can interpret after the file is attached;
@@ -154,16 +153,18 @@ export function AgentContextComposer({
     environment && scope.kind === 'folder' && environment.folderPath === scope.path
       ? environment
       : null;
+  const currentSource = useCurrentSource(scoped, context, session);
+  const currentItem = currentSource.item;
   const validations = useMemo(
     () =>
-      validateContext(context, {
+      validateContext(currentItem ? [...context, currentItem] : context, {
         listing: scoped?.listing ?? null,
         readiness: scoped?.readiness ?? {},
         scope,
         versions: scoped?.versions,
         hasUpload: (path) => Boolean(session.fileForTransient(path)),
       }),
-    [context, scope, scoped, session],
+    [context, currentItem, scope, scoped, session],
   );
   const issue = contextIssue ?? validations.find((item) => item.status === 'stale')?.reason;
   const chipPaths = useMemo(
@@ -190,10 +191,7 @@ export function AgentContextComposer({
   );
   const tileValidations = validations.filter((validation) => isDraftTile(validation, mentioned));
 
-  const suggestion = useSuggestedSource(scoped, context);
-
-  // Uploads render as the shared composer's own tiles, so the File behind
-  // each bound upload is handed back to it.
+  // Hand each uploaded File back to the shared composer's preview tiles.
   const uploads = useMemo(
     () =>
       context.flatMap((item) =>
@@ -253,10 +251,14 @@ export function AgentContextComposer({
   };
   const onMentionRemoved = (path: string) => {
     const bound = context.find((item) => item.kind === 'source' && item.source.path === path);
-    if (bound) session.removeContext(contextItemKey(bound));
+    if (bound?.kind === 'source') {
+      currentSource.dismiss(bound.source);
+      session.removeContext(contextItemKey(bound));
+    }
   };
 
   const removeTile = (item: AgentContextItem) => {
+    if (item.kind === 'source') currentSource.dismiss(item.source);
     session.removeContext(contextItemKey(item));
     if (item.kind === 'source') session.setDraft(removeMentionText(draft, item.source.path));
   };
@@ -272,7 +274,7 @@ export function AgentContextComposer({
     const visual =
       listed !== undefined &&
       isVisualSource({ boundVersion: null, format: listed.format, kind: 'source', source });
-    if (visual) {
+    if (visual || listed?.format === 'generic') {
       bindSource(source);
       return;
     }
@@ -300,10 +302,7 @@ export function AgentContextComposer({
 
   return (
     <div
-      // The Chat composer is a card-sized surface, so it takes that role
-      // rather than the fixed radius it used to spell out — the frame the
-      // reader sees around the editor is this wrapper, not the InputMessage
-      // inside it, and the two were drawing different corners.
+      // This wrapper owns the card surface; InputMessage stays transparent.
       className={cn('relative flex flex-col bg-surface-3 shadow-surface-3', shape.card)}
       onDragOverCapture={onDragOverCapture}
       onDropCapture={onDropCapture}
@@ -346,40 +345,41 @@ export function AgentContextComposer({
         leftSlot={attachSlot(attachments, leftSlot)}
         maxRows={maxRows}
         minRows={minRows}
-        onQueueChange={onQueueChange}
-        onSend={(text, _files, meta) =>
+        onQueueChange={(next) => {
+          const existing = session.store.getState().queuedPrompts;
+          if (next.some((item) => !existing.some((queued) => queued.id === item.id)))
+            currentSource.capture();
+          onQueueChange(next);
+        }}
+        onSend={(text, _files, meta) => {
+          if (!meta?.queuedId) currentSource.capture();
           void (onSend ?? session.sendPrompt)(
             text,
             meta?.queuedId ? { queuedId: meta.queuedId } : undefined,
-          )
+          );
+        }}
+        onSteer={
+          onSteer &&
+          ((text) => {
+            currentSource.capture();
+            onSteer(text);
+          })
         }
-        onSteer={onSteer && ((text) => onSteer(text))}
         onStop={onStop}
         onValueChange={session.setDraft}
         placeholder={placeholder}
         placeholderIsPrompt={placeholderIsPrompt}
         previewSlot={
-          tileValidations.length > 0 || suggestion.source ? (
-            <>
-              {tileValidations.length > 0 && (
-                <div aria-label="Attached context" className="contents" role="list">
-                  <DraftSourceTiles
-                    onOpenSource={onOpenSource}
-                    onRemove={removeTile}
-                    onReprocess={onReprocess}
-                    size={80}
-                    validations={tileValidations}
-                  />
-                </div>
-              )}
-              {suggestion.source && (
-                <SuggestedSourceChip
-                  onAttach={() => suggestion.source && attachSource(suggestion.source)}
-                  onDismiss={suggestion.dismiss}
-                  source={suggestion.source}
-                />
-              )}
-            </>
+          tileValidations.length > 0 ? (
+            <div aria-label="Attached context" className="contents" role="list">
+              <DraftSourceTiles
+                onOpenSource={onOpenSource}
+                onRemove={removeTile}
+                onReprocess={onReprocess}
+                size={80}
+                validations={tileValidations}
+              />
+            </div>
           ) : undefined
         }
         queue={queue}

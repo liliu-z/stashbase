@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import type { AppDependencies } from '@/app/dependencies';
 import { Providers } from '@/app/providers';
 import { App } from '@/app/shell';
+import { typeInto } from '@/test/dom';
+import { agentSessionPort } from '@/test/fakes/agent';
 import { appDependencies } from '@/test/fakes/app';
 import { documentAdapters, sourceApi } from '@/test/fakes/documents';
 import { preparationStatusApi } from '@/test/fakes/preparation';
@@ -285,6 +287,45 @@ describe('workspace shell', () => {
         ?.hasAttribute('hidden'),
     ).toBe(false);
   });
+
+  it('excludes the covered document from current context while New tab is selected', async () => {
+    await act(async () => root.unmount());
+    const next = appDependencies();
+    const { listeners, port, sent } = agentSessionPort();
+    await mount({
+      ...next,
+      agent: { ...next.agent, session: port },
+      workspace: {
+        ...next.workspace,
+        adapters: workspaceAdapters({
+          ...next.workspace.adapters,
+          files: filesApi({ load: vi.fn(async () => listing(['plan.md'])) }),
+        }),
+      },
+    });
+
+    const view = within(container);
+    await act(async () => (await view.findByRole('treeitem', { name: 'plan.md' })).click());
+    expect(
+      await view.findByRole('button', { name: 'Remove plan.md' }, { timeout: 5_000 }),
+    ).not.toBeNull();
+    await act(async () => view.getByRole('button', { name: 'New tab' }).click());
+    expect(view.getByRole('tab', { name: 'New tab' }).getAttribute('aria-selected')).toBe('true');
+    await waitFor(() => expect(view.queryByRole('button', { name: 'Remove plan.md' })).toBeNull());
+
+    typeInto(view.getByRole('textbox', { name: 'Message' }), 'Start a new idea');
+    await act(async () => view.getByRole('button', { name: 'Send' }).click());
+    await waitFor(() => expect(port.connect).toHaveBeenCalledOnce());
+    await act(async () => listeners[0]?.onEvent({ kind: 'ready' }));
+    await waitFor(() =>
+      expect(sent).toContainEqual(
+        expect.objectContaining({ kind: 'prompt', text: 'Start a new idea' }),
+      ),
+    );
+
+    await act(async () => view.getByRole('tab', { name: 'plan.md, preview' }).click());
+    expect(await view.findByRole('button', { name: 'Remove plan.md' })).not.toBeNull();
+  }, 15_000);
 
   it('keeps the tree on the document in front of the reader', async () => {
     await act(async () => root.unmount());

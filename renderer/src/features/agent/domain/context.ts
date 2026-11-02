@@ -387,7 +387,7 @@ export interface AgentScopeEnvironment {
    *  list can lead with what the user is looking at. */
   openPaths?: readonly string[];
   /** The document in front of the reader while the Agent docks beside it,
-   *  which the composer offers to attach: a source of this folder, or an
+   *  which accompanies the next request unless removed: a source of this folder, or an
    *  external file. Null in Chats, where no document is on screen. */
   activeSource?: SourceReference | null;
   readiness: Readonly<Record<string, AgentContextReadiness>>;

@@ -7,7 +7,12 @@ import { beforeEach, describe, expect, it, vi } from 'vite-plus/test';
 
 import { SOURCE_DRAG_MIME } from '@/shared/utils/source-drag';
 import { draftOf, pressKey, typeInto } from '@/test/dom';
-import { agentGateLifted, agentContextPort, idleAgentSessionPort } from '@/test/fakes/agent';
+import {
+  agentGateLifted,
+  agentContextPort,
+  agentSessionPort,
+  idleAgentSessionPort,
+} from '@/test/fakes/agent';
 
 import { registerWorkspaceCleanup, renderWorkspace, RESEARCH_SCOPE } from './workspace.harness';
 
@@ -261,6 +266,70 @@ describe('AgentWorkspace composer context', () => {
         expect.objectContaining({ format: 'md', kind: 'source' }),
         expect.objectContaining({ format: 'pdf', kind: 'source' }),
       ]),
+    );
+  });
+
+  it('attaches a dropped code file without changing prose and sends its exact source path', async () => {
+    const { listeners, port, sent } = agentSessionPort();
+    const { runtime } = renderWorkspace(port, undefined, agentContextPort());
+    const source = { folderPath: '/Library/Research', path: 'scripts/build (test).mjs' };
+    act(() =>
+      runtime.setScopeEnvironment({
+        ...researchEnvironment,
+        listing: {
+          ...researchEnvironment.listing,
+          files: [...researchEnvironment.listing.files, { format: 'generic', path: source.path }],
+        },
+      }),
+    );
+    await screen.findByText('What’s on your mind?');
+    await agentGateLifted();
+    const composer = screen.getByRole('textbox', { name: 'Message' });
+    typeInto(composer, 'Explain this build script');
+    const drop = () =>
+      fireEvent.drop(composer, {
+        dataTransfer: {
+          files: [],
+          getData: (type: string) => (type === SOURCE_DRAG_MIME ? JSON.stringify(source) : ''),
+          types: [SOURCE_DRAG_MIME],
+        },
+      });
+
+    drop();
+    expect(draftOf(runtime)).toBe('Explain this build script');
+    expect(
+      within(screen.getByRole('list', { name: 'Attached context' })).getAllByRole('listitem'),
+    ).toHaveLength(1);
+    await userEvent.click(screen.getByRole('button', { name: 'Remove build (test).mjs' }));
+    expect(runtime.activeSession().store.getState().context).toEqual([]);
+    expect(draftOf(runtime)).toBe('Explain this build script');
+    await waitFor(() =>
+      expect(screen.queryByRole('list', { name: 'Attached context' })).toBeNull(),
+    );
+
+    drop();
+    drop();
+    expect(
+      within(screen.getByRole('list', { name: 'Attached context' })).getAllByRole('listitem'),
+    ).toHaveLength(1);
+    expect(draftOf(runtime)).toBe('Explain this build script');
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+    await waitFor(() => expect(port.connect).toHaveBeenCalledOnce());
+    act(() => listeners[0]?.onEvent({ kind: 'ready' }));
+    await waitFor(() =>
+      expect(sent).toContainEqual(
+        expect.objectContaining({
+          kind: 'prompt',
+          text: 'Explain this build script\n\nAttached files:\n- /Library/Research/scripts/build (test).mjs',
+        }),
+      ),
+    );
+    expect(runtime.activeSession().store.getState().transcript).toContainEqual(
+      expect.objectContaining({
+        context: [{ boundVersion: null, format: 'generic', kind: 'source', source }],
+        kind: 'user',
+        text: 'Explain this build script',
+      }),
     );
   });
 });

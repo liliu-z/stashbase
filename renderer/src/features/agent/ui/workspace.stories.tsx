@@ -185,6 +185,7 @@ function WorkspacePreview({
   approvals = false,
   authRefused = false,
   context = false,
+  currentDocument = false,
   docked = false,
   empty = false,
   followUp = false,
@@ -199,6 +200,8 @@ function WorkspacePreview({
   approvals?: boolean;
   authRefused?: boolean;
   context?: boolean;
+  /** The document visible beside the Agent pane supplies the next request. */
+  currentDocument?: boolean;
   docked?: boolean;
   empty?: boolean;
   /** A follow-up sent into the running turn waits for the agent to read it. */
@@ -356,6 +359,7 @@ function WorkspacePreview({
             { format: 'md', path: 'NOTES.md' },
             { format: 'md', path: 'research/screenshot-tools.md' },
             { format: 'pdf', path: 'reference/style-guide.pdf' },
+            { format: 'generic', path: 'scripts/build (test).mjs' },
           ],
           folders: ['assets', 'lessons', 'reference'],
         },
@@ -375,6 +379,12 @@ function WorkspacePreview({
         kind: 'source',
         source: { folderPath: '/Library/Research', path: 'reference/style-guide.pdf' },
       });
+      session.addContext({
+        boundVersion: null,
+        format: 'generic',
+        kind: 'source',
+        source: { folderPath: '/Library/Research', path: 'scripts/build (test).mjs' },
+      });
       // Context first, then the draft: the editor's sync turns each known
       // `@path` run into an inline chip.
       session.setDraft(
@@ -383,6 +393,16 @@ function WorkspacePreview({
       void session.attachFiles([
         new File([STORY_IMAGE], 'workspace-cover.svg', { type: 'image/svg+xml' }),
       ]);
+    }
+    if (currentDocument) {
+      next.setScopeEnvironment({
+        activeSource: { folderPath: '/Library/Research', path: 'notes.md' },
+        folderPath: '/Library/Research',
+        listing: { files: [{ format: 'md', path: 'notes.md' }], folders: [] },
+        readiness: {},
+        versions: {},
+      });
+      next.activeSession().setDraft('What does this page say?');
     }
     if (approvals) next.activeSession().start();
     if (skills) {
@@ -424,7 +444,17 @@ function WorkspacePreview({
       });
     }
     return next;
-  }, [approvals, startupFailure, authRefused, context, empty, followUp, interrupted, skills]);
+  }, [
+    approvals,
+    startupFailure,
+    authRefused,
+    context,
+    currentDocument,
+    empty,
+    followUp,
+    interrupted,
+    skills,
+  ]);
 
   useEffect(() => () => runtime.dispose(), [runtime]);
 
@@ -545,6 +575,13 @@ export const ModelPicker: Story = {
 
 export const BoundContext: Story = {
   args: { context: true, empty: true },
+  play: readyWorkspace,
+};
+
+/** The open document is already included; Send preserves it in the transcript. */
+export const CurrentDocument: Story = {
+  args: { currentDocument: true, docked: true, empty: true },
+  parameters: { fluidCanvas: { minHeight: '50rem', width: '40rem' } },
   play: readyWorkspace,
 };
 

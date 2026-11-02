@@ -1,6 +1,6 @@
 /**
  * What the composer shows beside the draft's text: which bound items take a
- * tile, and which document it offers to attach.
+ * tile, and which current document accompanies the next request.
  */
 import { isRetrievableViewerFormat, viewerFormatOfPath } from '@/contracts/file-formats';
 import type {
@@ -29,11 +29,10 @@ export function isDraftTile(
   }
 }
 
-/** The document in front of the reader that the composer may offer to
- *  attach: listed in the chat's folder, or an external file the reader
- *  dropped beside it; readable as text; and not already bound. Null when
- *  there is nothing to offer. */
-export function suggestedContextSource(
+/** The current document to include with the next request: listed in the
+ *  chat's folder, or an external file the reader dropped beside it; readable
+ *  as text and not already bound. Null when there is nothing to include. */
+export function currentContextSource(
   environment: AgentScopeEnvironment | null,
   context: readonly AgentContextItem[],
 ): SourceReference | null {
@@ -66,8 +65,8 @@ export function fileContextItem(
 }
 
 /** A file bound because the reader opened it here, by dropping it on the
- *  workspace or as an external file, shows as the chip the composer offers
- *  the document in front with, rather than as a tile or a mention. */
+ *  workspace or as an external file, shows as a document chip rather than
+ *  as a tile or a mention. */
 export function showsAsDocumentChip(item: Extract<AgentContextItem, { kind: 'source' }>): boolean {
   return item.dropped === true || isExternalSource(item.source);
 }

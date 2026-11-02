@@ -181,7 +181,7 @@ function WorkspaceWindow() {
     documents,
     folderPath,
     selectedPath,
-    chrome.navigator.mode === 'documents',
+    chrome.navigator.mode === 'documents' && !newTab.open,
   );
   useEffect(() => runtime.setScopeEnvironment(agent.environment), [agent.environment, runtime]);
   // Asking about a selection brings the chat beside the document into view

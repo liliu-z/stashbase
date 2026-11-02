@@ -19,10 +19,10 @@ export interface RestoredAttachment {
  * file the user attached reads as ONE chip rather than a chip PLUS its raw
  * path leaking back into the shown message. Images become transient
  * thumbnails (transient-only, so an arbitrary image path never gains a preview
- * URL); every other transient upload becomes a plain name-only card. Known
- * project document paths retain their existing cards, while an arbitrary path
- * outside transient storage stays in the text untouched. A `Selected
- * passages:` block ahead of the suffix becomes quoted document cards. */
+ * URL); known documents and other absolute file paths become plain name-only
+ * cards, including code, configuration and extensionless sources. These cards grant
+ * no read access. A `Selected passages:` block ahead of the suffix becomes
+ * quoted document cards. */
 export function restoreHistoryAttachments(text: string): { text: string; attachments: RestoredAttachment[] } {
   const marker = '\n\nAttached files:\n';
   const offset = text.lastIndexOf(marker);
@@ -84,17 +84,16 @@ function restorePassages(text: string): { text: string; attachments: RestoredAtt
  * a trailing `(for text context, …)` hint after the path, so read the path up
  * to that. Returns null for a line we should leave in the prose. */
 function historyAttachment(rest: string): RestoredAttachment | null {
-  const cut = rest.indexOf(' (');
-  const candidate = (cut >= 0 ? rest.slice(0, cut) : rest).trim();
-  if (!candidate) return null;
+  // Parentheses and whitespace belong to filenames too. Strip only the
+  // generated representation hint, leaving the source spelling untouched.
+  const candidate = rest.replace(/ \((?:for text context, use mcp__stashbase__read_file with path .*; it returns the derived text representation for this (?:pdf|docx|audio)|derived text is not available yet; .*)\)$/u, '');
+  // Prepared-document hints name a folder-relative source. Keep that
+  // established document vocabulary; other formats must carry an absolute path.
+  if (!path.isAbsolute(candidate) && !isKnownDocument(candidate)) return null;
   // Images are preview-capable and therefore require the stronger transient
   // path check before any broader document-card classification.
   if (isPreviewableImage(candidate)) return historyImageAttachment(candidate);
-  if (isTransientAttachmentPath(candidate)) {
-    return { path: candidate, name: path.basename(candidate) };
-  }
-  if (isKnownDocument(candidate)) return { path: candidate, name: path.basename(candidate) };
-  return null;
+  return { path: candidate, name: path.basename(candidate) };
 }
 
 /** Build a preview only for an image written by StashBase's transient upload
@@ -112,11 +111,8 @@ function isPreviewableImage(filePath: string): boolean {
   return ['.avif', '.gif', '.jpeg', '.jpg', '.png', '.webp'].includes(path.extname(filePath).toLowerCase());
 }
 
-/** A non-image file whose extension is in the app's known viewable/attachable
- * vocabulary. Restricting to known types keeps an extension-less or unknown
- * path (e.g. `/etc/passwd`) in the prose instead of lifting it into a card —
- * a card grants no read access regardless, but a genuine attachment always
- * carries a recognised extension. */
+/** Passages retain the document vocabulary of the selection surfaces that
+ * create them; explicit file attachments do not require a known extension. */
 function isKnownDocument(filePath: string): boolean {
   const ext = path.extname(filePath).toLowerCase().replace(/^\./, '');
   return ext.length > 0 && (VIEWABLE_FILE_EXTENSIONS as readonly string[]).includes(ext);
