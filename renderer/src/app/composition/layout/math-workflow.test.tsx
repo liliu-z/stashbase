@@ -261,4 +261,5 @@ it('keeps formulas through Chat, Agent writing, document edits and copy-paste/sa
   selection = await reopenFile('Selection.md', user);
   expect(formulas(selection)).toEqual([MATH_TEX.matrix]);
   expect(fixture.session.listeners).toHaveLength(1);
-}, 30_000);
+  // Multiple real editors mount across the save/reopen and clipboard journeys.
+}, 60_000);

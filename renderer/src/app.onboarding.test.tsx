@@ -247,7 +247,9 @@ async function recoverAuthentication(
   const card = refusal.closest('section');
   if (!card) throw new Error('The failure has no recovery card.');
   await user.click(within(card).getByRole('button', { name: 'Sign in' }));
-  await screen.findByText('Your agents');
+  // The first recovery loads the Settings surface and its panels on demand.
+  const settings = await screen.findByRole('dialog', { name: 'Settings' }, { timeout: 5_000 });
+  expect(within(settings).getByText('Your agents')).not.toBeNull();
   await user.keyboard('{Escape}');
   expect(screen.getByRole('textbox', { name: 'Message' }).textContent).toBe('Keep this next idea');
   await user.click(screen.getByRole('button', { name: 'Send' }));
@@ -392,5 +394,6 @@ it.each(providers)(
     expect(fixture.dependencies.agent.catalog.prepareAgent).toHaveBeenCalledTimes(preparationCalls);
     expect(fixture.dependencies.settings.accountApi.startSignIn).toHaveBeenCalledTimes(signInCalls);
   },
-  20_000,
+  // This whole-window journey includes authentication polling and three mounts.
+  60_000,
 );

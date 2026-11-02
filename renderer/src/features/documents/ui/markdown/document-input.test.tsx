@@ -115,7 +115,7 @@ it('reads formula blocks without source and preserves editing history across mod
   await waitFor(() =>
     expect(screen.getByRole('document').getAttribute('data-markdown-state')).toBe('ready'),
   );
-  const list = within(screen.getByRole('document')).getByRole('list');
+  const list = within(screen.getByRole('textbox', { name: 'Markdown editor' })).getByRole('list');
   const items = within(list).getAllByRole('listitem');
   expect(items).toHaveLength(2);
   const firstItem = items[0];
