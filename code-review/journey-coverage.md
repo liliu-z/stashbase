@@ -1736,6 +1736,15 @@ Host/services: `server/retrieval/index.ts`, `server/indexer.mfs.ts`, `python/sta
 
 ## J06: Agent
 
+**Structured tool failure categories (2026-11-02):** Codex MCP error objects
+become JSON in the shared tool-result protocol. The previous prose-prefix-only
+classifier lost explicit not-found/permission/timeout evidence. The telemetry
+regression now traverses `toolResultFromItem` and verifies bounded inspection of
+only error code/message fields; arbitrary content blocks and prose mentions stay
+unknown, and tool output never enters the emitted diagnostic. Historical unknown
+reports cannot recover their missing reasons, and this does not establish the
+cause of shell failures or WebSocket 1006 closures.
+
 **Model and effort across projects (2026-10-29):** `server/routes/agent-preferences.ts`
 atomically saves each agent's last explicit model and effort alongside the project
 choice. `project-agents.ts` inherits these defaults only for missing project

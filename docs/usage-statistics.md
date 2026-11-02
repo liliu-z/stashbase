@@ -161,6 +161,11 @@ socket loss remains unknown. Closure after a successful turn is not a failed tur
 An agent error immediately followed by an exit with the same explanation is
 one diagnostic with the original cause; both notifications still reach the UI.
 
+Tool failures report only fixed failure categories. Explicit codes and message
+prefixes, including bounded structured native error envelopes, are classified
+locally; tool output and document content are never included in those reports.
+Unrecognized failures stay `unknown`, and a tool failure alone is not a failed turn.
+
 An identical diagnostic is reported when first seen. Repeats within its window
 (one minute for errors, ten minutes for warnings) are counted locally and sent as
 one event when the window closes. `occurrences` is the number of times it happened

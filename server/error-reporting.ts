@@ -163,6 +163,25 @@ export function beginAgentDiagnosticTurn(connection: object, turnId: string | un
 
 /** Only recognize an error prefix; never retain arbitrary tool output or paths. */
 function toolFailureKind(content: string): NonNullable<NonNullable<ErrorContext['context']>['tool_failure_kind']> {
+  // Codex MCP failures stringify a structured error. Inspect only its explicit
+  // code/message, not result/content blocks that may contain source documents.
+  if (content.trimStart().startsWith('{') && content.length <= 16_384) {
+    try {
+      const value = JSON.parse(content);
+      const error = value?.error && typeof value.error === 'object' ? value.error : value;
+      if (error && typeof error === 'object' && !Array.isArray(error)) {
+        for (const field of ['code', 'message']) {
+          if (typeof error[field] !== 'string') continue;
+          const kind = toolFailurePrefix(error[field]);
+          if (kind !== 'unknown') return kind;
+        }
+      }
+    } catch { /* Unrecognized tool output retains the unknown category. */ }
+  }
+  return toolFailurePrefix(content);
+}
+
+function toolFailurePrefix(content: string): NonNullable<NonNullable<ErrorContext['context']>['tool_failure_kind']> {
   const prefix = content.slice(0, 256).trimStart().replace(/^Error:\s*/i, '');
   if (/^(ENOENT\b|file not found\b|no such file or directory\b)/i.test(prefix)) return 'not_found';
   if (/^(EACCES\b|EPERM\b|permission denied\b|access denied\b)/i.test(prefix)) return 'permission_denied';

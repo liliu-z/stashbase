@@ -1200,6 +1200,7 @@ test('tool failure diagnostics retain only a bounded failure category, never too
   const { EventEmitter } = await import('node:events');
   const { telemetry } = await import('./telemetry.ts');
   const { attachAgentDiagnostics, reportAgentRuntimeError } = await import('./error-reporting.ts');
+  const { toolResultFromItem } = await import('./codex-protocol.ts');
   const f = fixture();
   t.mock.method(telemetry, 'scoped', () => f.service.scoped());
   const connection = new EventEmitter();
@@ -1211,7 +1212,14 @@ test('tool failure diagnostics retain only a bounded failure category, never too
     ['Error: Permission denied for PRIVATE', 'permission_denied'],
     ['Error: Invalid arguments: PRIVATE', 'invalid_arguments'],
     ['Error: Operation timed out: PRIVATE', 'timeout'],
+    [toolResultFromItem({ type: 'mcpToolCall', id: 'native-error', status: 'failed',
+      error: { code: 'ENOENT', message: 'PRIVATE source could not be opened' } })!.content, 'not_found'],
+    [toolResultFromItem({ type: 'mcpToolCall', id: 'native-error', status: 'failed',
+      error: { message: 'Error: EACCES: permission denied, open PRIVATE' } })!.content, 'permission_denied'],
+    [JSON.stringify({ error: { message: 'Request timed out: PRIVATE' } }), 'timeout'],
     ['PRIVATE source text mentions file not found', 'unknown'],
+    [JSON.stringify({ message: 'PRIVATE source text mentions file not found', content: 'ENOENT PRIVATE' }), 'unknown'],
+    [JSON.stringify({ content: [{ text: 'File not found: PRIVATE' }] }), 'unknown'],
   ];
   for (const [index, [content]] of failures.entries()) {
     const id = `call-${index}`;
