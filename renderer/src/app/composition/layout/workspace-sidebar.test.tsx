@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
 import { Providers } from '@/app/providers';
 import { App } from '@/app/shell';
 import { appDependencies } from '@/test/fakes/app';
+import { assetApi, documentAdapters, documentsApi } from '@/test/fakes/documents';
 import {
   accountPort,
   agentRuntimePort,
@@ -233,6 +234,17 @@ describe('titlebar band', () => {
         <Providers>
           <App
             dependencies={appDependencies({
+              documents: documentsApi({
+                adapters: documentAdapters({
+                  asset: assetApi({
+                    load: vi.fn(async () => ({
+                      kind: 'source' as const,
+                      url: 'data:text/html,',
+                      version: 'v1',
+                    })),
+                  }),
+                }),
+              }),
               workspace: { adapters, revealLabel: 'Show in file manager' },
             })}
           />
@@ -292,6 +304,7 @@ describe('titlebar band', () => {
       );
       await user.click(screen.getByRole('button', { name: 'Create text note' }));
       expect(await screen.findByRole('tab', { name: 'Untitled.md' }, LAZY)).not.toBeNull();
+      await screen.findByRole('textbox', { name: 'Markdown editor' }, LAZY);
       expect(screen.queryByRole('tab', { name: 'New tab' })).toBeNull();
       expect(files.createEntry).toHaveBeenCalledWith(
         expect.any(String),
@@ -303,6 +316,7 @@ describe('titlebar band', () => {
       await user.click(screen.getByRole('button', { name: 'New tab' }));
       await user.click(screen.getByRole('button', { name: 'Create interactive note' }));
       expect(await screen.findByRole('tab', { name: 'index.html' }, LAZY)).not.toBeNull();
+      await screen.findByTitle('index.html HTML preview', {}, LAZY);
       expect(screen.queryByRole('tab', { name: 'New tab' })).toBeNull();
       expect(files.createInteractiveNote).toHaveBeenCalledWith(
         expect.any(String),
