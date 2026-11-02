@@ -55,6 +55,7 @@ export function transitionFollowUp(
           at: action.at,
           ...(prompt.context.length > 0 ? { context: prompt.context } : {}),
           id: action.blockId,
+          followUp: true,
           kind: 'user',
           text: prompt.text,
         }),

@@ -27,6 +27,17 @@ Chat, Documents assistance, and runtimes.
    do not appear in activity summaries or expanded details; the agent explains
    task outcomes and native history retains the failed attempts. Selected Crew
    calls have their own cards, including failed calls and their explanations.
+   After a turn completes successfully, more than eight visible process
+   messages fold behind a counted row. Intermediate replies, notices, and
+   routine activity groups count once each, independent of raw tool-event
+   count. One click reveals the entire process and can fold it again; a manual
+   choice lasts while that chat remains open, including switches to other chats.
+   Prompts, accepted follow-ups, the final reply, file results, Crew calls,
+   pending decisions, and denied or cancelled actions stay visible in order.
+   Running, failed, stopped, and history turns without a confirmed outcome
+   stay expanded. Completion never folds underneath a reader who has scrolled
+   away or placed keyboard focus inside the process. Manual expansion pauses
+   following so the newly revealed messages remain readable.
    Only successful file operations contribute to changed-file results. A
    write made through a shell command or a subagent names no file and shows
    no result; when such a turn settles, the project's files refresh so the

@@ -1357,6 +1357,17 @@ registered host boundaries; renderer shared types are a different layer.
 - Tabs stay unique across asynchronous opens. First edit keeps a preview; only
   kept tabs persist. History advances after open succeeds. Hidden panes are inert;
   mode/visibility changes preserve drafts, transcripts, focus, and session identity.
+  Agent transcript presentation owns completed-turn process folding in
+  `ui/transcript/turn-process.tsx`. The domain marks the closing reply's observed
+  outcome and accepted mid-turn follow-ups; replay without those facts stays
+  expanded. A weak map keyed by the conversation runtime retains manual choices
+  across view switches, without persistence or a host protocol change. Paging
+  includes the beginning of a visible turn so one disclosure reveals all of it.
+  `use-stick-to-bottom.ts` remains the single owner of following: disclosure reads
+  its current state before automatic folding and pauses it on manual toggles.
+  Whole-turn folding toggles stable group shells without another measured
+  animation; nested activity owns its motion, and message actions keep their
+  overhang and focus rings outside group bounds.
   App composition chooses the root `index.html` preview once the first folder
   listing arrives, only if restoration and user navigation have left no document.
   App composition switches to Documents when a user opens a Chat file result or

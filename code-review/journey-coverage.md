@@ -3256,6 +3256,21 @@ Project choice and first Send: `renderer/src/features/agent/application/project-
   `transcript.test.tsx` covers Allow and Reject retaining summary focus without
   requesting browser scrolling. This is controlled renderer evidence, not a
   live-provider or packaged-app pass.
+  Completed-turn folding (2026-11-02): `transcript.test.tsx` covers the greater-than-eight
+  visible-message threshold, complete expansion across the 200-block page boundary,
+  and one earlier-messages click revealing the preceding turn after a turn longer
+  than two pages. It also covers chat-scoped manual expansion, retained follow-ups
+  and file results, focus and reading-position preservation, and running, failed,
+  stopped, or unclassified turns remaining open. `transcript.stories.tsx` supplies
+  completed, running, and compact views.
+  A driven Storybook browser pass verified the counted row, full process
+  expansion and re-collapse, retained final reply and changed-file card, running
+  work remaining open, and the compact view in dark mode. The three new stories
+  pass focused structural accessibility checks.
+  Review caught and corrected repeated no-op earlier-message clicks after a
+  long turn, and an outer clipping animation that cut off message controls.
+  Native history without an explicit outcome remains expanded; this renderer
+  behavior does not establish provider completion or historical outcome recovery.
   Clarifying questions (2026-09-18): focused renderer tests cover the question
   card's answers keyed by question text, multi-select and typed answers joined
   as the runtime reads them, Answer held until every question has one, Skip

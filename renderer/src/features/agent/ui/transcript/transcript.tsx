@@ -21,9 +21,15 @@ import { DayDivider } from './day-divider';
 import { AgentMarkdown } from './markdown';
 import { AgentQuestionCard } from './question-card';
 import { AgentRoleCall } from './role-call';
-import { closingReplies, transcriptGroups } from './transcript-order';
+import {
+  closingReplies,
+  transcriptGroups,
+  transcriptTurns,
+  type TranscriptGroup,
+} from './transcript-order';
 import { AgentTurnChangesCard, type AgentTurnChangeReview } from './turn-changes-card';
 import { TurnFailure } from './turn-failure';
+import { TurnProcess } from './turn-process';
 
 export { closingReplies } from './transcript-order';
 
@@ -167,6 +173,9 @@ const TranscriptBlock = memo(function TranscriptBlock({
 export const AgentTranscript = memo(function AgentTranscript({
   activeTurn,
   blocks,
+  canFoldProcess,
+  disclosureScope,
+  onProcessToggle,
   focusBlockId,
   modelRefresh,
   onEditPrompt,
@@ -184,6 +193,9 @@ export const AgentTranscript = memo(function AgentTranscript({
 }: TranscriptDecisions & {
   activeTurn: boolean;
   blocks: AgentTranscriptBlock[];
+  canFoldProcess?: (() => boolean) | undefined;
+  disclosureScope?: object | undefined;
+  onProcessToggle?: (() => void) | undefined;
   /** Follow-ups sent into the running turn that its runtime has not read
    *  yet. They wait, dimmed, below the turn and join it where it reads them. */
   pending?: readonly PendingFollowUp[] | undefined;
@@ -224,6 +236,8 @@ export const AgentTranscript = memo(function AgentTranscript({
   );
   const visibleBlocks = blocks.slice(hiddenCount);
   const groups = useMemo(() => transcriptGroups(visibleBlocks), [visibleBlocks]);
+  const turns = useMemo(() => transcriptTurns(groups), [groups]);
+  const localDisclosureScope = useMemo(() => ({}), []);
   const closing = useMemo(() => closingReplies(blocks, activeTurn), [activeTurn, blocks]);
   // Only the latest prompt can be edited, and only once its turn has settled;
   // an earlier one would resend into a conversation that has moved on.
@@ -251,6 +265,50 @@ export const AgentTranscript = memo(function AgentTranscript({
     liveGroup !== null ||
     (tail?.kind === 'tool' && tail.status === 'awaiting') ||
     (tailGroup?.kind === 'role-call' && tailGroup.tool.status === 'running');
+  const renderGroup = (group: TranscriptGroup) =>
+    group.kind === 'role-call' ? (
+      <AgentRoleCall
+        key={group.id}
+        status={group.tool.status}
+        view={agentRoleCallView(group.tool, group.role)}
+      />
+    ) : group.kind === 'activity' ? (
+      <AgentActivityGroup
+        focusToolId={decidedToolId}
+        key={group.id}
+        live={activeTurn && group === liveGroup}
+        onOpenSource={onOpenSource}
+        sourceFor={sourceFor}
+        steps={group.steps}
+      />
+    ) : (
+      <Fragment key={group.id}>
+        {group.kind === 'user' && group.at !== undefined && dayBreaks.has(group.id) && (
+          <DayDivider at={group.at} now={now} />
+        )}
+        <div className="flex min-w-0 flex-col" data-notification-block-id={group.id} tabIndex={-1}>
+          <TranscriptBlock
+            block={group}
+            closing={closing.has(group.id)}
+            editable={group.id === editableId}
+            modelRefresh={modelRefresh}
+            now={now}
+            onEditPrompt={onEditPrompt}
+            onOpenExternal={onOpenExternal}
+            onOpenSource={onOpenSource}
+            onReviewTurnChange={onReviewTurnChange}
+            sourceFor={sourceFor}
+            onPermission={decide}
+            onRetry={onRetry}
+            onSignIn={onSignIn}
+            onUpdateApp={onUpdateApp}
+            promptAt={closing.get(group.id)}
+            runtimeUpdate={runtimeUpdate}
+            transientFile={transientFile}
+          />
+        </div>
+      </Fragment>
+    );
   return (
     <>
       {hiddenCount > 0 && (
@@ -258,55 +316,20 @@ export const AgentTranscript = memo(function AgentTranscript({
           Show earlier messages
         </Button>
       )}
-      {groups.map((group) =>
-        group.kind === 'role-call' ? (
-          <AgentRoleCall
-            key={group.id}
-            status={group.tool.status}
-            view={agentRoleCallView(group.tool, group.role)}
-          />
-        ) : group.kind === 'activity' ? (
-          <AgentActivityGroup
-            focusToolId={decidedToolId}
-            key={group.id}
-            live={activeTurn && group === liveGroup}
-            onOpenSource={onOpenSource}
-            sourceFor={sourceFor}
-            steps={group.steps}
-          />
-        ) : (
-          <Fragment key={group.id}>
-            {group.kind === 'user' && group.at !== undefined && dayBreaks.has(group.id) && (
-              <DayDivider at={group.at} now={now} />
-            )}
-            <div
-              className="flex min-w-0 flex-col"
-              data-notification-block-id={group.id}
-              tabIndex={-1}
-            >
-              <TranscriptBlock
-                block={group}
-                closing={closing.has(group.id)}
-                editable={group.id === editableId}
-                modelRefresh={modelRefresh}
-                now={now}
-                onEditPrompt={onEditPrompt}
-                onOpenExternal={onOpenExternal}
-                onOpenSource={onOpenSource}
-                onReviewTurnChange={onReviewTurnChange}
-                sourceFor={sourceFor}
-                onPermission={decide}
-                onRetry={onRetry}
-                onSignIn={onSignIn}
-                onUpdateApp={onUpdateApp}
-                promptAt={closing.get(group.id)}
-                runtimeUpdate={runtimeUpdate}
-                transientFile={transientFile}
-              />
-            </div>
-          </Fragment>
-        ),
-      )}
+      {turns.map((turn, index) => (
+        <TurnProcess
+          canFold={canFoldProcess}
+          completed={turn.completed && !(activeTurn && index === turns.length - 1)}
+          finalId={turn.finalId}
+          focusBlockId={focusBlockId}
+          groups={turn.groups}
+          id={turn.id}
+          key={turn.id}
+          onToggle={onProcessToggle}
+          renderGroup={renderGroup}
+          scope={disclosureScope ?? localDisclosureScope}
+        />
+      ))}
       {activeTurn && !narrated && <ThinkingIndicator className="px-0" size="compact" />}
       {pending.map((prompt) => (
         <div className="flex min-w-0 flex-col opacity-60" key={prompt.id}>

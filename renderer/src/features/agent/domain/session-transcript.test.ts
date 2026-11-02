@@ -121,11 +121,17 @@ describe('Agent transcript edits', () => {
       { id: 'reply-2', kind: 'assistant', text: 'It is small.' },
       { id: 'notice-1', kind: 'notice', text: 'Reviewed.' },
     ];
-    const stamped = stampClosingReply(turn, 13_000);
-    expect(stamped[3]).toMatchObject({ at: 13_000, id: 'reply-2' });
+    const stamped = stampClosingReply(turn, 13_000, 'completed');
+    expect(stamped[3]).toMatchObject({ at: 13_000, id: 'reply-2', turnOutcome: 'completed' });
     expect(stamped[1]).toBe(turn[1]);
     // A second end for the same turn, or a turn that produced no reply, changes nothing.
     expect(stampClosingReply(stamped, 14_000)).toEqual(stamped);
+    const followed = stampClosingReply(
+      [...turn, { id: 'follow-up', kind: 'user', text: 'Also check the sources', followUp: true }],
+      14_000,
+      'stopped',
+    );
+    expect(followed[3]).toMatchObject({ at: 14_000, turnOutcome: 'stopped' });
     const bare: AgentTranscriptBlock[] = [
       { at: 1_000, id: 'user-1', kind: 'user', text: 'Map the repo' },
       { id: 'tool-1', input: {}, kind: 'tool', name: 'Bash', status: 'done' },

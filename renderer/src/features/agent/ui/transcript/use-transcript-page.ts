@@ -15,12 +15,23 @@ export function useTranscriptPage(blocks: AgentTranscriptBlock[], focusBlockId?:
   useEffect(() => {
     if (focusIndex >= 0) setVisibleCount((count) => Math.max(count, blocks.length - focusIndex));
   }, [focusIndex, blocks.length]);
+  let hiddenCount = Math.min(
+    Math.max(0, blocks.length - visibleCount),
+    pendingIndex < 0 ? blocks.length : pendingIndex,
+    focusIndex < 0 ? blocks.length : focusIndex,
+  );
+  // A page boundary must not strand the beginning of a long turn behind a
+  // second disclosure: expanding that turn reveals its complete process.
+  let turnStart = hiddenCount;
+  while (turnStart > 0) {
+    const block = blocks[turnStart];
+    if (block?.kind === 'user' && !block.followUp) break;
+    turnStart -= 1;
+  }
+  if (blocks[turnStart]?.kind === 'user') hiddenCount = turnStart;
   return {
-    hiddenCount: Math.min(
-      Math.max(0, blocks.length - visibleCount),
-      pendingIndex < 0 ? blocks.length : pendingIndex,
-      focusIndex < 0 ? blocks.length : focusIndex,
-    ),
-    showEarlier: () => setVisibleCount((count) => count + PAGE_SIZE),
+    hiddenCount,
+    showEarlier: () =>
+      setVisibleCount((count) => Math.max(count, blocks.length - hiddenCount) + PAGE_SIZE),
   };
 }

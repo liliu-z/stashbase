@@ -64,12 +64,20 @@ export type AgentTranscriptBlock =
       kind: 'user';
       id: string;
       text: string;
+      /** Accepted into an existing turn rather than starting another one. */
+      followUp?: boolean | undefined;
       attachments?: AgentTranscriptAttachment[] | undefined;
       /** The bound context this prompt was sent with. */
       context?: AgentContextItem[] | undefined;
       at?: number | undefined;
     }
-  | { kind: 'assistant'; id: string; text: string; at?: number | undefined }
+  | {
+      kind: 'assistant';
+      id: string;
+      text: string;
+      at?: number | undefined;
+      turnOutcome?: 'completed' | 'failed' | 'stopped' | undefined;
+    }
   | { kind: 'thinking'; id: string; text: string }
   | { kind: 'notice'; id: string; text: string }
   | {
@@ -338,17 +346,20 @@ export function settlePendingTools(
 export function stampClosingReply(
   transcript: readonly AgentTranscriptBlock[],
   at: number,
+  turnOutcome?: 'completed' | 'failed' | 'stopped',
 ): AgentTranscriptBlock[] {
   let closing = -1;
   for (let index = transcript.length - 1; index >= 0; index -= 1) {
     const block = transcript[index];
-    if (block?.kind === 'user') break;
+    if (block?.kind === 'user' && !block.followUp) break;
     if (block?.kind !== 'assistant') continue;
     if (block.at === undefined) closing = index;
     break;
   }
   return transcript.map((block, index) =>
-    index === closing && block.kind === 'assistant' ? { ...block, at } : block,
+    index === closing && block.kind === 'assistant'
+      ? { ...block, at, ...(turnOutcome ? { turnOutcome } : {}) }
+      : block,
   );
 }
 

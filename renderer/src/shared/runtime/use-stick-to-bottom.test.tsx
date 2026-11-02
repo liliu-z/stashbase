@@ -6,7 +6,7 @@ import { useStickToBottom } from './use-stick-to-bottom';
 
 function Log({ conversation }: { conversation: string }) {
   const ref = useRef<HTMLDivElement>(null);
-  const followLatest = useStickToBottom(ref, conversation);
+  const { followLatest, pauseFollowing } = useStickToBottom(ref, conversation);
   return (
     <>
       <div data-testid="log" ref={ref}>
@@ -17,6 +17,7 @@ function Log({ conversation }: { conversation: string }) {
         </div>
       </div>
       <button onClick={followLatest}>Send</button>
+      <button onClick={pauseFollowing}>Inspect process</button>
     </>
   );
 }
@@ -75,6 +76,19 @@ function scroller(element: HTMLElement, initial: number) {
 }
 
 describe('useStickToBottom', () => {
+  it('keeps newly expanded process messages in place until the reader sends or follows again', () => {
+    const view = render(<Log conversation="a" />);
+    const log = view.getByTestId('log');
+    const content = scroller(log, 1_000);
+    content.grow(1_000);
+    fireEvent.click(view.getByRole('button', { name: 'Inspect process' }));
+    content.grow(2_000);
+    expect(log.scrollTop).toBe(700);
+    content.scroll(1_000, 1_700);
+    content.grow(2_200);
+    expect(log.scrollTop).toBe(1_900);
+  });
+
   it('follows output until the reader scrolls toward the start, however little', () => {
     const view = render(<Log conversation="a" />);
     const log = view.getByTestId('log');

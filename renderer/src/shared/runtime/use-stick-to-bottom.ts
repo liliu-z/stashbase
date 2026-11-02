@@ -48,8 +48,9 @@ function innerAreaScrolls(target: EventTarget | null, container: HTMLElement, up
  *  start. Only the reader's own gesture (wheel, touch, keys, scrollbar) leaves
  *  the end, so output that lands or moves never strands them; a gesture back
  *  to the end follows again. A new `key` (another conversation) opens at the
- *  end. The returned callback follows again from anywhere, for the reader's
- *  own send: from far up it glides, and output landing meanwhile is glided to. */
+ *  end. `followLatest` resumes following for the reader's own send: from far
+ *  up it glides, including output landing meanwhile. `isFollowing` reads that
+ *  same state, and `pauseFollowing` preserves a deliberately expanded section. */
 export function useStickToBottom(ref: RefObject<HTMLElement | null>, key: string) {
   const away = useRef(false);
   // When the last glide began; output landing soon after continues it.
@@ -173,5 +174,9 @@ export function useStickToBottom(ref: RefObject<HTMLElement | null>, key: string
       observer?.disconnect();
     };
   }, [key, ref]);
-  return followLatest;
+  const isFollowing = useCallback(() => !away.current, []);
+  const pauseFollowing = useCallback(() => {
+    away.current = true;
+  }, []);
+  return { followLatest, isFollowing, pauseFollowing };
 }

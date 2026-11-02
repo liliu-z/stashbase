@@ -281,6 +281,10 @@ permissions, with current model and tool choices checked before use.
 - Resolving an approval keeps the composer anchored at the bottom of an active
   conversation. Transcript scrolling and focus restoration stay inside the
   conversation's scroll area, including when long previews collapse.
+- Completed-turn process folding follows the [Chat journey](../journeys/chat.md#flow)
+  in both Chat and Documents assistance. It requires an observed successful
+  completion; missing native-history outcomes never imply success. Disclosure
+  choices belong to the open conversation, without changing native history.
 - Allow applies to its pending action only. Codex also offers Allow for this session
   and Always allow when the native request supports those durations. The choice
   remembers that permission with Codex; it does not approve unrelated actions.

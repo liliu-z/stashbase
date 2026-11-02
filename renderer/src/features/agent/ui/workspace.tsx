@@ -160,7 +160,7 @@ function ChatWorkspace({
     [active],
   );
   const logRef = useRef<HTMLDivElement>(null);
-  const followLatest = useStickToBottom(logRef, activeId);
+  const { followLatest, isFollowing, pauseFollowing } = useStickToBottom(logRef, activeId);
   // Sending returns a reader who scrolled up to the end, where the message lands.
   const send = (text: string, options?: { queuedId?: string }) => {
     followLatest();
@@ -212,6 +212,9 @@ function ChatWorkspace({
             <AgentTranscript
               activeTurn={activeTurn}
               blocks={state.transcript}
+              canFoldProcess={isFollowing}
+              disclosureScope={active}
+              onProcessToggle={pauseFollowing}
               focusBlockId={focusBlockId}
               key={activeId}
               modelRefresh={modelRefresh}

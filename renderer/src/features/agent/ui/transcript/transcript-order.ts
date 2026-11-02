@@ -12,7 +12,7 @@ export function closingReplies(
   let promptAt: number | undefined;
   let lastReply: string | null = null;
   for (const block of blocks) {
-    if (block.kind === 'user') {
+    if (block.kind === 'user' && !block.followUp) {
       if (lastReply) replies.set(lastReply, promptAt);
       lastReply = null;
       promptAt = block.at;
@@ -24,7 +24,7 @@ export function closingReplies(
   return replies;
 }
 
-type TranscriptGroup =
+export type TranscriptGroup =
   | AgentTranscriptBlock
   | { kind: 'activity'; id: string; steps: AgentActivityStep[] }
   | {
@@ -56,4 +56,29 @@ export function transcriptGroups(blocks: AgentTranscriptBlock[]): TranscriptGrou
     } else groups.push(block);
   }
   return groups;
+}
+
+/** Keep accepted follow-ups in their original turn while leaving each user
+ * message in place. Only an explicitly completed final reply may fold work. */
+export function transcriptTurns(groups: TranscriptGroup[]) {
+  const turns: Array<{
+    id: string;
+    groups: TranscriptGroup[];
+    finalId?: string;
+    completed: boolean;
+  }> = [];
+  for (const group of groups) {
+    let turn = turns.at(-1);
+    if (!turn || (group.kind === 'user' && !group.followUp)) {
+      turn = { id: group.id, groups: [], completed: false };
+      turns.push(turn);
+    }
+    turn.groups.push(group);
+    if (group.kind === 'assistant') {
+      turn.finalId = group.id;
+      turn.completed = group.turnOutcome === 'completed';
+    }
+    if (group.kind === 'error') turn.completed = false;
+  }
+  return turns;
 }

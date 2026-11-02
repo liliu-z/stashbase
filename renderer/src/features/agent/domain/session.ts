@@ -280,6 +280,7 @@ export function transitionAgentSession(
             state.delivery === 'stopping' ? 'cancelled' : action.isError ? 'error' : 'done',
           ),
           action.at,
+          delivery,
         ),
       };
     }
