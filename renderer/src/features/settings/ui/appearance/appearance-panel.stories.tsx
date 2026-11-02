@@ -6,9 +6,9 @@ import type { AppearancePort, SystemTextPort } from '@/features/settings/applica
 import type { AppearancePreferences } from '@/features/settings/domain/appearance';
 import { appearanceSurface } from '@/test/fakes/settings';
 
+import { AppearanceMenu } from './appearance-menu';
 import { AppearancePanel } from './appearance-panel';
 import { EditorPanel } from './editor-panel';
-import { ReadingTextMenu } from './reading-text-menu';
 
 function Queries({ children }: { children: ReactNode }) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -52,5 +52,5 @@ export const Editor: Story = {
 };
 
 export const ReadingBar: Story = {
-  render: () => <ReadingTextMenu appearanceApi={appearancePort} />,
+  render: () => <AppearanceMenu appearanceApi={appearancePort} />,
 };

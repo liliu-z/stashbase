@@ -497,7 +497,10 @@ body {
     'Newsreader Variable', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC',
     serif;
   --font-reading: var(--font-reading-sans);
-  --reading-font-size: 16px;
+  /* The reading font's own size, scaled by the reader's text size step. */
+  --reading-font-base: 16px;
+  --reading-font-scale: 1;
+  --reading-font-size: calc(var(--reading-font-base) * var(--reading-font-scale));
   --reading-line-height-base: 1.65;
   --reading-measure-base: 44em;
   /* Code relative to the prose around it, chosen per font so monospace lands
@@ -539,28 +542,34 @@ html[data-ui-scale='large'] {
   --ui-scale: 1.15;
 }
 
-html[data-reading-text-size='small'] {
-  --reading-font-size: 15px;
+/* Seven steps around each font's own size (step 3). Upward steps are wider
+   and more numerous, because readers enlarge text more often than shrink it:
+   Sans reads 14, 15, 16, 17, 18, 20 and 22px; Serif the same multiples of 18. */
+html[data-reading-text-size='1'] {
+  --reading-font-scale: 0.875;
 }
-
-html[data-reading-text-size='large'] {
-  --reading-font-size: 18px;
+html[data-reading-text-size='2'] {
+  --reading-font-scale: 0.9375;
+}
+html[data-reading-text-size='4'] {
+  --reading-font-scale: 1.0625;
+}
+html[data-reading-text-size='5'] {
+  --reading-font-scale: 1.125;
+}
+html[data-reading-text-size='6'] {
+  --reading-font-scale: 1.25;
+}
+html[data-reading-text-size='7'] {
+  --reading-font-scale: 1.375;
 }
 
 html[data-reading-font='serif'] {
   --font-reading: var(--font-reading-serif);
-  --reading-font-size: 18px;
+  --reading-font-base: 18px;
   --reading-line-height-base: 1.7;
   --reading-measure-base: 36em;
   --reading-code-scale: 0.8;
-}
-
-html[data-reading-font='serif'][data-reading-text-size='small'] {
-  --reading-font-size: 17px;
-}
-
-html[data-reading-font='serif'][data-reading-text-size='large'] {
-  --reading-font-size: 20px;
 }
 
 html[data-line-spacing='compact'] {

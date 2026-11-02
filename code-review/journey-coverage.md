@@ -1317,8 +1317,8 @@ and recovery behavior; the evidence below establishes its exercised paths.
 
 **Implementation:** Renderer: `renderer/src/features/documents/ui/source/registry.tsx`, `renderer/src/features/documents/application/document-runtime.ts`, `renderer/src/features/documents/ui/markdown/document.tsx`.
 The Markdown reading bar composes the Settings-owned
-`renderer/src/features/settings/ui/appearance/reading-text-menu.tsx`; durable
-font and size presets cross `shared/protocols/http/appearance.ts` to
+`renderer/src/features/settings/ui/appearance/appearance-menu.tsx`; durable
+font, size, page colour and line presets cross `shared/protocols/http/appearance.ts` to
 `server/app-config.ts` and are stamped on the document root by
 `renderer/src/shared/runtime/appearance-surface.ts`.
 Inline review: `renderer/src/features/documents/domain/revision.ts`,
@@ -1356,9 +1356,10 @@ Host/services: `server/file-save.ts`, `server/text-file-transaction.ts`,
   `server/routes/files.test.ts` verifies preference changes through folder-explicit
   workspace requests, including project isolation and refusal of unregistered roots.
   `pnpm test:server` covers strict durable preferences.
-  `reading-text-menu.test.tsx`, the Appearance domain/infrastructure/surface
+  `appearance-menu.test.tsx`, the Appearance domain/infrastructure/surface
   suites, `shared/protocols/http/appearance.test.ts`, and
-  `server/routes/appearance.test.ts` cover the reading menu's font/size writes,
+  `server/routes/appearance.test.ts` cover the Appearance menu's font, size
+  step and page-colour pair writes,
   immediate surface application, rollback, strict wire values, and preservation
   of unrelated preferences.
   Transaction/Python regressions cover concurrent saves, staging-time external
@@ -1397,7 +1398,17 @@ Host/services: `server/file-save.ts`, `server/text-file-transaction.ts`,
   configuration retained `readingFont: sans` and `readingTextSize: large`.
   A full-window screenshot was reviewed by eye for the reading bar, open menu,
   selected presets, and enlarged document composition. This pass did not use a
-  packaged, signed application or exercise a failed preference write.
+  packaged, signed application or exercise a failed preference write. It
+  predates the Appearance menu below.
+- **Appearance menu runtime pass (2026-11-02):** an isolated macOS Electron
+  source pass (renderer from the working tree through Vite) opened a Markdown
+  note and its Appearance menu. Choosing Paper recoloured the whole window
+  with brown ink; two slider steps set step 5 (`18px * 1.125` under Serif);
+  Dark and Light under Paper and Green showed each pair's sides. Screenshots
+  were reviewed by eye in each state. `shared/protocols/http/appearance.test.ts`
+  holds every theme, Paper and Green included, to AA body and secondary
+  contrast. A packaged application and a failed write from the menu were not
+  exercised.
 - **Heading menu runtime pass (2026-09-26):** the built macOS source app, with
   isolated configuration and telemetry disabled, opened a fixture Markdown file
   in the normal Documents and Chat split. Selecting its blocks and choosing

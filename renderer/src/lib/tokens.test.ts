@@ -219,14 +219,19 @@ describe('appearance preferences', () => {
     // Interface size moves chrome type only. A reading declaration that
     // picked up `--ui-scale` would enlarge prose along with the furniture,
     // and the two preferences would stop being separable at all.
-    const declared = [...stylesheet.matchAll(/^[ \t]*--reading-font-size:[^;]*;/gm)];
-    expect(declared, 'globals.css declares a default and both steps per reading font').toHaveLength(
-      6,
+    const size = [...stylesheet.matchAll(/^[ \t]*--reading-font-size:[^;]*;/gm)].map((one) =>
+      one[0].trim(),
     );
-    for (const [declaration] of declared) {
-      expect(declaration).not.toContain('--ui-scale');
-      expect(declaration.trim()).toMatch(/^--reading-font-size: \d+px;$/);
-    }
+    expect(size).toEqual([
+      '--reading-font-size: calc(var(--reading-font-base) * var(--reading-font-scale));',
+    ]);
+    const bases = [...stylesheet.matchAll(/^[ \t]*--reading-font-base:[^;]*;/gm)];
+    expect(bases, 'one base size per reading font').toHaveLength(2);
+    for (const [declaration] of bases)
+      expect(declaration.trim()).toMatch(/^--reading-font-base: \d+px;$/);
+    const steps = [...stylesheet.matchAll(/^[ \t]*--reading-font-scale:[^;]*;/gm)];
+    expect(steps, 'a default and the six other steps').toHaveLength(7);
+    for (const [declaration] of steps) expect(declaration).not.toContain('--ui-scale');
   });
 
   it('keys both scopes on the attributes the applier stamps', () => {
@@ -236,8 +241,8 @@ describe('appearance preferences', () => {
     // TypeScript with the preference silently inert.
     expect(stylesheet).toContain("html[data-ui-scale='small']");
     expect(stylesheet).toContain("html[data-ui-scale='large']");
-    expect(stylesheet).toContain("html[data-reading-text-size='small']");
-    expect(stylesheet).toContain("html[data-reading-text-size='large']");
+    for (const step of [1, 2, 4, 5, 6, 7])
+      expect(stylesheet).toContain(`html[data-reading-text-size='${step}']`);
     expect(stylesheet).toContain("html[data-reading-font='serif']");
     const applier = fs.readFileSync(
       path.resolve(
@@ -247,7 +252,7 @@ describe('appearance preferences', () => {
       'utf8',
     );
     expect(applier).toContain('root.dataset.uiScale = surface.uiScale');
-    expect(applier).toContain('root.dataset.readingTextSize = surface.readingTextSize');
+    expect(applier).toContain('root.dataset.readingTextSize = String(surface.readingTextSize)');
     expect(applier).toContain('root.dataset.readingFont = surface.readingFont');
   });
 });

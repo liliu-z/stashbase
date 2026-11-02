@@ -29,11 +29,7 @@ import {
   type NewTab,
 } from '@/features/documents/public';
 import { SourcePreparationStatus, type FolderIndexStatus } from '@/features/preparation/public';
-import {
-  LocalComponentRecovery,
-  ReadingTextMenu,
-  useAccountView,
-} from '@/features/settings/public';
+import { LocalComponentRecovery, AppearanceMenu, useAccountView } from '@/features/settings/public';
 import type { WorkspaceRuntime, WorkspaceSessionController } from '@/features/workspace/public';
 import { isExternalSource } from '@/shared/domain/external-source';
 import type { SourceReference } from '@/shared/domain/source-reference';
@@ -209,7 +205,7 @@ export function WorkspacePanes({
                     )
                   }
                   renderReadingControl={() => (
-                    <ReadingTextMenu appearanceApi={dependencies.settings.appearanceApi} />
+                    <AppearanceMenu appearanceApi={dependencies.settings.appearanceApi} />
                   )}
                   revealLabel={dependencies.workspace.revealLabel}
                   runtime={documents}

@@ -6,6 +6,11 @@ const appearanceThemeSchema = z.enum(['system', 'light', 'dark']);
 
 const appearanceScaleSchema = z.enum(['small', 'default', 'large']);
 
+/** Document text size as a step on the reading menu's slider; the
+ *  stylesheet maps each step to a multiple of the reading font's base size. */
+export const READING_TEXT_SIZE_STEPS = 7;
+const readingTextSizeSchema = z.number().int().min(1).max(READING_TEXT_SIZE_STEPS);
+
 /** The two reading fonts StashBase ships for Markdown prose. */
 const readingFontSchema = z.enum(['serif', 'sans']);
 
@@ -34,7 +39,7 @@ export const appearancePreferencesSchema = z
     lightTheme: z.enum(LIGHT_THEME_IDS),
     darkTheme: z.enum(DARK_THEME_IDS),
     uiScale: appearanceScaleSchema,
-    readingTextSize: appearanceScaleSchema,
+    readingTextSize: readingTextSizeSchema,
     readingFont: readingFontSchema,
     /** An installed font that overrides the reading font; null keeps the
      *  preset. The code font's null is the bundled Geist Mono. */
@@ -71,7 +76,7 @@ export const DEFAULT_APPEARANCE_PREFERENCES: AppearancePreferencesWire = {
   lightTheme: 'stashbase-light',
   darkTheme: 'stashbase-dark',
   uiScale: 'default',
-  readingTextSize: 'default',
+  readingTextSize: 3,
   readingFont: 'serif',
   writingFont: null,
   codeFont: null,

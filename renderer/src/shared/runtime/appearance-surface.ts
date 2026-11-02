@@ -49,7 +49,7 @@ export function applyAppearanceSurface(surface: AppearanceSurface): void {
   stampFont(root, '--writing-font', surface.writingFont, 'var(--font-sans)');
   stampFont(root, '--code-font', surface.codeFont, 'var(--font-mono)');
   root.dataset.uiScale = surface.uiScale;
-  root.dataset.readingTextSize = surface.readingTextSize;
+  root.dataset.readingTextSize = String(surface.readingTextSize);
   root.dataset.readingFont = surface.readingFont;
   root.dataset.lineSpacing = surface.lineSpacing;
   root.dataset.lineWidth = surface.lineWidth;

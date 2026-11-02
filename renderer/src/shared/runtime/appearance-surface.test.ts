@@ -40,10 +40,10 @@ afterEach(() => {
 
 describe('applyAppearanceSurface', () => {
   it('stamps both scales on the document root', () => {
-    applyAppearanceSurface(surface({ uiScale: 'large', readingTextSize: 'small' }));
+    applyAppearanceSurface(surface({ uiScale: 'large', readingTextSize: 1 }));
 
     expect(document.documentElement.dataset.uiScale).toBe('large');
-    expect(document.documentElement.dataset.readingTextSize).toBe('small');
+    expect(document.documentElement.dataset.readingTextSize).toBe('1');
   });
 
   it('carries the pinned theme as its class', () => {
@@ -117,10 +117,10 @@ describe('subscribeToAppearanceSurface', () => {
     const received: AppearanceSurface[] = [];
     const stop = subscribeToAppearanceSurface((next) => received.push(next));
 
-    post(surface({ readingTextSize: 'large' }));
+    post(surface({ readingTextSize: 6 }));
 
     await waitFor(() => expect(received).toHaveLength(1));
-    expect(received[0]?.readingTextSize).toBe('large');
+    expect(received[0]?.readingTextSize).toBe(6);
     stop();
   });
 

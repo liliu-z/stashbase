@@ -8,6 +8,7 @@ import {
   isReadingFont,
   PRESET_ROWS,
   READING_FONT_CHOICES,
+  READING_TEXT_SIZE_DETAIL,
   readingFontChange,
   spellcheckLanguageLabel,
 } from '@/features/settings/domain/appearance';
@@ -24,6 +25,7 @@ import { FailureNotice } from '@/shared/ui/failure-notice';
 import { ChoiceSelect } from './choice-select';
 import { FontPicker } from './font-picker';
 import { PresetRowView } from './preset-row-view';
+import { ReadingSizeSlider } from './reading-size-slider';
 
 const SYSTEM_LANGUAGE = '';
 export function EditorPanel({
@@ -92,7 +94,11 @@ export function EditorPanel({
               />
             }
           />
-          <PresetRowView appearance={appearance} row={PRESET_ROWS.readingTextSize} />
+          <SettingsRow
+            detail={READING_TEXT_SIZE_DETAIL}
+            title="Text size"
+            trail={<ReadingSizeSlider appearance={appearance} className="w-56" />}
+          />
           <PresetRowView appearance={appearance} row={PRESET_ROWS.lineSpacing} />
           <PresetRowView appearance={appearance} row={PRESET_ROWS.lineWidth} />
         </SettingsList>

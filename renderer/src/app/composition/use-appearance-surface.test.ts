@@ -30,7 +30,7 @@ afterEach(() => {
   delete root().dataset.readingTextSize;
 });
 
-const read: AppearanceSurface = { ...D, readingTextSize: 'large', theme: 'dark', uiScale: 'small' };
+const read: AppearanceSurface = { ...D, readingTextSize: 6, theme: 'dark', uiScale: 'small' };
 
 describe('useAppearanceSurface', () => {
   it('applies what the read answered', async () => {
@@ -42,7 +42,7 @@ describe('useAppearanceSurface', () => {
 
     await waitFor(() => expect(root().classList.contains('dark')).toBe(true));
     expect(root().dataset.uiScale).toBe('small');
-    expect(root().dataset.readingTextSize).toBe('large');
+    expect(root().dataset.readingTextSize).toBe('6');
     expect(setAppearance).toHaveBeenLastCalledWith(read);
   });
 
@@ -70,7 +70,7 @@ describe('useAppearanceSurface', () => {
 
     const chosen: AppearanceSurface = {
       ...D,
-      readingTextSize: 'large',
+      readingTextSize: 6,
       theme: 'dark',
       uiScale: 'large',
     };
@@ -78,12 +78,12 @@ describe('useAppearanceSurface', () => {
     await waitFor(() => expect(root().classList.contains('dark')).toBe(true));
 
     await act(async () => {
-      answer?.({ ...D, readingTextSize: 'small', theme: 'light', uiScale: 'small' });
+      answer?.({ ...D, readingTextSize: 1, theme: 'light', uiScale: 'small' });
     });
 
     expect(root().classList.contains('dark')).toBe(true);
     expect(root().classList.contains('light')).toBe(false);
     expect(root().dataset.uiScale).toBe('large');
-    expect(root().dataset.readingTextSize).toBe('large');
+    expect(root().dataset.readingTextSize).toBe('6');
   });
 });

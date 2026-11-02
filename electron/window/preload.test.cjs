@@ -100,7 +100,7 @@ test('window preload sends only a valid appearance record to the desktop', async
   const preload = createWindowLifecyclePreload(ipc);
   const appearance = {
     theme: 'dark', lightTheme: 'stashbase-light', darkTheme: 'nord', uiScale: 'default',
-    readingTextSize: 'default', readingFont: 'serif', writingFont: 'Literata', codeFont: null, lineSpacing: 'default',
+    readingTextSize: 3, readingFont: 'serif', writingFont: 'Literata', codeFont: null, lineSpacing: 'default',
     lineWidth: 'wide', reduceMotion: 'system', spellcheck: true, spellcheckLanguage: null,
     focusMode: false, typewriterScrolling: false, wordCount: true,
   };

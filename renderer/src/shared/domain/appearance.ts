@@ -10,7 +10,8 @@ export interface AppearanceSurface {
   readonly lightTheme: LightThemeId;
   readonly darkTheme: DarkThemeId;
   readonly uiScale: Scale;
-  readonly readingTextSize: Scale;
+  /** A step from 1 to 7; 3 is the reading font's own size. */
+  readonly readingTextSize: number;
   /** The included reading font; an installed `writingFont` overrides it. */
   readonly readingFont: 'serif' | 'sans';
   /** Null keeps the reading font above for writing and Geist Mono for code. */

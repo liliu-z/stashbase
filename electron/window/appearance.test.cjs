@@ -13,7 +13,7 @@ const DEFAULTS = {
   lightTheme: 'stashbase-light',
   darkTheme: 'stashbase-dark',
   uiScale: 'default',
-  readingTextSize: 'default', readingFont: 'serif',
+  readingTextSize: 3, readingFont: 'serif',
   writingFont: null,
   codeFont: null,
   lineSpacing: 'default',

@@ -1,6 +1,8 @@
 /**
- * The color themes StashBase offers: each is a published palette from its
- * own project, never one StashBase composed. A theme names the handful of
+ * The color themes StashBase offers. StashBase's own are the hand-tuned
+ * defaults and two reading pairs, Paper and Green, whose ink is tinted to
+ * their page the way an e-reader's page colours are; every other theme is a
+ * published palette from its own project. A theme names the handful of
  * roles every palette publishes (the page ground, a raised surface, an
  * overlay, text, subdued text, an accent, and red/green/yellow), and one
  * mapping turns those roles into the renderer's semantic tokens. The mapping
@@ -46,9 +48,43 @@ interface ThemeDefinition {
 }
 
 const STASHBASE_BACKGROUND = { dark: '#171717', light: '#fafafa' } as const;
+/** The StashBase document page, `--surface-2` in `globals.css`. */
+const STASHBASE_PAGE = { dark: '#1e1e1e', light: '#fcfcfc' } as const;
 
 export const LIGHT_THEMES = {
   'stashbase-light': { family: 'StashBase', label: 'StashBase Light', mode: 'light', palette: null },
+  'paper-light': {
+    family: 'Paper',
+    label: 'Paper Light',
+    mode: 'light',
+    palette: {
+      ground: '#efe5cf',
+      raised: '#fbf3e3',
+      overlay: '#e2d4b8',
+      text: '#3d2e1f',
+      subtext: '#7a6650',
+      accent: '#8b5a2b',
+      red: '#b4432f',
+      green: '#5b7a2e',
+      yellow: '#b7791f',
+    },
+  },
+  'green-light': {
+    family: 'Green',
+    label: 'Green Light',
+    mode: 'light',
+    palette: {
+      ground: '#d1e1ce',
+      raised: '#e5f1e2',
+      overlay: '#c0d4bc',
+      text: '#1d3527',
+      subtext: '#536c5c',
+      accent: '#2f6b45',
+      red: '#b23b3b',
+      green: '#2f7a45',
+      yellow: '#b7791f',
+    },
+  },
   'catppuccin-latte': {
     family: 'Catppuccin',
     label: 'Catppuccin Latte',
@@ -117,6 +153,38 @@ export const LIGHT_THEMES = {
 
 export const DARK_THEMES = {
   'stashbase-dark': { family: 'StashBase', label: 'StashBase Dark', mode: 'dark', palette: null },
+  'paper-dark': {
+    family: 'Paper',
+    label: 'Paper Dark',
+    mode: 'dark',
+    palette: {
+      ground: '#201b15',
+      raised: '#2c251f',
+      overlay: '#40362c',
+      text: '#eadfc9',
+      subtext: '#a8987f',
+      accent: '#d4a373',
+      red: '#e2836f',
+      green: '#a3be72',
+      yellow: '#e0b15c',
+    },
+  },
+  'green-dark': {
+    family: 'Green',
+    label: 'Green Dark',
+    mode: 'dark',
+    palette: {
+      ground: '#171f1a',
+      raised: '#212b24',
+      overlay: '#33423a',
+      text: '#d4e5d5',
+      subtext: '#8fa595',
+      accent: '#8cc4a0',
+      red: '#e0857a',
+      green: '#8fcf9a',
+      yellow: '#e3b25a',
+    },
+  },
   'catppuccin-frappe': {
     family: 'Catppuccin',
     label: 'Catppuccin Frappé',
@@ -423,6 +491,15 @@ export function lightThemeTokens(id: LightThemeId): Record<ThemeToken, string> |
 export function darkThemeTokens(id: DarkThemeId): Record<ThemeToken, string> | null {
   const { palette } = DARK_THEMES[id];
   return palette ? themePaletteTokens(palette, 'dark') : null;
+}
+
+/** The page a document sits on in a theme, as a swatch shows it: the
+ *  second surface, which document panes use. */
+export function themePage(id: LightThemeId | DarkThemeId): string {
+  const theme =
+    id in LIGHT_THEMES ? LIGHT_THEMES[id as LightThemeId] : DARK_THEMES[id as DarkThemeId];
+  if (theme.palette) return mixHex(theme.palette.ground, theme.palette.raised, 0.5);
+  return theme.mode === 'light' ? STASHBASE_PAGE.light : STASHBASE_PAGE.dark;
 }
 
 /** The ground a window paints before its page does, per side. */

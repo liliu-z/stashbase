@@ -1,0 +1,101 @@
+import { cleanup, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
+
+import { failureMessage } from '@/features/settings/application/failure-messages';
+import { appearancePort } from '@/test/fakes/settings';
+import { withQueryClient } from '@/test/query';
+
+import { AppearanceMenu } from './appearance-menu';
+
+afterEach(() => {
+  cleanup();
+  delete document.documentElement.dataset.readingFont;
+  delete document.documentElement.dataset.readingTextSize;
+});
+
+async function open() {
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole('button', { name: 'Appearance' }));
+  return user;
+}
+
+const choice = async (group: string, name: string) =>
+  within(await screen.findByRole('radiogroup', { name: group })).getByRole<HTMLInputElement>(
+    'radio',
+    {
+      name,
+    },
+  );
+
+describe('AppearanceMenu', () => {
+  it('saves only the reading font and applies it at once', async () => {
+    const port = appearancePort();
+    withQueryClient(<AppearanceMenu appearanceApi={port} />);
+
+    const user = await open();
+    await user.click(await choice('Font', 'Sans'));
+
+    await waitFor(() =>
+      expect(port.update).toHaveBeenCalledWith(
+        { readingFont: 'sans', writingFont: null },
+        expect.any(AbortSignal),
+      ),
+    );
+    expect(document.documentElement.dataset.readingFont).toBe('sans');
+    expect((await choice('Font', 'Sans')).checked).toBe(true);
+  });
+
+  it('saves the text size from the slider as one step', async () => {
+    const port = appearancePort();
+    withQueryClient(<AppearanceMenu appearanceApi={port} />);
+
+    const user = await open();
+    const slider = await screen.findByRole('slider', { name: 'Text size' });
+    await waitFor(() => expect(slider.hasAttribute('disabled')).toBe(false));
+    slider.focus();
+    await user.keyboard('{ArrowRight}');
+
+    await waitFor(() =>
+      expect(port.update).toHaveBeenCalledWith({ readingTextSize: 4 }, expect.any(AbortSignal)),
+    );
+    expect(document.documentElement.dataset.readingTextSize).toBe('4');
+  });
+
+  it('chooses a page colour as its light and dark pair', async () => {
+    const port = appearancePort();
+    withQueryClient(<AppearanceMenu appearanceApi={port} />);
+
+    const user = await open();
+    expect((await choice('Page color', 'White')).checked).toBe(true);
+    await user.click(await choice('Page color', 'Paper'));
+
+    await waitFor(() =>
+      expect(port.update).toHaveBeenCalledWith(
+        { lightTheme: 'paper-light', darkTheme: 'paper-dark' },
+        expect.any(AbortSignal),
+      ),
+    );
+    expect((await choice('Page color', 'Paper')).checked).toBe(true);
+    expect((await choice('Mode', 'Match system')).checked).toBe(true);
+  });
+
+  it('rolls the choice back and says why when the save is refused', async () => {
+    const port = appearancePort({
+      update: vi.fn(async () => {
+        throw new Error('EPIPE');
+      }),
+    });
+    withQueryClient(<AppearanceMenu appearanceApi={port} />);
+
+    const user = await open();
+    await user.click(await choice('Font', 'Sans'));
+
+    expect(await screen.findByRole('status')).toHaveProperty(
+      'textContent',
+      failureMessage('unavailable'),
+    );
+    expect((await choice('Font', 'Serif')).checked).toBe(true);
+    expect(document.documentElement.dataset.readingFont).toBe('serif');
+  });
+});

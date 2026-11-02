@@ -31,9 +31,10 @@ platform capabilities stay named and disabled in navigation.
   Account and billing remain available independently of agent runtime readiness.
 - **Appearance:** user-wide theme and interface preferences:
   - **Theme:** a mode (match system, light, dark) plus a light theme and a dark
-    theme chosen separately from published palettes (StashBase, Catppuccin,
-    Tokyo Night, Rosé Pine, Gruvbox, Nord). Every theme keeps body and
-    secondary text at WCAG AA on its surfaces. The theme also governs native
+    theme chosen separately: StashBase's own (the defaults, and the Paper and
+    Green reading pairs, whose ink is tinted to their page) and published
+    palettes (Catppuccin, Tokyo Night, Rosé Pine, Gruvbox, Nord). Every theme
+    keeps body and secondary text at WCAG AA on its surfaces. The theme also governs native
     menus, dialogs, and the window background from launch.
   - **Interface:** interface size, which reaches all chrome text, and reduce
     motion (match system or on).
@@ -41,13 +42,16 @@ platform capabilities stay named and disabled in navigation.
   - **Documents:** how document text looks: the document font, chosen from the two included reading fonts
     (Serif, the default, and Sans) or any font installed on the computer; the
     code font, from the bundled monospace or installed monospaced fonts; and
-    reading text size, line spacing, and line width. The document's reading
-    menu edits the same reading font and size.
+    reading text size (a slider of seven steps), line spacing, and line width.
+    The document's Appearance menu edits the same font, text size, line width
+    and line spacing, and offers the page colour as a pair: choosing White,
+    Paper or Green sets the light and the dark theme together, beside the
+    mode.
   - **Writing:** what helps while writing: spellcheck and its language (where
     the system offers a choice), focus mode, typewriter scrolling, and word
     count.
 
-  Every appearance value is a preset except the two font names, which are
+  Every appearance value is a preset or a step except the two font names, which are
   validated as names before they are stored. An installed writing font
   overrides the Serif/Sans preset and keeps that preset's size steps and
   measure; choosing Serif or Sans again clears it. A chosen font that is later

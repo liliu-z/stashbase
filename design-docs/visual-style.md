@@ -10,9 +10,13 @@ Keep documents and conversation readable; navigation and controls stay secondary
 - Keep controls compact and long-form text comfortable. Use sans for interface
   text and monospace for paths/code. Markdown prose offers a reading font:
   Serif (the default, for writing) or Sans (for documents full of code), or a
-  font installed on the computer from Settings. Serif and Sans switch with the
-  reading text size from an e-reader style menu in the document's reading bar,
-  a paper-coloured band the editor scrolls beneath without passing under. All
+  font installed on the computer from Settings. The document's reading bar, a
+  paper-coloured band the editor scrolls beneath without passing under, holds
+  one Appearance menu set out like an e-reader's: the font, each sample set in
+  its own face; text size on a slider of seven steps; the page colour; then
+  line width and line spacing. A page colour is a light and a dark theme that
+  follow the system together, drawn as one half-and-half swatch: White,
+  Paper and Green, whose ink is tinted to their page as an e-reader's is. All
   stay app-wide Appearance preferences. The reading font changes only the
   rendered document's prose and headings; the interface, Chat, source view,
   code, and tables keep their own faces, the font never changes the

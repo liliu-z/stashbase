@@ -4,7 +4,13 @@
  * and the editor toggles. One table per kind of row, so the panel renders
  * rows rather than knowing any preference by name.
  */
-import { DARK_THEMES, LIGHT_THEMES } from '@/contracts/appearance-themes';
+import {
+  DARK_THEMES,
+  LIGHT_THEMES,
+  themePage,
+  type DarkThemeId,
+  type LightThemeId,
+} from '@/contracts/appearance-themes';
 import type { AppearanceSurface } from '@/shared/domain/appearance';
 
 /** The saved appearance is exactly what a window applies. */
@@ -30,13 +36,7 @@ interface Choice<Value extends string> {
 }
 
 /** Fields a segmented control can carry: a handful of string presets. */
-export type PresetField =
-  | 'theme'
-  | 'uiScale'
-  | 'readingTextSize'
-  | 'lineSpacing'
-  | 'lineWidth'
-  | 'reduceMotion';
+export type PresetField = 'theme' | 'uiScale' | 'lineSpacing' | 'lineWidth' | 'reduceMotion';
 
 /** Parameterised by field so a row's choices cannot carry a value the field
  *  does not accept. */
@@ -52,7 +52,7 @@ export type PresetRow = { [Field in PresetField]: PresetRowFor<Field> }[PresetFi
 /** Both scale rows, and the document's reading menu, offer the same three
  *  steps, so the steps are one vocabulary rather than a choice each row makes
  *  for itself. */
-export const SCALE_CHOICES = [
+const SCALE_CHOICES = [
   { label: 'Small', value: 'small' },
   { label: 'Default', value: 'default' },
   { label: 'Large', value: 'large' },
@@ -109,12 +109,6 @@ export const PRESET_ROWS = {
     field: 'reduceMotion',
     title: 'Reduce motion',
   },
-  readingTextSize: {
-    choices: SCALE_CHOICES,
-    detail: 'Size of the text in documents. The interface keeps its own.',
-    field: 'readingTextSize',
-    title: 'Text size',
-  },
   lineSpacing: {
     choices: [
       { label: 'Compact', value: 'compact' },
@@ -137,6 +131,30 @@ export const PRESET_ROWS = {
     title: 'Line width',
   },
 } as const satisfies { [Field in PresetField]: PresetRowFor<Field> };
+
+/** The page colours the reading menu offers. Each is a light theme and the
+ *  dark theme that goes with it, so following the system keeps the colour
+ *  and only changes its side. The full theme lists stay in Settings. */
+export const PAGE_COLORS = [
+  { label: 'White', light: 'stashbase-light', dark: 'stashbase-dark' },
+  { label: 'Paper', light: 'paper-light', dark: 'paper-dark' },
+  { label: 'Green', light: 'green-light', dark: 'green-dark' },
+] as const satisfies readonly { label: string; light: LightThemeId; dark: DarkThemeId }[];
+
+export type PageColor = (typeof PAGE_COLORS)[number];
+
+/** The light page and the dark page a swatch shows, half and half. */
+export function pageColorSwatch(color: PageColor): { light: string; dark: string } {
+  return { light: themePage(color.light), dark: themePage(color.dark) };
+}
+
+export const READING_TEXT_SIZE_DETAIL =
+  'Size of the text in documents. The interface keeps its own.';
+
+/** Document text size steps on the slider; step 3 is the reading font's own
+ *  size, so more steps lie above it than below. */
+export const READING_TEXT_SIZE_STEPS = 7;
+export const DEFAULT_READING_TEXT_SIZE = 3;
 
 /** The DOM hands a radio's value back as a string; the row that listed the
  *  choices is what turns it into a typed change. */
