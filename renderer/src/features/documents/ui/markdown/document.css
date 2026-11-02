@@ -229,6 +229,68 @@ html[data-focus-mode='on'] .markdown-crepe:focus-within .ProseMirror > :not(.is-
   display: none;
 }
 
+/* Math is a reading block first. Only its expanded source uses the code editor
+   surface; the CodeMirror tools and preview chrome belong to ordinary code. */
+.markdown-crepe .stashbase-math-block {
+  min-width: 0;
+  margin: 0.75em 0;
+}
+
+.markdown-crepe .stashbase-math-block-preview {
+  overflow-x: auto;
+  padding: 4px 0;
+  border-radius: var(--shape-input-radius, 8px);
+}
+
+.markdown-crepe .stashbase-math-block-preview[role='button'] {
+  cursor: text;
+}
+
+.markdown-crepe .stashbase-math-block-preview[role='button']:hover {
+  background: var(--hover);
+}
+
+.markdown-crepe .stashbase-math-block-preview:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.markdown-crepe .stashbase-math-block-preview .katex-display {
+  margin: 0;
+}
+
+.markdown-crepe .stashbase-math-block-source {
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--shape-input-radius, 8px);
+  background: var(--muted);
+}
+
+.markdown-crepe .stashbase-math-block-source .milkdown-code-block {
+  margin: 0;
+  padding: 0;
+}
+
+.markdown-crepe .stashbase-math-block-source .tools {
+  display: none;
+}
+
+.markdown-crepe .stashbase-math-block-source > button {
+  display: block;
+  margin: 4px 0 0 auto;
+  padding: 4px 8px;
+  border-radius: var(--shape-input-radius, 8px);
+  color: var(--muted-foreground);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.markdown-crepe .stashbase-math-block-source > button:hover {
+  color: var(--foreground);
+  background: var(--hover);
+}
+
 /* One family for headings and prose, so hierarchy comes from size alone; the
    serif's optical-size axis also gives large headings a tighter display cut. */
 .markdown-crepe .milkdown .ProseMirror :is(h1, h2, h3, h4, h5, h6) {

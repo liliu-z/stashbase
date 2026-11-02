@@ -956,6 +956,20 @@ byte-identical saves after toggles, a save changing only the edited paragraph,
 Undo/Redo across toggles and reopening the saved file. The rendered document was
 visually inspected. These checks do not establish external clipboard
 interoperability or packaged distribution behavior.
+Documents' `ui/markdown/math-blocks.ts` now presents block formulas without code
+chrome, retaining the native CodeMirror source editor behind an explicit edit
+action. `document-input.test.tsx` exercises default disclosure, read/write mode
+transitions without saves, ordinary code isolation, source edits and Undo/Redo
+from both the source and the collapsed formula. `math.test.ts` covers restored
+native input after a formula receives an external source update while reading.
+An isolated macOS Electron source
+pass visually checked fractions, integrals and matrices in narrow and wide panes,
+compact spacing and wrapped long TeX source. It verified byte-identical mode
+toggles, native keyboard edits, Undo/Redo after closing source and changing mode,
+and the saved formula after reopening. A follow-up external file update while
+reading retained the same editors, refreshed the formula and allowed native
+input and saving on return to editing. This is source-runtime evidence, not
+packaged distribution acceptance.
 Reading controls share a project write across retained document menus, wait for
 it before a new read, and retain rollback/error presentation after the initiating
 menu unmounts. The existing Reading text menu tests also cover initial-read retry

@@ -1441,7 +1441,12 @@ registered host boundaries; renderer shared types are a different layer.
   delimiters. Its presentation uses the ordinary Markdown parser; formatting
   commands edit that same source through existing ProseMirror transactions.
   Changing Math redraws decorations, preserving the editor, history and
-  source-block mapping. A caret inside a formula exposes its source for correction.
+  source-block mapping. A caret inside an inline formula exposes its source for
+  correction. Documents' `ui/markdown/math-blocks.ts` owns block formula disclosure
+  and rendering around the existing CodeMirror node view, which retains source
+  edits, selection and history. Read-only transitions collapse source through the
+  editor view lifecycle, without changing the document; ordinary code blocks keep
+  their existing presentation. Math source alone enables CodeMirror line wrapping.
   Chat's `markdown-copy.ts` maps rendered text and formula selections back to the
   original Markdown positions, preserving delimiters, escapes and block structure;
   a selection inside KaTeX copies the formula's source. The reply action copies

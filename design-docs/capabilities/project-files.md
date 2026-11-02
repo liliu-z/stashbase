@@ -281,7 +281,12 @@ saved Chat messages retain their original delimiters.
 Changing Math retains unsaved edits, Undo/Redo, selection and reading position.
 Formula source, including matrix row separators and escaped dollar signs,
 survives editing, saving and reopening; untouched blocks keep their source.
-In the editor, placing the caret in a formula exposes its editable source.
+Reading mode shows block formulas without source or preview labels. In the
+editor, block formulas also start rendered; clicking or entering a formula with
+the keyboard opens its source. Done or Escape returns to the formula, and
+entering reading mode always closes the source. Formula blocks use compact
+spacing, and their editable source wraps within the document pane. Placing the
+caret in an inline formula exposes its editable source.
 Chat selection-copy retains Markdown structure and formula source, including
 when the selection begins or ends inside a rendered formula. Copying a complete
 reply continues to copy its original Markdown. Other applications' rendered

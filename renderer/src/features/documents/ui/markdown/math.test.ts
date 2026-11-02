@@ -2,6 +2,7 @@
  * Source-backed math against the real Milkdown parser, live editor and save
  * boundary, including the text a reader edits around formulas.
  */
+import { EditorView as CodeMirror } from '@codemirror/view';
 import { CrepeBuilder } from '@milkdown/crepe/builder';
 import { codeMirror } from '@milkdown/crepe/feature/code-mirror';
 import { editorViewCtx } from '@milkdown/kit/core';
@@ -114,6 +115,31 @@ describe('math', () => {
     const { markdown } = await open(source);
 
     expect(markdown()).toBe(source);
+  });
+
+  it('reopens an externally updated formula for native input after reading mode', async () => {
+    const source = 'Before.\n\n$$\nx^2\n$$\n\nAfter.\n';
+    const { editor, view, host, markdown } = await open(source, true);
+    const preview = host.querySelector<HTMLElement>('[aria-label="Edit formula"]');
+    preview?.click();
+    const element = host.querySelector<HTMLElement>('.cm-editor'); // dom-contract: formula input remains the native CodeMirror editor.
+    const input = element && CodeMirror.findFromDOM(element);
+    if (!input || !preview) throw new Error('Formula source editor did not mount.');
+    editor.setReadonly(true);
+    const at = (view.state.doc.firstChild?.nodeSize ?? 0) + 1;
+    view.dispatch(view.state.tr.insertText('y', at, at + 1));
+    expect(input.state.readOnly).toBe(true);
+    editor.setReadonly(false);
+    expect(input.state.readOnly).toBe(false);
+    preview.click();
+    input.focus();
+    input.dispatch({ selection: { anchor: input.state.doc.length } });
+    // Native key handling respects readonly; direct replacement would bypass it.
+    input.contentDOM.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Backspace', code: 'Backspace', bubbles: true }),
+    );
+    expect(input.state.doc.toString()).toBe('y^');
+    expect(markdown()).toBe(source.replace('x^2', 'y^'));
   });
 
   it.each([
