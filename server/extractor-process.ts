@@ -11,6 +11,7 @@ const EXTRACTOR_NICE_PRIORITY = 15;
 const STDERR_TAIL_BYTES = 64 * 1024;
 
 interface ExtractorSpawnOptions {
+  cwd: string;
   detached: boolean;
   stdio: ['ignore', 'pipe', 'pipe'];
   env: NodeJS.ProcessEnv;
@@ -18,6 +19,10 @@ interface ExtractorSpawnOptions {
 
 export function spawnOptionsForExtractor(): ExtractorSpawnOptions {
   return {
+    // App replacement can unlink the host's Resources cwd while it is still
+    // running. Python's spawned PDF batches need getcwd(); all inputs/outputs
+    // are absolute, so use the OS temp directory instead of inheriting it.
+    cwd: os.tmpdir(),
     detached: true,
     stdio: ['ignore', 'pipe', 'pipe'],
     env: {

@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import test from 'node:test';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
@@ -76,6 +77,43 @@ test('PDF/OCR subprocess configuration stays hidden on Windows', () => {
 
   assert.equal(spawnOptionsForPdfOcr('linux').detached, true);
   assert.equal(spawnOptionsForExtractor().detached, true);
+});
+
+test('PDF/OCR can start after the host working directory has been removed', { skip: process.platform === 'win32', timeout: 10_000 }, async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-extractor-cwd-'));
+  const removed = path.join(tmp, 'old-resources');
+  fs.mkdirSync(removed);
+  const harness = path.join(tmp, 'host.mjs');
+  fs.writeFileSync(harness, `
+    import assert from 'node:assert/strict';
+    import fs from 'node:fs';
+    import { spawn } from 'node:child_process';
+    import { runExtractor } from ${JSON.stringify(pathToFileURL(path.resolve('server/extractor-process.ts')).href)};
+    process.chdir(${JSON.stringify(removed)});
+    fs.rmdirSync(${JSON.stringify(removed)});
+    assert.throws(() => process.cwd(), { code: 'ENOENT' });
+    for (const mode of ['pdf', 'ocr']) {
+      const outcome = await runExtractor({ mode, script: mode + '_extract.py', args: [] }, {
+        spawn: (_command, _args, options) => spawn(process.execPath,
+          ['-e', 'process.stderr.write(process.cwd())'], options),
+      });
+      assert.equal(outcome.code, 0, outcome.stderr);
+      assert.ok(fs.statSync(outcome.stderr).isDirectory());
+    }
+  `);
+  try {
+    const child = spawn(process.execPath, ['--import', 'tsx', harness], { stdio: ['ignore', 'pipe', 'pipe'] });
+    let stderr = '';
+    child.stdout.resume();
+    child.stderr.on('data', chunk => { stderr += String(chunk); });
+    const code = await new Promise<number | null>((resolve, reject) => {
+      child.once('error', reject);
+      child.once('close', resolve);
+    });
+    assert.equal(code, 0, stderr);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 });
 
 for (const outcome of ['success', 'exit_failure', 'spawn_failure', 'fallback_failure'] as const) {

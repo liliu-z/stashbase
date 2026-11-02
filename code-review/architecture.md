@@ -243,6 +243,9 @@ source URL and installed package version.
   after a cancellable 250 ms delay; no successfully started extraction is replayed.
   Persistent launch failure retains its cause, errno/syscall and attempt count.
   Extractor stdout is drained even though artifacts are written to files.
+  PDF/OCR launches use the OS temporary directory as their working directory,
+  with absolute source/output paths. They must not inherit the host's app-bundle
+  directory, which application replacement can unlink while the host is alive.
   macOS PDF batches use fresh spawned interpreters rather than inheriting native
   PDF/OCR state through fork. The combined frozen entry calls freeze_support
   before dispatch; batch workers and PDF/OCR entry points enable native fault

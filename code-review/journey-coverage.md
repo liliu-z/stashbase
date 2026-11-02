@@ -1463,6 +1463,18 @@ Host/services: `server/file-save.ts`, `server/text-file-transaction.ts`,
 
 ## J04: Preparation
 
+**Replaced app working directory (2026-11-02):** 98 different PDFs on one macOS
+2.18.3 installation failed before batch execution with `ENOENT`. The live host's
+Resources cwd inode differs from the replacement bundle's directory. The installed
+extractor converts an affected PDF from a valid cwd but reproduces the exact
+failure from an unlinked cwd; a source traceback identifies multiprocessing's
+`get_preparation_data` → `os.getcwd`. `extractor-process.ts` now starts PDF/OCR
+in the OS temporary directory. Its real-child regression removes the host cwd
+before launch and exercises both modes. Real installed-extractor and built-host
+verification use private output directories and leave source bytes unchanged;
+this does not update the user's running app or establish other platforms' native
+PDF/OCR behavior.
+
 **Extractor termination evidence (2026-10-27):** PDF/OCR errors now retain native
 signals and structured stderr alongside exit codes. A real child-process fixture
 distinguishes signal termination from caller cancellation. Retry and durable
