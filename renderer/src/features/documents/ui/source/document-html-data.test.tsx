@@ -160,7 +160,10 @@ it('binds only its own frame, requires input activation, autosaves data, keeps t
       version: 'v2',
     });
     act(() => window.dispatchEvent(new Event('focus')));
-    await waitFor(() => expect(screen.getByTitle('form.html HTML preview')).not.toBe(frame));
+    await waitFor(
+      () => expect(screen.getByTitle('form.html HTML preview')).not.toBe(frame),
+      REPLACED,
+    );
     const rewritten = screen.getByTitle<HTMLIFrameElement>('form.html HTML preview');
     expect(rewritten.getAttribute('sandbox')).toBe('allow-scripts');
     target = required(rewritten.contentWindow);
@@ -172,7 +175,10 @@ it('binds only its own frame, requires input activation, autosaves data, keeps t
       json.change('{"name":"JSON editor"}');
       await json.save(api);
     });
-    await waitFor(() => expect(screen.getByTitle('form.html HTML preview')).not.toBe(rewritten));
+    await waitFor(
+      () => expect(screen.getByTitle('form.html HTML preview')).not.toBe(rewritten),
+      REPLACED,
+    );
     const fromEditor = screen.getByTitle<HTMLIFrameElement>('form.html HTML preview');
     target = required(fromEditor.contentWindow);
     reply = vi.spyOn(target, 'postMessage');
@@ -181,7 +187,10 @@ it('binds only its own frame, requires input activation, autosaves data, keeps t
     disk = '{"name":"external"}';
     version += '!';
     act(() => window.dispatchEvent(new Event('focus')));
-    await waitFor(() => expect(screen.getByTitle('form.html HTML preview')).not.toBe(fromEditor));
+    await waitFor(
+      () => expect(screen.getByTitle('form.html HTML preview')).not.toBe(fromEditor),
+      REPLACED,
+    );
     target = required(screen.getByTitle<HTMLIFrameElement>('form.html HTML preview').contentWindow);
     reply = vi.spyOn(target, 'postMessage');
     expect((await send('load')).value).toEqual({ name: 'external' });
@@ -200,6 +209,9 @@ it('binds only its own frame, requires input activation, autosaves data, keeps t
     else Reflect.deleteProperty(navigator, 'userActivation');
   }
 });
+
+/** A replacement shows after its status has spun and the old page has faded. */
+const REPLACED = { timeout: 3_000 };
 
 function required<T>(value: T | null | undefined): T {
   if (value === null || value === undefined)

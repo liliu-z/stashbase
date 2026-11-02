@@ -865,6 +865,21 @@ html[data-reduce-motion='on'] *::after {
   animation: shimmer 1.5s ease-in-out infinite;
 }
 
+/* ── check-draw ── a check that draws itself where a spinner stood, when the
+   work it waited on lands. Pair it with a path dash of 24, which outlasts
+   lucide's check. lucide's path starts at the long stroke's tip, so the
+   offset runs from below zero to draw it from the short stroke, as a hand
+   writes it. */
+
+@keyframes check-draw {
+  from {
+    stroke-dashoffset: -24;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
 /* ── Spinner keyframes ── */
 
 @keyframes spinner-move {

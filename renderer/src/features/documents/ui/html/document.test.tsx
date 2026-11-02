@@ -191,7 +191,7 @@ describe('HTML document', () => {
       ),
     );
     expect(frames()).toHaveLength(2);
-    expect(screen.queryByText('Updated')).toBeNull();
+    expect(screen.getByRole('status').textContent).toBe('Updating page');
 
     const restore = postMessage.mock.calls.find(
       ([message]) => (message as Record<string, unknown>).type === 'stashbase-scroll-restore',
@@ -204,7 +204,8 @@ describe('HTML document', () => {
         }),
       );
     });
-    expect(screen.getByRole('status').textContent).toBe('Updated');
+    // The page and its check land together, after the status has spun.
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Page updated'));
     expect(replacement.closest('[inert]')).toBeNull();
     await waitFor(() => expect(frames()).toEqual([replacement]));
   });

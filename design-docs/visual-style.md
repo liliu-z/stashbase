@@ -45,6 +45,13 @@ Keep documents and conversation readable; navigation and controls stay secondary
     watching, such as an update or background preparation. While the sidebar
     is collapsed, its control carries a dot instead. The lower right is never
     used, because the composer and its send button live there.
+  - **A passing status** over the top centre of a view whose content changed
+    by itself, such as an HTML preview that loaded its file's newer version.
+    It is an ink pill like a tooltip, monochrome like the rest of the
+    interface. A spinner turns into a check as the new content appears. It
+    pushes nothing, takes no input, and leaves on its own after a few
+    seconds, so it is the one notice without a dismissal. A failure that
+    stands is a strip instead.
 
   Every notice says itself the same way: the sentence in ink, then its
   answer, then the dismissal last and quietest. Only an offer, such as

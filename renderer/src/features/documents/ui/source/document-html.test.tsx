@@ -39,10 +39,14 @@ it('retains the HTML frame on unchanged or failed reads and reloads it for newer
   const after = { ...before, url: 'data:text/html,two', version: 'two' };
   vi.mocked(api.load).mockResolvedValue(after);
   act(() => window.dispatchEvent(new Event('focus')));
-  await waitFor(() => {
-    const refreshed = screen.getByTitle('archive.html HTML preview');
-    expect(refreshed).not.toBe(frame);
-    expect(refreshed.getAttribute('src')).toBe(after.url);
-    expect(refreshed.getAttribute('sandbox')).toBe('allow-scripts');
-  });
+  // The replacement shows after its status has spun and the old page has faded.
+  await waitFor(
+    () => {
+      const refreshed = screen.getByTitle('archive.html HTML preview');
+      expect(refreshed).not.toBe(frame);
+      expect(refreshed.getAttribute('src')).toBe(after.url);
+      expect(refreshed.getAttribute('sandbox')).toBe('allow-scripts');
+    },
+    { timeout: 3_000 },
+  );
 });

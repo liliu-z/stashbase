@@ -10,7 +10,10 @@ import { cn } from '@/lib/utils';
 
 import type { PreviewStatus } from './preview-layers';
 
-const LABEL: Record<PreviewStatus, string> = { updated: 'Updated', updating: 'Updating' };
+const LABEL: Record<PreviewStatus, string> = {
+  updated: 'Page updated',
+  updating: 'Updating page',
+};
 
 export function PreviewUpdateStatus({ status }: { status: PreviewStatus | null }) {
   // Keep the last words while the pill fades out.
@@ -38,7 +41,11 @@ export function PreviewUpdateStatus({ status }: { status: PreviewStatus | null }
               strokeWidth={2}
             />
           ) : (
-            <Check aria-hidden="true" className="size-3.5" strokeWidth={2} />
+            <Check
+              aria-hidden="true"
+              className="size-3.5 [&_path]:animate-[check-draw_var(--motion-slow)_ease-out_both] [&_path]:[stroke-dasharray:24]"
+              strokeWidth={2}
+            />
           )}
           {LABEL[shown]}
         </span>

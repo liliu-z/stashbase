@@ -44,8 +44,9 @@ when the reader returns to the window, without requiring a tab switch.
 HTML previews also follow changes to local scripts and stylesheets referenced
 directly by the page, including a dashboard's separate data script.
 The newer page loads behind the one on screen and replaces it once its data
-has loaded, at the same scroll position. A brief **Updated** status confirms
-the change. A replacement that is slow to load shows **Updating** instead.
+has loaded, at the same scroll position. A status over the preview says
+**Updating page** from the moment the change is found. It turns into
+**Page updated** as the new page appears, then leaves after a few seconds.
 [HTML forms](../capabilities/project-files.md#html-forms) retain their live view,
 save their JSON data automatically, and share that draft with its source editor;
 code changes reload the form at once.
