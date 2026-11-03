@@ -1,9 +1,19 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
 
-import { settingsQueryKeys } from '@/features/settings/application/queries';
+import { AgentRuntimeError } from '@/features/settings/application/ports';
+import {
+  agentAllowanceQuery,
+  billingStatusQuery,
+  settingsQueryKeys,
+} from '@/features/settings/application/queries';
 import type { HostedSignInStatus } from '@/features/settings/domain/account';
-import { accountPort, SIGNED_IN_ACCOUNT, SIGNED_OUT_ACCOUNT } from '@/test/fakes/settings';
+import {
+  accountPort,
+  agentRuntimePort,
+  SIGNED_IN_ACCOUNT,
+  SIGNED_OUT_ACCOUNT,
+} from '@/test/fakes/settings';
 import { createTestQueryClient, queryWrapper } from '@/test/query';
 
 import { useAccount } from './use-account';
@@ -19,6 +29,155 @@ function mount(port = accountPort(), openExternal = vi.fn()) {
 }
 
 describe('useAccount', () => {
+  it('replaces an account read begun before authentication failed, sharing concurrent recovery', async () => {
+    const port = accountPort(SIGNED_IN_ACCOUNT);
+    const { hook, queryClient } = mount(port);
+    await waitFor(() => expect(hook.result.current.account?.signedIn).toBe(true));
+    let finishOld!: (account: typeof SIGNED_IN_ACCOUNT) => void;
+    let finishRecovery!: (account: typeof SIGNED_OUT_ACCOUNT) => void;
+    vi.mocked(port.load)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishOld = resolve;
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishRecovery = resolve;
+          }),
+      );
+    act(() => hook.result.current.retryAccount());
+    await waitFor(() => expect(port.load).toHaveBeenCalledTimes(2));
+    const oldSignal = vi.mocked(port.load).mock.calls[1]?.[0];
+    const expired = new AgentRuntimeError('unauthorized', 'Expired');
+    const runtime = agentRuntimePort({
+      getAllowance: vi.fn().mockRejectedValue(expired),
+      getBillingStatus: vi.fn().mockRejectedValue(expired),
+    });
+    const pending = Promise.allSettled([
+      queryClient.fetchQuery(agentAllowanceQuery(runtime)),
+      queryClient.fetchQuery(billingStatusQuery(runtime)),
+    ]);
+    await waitFor(() => expect(port.load).toHaveBeenCalledTimes(3));
+    expect(oldSignal?.aborted).toBe(true);
+    expect(vi.mocked(port.load).mock.calls[2]?.[0].aborted).toBe(false);
+    await act(async () => {
+      finishRecovery(SIGNED_OUT_ACCOUNT);
+      await pending;
+      finishOld(SIGNED_IN_ACCOUNT);
+    });
+    await waitFor(() => expect(hook.result.current.account?.signedIn).toBe(false));
+    expect(runtime.getAllowance).toHaveBeenCalledOnce();
+    expect(runtime.getBillingStatus).toHaveBeenCalledOnce();
+    expect(port.load).toHaveBeenCalledTimes(3);
+  });
+
+  it('a send waits for sign-in after a credit read confirms that the account expired', async () => {
+    const port = accountPort(SIGNED_IN_ACCOUNT);
+    const { hook, queryClient } = mount(port);
+    await waitFor(() => expect(hook.result.current.account?.signedIn).toBe(true));
+    vi.mocked(port.load).mockResolvedValue(SIGNED_OUT_ACCOUNT);
+    const runtime = agentRuntimePort({
+      getAllowance: vi.fn(async () => {
+        throw new AgentRuntimeError('unauthorized', 'Sign in first.');
+      }),
+    });
+    await act(async () => {
+      await expect(queryClient.fetchQuery(agentAllowanceQuery(runtime))).rejects.toThrow(
+        'Sign in first.',
+      );
+    });
+    await waitFor(() => expect(hook.result.current.account?.signedIn).toBe(false));
+
+    let waiting!: Promise<boolean>;
+    act(() => {
+      waiting = hook.result.current.signInAndWait(new AbortController().signal);
+    });
+    expect(hook.result.current.accessOpen).toBe(true);
+    expect(port.startSignIn).not.toHaveBeenCalled();
+    act(() => hook.result.current.closeAccess());
+    await expect(waiting).resolves.toBe(false);
+  });
+
+  it('an old unauthorized credit read cannot disturb a newer account', async () => {
+    const port = accountPort(SIGNED_IN_ACCOUNT);
+    const { hook, queryClient } = mount(port);
+    await waitFor(() => expect(hook.result.current.account?.signedIn).toBe(true));
+    let refuse!: (error: Error) => void;
+    const runtime = agentRuntimePort({
+      getAllowance: vi.fn(
+        () =>
+          new Promise<never>((_resolve, reject) => {
+            refuse = reject;
+          }),
+      ),
+    });
+    const pending = queryClient.fetchQuery(agentAllowanceQuery(runtime)).catch(() => undefined);
+    await waitFor(() => expect(runtime.getAllowance).toHaveBeenCalledOnce());
+    const newer = { ...SIGNED_IN_ACCOUNT, email: 'new@example.com' };
+    act(() => hook.result.current.emailSignedIn(newer));
+    await act(async () => {
+      refuse(new AgentRuntimeError('unauthorized', 'Old account expired.'));
+      await pending;
+    });
+    expect(hook.result.current.account).toEqual(newer);
+    expect(port.load).toHaveBeenCalledOnce();
+    expect(hook.result.current.accessOpen).toBe(false);
+  });
+
+  it('a cancelled credit read cannot start account recovery when its refusal arrives late', async () => {
+    const port = accountPort(SIGNED_IN_ACCOUNT);
+    const { hook, queryClient } = mount(port);
+    await waitFor(() => expect(hook.result.current.account?.signedIn).toBe(true));
+    let refuse!: (error: Error) => void;
+    const runtime = agentRuntimePort({
+      getAllowance: vi.fn(
+        () =>
+          new Promise<never>((_resolve, reject) => {
+            refuse = reject;
+          }),
+      ),
+    });
+    const pending = queryClient.fetchQuery(agentAllowanceQuery(runtime)).catch(() => undefined);
+    await waitFor(() => expect(runtime.getAllowance).toHaveBeenCalledOnce());
+    await queryClient.cancelQueries({ queryKey: settingsQueryKeys.agentAllowance });
+    await act(async () => {
+      refuse(new AgentRuntimeError('unauthorized', 'Expired'));
+      await pending;
+    });
+    expect(hook.result.current.account).toEqual(SIGNED_IN_ACCOUNT);
+    expect(port.load).toHaveBeenCalledOnce();
+  });
+
+  it('a late account recovery read cannot replace a newer sign-in', async () => {
+    const port = accountPort(SIGNED_IN_ACCOUNT);
+    const { hook, queryClient } = mount(port);
+    await waitFor(() => expect(hook.result.current.account?.signedIn).toBe(true));
+    let finish!: (account: typeof SIGNED_OUT_ACCOUNT) => void;
+    vi.mocked(port.load).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const runtime = agentRuntimePort({
+      getAllowance: vi.fn(async () => {
+        throw new AgentRuntimeError('unauthorized', 'Expired');
+      }),
+    });
+    const pending = queryClient.fetchQuery(agentAllowanceQuery(runtime)).catch(() => undefined);
+    await waitFor(() => expect(port.load).toHaveBeenCalledTimes(2));
+    const newer = { ...SIGNED_IN_ACCOUNT, email: 'new@example.com' };
+    act(() => hook.result.current.emailSignedIn(newer));
+    await act(async () => {
+      finish(SIGNED_OUT_ACCOUNT);
+      await pending;
+    });
+    expect(hook.result.current.account).toEqual(newer);
+  });
+
   it('exposes failed initial reads and recovers without starting browser sign-in', async () => {
     const port = accountPort(SIGNED_OUT_ACCOUNT, {
       load: vi

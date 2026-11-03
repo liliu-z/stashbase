@@ -17,6 +17,12 @@ Selecting an agent is not login or installation consent. Account sign-in does no
 enable search. Credentials remain outside projects, renderer persistence, and
 agent history; supplied environment variables do not configure BYOK access.
 
+When credits or billing reports lost authentication, account surfaces refresh
+the host-owned account state. Confirmed expiry restores Sign in and refreshes
+Default Agent readiness. Network failures keep the signed-in identity and Retry.
+An old refusal or pending account read cannot replace a newer login; recovery
+never repeats a billing action or a message automatically.
+
 ## Settings Organization
 
 Settings owns lasting preferences and connection configuration:
@@ -131,8 +137,10 @@ platform capabilities stay named and disabled in navigation.
   that Retry signs in, opening the browser when the check still cannot answer.
   A broken executable instead offers installation repair. The first-send
   connection follows this same recovery action before continuing its held send.
-  An expired sign-in reported by
-  a running conversation restores that action without clearing credentials.
+  An expired or invalid sign-in reported by a status check or a running
+  conversation restores the sign-in action without clearing credentials.
+  A later cached signed-in status cannot dismiss that refusal; recovery requires
+  a successful explicit sign-in.
   Setup and update failures show the failed operation, stage, and available
   diagnostic in place, including service refusals and download errors.
   A runtime that reports a model its

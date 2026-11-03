@@ -1,11 +1,21 @@
+/**
+ * Settings query identities and shared request behavior live here.
+ * Credits and billing refresh host-owned account state after authentication
+ * refusal, coordinating readers without replaying commands or replacing a
+ * newer sign-in with an old response.
+ */
+import type { QueryClient } from '@tanstack/react-query';
+
 import type { EmbedderPort } from '@/features/settings/application/embedder-port';
-import type {
-  AccountPort,
-  AgentRuntimePort,
-  AppearancePort,
-  McpAccessPort,
-  SystemTextPort,
+import {
+  AgentRuntimeError,
+  type AccountPort,
+  type AgentRuntimePort,
+  type AppearancePort,
+  type McpAccessPort,
+  type SystemTextPort,
 } from '@/features/settings/application/ports';
+import type { HostedAccount } from '@/features/settings/domain/account';
 
 export const settingsQueryKeys = {
   localComponent: ['settings', 'local-component'] as const,
@@ -67,7 +77,8 @@ export function agentCatalogQuery(port: AgentRuntimePort) {
 
 export function agentAllowanceQuery(port: AgentRuntimePort) {
   return {
-    queryFn: ({ signal }: { signal: AbortSignal }) => port.getAllowance(signal),
+    queryFn: ({ client, signal }: { client: QueryClient; signal: AbortSignal }) =>
+      accountRequest(client, signal, () => port.getAllowance(signal)),
     queryKey: settingsQueryKeys.agentAllowance,
     refetchInterval: 30_000,
     retry: false,
@@ -85,10 +96,66 @@ export function billingPlansQuery(port: AgentRuntimePort) {
 
 export function billingStatusQuery(port: AgentRuntimePort) {
   return {
-    queryFn: ({ signal }: { signal: AbortSignal }) => port.getBillingStatus(signal),
+    queryFn: ({ client, signal }: { client: QueryClient; signal: AbortSignal }) =>
+      accountRequest(client, signal, () => port.getBillingStatus(signal)),
     queryKey: settingsQueryKeys.billingStatus,
     retry: false,
   } as const;
+}
+
+const accountRecoveries = new WeakMap<
+  QueryClient,
+  { account: HostedAccount; pending: Promise<void> }
+>();
+
+function recoverAccount(client: QueryClient, account: HostedAccount): Promise<void> {
+  const current = accountRecoveries.get(client);
+  if (current?.account === account) return current.pending;
+  // Replace a read that may have captured the session before the host retired
+  // it. Concurrent authentication refusals share this fresh read.
+  const pending = client
+    .invalidateQueries({ queryKey: settingsQueryKeys.account, exact: true })
+    .finally(() => {
+      if (accountRecoveries.get(client)?.pending === pending) accountRecoveries.delete(client);
+    });
+  accountRecoveries.set(client, { account, pending });
+  return pending;
+}
+
+/** Credits and billing can discover that the host retired a session. Re-read
+ * its account rather than inferring sign-out from a failed request. A refusal
+ * from an older account cannot disturb a newer sign-in, and no work is replayed. */
+export async function accountRequest<T>(
+  client: QueryClient,
+  signal: AbortSignal,
+  request: () => Promise<T>,
+): Promise<T> {
+  const account = client.getQueryData<HostedAccount>(settingsQueryKeys.account);
+  try {
+    return await request();
+  } catch (error) {
+    if (
+      !signal.aborted &&
+      error instanceof AgentRuntimeError &&
+      error.kind === 'unauthorized' &&
+      account?.signedIn &&
+      client.getQueryData(settingsQueryKeys.account) === account
+    ) {
+      await recoverAccount(client, account);
+      const refreshed = client.getQueryData<HostedAccount>(settingsQueryKeys.account);
+      if (
+        !signal.aborted &&
+        refreshed &&
+        (refreshed.signedIn !== account.signedIn || refreshed.email !== account.email)
+      ) {
+        void client.invalidateQueries(
+          { queryKey: settingsQueryKeys.agentCatalog },
+          { cancelRefetch: false },
+        );
+      }
+    }
+    throw error;
+  }
 }
 
 export function mcpAccessQuery(port: McpAccessPort) {

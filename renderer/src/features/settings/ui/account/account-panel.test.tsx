@@ -17,6 +17,7 @@ import {
   FREE_BILLING,
   IDLE_ALLOWANCE,
   SIGNED_IN_ACCOUNT,
+  SIGNED_OUT_ACCOUNT,
 } from '@/test/fakes/settings';
 import { withQueryClient } from '@/test/query';
 
@@ -298,17 +299,55 @@ describe('AccountPanel', () => {
     expect(screen.getAllByRole('button', { name: 'Subscribe' })).toHaveLength(2);
   });
 
-  it('shows a quiet retry row when the allowance fails to load, never a stale number', async () => {
+  it.each(['getAllowance', 'getBillingStatus'] as const)(
+    'offers sign-in when %s discovers the saved account expired',
+    async (operation) => {
+      let current = SIGNED_IN_ACCOUNT;
+      const account = accountPort(current, { load: vi.fn(async () => current) });
+      const port = agentRuntimePort({
+        [operation]: vi.fn(async () => {
+          current = SIGNED_OUT_ACCOUNT;
+          throw new AgentRuntimeError('unauthorized', 'Sign in first.');
+        }),
+      });
+      const { onOpenExternal } = renderPanel(port, account);
+
+      await waitFor(() => expect(account.load).toHaveBeenCalledTimes(2));
+      await waitFor(() =>
+        expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Sign in' }).disabled).toBe(
+          false,
+        ),
+      );
+      await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+      expect(await screen.findByRole('button', { name: 'Continue with Google' })).not.toBeNull();
+      expect(screen.queryByText('Could not load your credit balance.')).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull();
+      expect(account.load).toHaveBeenCalledTimes(2);
+      expect(account.signOut).not.toHaveBeenCalled();
+      expect(account.startSignIn).not.toHaveBeenCalled();
+      expect(onOpenExternal).not.toHaveBeenCalled();
+    },
+  );
+
+  it('preserves sign-in on a credit network failure and recovers through Retry', async () => {
     const port = agentRuntimePort({
       listAgents: vi.fn(async () => catalog([agentRuntime()])),
       getAllowance: vi.fn(async () => {
-        throw new Error('unavailable');
+        throw new AgentRuntimeError('unavailable', 'ETIMEDOUT');
       }),
     });
-    renderPanel(port, accountPort(SIGNED_IN_ACCOUNT));
+    const account = accountPort(SIGNED_IN_ACCOUNT);
+    renderPanel(port, account);
 
     expect(await screen.findByText('Could not load your credit balance.')).not.toBeNull();
     expect(screen.queryByText(/% left/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Sign out' })).not.toBeNull();
+    expect(account.load).toHaveBeenCalledOnce();
+    expect(account.signOut).not.toHaveBeenCalled();
+    vi.mocked(port.getAllowance).mockResolvedValue({ ...IDLE_ALLOWANCE, remainingPercent: 63 });
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByText(/63%/)).not.toBeNull();
+    expect(account.load).toHaveBeenCalledOnce();
   });
   it('loads credits independently of runtime readiness and refreshes on focus only while mounted', async () => {
     let remainingPercent = 90;

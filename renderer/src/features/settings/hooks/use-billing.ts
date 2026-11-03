@@ -14,10 +14,12 @@ import { useCallback, useEffect, useState } from 'react';
 
 import type { AgentRuntimePort } from '@/features/settings/application/ports';
 import {
+  accountRequest,
   billingPlansQuery,
   billingStatusQuery,
   settingsQueryKeys,
 } from '@/features/settings/application/queries';
+import type { HostedAccount } from '@/features/settings/domain/account';
 import {
   billingPaid,
   type BillingPlan,
@@ -84,7 +86,13 @@ export function useBilling(
       waiting || query.state.data?.changePending ? CONFIRM_POLL_MS : false,
   });
   const { refetch: refetchStatus } = status;
-  const refreshStatus = useCallback(() => void refetchStatus(), [refetchStatus]);
+  const refreshStatus = useCallback(() => {
+    // A command can discover expiry before this hook renders signed out.
+    // Manual refetch bypasses the query's enabled flag, so read the owner here.
+    if (queryClient.getQueryData<HostedAccount>(settingsQueryKeys.account)?.signedIn === false)
+      return;
+    void refetchStatus();
+  }, [queryClient, refetchStatus]);
   // Returning from Checkout or the Portal focuses the window again.
   const resumeConfirmation = useCallback(() => {
     if (confirmingSince !== null) {
@@ -125,7 +133,8 @@ export function useBilling(
 
   const checkout = useSettingsCommand(
     'billingCheckout',
-    (priceId: string, signal) => port.startCheckout(priceId, signal),
+    (priceId: string, signal) =>
+      accountRequest(queryClient, signal, () => port.startCheckout(priceId, signal)),
     {
       onStart: (priceId) => {
         setBrowserPage('checkout');
@@ -139,13 +148,15 @@ export function useBilling(
   );
   const portal = useSettingsCommand(
     'billingPortal',
-    (_input: void, signal) => port.openBillingPortal(signal),
+    (_input: void, signal) =>
+      accountRequest(queryClient, signal, () => port.openBillingPortal(signal)),
     { onStart: () => setBrowserPage('portal'), onDone: (url) => openPage(url, 'portal') },
   );
 
   const change = useSettingsCommand(
     'billingChange',
-    (input: BillingChange, signal) => port.changeBilling(input, signal),
+    (input: BillingChange, signal) =>
+      accountRequest(queryClient, signal, () => port.changeBilling(input, signal)),
     { onSettled: refreshStatus },
   );
 

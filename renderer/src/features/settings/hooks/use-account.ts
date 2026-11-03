@@ -245,6 +245,9 @@ export function useAccount(
     signInWithGoogle,
     emailSignedIn: (next) => {
       setAccessOpen(false);
+      // A recovery read may still describe the expired account. Retire it
+      // before publishing the new sign-in, even if its transport answers late.
+      void queryClient.cancelQueries({ queryKey: settingsQueryKeys.account, exact: true });
       writeAccount(next);
       invalidateDependents();
       finishWaiters(true);
