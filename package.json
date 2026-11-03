@@ -1,7 +1,7 @@
 {
   "name": "stashbase",
   "desktopName": "stashbase.desktop",
-  "version": "2.18.7",
+  "version": "2.18.8",
   "packageManager": "pnpm@11.5.1",
   "description": "An open-source, local-first writing workspace. Write with Claude and Codex, drawing on your own sources and past work.",
   "author": {
