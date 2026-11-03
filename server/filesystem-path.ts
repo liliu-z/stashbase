@@ -186,7 +186,19 @@ export function createFilesystemPath(
   }
 
   function equal(a: string, b: string): boolean {
+    const quick = lexicalEquality(a, b);
+    if (quick !== undefined) return quick;
     return identity(a) === identity(b);
+  }
+
+  /** Volume rules can change case sensitivity, never other characters.
+   * Possible macOS aliases still require the real volume rules. */
+  function lexicalEquality(a: string, b: string): boolean | undefined {
+    const aSource = absolute(a), bSource = absolute(b);
+    if (aSource === bSource) return true;
+    if (platform !== 'darwin') return identity(aSource) === identity(bSource);
+    if (macIdentitySegment(aSource, true) !== macIdentitySegment(bSource, true)) return false;
+    return undefined;
   }
 
   function contains(root: string, candidate: string): boolean {
@@ -295,6 +307,8 @@ export function createFilesystemPath(
   }
 
   async function equalAsync(a: string, b: string): Promise<boolean> {
+    const quick = lexicalEquality(a, b);
+    if (quick !== undefined) return quick;
     const [aKey, bKey] = await Promise.all([identityAsync(a), identityAsync(b)]);
     return aKey === bKey;
   }

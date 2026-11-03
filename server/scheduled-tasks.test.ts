@@ -7,10 +7,13 @@ import test from 'node:test';
 import type { AppConfigFile } from './app-config.ts';
 import {
   createScheduledTaskStore,
+  listScheduledProjects,
   parseScheduleFile,
   withTask,
   withoutTask,
 } from './scheduled-tasks.ts';
+import { writeAppConfigStrict } from './app-config.ts';
+import { filesystemPath } from './filesystem-path.ts';
 import { dueOccurrence, missedRuns, nextRun } from '../shared/scheduled-task-timing.ts';
 
 // Local wall-clock instants, so the rules read the same in every time zone.
@@ -23,6 +26,79 @@ const timing = (overrides: Partial<Parameters<typeof missedRuns>[0]> = {}) => ({
   problem: null,
   time: '08:00',
   ...overrides,
+});
+
+for (const stalledOperation of ['directory stat', 'task file open']) {
+test(`slow ${stalledOperation} returns healthy tasks, preserves state, and shares pending reads until storage recovers`, async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-slow-schedule-'));
+  const slow = filesystemPath.absolute(path.join(root, 'slow'));
+  const healthy = filesystemPath.absolute(path.join(root, 'healthy'));
+  for (const folder of [slow, healthy]) {
+    fs.mkdirSync(folder);
+    fs.writeFileSync(path.join(folder, '.schedules.json'), JSON.stringify({ tasks: [{ id: 'brief', name: 'Brief', time: '08:00', prompt: 'Write.' }] }));
+  }
+  writeAppConfigStrict({ recentFolders: [slow, healthy].map((path) => ({ path, openedAt: new Date().toISOString() })) });
+  const { store, config } = memoryStore();
+  store.setEnabled(slow, 'brief', true);
+  store.setEnabled(healthy, 'brief', true);
+  const saved = structuredClone(config());
+  const statSync = fs.statSync;
+  let syncProbes = 0;
+  t.mock.method(fs, 'statSync', (...args: Parameters<typeof statSync>) => {
+    if (filesystemPath.absolute(String(args[0])) === slow) syncProbes++;
+    return statSync(...args);
+  });
+  const stat = fs.promises.stat;
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  let blocked = 0;
+  const mockedStat = t.mock.method(fs.promises, 'stat', async (...args: Parameters<typeof stat>) => {
+    if (stalledOperation === 'directory stat' && filesystemPath.absolute(String(args[0])) === slow) { blocked++; await gate; }
+    return stat(...args);
+  });
+  const open = fs.promises.open;
+  const mockedOpen = t.mock.method(fs.promises, 'open', async (...args: Parameters<typeof open>) => {
+    if (stalledOperation === 'task file open' && filesystemPath.absolute(String(args[0])) === filesystemPath.join(slow, '.schedules.json')) { blocked++; await gate; }
+    return open(...args);
+  });
+  try {
+    const scans = await Promise.all([listScheduledProjects(store), listScheduledProjects(store)]);
+    for (const scan of scans) {
+      assert.equal(scan.find((project) => project.folderPath === healthy)?.tasks[0]?.id, 'brief');
+      assert.equal(scan.find((project) => project.folderPath === healthy)?.tasks[0]?.enabled, true);
+      assert.match(scan.find((project) => project.folderPath === slow)?.problem ?? '', /taking too long/);
+    }
+    assert.equal(blocked, 1, 'overlapping ticks share the still-running filesystem read');
+    assert.deepEqual(config(), saved, 'a slow scan cannot disable tasks or alter run history');
+    mockedStat.mock.restore();
+    mockedOpen.mock.restore();
+    release();
+    const recovered = await listScheduledProjects(store);
+    assert.equal(recovered.find((project) => project.folderPath === slow)?.tasks[0]?.enabled, true);
+    assert.equal(recovered.find((project) => project.folderPath === slow)?.problem, null);
+    assert.equal(syncProbes, 0, 'stored switches must not synchronously probe an unrelated mount');
+  } finally {
+    mockedStat.mock.restore();
+    mockedOpen.mock.restore();
+    release();
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+}
+
+test('an unavailable registered project keeps its problem without warning on each scan', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-missing-schedule-'));
+  const missing = filesystemPath.absolute(path.join(root, 'missing'));
+  writeAppConfigStrict({ recentFolders: [{ path: missing, openedAt: new Date().toISOString() }] });
+  const warnings = t.mock.method(console, 'error', () => {});
+  try {
+    const projects = await listScheduledProjects(memoryStore().store);
+    assert.equal(projects.length, 1);
+    assert.equal(projects[0]?.folderPath, missing);
+    assert.match(projects[0]?.problem ?? '', /could not be read/);
+    assert.deepEqual(projects[0]?.tasks, []);
+    assert.equal(warnings.mock.callCount(), 0);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
 test('a task file is read leniently: each bad task says why it cannot run, the rest still run', () => {

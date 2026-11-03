@@ -25,8 +25,8 @@ import {
 } from './app-config.ts';
 import { saveFileContent } from './file-save.ts';
 import { filesystemPath } from './filesystem-path.ts';
-import { registeredFolderRootsAsync, runWithFolderRoot } from './folder.ts';
-import { errorMessage, logger } from './log.ts';
+import { configuredFolderRootsAsync, runWithFolderRoot } from './folder.ts';
+import { errorCode, errorMessage, logger } from './log.ts';
 import { fileChanged, readTextSnapshotAsync, type TextSnapshot } from './text-file-transaction.ts';
 import type { AgentId } from '../shared/agent-protocol.ts';
 import { agentIdSchema } from '../shared/protocols/http/agent-runtime.ts';
@@ -591,17 +591,13 @@ async function readScheduleSnapshot(root: string): Promise<{ snapshot: TextSnaps
   try {
     return { problem: null, snapshot: await runWithFolderRoot(root, () => readTextSnapshotAsync(SCHEDULE_FILE_NAME)) };
   } catch (error) {
-    log.warn(`could not read ${SCHEDULE_FILE_NAME} in ${root}:`, error);
+    if (errorCode(error) !== 'FOLDER_NOT_FOUND') log.warn(`could not read ${SCHEDULE_FILE_NAME} in ${root}:`, error);
     return { problem: `The task file could not be read: ${errorMessage(error)}`, snapshot: null };
   }
 }
 
-/** One project's tasks as the file states them, with what this app keeps. */
-export async function readProjectSchedule(
-  root: string,
-  store: ScheduledTaskStore = scheduledTaskStore,
-): Promise<ProjectScheduleWire> {
-  const { problem: readProblem, snapshot } = await readScheduleSnapshot(root);
+function projectSchedule(root: string, { problem: readProblem, snapshot }: Awaited<ReturnType<typeof readScheduleSnapshot>>,
+  store: ScheduledTaskStore): ProjectScheduleWire {
   const parsed = parseScheduleFile(snapshot?.content ?? null);
   const state = store.states(root);
   return {
@@ -612,16 +608,46 @@ export async function readProjectSchedule(
   };
 }
 
-/** Every registered project that states at least one task, for main. */
+/** One project's tasks as the file states them, with what this app keeps. */
+export async function readProjectSchedule(
+  root: string,
+  store: ScheduledTaskStore = scheduledTaskStore,
+): Promise<ProjectScheduleWire> {
+  return projectSchedule(root, await readScheduleSnapshot(root), store);
+}
+
+// Filesystem reads cannot reliably be cancelled. Keep the actual read owned
+// until it settles so overlapping ticks do not accumulate work on a stalled
+// mount. A timeout is only this scan's observation, never a cached empty file.
+const listedScheduleReads = new Map<string, ReturnType<typeof readScheduleSnapshot>>();
+const SCHEDULE_PROJECT_READ_MS = 2_000;
+
+async function listedProjectSchedule(root: string, store: ScheduledTaskStore): Promise<ProjectScheduleWire> {
+  let pending = listedScheduleReads.get(root);
+  if (!pending) {
+    pending = readScheduleSnapshot(root).finally(() => { listedScheduleReads.delete(root); });
+    listedScheduleReads.set(root, pending);
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const snapshot = await Promise.race([
+      pending,
+      new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), SCHEDULE_PROJECT_READ_MS); }),
+    ]);
+    return snapshot === null
+      ? { folderPath: root, problem: 'This project is taking too long to read. StashBase will check it again.', tasks: [], version: null }
+      : projectSchedule(root, snapshot, store);
+  } finally { clearTimeout(timer); }
+}
+
+/** Available task definitions and unreadable projects, for main. One slow
+ * project cannot prevent healthy projects from reaching this clock tick. */
 export async function listScheduledProjects(
   store: ScheduledTaskStore = scheduledTaskStore,
 ): Promise<ProjectScheduleWire[]> {
-  const projects: ProjectScheduleWire[] = [];
-  for (const root of await registeredFolderRootsAsync()) {
-    const schedule = await readProjectSchedule(root, store);
-    if (schedule.tasks.length > 0) projects.push(schedule);
-  }
-  return projects;
+  const roots = await configuredFolderRootsAsync();
+  const projects = await Promise.all(roots.map((root) => listedProjectSchedule(root, store)));
+  return projects.filter((schedule) => schedule.tasks.length > 0 || schedule.problem !== null);
 }
 
 function validateDraft(draft: ScheduledTaskDraftWire): void {

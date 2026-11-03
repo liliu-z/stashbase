@@ -53,6 +53,9 @@ using submodules or Git LFS remain unsupported.
 
 ## Failure and Recovery
 
+- Checking a registered project must not wait for an unrelated unavailable
+  directory. A missing project keeps its membership and can recover when its
+  directory returns; malformed registry entries never grant access.
 - New-copy conflicts preserve the destination and the proposed name. Choose
   another name or explicitly open the existing folder; never silently merge or
   overwrite. Existing directory names do not inherit new-copy naming restrictions.

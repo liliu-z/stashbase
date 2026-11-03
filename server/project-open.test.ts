@@ -46,7 +46,7 @@ function holdStat(t: TestContext, target: string) {
   const gate = new Promise<void>((resolve, reject) => { resume = resolve; fail = reject; });
   let held = false;
   t.mock.method(fs.promises, 'stat', async (...args: Parameters<typeof stat>) => {
-    if (args[0] === target && !held) {
+    if (filesystemPath.absolute(String(args[0])) === target && !held) {
       held = true;
       reached();
       await gate;
@@ -56,17 +56,46 @@ function holdStat(t: TestContext, target: string) {
   return { started, resume, fail };
 }
 
+for (const slowName of ['Slow', 'healthy']) {
+test(`a project request ignores a slow ${slowName === 'Slow' ? 'unrelated mount' : 'possible alias'} but still requires an exact available member`, async (t) => {
+  const slow = directory(slowName), healthy = directory('Healthy');
+  const missing = filesystemPath.absolute(path.join(root, 'Missing'));
+  const file = filesystemPath.absolute(path.join(root, 'File'));
+  fs.writeFileSync(file, 'not a directory');
+  config.writeAppConfigStrict({ recentFolders: ['', slow, healthy, missing, file].map((path) => ({ path, openedAt: new Date().toISOString() })) });
+  const gate = holdStat(t, slow);
+  const request = folder.exactRegisteredFolderRootAsync(healthy);
+  let deadline: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const result = await Promise.race([
+      request,
+      new Promise<null>((resolve) => { deadline = setTimeout(() => resolve(null), 200); }),
+    ]);
+    assert.equal(result, healthy, 'the exact stored spelling must win without probing another member');
+    assert.equal(await folder.exactRegisteredFolderRootAsync(path.join(healthy, 'child')), null);
+    assert.equal(await folder.exactRegisteredFolderRootAsync(root), null);
+    assert.equal(await folder.exactRegisteredFolderRootAsync(missing), null);
+    assert.equal(await folder.exactRegisteredFolderRootAsync(file), null);
+  } finally {
+    clearTimeout(deadline);
+    gate.resume();
+    await request;
+  }
+});
+}
+
 test('opening a slow directory yields and uses no synchronous directory probes', async (t) => {
   const selected = directory('Selected');
   const gate = holdStat(t, selected);
   const stat = fs.statSync;
+  let syncProbes = 0;
   t.mock.method(fs, 'statSync', (...args: Parameters<typeof stat>) => {
-    assert.ok(!String(args[0]).startsWith(root), 'sync probe reached a project directory');
+    if (filesystemPath.absolute(String(args[0])).startsWith(root)) syncProbes++;
     return stat(...args);
   });
   const readdir = fs.readdirSync;
   t.mock.method(fs, 'readdirSync', (...args: Parameters<typeof readdir>) => {
-    assert.ok(!String(args[0]).startsWith(root), 'sync directory enumeration');
+    if (filesystemPath.absolute(String(args[0])).startsWith(root)) syncProbes++;
     return readdir(...args);
   });
   const pending = folder.openProjectFolder(selected);
@@ -77,6 +106,7 @@ test('opening a slow directory yields and uses no synchronous directory probes',
   const result = await pending;
   assert.equal(result.snapshot.current?.path, selected);
   assert.equal(result.changed, true);
+  assert.equal(syncProbes, 0, 'opening a project must not synchronously probe its directories');
 });
 
 for (const failure of [false, true]) {

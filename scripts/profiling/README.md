@@ -144,6 +144,22 @@ This measures canvas dimensions × four bytes, not total renderer/GPU RSS or PDF
 image-decoder allocations. It does not reproduce the reported low-memory Windows
 OOM/GPU crash, establish a driver fault, or measure arbitrary complex documents.
 
+## Scenario: project availability
+
+`pnpm profile:project-availability --label after --runs 2` measures
+healthy registered-project lookup and scheduled-task enumeration while another
+project's storage is slow. The headless scenario requires the isolated-home
+preload, creates disposable project files, and makes no provider requests.
+
+On macOS arm64 (2026-11-03), two baseline runs left the healthy lookup pending
+through a 400 ms hold on the unrelated directory; after isolation it returned
+in 0.3–6.7 ms while that hold remained. With a three-second delay injected into
+each slow-directory stat, list latency fell from 12,047–12,306 ms to
+2,001–2,002 ms. The healthy task returned alongside a problem for the slow
+project. These are controlled coupling/deadline measurements, not real disk
+benchmarks or proof of the reported Windows timeout's cause. The schedule
+regressions separately cover stored switches and synchronous path comparisons.
+
 ## Adding a scenario
 
 Write `<scenario>.mjs` beside `editing.mjs`:

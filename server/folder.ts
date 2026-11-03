@@ -113,6 +113,16 @@ export async function registeredFolderRootsAsync(): Promise<string[]> {
   return (await getRecentFoldersAsync()).map((r) => filesystemPath.absolute(r.path));
 }
 
+/** Durable membership only; each caller must check its chosen project's
+ * availability. Enumerating membership must not probe unrelated mounts. */
+export async function configuredFolderRootsAsync(): Promise<string[]> {
+  return ((await readConfigAsync()).recentFolders ?? []).flatMap((member) => {
+    if (typeof member?.path !== 'string' || !member.path.trim()) return [];
+    try { return [filesystemPath.absolute(member.path)]; }
+    catch { return []; }
+  });
+}
+
 /** Config JSON is external durable input. Keep malformed/legacy empty path
  * values from reaching the strict filesystem-path API; valid path semantics
  * still come exclusively from that module. */
@@ -129,8 +139,13 @@ async function storedFolderPathEqualsAsync(value: unknown, target: string): Prom
 /** Return the retained spelling of an available exact project member. */
 export async function exactRegisteredFolderRootAsync(abs: string): Promise<string | null> {
   const target = filesystemPath.absolute(abs);
-  for (const root of await registeredFolderRootsAsync()) {
-    if (await filesystemPath.equalAsync(root, target)) return root;
+  const roots = await configuredFolderRootsAsync();
+  // An exact stored spelling needs no alias probes on other mounted volumes.
+  const candidates = roots.includes(target) ? [target, ...roots.filter((root) => root !== target)] : roots;
+  for (const root of candidates) {
+    if (!await filesystemPath.equalAsync(root, target)) continue;
+    try { if ((await fs.promises.stat(root)).isDirectory()) return root; }
+    catch { /* Missing or unreadable members remain registered, not authorized. */ }
   }
   return null;
 }

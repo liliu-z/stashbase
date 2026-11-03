@@ -73,6 +73,10 @@ list and the file stay one thing:
   cannot run, and the rest still run.
 - The file is hidden in Files unless hidden files are shown, and is never searchable
   project material. Agents write it with the ordinary file tools.
+- A slow or unavailable project does not hold up other projects' tasks. Its list
+  reports the read problem and checks again later without changing definitions,
+  switches, or run history. Recovery keeps the same on-time window and never
+  replays an occurrence that may already have started.
 
 ### Control comes from seeing everything
 
