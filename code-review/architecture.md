@@ -50,6 +50,12 @@ Journey-specific entry points and evidence stay in [Journey Coverage](journey-co
   Unicode. Use comparison identity only for equality and subtree matching.
   Realpath-aware containment protects existing and creatable targets; lexical
   prefix checks alone do not establish symlink safety. Slow probes must yield.
+- Exact registered-root lookup reads durable membership without first probing
+  every directory. Literal matches take precedence; only the matching root needs
+  an availability check. Synchronous and asynchronous equality share a lexical
+  fast path for identical paths and impossible aliases; possible macOS case or
+  Unicode aliases still use the volume's identity rules. Invalid stored paths
+  are skipped without widening scope.
 - Requests retain their authorized folder across awaits. Supplied blank or stale
   session identity fails; it is never treated as omitted. Only absent identity
   permits an owning window's sole active turn to supply attribution, never an
@@ -350,6 +356,10 @@ stable status without download, retry, or a new durable demand latch.
   official native installer, including when the current copy was installed by
   npm. Preparation/shutdown share one cancellable flight per runtime.
   Stage/code/retryability are structured; the renderer never parses error prose.
+  Startup carries a distinct action. A completed probe reporting no stored
+  sign-in remains an authentication-required/login prerequisite without a failed
+  setup event or MCP warning. The coordinator marks that exact status; credential
+  refusals, unanswered probes, MCP failures and explicit checks retain diagnostics.
   The first-send access prompt preserves the failed setup stage and diagnostic
   through its catalog adapter and application error. It displays the explanation
   as plain text at the failure site; generic transport wording must not replace
@@ -385,8 +395,13 @@ stable status without download, retry, or a new durable demand latch.
   During login the status check runs beside it; the first signed-in reading
   completes sign-in and retires the login process, so a login command that
   keeps waiting after the browser step cannot hold setup to its deadline.
-  Native authentication refusals restore the sign-in action;
-  they never delete credentials. The chat workspace refreshes its readiness
+  Native authentication refusals, including explicit invalid-credential output
+  from a completed status probe, restore the sign-in action. The probe uses the
+  same provider-output classification as live sessions and passes a typed refusal
+  to the setup coordinator; launch errors, timeouts and unanswered checks remain
+  check failures. Refused probe output retains its bounded diagnostic and the
+  coordinator's explicit login retry action without deleting credentials.
+  The chat workspace refreshes its readiness
   catalog when a turn or terminal connection reports `auth-expired`; either names the sign-in
   prerequisite and opens Agents settings through app composition. It preserves
   the raw diagnostic and draft, and never replays the failed request.
@@ -602,6 +617,10 @@ stable status without download, retry, or a new durable demand latch.
   A missing Codex executable reports `412 AGENT_NOT_INSTALLED` at its process
   owner; history reads and mutations preserve that prerequisite instead of
   reporting empty history or HTTP 500. Installed-runtime failures still propagate.
+  The renderer preserves that typed installation prerequisite in both history
+  entries, offers Agents settings and an explicit recheck, and keeps cached chats
+  and other agents' history. Ordinary read failures retain Retry. A closed history
+  popover does not start its own reads; the visible sidebar remains independent.
 - Transcript presentation omits failed tools from activity rows and summaries
   without deleting native history or inferring recovery from later calls.
   Empty activity groups render nothing. Turn failures and permission decisions
@@ -903,6 +922,13 @@ across three owners; none keeps another's state.
 | Electron main `electron/scheduled-tasks/` | The clock: checks after launch, every minute, and on resume or unlock; decides what is due in local time; claims through the server; finds or opens the project's window; asks it to start the run; records the outcome. |
 | Renderer agent feature | Starts the run's chat through the session's ordinary send path, answers whether its request was accepted, and reports how its first turn ended. Shows the task list in the chat's place. |
 
+- Project enumeration reads configured membership and starts schedule snapshots
+  independently, with a two-second wait per project. Slow projects return a
+  problem instead of an empty success. Concurrent scans share one pending read
+  per root until the actual filesystem operation settles; the deadline does not
+  cancel OS I/O. Completed reads are not cached, and switches/history are read
+  from current state after the snapshot. Neither timeout nor missing storage
+  changes configuration, claims work, or extends the clock's on-time window.
 - `shared/scheduled-task-timing.ts` is the one due rule: main decides what to claim
   with it, the list's adapter reads each task's next run and its missed days from it,
   and the server records the missed days with it when a claim follows them. Both
@@ -980,6 +1006,11 @@ data migration is not required by [maintenance policy](../MAINTENANCE.md#previou
   evidence of revocation. Network, timeout, rate-limit, and server failures preserve them.
   Credits and billing return 401 when authentication is lost during their request,
   as they do for a request begun signed out; other upstream failures remain 502.
+  Their renderer request owner re-reads the authoritative account query after a
+  typed authentication refusal, only while its initiating cached identity remains
+  current. Confirmed identity changes invalidate Agent readiness. A new email
+  login cancels old account reads before publishing its state. Transport failures
+  retain sign-in and Retry; recovery does not replay billing mutations.
   Unreadable Auth responses retain upstream status, content type, request ID and
   safe parse/transport causes. Parser body excerpts never enter diagnostics.
 - `server/hosted-auth-transport.ts` sends desktop Auth exchange, refresh, profile
@@ -1254,6 +1285,14 @@ allowance snapshot to the gateway so their explanation reflects held capacity.
   carry the renderer turn ID and initiating identity. Shared socket connection IDs
   exist before the first prompt. Context-read HTTP requests explicitly propagate
   their submitting turn ID; unrelated HTTP calls never inherit one globally.
+  Local JSON clients create a UUID before dispatch, and the host validates and
+  returns it so transport/body timeouts retain correlation. Bounded
+  `http_request_lifecycle` observations record a ten-second pending request and
+  its later finish or close, at most twice per request and for 100 concurrent
+  requests under the existing observation budget. A close is an observation,
+  not a failure diagnosis. Fast successes, assets, telemetry sinks and streams
+  are excluded. Routes omit query strings and dynamic path values; consent or
+  account changes invalidate pending observations without per-request storage.
   Native adapters report host acceptance, dispatch, permissions, tool boundaries
   and terminal facts independently of renderer delivery. The owned model broker
   reports request/response boundaries and failures directly. Stage transitions

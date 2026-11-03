@@ -49,6 +49,46 @@ The map is navigation, not proof that every caller has been reviewed.
 
 ## J01: Onboarding
 
+**Account and startup recovery (2026-11-03):** credits and billing now refresh
+host-owned account state after a typed authentication refusal. Confirmed expiry
+restores Sign in and invalidates Agent readiness; network errors keep the
+identity and Retry. Focused account, billing and panel tests cover stale refusals,
+overlapping account reads, new login, cancellation and no mutation replay.
+The expired-account and credit-network-failure Stories were inspected in Chrome,
+including Sign in and a Retry that preserves the account. Native startup now
+distinguishes an ordinary completed signed-out probe from a credential refusal,
+unanswered probe or MCP failure: only the ordinary prerequisite avoids failed
+setup/MCP diagnostics. Focused installer tests preserve explicit-check reporting
+and actual failure diagnostics, including mixed signed-out/401 probe output.
+The completion gate passed 118 host, 11 renderer and three controlled bundled
+runtime checks. After the final race/precedence corrections, affected account
+checks (35), installer checks (11), host/renderer types and target format/lint
+passed. Fresh renderer, Electron and service builds, built Electron smoke and
+documentation checks passed. The persistent private Claude onboarding profile
+opened its empty First essay project; native runtimes were uninstalled and
+Default required sign-in. These checks do not verify live account expiry,
+provider installation/OAuth, a completed real reply or returning-user login.
+
+**Invalid native credentials (2026-11-03):** a controlled Claude CLI reproduced
+`401 / OAuth access token is invalid` being reported as an unanswered sign-in
+check. `agentIsAuthenticated` now classifies completed probe output and passes a
+typed refusal to `AgentBootstrapCoordinator`, which offers explicit login and
+retains the refusal across cached-success rechecks. The existing installer suite
+exercises the real probe and login launcher through rejection, recheck and a new
+login; connection/503/unsupported-command output still offers check recovery.
+The catalog adapter test follows Claude's recovery through `/login` and preserves
+the diagnostic. Settings uses its existing Sign in presentation, with an
+`InvalidClaudeCredentials` Story for the refused probe.
+Host/renderer types, the core gate (114 host checks, 11 renderer checks and three
+bundled-runtime checks), 32 focused Settings checks and fresh builds passed.
+The isolated Electron Story visibly shows the 401 diagnostic and Sign in.
+Built Electron smoke passed across the initial run and resumed scenarios after
+dismissing a macOS crash-restoration dialog that had blocked the lifecycle test's
+launch. Renderer formatting/lint and documentation checks passed.
+The isolated persistent Claude onboarding app reached Welcome; its runtime
+catalog reports Claude uninstalled. Real installation, OAuth, invalid-token
+reauthentication, a completed provider reply and login reuse remain unverified.
+
 **Codex lifecycle verification (2026-11-02):** the fresh built app and host
 launched with `verify:onboarding --agent codex --built` in the persistent private
 profile. `/api/terminal/clis` reports Codex uninstalled, with no discovered host
@@ -1815,6 +1855,19 @@ Host/services: `server/retrieval/index.ts`, `server/indexer.mfs.ts`, `python/sta
   evaluation does not establish ranking quality.
 
 ## J06: Agent
+
+**Missing-runtime history recovery (2026-11-03):** the renderer preserves
+`412 AGENT_NOT_INSTALLED` as an installation prerequisite. Both the Chats sidebar
+and history popover offer Agents settings and Check again, retain cached chats
+and other agents' rows, and reserve Retry for ordinary failures. Closed popovers
+do not start history reads. Adapter, sidebar, popover, hook consumers and scheduled
+header regressions exercise this recovery and its settings composition. The
+`HistoryNeedsInstallation` Story was inspected in Chrome, with cached Claude
+history beside missing Codex and both recovery buttons visible. This does not
+verify installing or signing into the real Codex provider. The fresh built
+Electron app also opened the private empty project, received the real host's
+missing-Codex history prerequisite, and navigated through its recovery button
+to Agents settings with the Install control visible.
 
 **Codex ownership and history recovery (2026-11-02):** a real child-process
 fixture reproduces `already has an active writer` when a replacement resumes
@@ -4045,6 +4098,31 @@ Host/services: `server/routes/gallery.ts`, `server/github-import.ts`, `server/gi
   publication.
 
 ## J14: Scheduled tasks
+
+**Project-list isolation and diagnosis (2026-11-03):** a held unrelated directory
+stat reproduced a healthy registered-project lookup waiting on all projects.
+Exact membership now checks the selected root's availability; schedule scans
+read projects independently with a two-second wait and a problem entry for slow
+storage. Concurrent scans share pending reads until actual I/O settles, without
+changing definitions, switches, history or occurrence claims. Path comparison
+fast paths also prevent unrelated synchronous volume probes during state reads.
+Focused project/path/schedule regressions cover scope, malformed membership,
+slow-project isolation, current enabled state and recovery. The isolated
+`project-availability` profile measures the previous list at 12,047–12,306 ms
+and the isolated list at 2,001–2,002 ms with injected three-second stats; see the
+[scenario](../scripts/profiling/README.md#scenario-project-availability).
+Renderer and scheduler clients now retain a pre-dispatch request UUID through
+transport and body timeouts. Host lifecycle observations distinguish pending,
+finished and closed requests under bounded, consent-aware telemetry; they do
+not equate closure with failure. These changes fix demonstrated coupling and
+missing evidence, not the still-unproven cause of users' Windows timeouts or
+WebSocket 1006 closures. Actual device service/process evidence remains needed.
+The final slow-storage regressions hold both root stat and task-file open,
+retain enabled switches, and verify missing storage stays quiet. Seven built
+Electron scheduler checks pass, including request IDs across transport/body
+timeouts with no request replay. Built smoke also passes controlled renderer
+and network-process closure correlation and reconnection; injected process
+termination does not establish the cause of users' historical disconnects.
 
 **Intent:** [J14](../design-docs/journeys/README.md#j14-run-a-scheduled-task-in-a-project).
 
