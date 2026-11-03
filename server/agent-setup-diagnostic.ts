@@ -3,6 +3,10 @@
  * apart from a missing or unreadable sign-in. The message is the provider's. */
 export class AgentAccountRefusedError extends Error {}
 
+/** The provider explicitly rejected the stored credential during a status
+ * probe. A later cached signed-in result cannot replace a new browser login. */
+export class AgentAuthenticationRequiredError extends Error {}
+
 /** Preserve bounded, plain-text setup diagnostics, including Node fetch causes. */
 export function agentSetupDiagnostic(error: unknown): string {
   const seen = new Set<unknown>();

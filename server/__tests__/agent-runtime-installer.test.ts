@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test, { mock } from 'node:test';
 import { agentCliSearchDirs, resolveAgentCli, resolveAgentCliWithLoginShell } from '../agent-cli.ts';
+import { AgentAuthenticationRequiredError } from '../agent-setup-diagnostic.ts';
 import {
   AgentBootstrapCoordinator,
   agentIsAuthenticated,
@@ -64,7 +65,7 @@ async function prepare(coordinator: AgentBootstrapCoordinator, id: 'codex' | 'cl
   return coordinator.wait(id);
 }
 
-async function connect(coordinator: AgentBootstrapCoordinator, id: 'codex' | 'claude', options?: { probeLoginShell?: boolean }) {
+async function connect(coordinator: AgentBootstrapCoordinator, id: 'codex' | 'claude', options?: { probeLoginShell?: boolean; source?: 'startup' }) {
   coordinator.connectIfInstalled(id, options);
   return coordinator.wait(id);
 }
@@ -129,6 +130,67 @@ else exit 42; fi
     assert.equal((await prepare(coordinator, 'claude')).failure?.code, 'authentication-required');
     coordinator.login('claude');
     assert.equal((await coordinator.wait('claude')).phase, 'ready');
+  });
+
+test('native credential rejection requires a new login even when a later status reads cached sign-in',
+  { skip: process.platform === 'win32' }, async (t) => {
+    for (const id of ['claude', 'codex'] as const) {
+      for (const mixedSignedOut of [false, true]) {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-native-refused-'));
+        t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+        const executable = path.join(root, id);
+        const statusCommand = id === 'claude' ? 'auth status' : 'login status';
+        const loginCommand = id === 'claude' ? 'auth login' : 'login ';
+        const signedOut = mixedSignedOut ? (id === 'claude' ? '{"loggedIn":false}' : 'Not logged in') : '';
+        fs.writeFileSync(executable, `#!/bin/sh
+if [ "$1 $2" = '${statusCommand}' ]; then
+  if [ -f '${root}/cached-sign-in' ]; then echo '{"loggedIn":true}'; exit 0; fi
+  echo '${signedOut}'
+  echo 'API Error: 401 {"error":{"type":"authentication_error","message":"OAuth access token is invalid"}}' >&2
+  exit 1
+elif [ "$1 $2" = '${loginCommand}' ]; then touch '${root}/login-ran'
+else exit 42; fi
+`, { mode: 0o755 });
+        const fixture = fakeDependencies({
+          resolveExecutable: () => executable,
+          isAuthenticated: agentIsAuthenticated,
+          login: loginToAgent,
+        });
+        const coordinator = new AgentBootstrapCoordinator(fixture.dependencies);
+        const refused = await connect(coordinator, id, { source: 'startup' });
+        assert.equal(refused.failure?.code, 'authentication-required');
+        assert.equal(refused.failure?.retryAction, 'login');
+        assert.match(refused.failure?.message ?? '', /401.*OAuth access token is invalid/);
+        assert.equal(coordinator.isExpectedSignOut(id, refused), false, 'an explicit refusal is not ordinary signed-out startup');
+        assert.equal(fs.existsSync(path.join(root, 'login-ran')), false, 'a status check never launches login');
+        fs.writeFileSync(path.join(root, 'cached-sign-in'), '');
+        assert.equal((await prepare(coordinator, id)).failure?.code, 'authentication-required');
+        assert.equal(fixture.configured(), 0, 'a cached sign-in cannot erase the provider refusal');
+        coordinator.login(id);
+        assert.equal((await coordinator.wait(id)).phase, 'ready');
+        assert.equal(fs.existsSync(path.join(root, 'login-ran')), true, 'explicit sign-in must run the browser login');
+        assert.equal(fixture.configured(), 1);
+        assert.equal((await connect(coordinator, id)).phase, 'ready');
+      }
+    }
+  });
+
+test('unanswered native sign-in checks retain check recovery instead of requesting a new login',
+  { skip: process.platform === 'win32' }, async (t) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-auth-check-'));
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    // A path's digits are not provider output and cannot establish an HTTP 401.
+    const executable = path.join(root, 'claude-401');
+    for (const message of ['fetch failed: ECONNRESET', 'OAuth service unavailable: 503', 'unknown command: auth status']) {
+      fs.writeFileSync(executable, `#!/bin/sh\necho '${message}' >&2\nexit 1\n`, { mode: 0o755 });
+      const fixture = fakeDependencies({ resolveExecutable: () => executable, isAuthenticated: agentIsAuthenticated });
+      const coordinator = new AgentBootstrapCoordinator(fixture.dependencies);
+      const failed = await connect(coordinator, 'claude');
+      assert.equal(failed.failure?.code, 'authentication-check-failed');
+      assert.equal(failed.failure?.retryAction, 'bootstrap');
+      assert.ok(failed.failure?.message.includes(message));
+      assert.equal(fixture.configured(), 0);
+    }
   });
 
 test('installer failures retain stdout and network cause diagnostics', { skip: process.platform === 'win32' }, async (t) => {
@@ -708,11 +770,69 @@ test('startup connects MCP for discovered runtimes without installing missing on
   });
   const coordinator = new AgentBootstrapCoordinator(fake.dependencies);
 
-  assert.equal((await connect(coordinator, 'codex')).phase, 'ready');
+  assert.equal((await connect(coordinator, 'codex', { source: 'startup' })).phase, 'ready');
   installed = false;
-  assert.equal((await connect(coordinator, 'claude')).phase, 'idle');
+  assert.equal((await connect(coordinator, 'claude', { source: 'startup' })).phase, 'idle');
   assert.equal(installs, 0);
   assert.equal(configured, 1);
+});
+
+test('ordinary signed-out startup keeps login recovery without a failed setup report', async (t) => {
+  const { telemetry } = await import('../telemetry.ts');
+  const events: any[] = [];
+  t.mock.method(telemetry, 'scoped', () => (event: unknown) => events.push(event));
+  let signedIn = false;
+  const fixture = fakeDependencies({
+    resolveExecutable: () => '/system/claude',
+    isAuthenticated: () => signedIn,
+    login: async () => { signedIn = true; },
+  });
+  const coordinator = new AgentBootstrapCoordinator(fixture.dependencies);
+  const status = await connect(coordinator, 'claude', { source: 'startup' });
+  assert.equal(status.failure?.code, 'authentication-required');
+  assert.equal(status.failure?.retryAction, 'login');
+  assert.equal(coordinator.isExpectedSignOut('claude', status), true);
+  assert.equal(fixture.configured(), 0);
+  assert.equal(events.length, 0, 'a normal startup prerequisite is not failed setup');
+
+  await connect(coordinator, 'claude');
+  const explicit = events.find(event => event.event === 'agent_setup_result');
+  assert.equal(explicit.context.action, 'connect');
+  assert.equal(explicit.context.retry_of, undefined, 'no retry link to an unreported startup');
+  assert.equal(explicit.failure_stage, 'authentication');
+  coordinator.login('claude');
+  assert.equal((await coordinator.wait('claude')).phase, 'ready');
+  assert.equal(coordinator.isExpectedSignOut('claude'), false);
+  assert.equal(fixture.configured(), 1);
+});
+
+test('startup retains diagnostics for rejected credentials, unanswered probes, and MCP failures', async (t) => {
+  const { telemetry } = await import('../telemetry.ts');
+  const events: any[] = [];
+  t.mock.method(telemetry, 'scoped', () => (event: unknown) => events.push(event));
+  for (const scenario of ['credential-rejected', 'previous-refusal', 'check-failed', 'mcp-failed'] as const) {
+    events.length = 0;
+    const fixture = fakeDependencies({
+      resolveExecutable: () => '/system/claude',
+      isAuthenticated: () => {
+        if (scenario === 'credential-rejected') throw new AgentAuthenticationRequiredError('401 OAuth access token is invalid');
+        if (scenario === 'check-failed') throw new Error('Agent probe timed out after 10000ms.');
+        return scenario !== 'previous-refusal';
+      },
+      configureMcp: () => { if (scenario === 'mcp-failed') throw new Error('EACCES: MCP config is not writable'); },
+    });
+    const coordinator = new AgentBootstrapCoordinator(fixture.dependencies);
+    if (scenario === 'previous-refusal') coordinator.requireSignIn('claude', 'Provider refused the stored credential.');
+    const status = await connect(coordinator, 'claude', { source: 'startup' });
+    assert.equal(status.phase, 'failed', scenario);
+    assert.equal(coordinator.isExpectedSignOut('claude', status), false, scenario);
+    const results = events.filter(event => event.event === 'agent_setup_result');
+    assert.equal(results.length, 1, scenario);
+    assert.equal(results[0].context.action, 'startup', scenario);
+    assert.equal(results[0].outcome, 'failed', scenario);
+    assert.equal(results[0].failure_stage, scenario === 'mcp-failed' ? 'mcp' : 'authentication', scenario);
+    assert.ok(results[0].diagnostic.message, scenario);
+  }
 });
 
 test('recheck recovers a failed setup from an externally installed runtime without downloading', async () => {
@@ -754,7 +874,7 @@ test('startup MCP repair does not consume the next explicit setup failure', asyn
   });
   const coordinator = new AgentBootstrapCoordinator(fake.dependencies);
 
-  assert.equal((await connect(coordinator, 'codex')).phase, 'ready');
+  assert.equal((await connect(coordinator, 'codex', { source: 'startup' })).phase, 'ready');
   assert.equal(configured, 1);
   assert.equal(nextFailure, 'mcp');
   assert.equal((await prepare(coordinator, 'codex')).failure?.stage, 'mcp');

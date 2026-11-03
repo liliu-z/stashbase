@@ -369,8 +369,9 @@ const server = app.listen(PORT, '127.0.0.1', () => {
     log.warn(`MCP HTTP startup failed:`, err);
   });
   void connectInstalledAgentMcpOnStartup().then((results) => {
-    for (const { id, status } of results) {
+    for (const { id, status, expectedSignOut } of results) {
       if (status.phase === 'ready') log.info(`connected StashBase MCP for installed ${id} runtime`);
+      else if (expectedSignOut) log.info(`installed ${id} needs sign-in before connecting StashBase MCP`);
       else if (status.phase === 'failed') log.warn(`could not connect StashBase MCP for ${id}: ${status.failure?.message ?? 'unknown error'}`);
     }
   }).catch((error) => log.warn(`Agent startup check failed:`, error));

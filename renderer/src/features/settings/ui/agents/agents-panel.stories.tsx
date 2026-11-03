@@ -145,6 +145,32 @@ export const RenewalCanceled: Story = { args: { account: signedIn, port: subscri
 
 export const NeedsSignIn: Story = { args: { account: signedOut, port: accountRequiredPort() } };
 
+export const InvalidClaudeCredentials: Story = {
+  args: {
+    account: signedIn,
+    port: {
+      ...fakePort(),
+      listAgents: async () =>
+        catalog([
+          codex,
+          {
+            ...claude,
+            preparation: {
+              kind: 'failed',
+              failure: {
+                note: 'Claude · Check · authentication\n401 / OAuth access token is invalid',
+                refusal: 'authentication-required',
+                retryAction: 'login',
+                stage: 'authenticate',
+              },
+            },
+          },
+          stashbase,
+        ]),
+    },
+  },
+};
+
 export const UpdateOffersAModel: Story = {
   args: { account: signedIn, port: upgradeOfferedPort() },
 };

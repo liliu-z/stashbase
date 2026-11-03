@@ -19,7 +19,8 @@ import {
 } from './agent-runtime-paths.ts';
 import { probeAgentCommand } from './agent-probe.ts';
 import { agentCliLaunch } from './agent-cli-launch.ts';
-import { AgentAccountRefusedError, agentSetupDiagnostic } from './agent-setup-diagnostic.ts';
+import { AgentAccountRefusedError, AgentAuthenticationRequiredError, agentSetupDiagnostic } from './agent-setup-diagnostic.ts';
+import { classifyAgentTurnFailure } from './agent-turn-failure.ts';
 import { ensureAgentMcp } from './agent-mcp.ts';
 import {
   agentCliEnv,
@@ -97,6 +98,9 @@ export class AgentBootstrapCoordinator {
   private readonly diagnostics = new Map<NativeAgentId, ErrorDiagnostic>();
   /** Runtimes whose provider refused the stored sign-in since it last became ready. */
   private readonly refusedSignIns = new Map<NativeAgentId, string>();
+  /** Only a completed status check that found no sign-in is expected at boot.
+   * Tie the marker to its exact status so a later failure cannot inherit it. */
+  private readonly signedOutStatuses = new WeakSet<AgentBootstrapStatus>();
   /** Runtimes whose running preparation the reader stopped. */
   private readonly stopped = new Set<NativeAgentId>();
 
@@ -107,6 +111,10 @@ export class AgentBootstrapCoordinator {
 
   status(id: NativeAgentId): AgentBootstrapStatus {
     return this.statuses.get(id) ?? IDLE_STATUS;
+  }
+
+  isExpectedSignOut(id: NativeAgentId, status = this.status(id)): boolean {
+    return this.signedOutStatuses.has(status) && !this.refusedSignIns.has(id);
   }
 
   begin(id: NativeAgentId): AgentBootstrapStatus {
@@ -127,8 +135,9 @@ export class AgentBootstrapCoordinator {
   }
 
   /** Startup and explicit recheck can repair installed runtimes, never download. */
-  connectIfInstalled(id: NativeAgentId, options?: { probeLoginShell?: boolean }): AgentBootstrapStatus {
-    return this.start(id, 'connect', options);
+  connectIfInstalled(id: NativeAgentId, options?: { probeLoginShell?: boolean; source?: 'startup' }): AgentBootstrapStatus {
+    const { source, ...discovery } = options ?? {};
+    return this.start(id, 'connect', discovery, source);
   }
 
   /** Run the official standalone installer, then reconnect authentication and
@@ -141,6 +150,7 @@ export class AgentBootstrapCoordinator {
     id: NativeAgentId,
     action: AgentBootstrapAction | 'connect',
     options?: { probeLoginShell?: boolean },
+    source?: 'startup',
   ): AgentBootstrapStatus {
     if (this.runs.has(id)) {
       if (action !== 'connect' && action !== this.actions.get(id)) {
@@ -154,7 +164,7 @@ export class AgentBootstrapCoordinator {
     this.attempts.set(id, attemptId);
     const startedAt = Date.now();
     const capture = telemetry.scoped();
-    const context = { attempt_id: attemptId, ...(retryOf ? { retry_of: retryOf } : {}), action };
+    const context = { attempt_id: attemptId, ...(retryOf ? { retry_of: retryOf } : {}), action: source ?? action };
     const reportStage = (stage: AgentBootstrapFailureStage, outcome: 'started' | 'success') => {
       if (action !== 'connect') capture({ event: 'agent_setup_stage', runtime: id, attempt_id: attemptId, stage, outcome, context });
     };
@@ -265,7 +275,11 @@ export class AgentBootstrapCoordinator {
       }
     }).finally(() => {
       const status = this.status(id);
-      if (action !== 'connect' || status.phase === 'failed') capture({ event: 'agent_setup_result', runtime: id,
+      const expectedStartupSignOut = source === 'startup' && this.isExpectedSignOut(id, status);
+      // Startup discovery is not a failed setup when no sign-in was stored.
+      // Do not link a later explicit action to an attempt we never reported.
+      if (expectedStartupSignOut) this.attempts.delete(id);
+      else if (action !== 'connect' || status.phase === 'failed') capture({ event: 'agent_setup_result', runtime: id,
         context: { ...context, elapsed_ms: Date.now() - startedAt },
         stage: action === 'login' ? 'login' : action === 'update' ? 'update' : action === 'connect' ? 'connect' : 'prepare',
         outcome: signal.aborted && signal.reason?.name === 'AbortError' ? 'cancelled' : status.phase === 'ready' ? 'success' : 'failed',
@@ -306,9 +320,15 @@ export class AgentBootstrapCoordinator {
       if (authenticated && (refusal === undefined || action === 'login')) return true;
       this.fail(id, action, 'authentication', 'authentication-required',
         new Error(refusal ?? `${agentLabel(id)} is installed, but it is not signed in.`), undefined, 'login');
+      if (!authenticated && refusal === undefined) this.signedOutStatuses.add(this.status(id));
     } catch (error) {
       // A stop or timeout is the run's to report, not a failed check.
       if (signal.aborted) throw error;
+      if (error instanceof AgentAuthenticationRequiredError) {
+        this.refusedSignIns.set(id, error.message);
+        this.fail(id, action, 'authentication', 'authentication-required', error, undefined, 'login');
+        return false;
+      }
       if (error instanceof AgentAccountRefusedError) {
         this.fail(id, action, 'authentication', 'account-refused', error);
         return false;
@@ -425,10 +445,19 @@ export async function agentIsAuthenticated(
     signal,
     env: agentCliEnv({}, [commandDir(executable)]),
   });
-  const output = `${result.stdout}\n${result.stderr}`.replace(/\s+/g, ' ').trim().slice(-800);
+  const output = `${result.stdout}\n${result.stderr}`.replace(/\s+/g, ' ').trim();
   if (result.status === 0) return true;
-  if (result.status === 1 && (id === 'claude' ? /"loggedIn"\s*:\s*false/.test(output) : /not logged in/i.test(output))) return false;
-  throw new Error(`Could not check ${agentLabel(id)} sign-in using ${executable} (exit ${result.status ?? 'unknown'}${output ? `: ${output}` : ''}).`);
+  const signedOutMarker = id === 'claude' ? /"loggedIn"\s*:\s*false/g : /not logged in/gi;
+  const signedOut = result.status === 1 && signedOutMarker.test(output);
+  const detail = `using ${executable} (exit ${result.status ?? 'unknown'}${output ? `: ${output.slice(-800)}` : ''}).`;
+  // Read only completed probe output, never a launch/timeout error or the
+  // executable path. The ordinary signed-out marker is not a refusal, but
+  // cannot hide an explicit rejected credential elsewhere in the output.
+  if (classifyAgentTurnFailure(signedOut ? output.replace(signedOutMarker, '') : output) === 'auth-expired') {
+    throw new AgentAuthenticationRequiredError(`${agentLabel(id)} sign-in was rejected. Sign in again.\nStatus ${detail}`);
+  }
+  if (signedOut) return false;
+  throw new Error(`Could not check ${agentLabel(id)} sign-in ${detail}`);
 }
 
 const AGENT_LOGIN_TIMEOUT_MS = 10 * 60_000;
@@ -630,10 +659,11 @@ export function recheckAgentBootstrap(id: NativeAgentId): AgentBootstrapStatus {
 }
 
 /** One asynchronous startup pass includes login-shell discovery. */
-export async function connectInstalledAgentMcpOnStartup(): Promise<Array<{ id: NativeAgentId; status: AgentBootstrapStatus }>> {
+export async function connectInstalledAgentMcpOnStartup(): Promise<Array<{ id: NativeAgentId; status: AgentBootstrapStatus; expectedSignOut: boolean }>> {
   return Promise.all(NATIVE_AGENT_IDS.map(async (id) => {
-    agentBootstrapCoordinator.connectIfInstalled(id, { probeLoginShell: true });
-    return { id, status: await agentBootstrapCoordinator.wait(id) };
+    agentBootstrapCoordinator.connectIfInstalled(id, { probeLoginShell: true, source: 'startup' });
+    const status = await agentBootstrapCoordinator.wait(id);
+    return { id, status, expectedSignOut: agentBootstrapCoordinator.isExpectedSignOut(id, status) };
   }));
 }
 

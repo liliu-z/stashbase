@@ -80,7 +80,8 @@ describe('agent catalog adapter', () => {
   });
 
   it('connects through the host-selected sign-in recovery, including an unanswered Antigravity check', async () => {
-    const signedOut = (id: string, code: string, retryAction?: string) =>
+    const invalidCredential = '401 / OAuth access token is invalid';
+    const signedOut = (id: string, code: string, retryAction?: string, message = 'Sign in.') =>
       runtime({
         id,
         state: 'failed',
@@ -91,7 +92,7 @@ describe('agent catalog adapter', () => {
             code,
             retryAction,
             retryable: true,
-            message: 'Sign in.',
+            message,
           },
         },
       });
@@ -103,20 +104,41 @@ describe('agent catalog adapter', () => {
           signedOut('claude', 'authentication-check-failed'),
           signedOut('antigravity', 'authentication-check-failed', 'login'),
           signedOut('antigravity', 'account-refused', 'bootstrap'),
+          signedOut('claude', 'authentication-required', 'login', invalidCredential),
         ],
       }),
     );
     const { agents } = await adapter.listAgents(signal);
-    expect(agents.map((agent) => agent.needsSignIn)).toEqual([true, true, false, true, false]);
-    const paths: string[] = [];
-    const connection = createAgentCatalogAdapter({
-      request: async (request) => {
-        paths.push(request.path);
-        return { status: 200, body: { clis: [runtime({ id: 'antigravity' })] } };
-      },
+    expect(agents.map((agent) => agent.needsSignIn)).toEqual([
+      true,
+      true,
+      false,
+      true,
+      false,
+      true,
+    ]);
+    expect(agents[5]?.setupFailure).toEqual({
+      stage: 'authentication',
+      message: invalidCredential,
+      retryAction: 'login',
     });
-    await connectAgent(connection, 'antigravity', agents[3], signal);
-    expect(paths).toEqual(['/api/terminal/clis/antigravity/login']);
+    const paths: string[] = [];
+    for (const [id, index] of [
+      ['antigravity', 3],
+      ['claude', 5],
+    ] as const) {
+      const connection = createAgentCatalogAdapter({
+        request: async (request) => {
+          paths.push(request.path);
+          return { status: 200, body: { clis: [runtime({ id })] } };
+        },
+      });
+      await connectAgent(connection, id, agents[index], signal);
+    }
+    expect(paths).toEqual([
+      '/api/terminal/clis/antigravity/login',
+      '/api/terminal/clis/claude/login',
+    ]);
   });
 
   it('reads a running phase as the step the first-send dialog reports', async () => {
