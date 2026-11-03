@@ -154,6 +154,7 @@ function setup(initial: ProjectSchedule = busy, overrides: Partial<ScheduledTask
     <ScheduledTasksView
       catalog={agentCatalogPort()}
       header
+      onOpenAgentSettings={vi.fn()}
       port={port}
       runtime={runtime}
       scope={SCOPE}

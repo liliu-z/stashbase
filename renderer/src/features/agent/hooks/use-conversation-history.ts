@@ -14,7 +14,7 @@ import { useState } from 'react';
 import {
   agentFailure,
   failureKind,
-  type AgentContextErrorKind,
+  type AgentFailureKind,
 } from '@/features/agent/application/failure-messages';
 import type { AgentSessionRuntime } from '@/features/agent/application/session-runtime';
 import type { AgentWorkspaceRuntime } from '@/features/agent/application/workspace-runtime';
@@ -29,9 +29,7 @@ const HISTORY_QUERY_ROOT = ['agent', 'history'] as const;
  *  whether the service refused the change or nothing was ever asked of it,
  *  so a refusal carries the kind behind it and the caller decides how to
  *  say so. */
-export type AgentHistoryMutation =
-  | { kind: 'done' }
-  | { kind: 'refused'; reason: AgentContextErrorKind };
+export type AgentHistoryMutation = { kind: 'done' } | { kind: 'refused'; reason: AgentFailureKind };
 
 function scopeKey(scope: AgentScope): string {
   return `folder:${scope.path}`;
@@ -104,6 +102,10 @@ export function useRenameConversation(runtime: AgentWorkspaceRuntime) {
   };
 }
 
+function needsInstallation(query: UseQueryResult<AgentHistoryEntry[]>) {
+  return query.isError && failureKind(query.error) === 'installation-required';
+}
+
 /** useQueries returns a new result array on each render. Combining at the
  * query boundary preserves unchanged history rows, so streaming a reply does
  * not continuously reset the history popover's keyboard selection. */
@@ -111,13 +113,27 @@ function combineHistory(queries: UseQueryResult<AgentHistoryEntry[]>[]) {
   const history = queries.flatMap((query) => query.data ?? []);
   return {
     history,
-    failedAgents: AGENT_ORDER.filter((_, index) => queries[index]?.isError),
+    installationRequired: AGENT_ORDER.filter((_, index) => {
+      const query = queries[index];
+      return query && needsInstallation(query);
+    }),
+    failedAgents: AGENT_ORDER.filter((_, index) => {
+      const query = queries[index];
+      return query?.isError && !needsInstallation(query);
+    }),
     loading: queries.some((query) => query.isLoading) && history.length === 0,
-    refetch: queries.map((query) => query.refetch),
+    refetch: queries
+      .filter((query) => query.isError && !needsInstallation(query))
+      .map((query) => query.refetch),
+    checkInstallation: queries.filter(needsInstallation).map((query) => query.refetch),
   };
 }
 
-export function useConversationHistory(runtime: AgentWorkspaceRuntime, scope: AgentScope) {
+export function useConversationHistory(
+  runtime: AgentWorkspaceRuntime,
+  scope: AgentScope,
+  enabled = true,
+) {
   const queryClient = useQueryClient();
   const signalFor = useRequestSignals<'remove' | 'rename'>();
   const [mutationFailure, setMutationFailure] = useState<string | null>(null);
@@ -139,6 +155,7 @@ export function useConversationHistory(runtime: AgentWorkspaceRuntime, scope: Ag
     queries: AGENT_ORDER.map((agent) => ({
       queryKey: historyQueryKey(agent, scope),
       queryFn: ({ signal }: { signal: AbortSignal }) => runtime.listHistory(agent, scope, signal),
+      enabled,
       gcTime: Infinity,
       retry: false,
       staleTime: 5_000,
@@ -171,6 +188,7 @@ export function useConversationHistory(runtime: AgentWorkspaceRuntime, scope: Ag
     clearMutationFailure: () => setMutationFailure(null),
     history,
     historyFailure,
+    installationRequired: result.installationRequired,
     historyLoading: result.loading,
     mutationFailure,
     mutationPending: rename.isPending || remove.isPending,
@@ -191,5 +209,6 @@ export function useConversationHistory(runtime: AgentWorkspaceRuntime, scope: Ag
       }
     },
     retry: () => Promise.all(result.refetch.map((refetch) => refetch())),
+    checkInstallation: () => Promise.all(result.checkInstallation.map((refetch) => refetch())),
   };
 }

@@ -1,7 +1,8 @@
 /** Owns the live WebSocket and HTTP conversation history. Wire translation stays
  * in session-wire; this adapter validates frames and classifies transport failures. */
+import type { AgentHistoryExtra } from '@/features/agent/application/failure-messages';
 import {
-  AgentSessionError,
+  AgentHistoryError,
   type AgentConnectionListener,
   type AgentSessionPort,
 } from '@/features/agent/application/ports';
@@ -71,9 +72,21 @@ function historyEntry(
   };
 }
 
-function history(path: string, signal: AbortSignal): TransportRequest {
+function history(path: string, signal: AbortSignal): TransportRequest<AgentHistoryExtra> {
   return {
-    error: AgentSessionError,
+    error: AgentHistoryError,
+    failure: ({ response, serverMessage }) => {
+      const failure = agentSessionFailureSchema.safeParse(response.body);
+      return response.status === 412 &&
+        failure.success &&
+        failure.data.code === 'AGENT_NOT_INSTALLED'
+        ? new AgentHistoryError(
+            'installation-required',
+            'The agent is not installed.',
+            serverMessage ? { cause: new Error(serverMessage) } : undefined,
+          )
+        : null;
+    },
     failureSchema: agentSessionFailureSchema,
     path,
     signal,

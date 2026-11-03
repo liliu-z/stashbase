@@ -376,6 +376,11 @@ process stopped successfully. A later confirmed exit releases the retired
 runtime without replaying a request or changing the original timeout into success.
 An uninstalled agent is an installation prerequisite when reading its history,
 not a server failure or evidence that its native history is empty.
+The Chats sidebar and history popover identify the missing installation and open
+Agents settings, with an explicit check after installation. Other agents' history
+and previously loaded chats remain visible. A closed history popover starts no
+listing request; opening it reads the current history. Ordinary history failures
+keep their separate Retry action.
 Repeated identical native retry errors appear once per turn while retries continue;
 a final short-term request limit or accounting-recovery refusal remains a rate-limit
 failure with manual recovery. Accounting recovery may require service-side

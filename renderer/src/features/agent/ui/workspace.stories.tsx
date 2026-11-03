@@ -8,6 +8,7 @@ import type {
   AgentToolChange,
   AgentToolsPort,
 } from '@/features/agent/application/ports';
+import { AgentHistoryError } from '@/features/agent/application/ports';
 import { createAgentWorkspaceRuntime } from '@/features/agent/application/workspace-runtime';
 import type {
   Agent,
@@ -189,6 +190,7 @@ function WorkspacePreview({
   docked = false,
   empty = false,
   followUp = false,
+  historyNeedsInstallation = false,
   interrupted = false,
   preparation,
   ready = true,
@@ -206,6 +208,7 @@ function WorkspacePreview({
   empty?: boolean;
   /** A follow-up sent into the running turn waits for the agent to read it. */
   followUp?: boolean;
+  historyNeedsInstallation?: boolean;
   interrupted?: boolean;
   /** The step Codex's preparation stays on once the reader connects it. */
   preparation?: AgentPreparation;
@@ -280,7 +283,23 @@ function WorkspacePreview({
             },
           };
         },
-        list: async () => [],
+        list: async (agent, scope) => {
+          if (historyNeedsInstallation && agent === 'codex') {
+            throw new AgentHistoryError('installation-required', 'Codex is not installed.');
+          }
+          return historyNeedsInstallation && agent === 'claude'
+            ? [
+                {
+                  agent,
+                  hasContent: true,
+                  id: 'claude-draft',
+                  lastModified: Date.now(),
+                  scope,
+                  title: 'Planning my next essay',
+                },
+              ]
+            : [];
+        },
         remove: async () => undefined,
         rename: async (entry) => entry,
         replay: async () => ({ effort: null, transcript: [] }),
@@ -452,6 +471,7 @@ function WorkspacePreview({
     currentDocument,
     empty,
     followUp,
+    historyNeedsInstallation,
     interrupted,
     skills,
   ]);
@@ -650,6 +670,15 @@ export const SetupFailure: Story = {
 
 export const StartupSignInRequired: Story = {
   args: { empty: true, startupFailure: 'auth-expired' },
+};
+export const HistoryNeedsInstallation: Story = {
+  args: { empty: true, historyNeedsInstallation: true },
+  play: async () => {
+    await readyWorkspace();
+    await userEvent.click(screen.getByRole('button', { name: 'Chat history' }));
+    await screen.findByText('Install Codex to access saved chats.');
+    await screen.findByRole('option', { name: /Planning my next essay/ });
+  },
 };
 export const StartupUpdateRequired: Story = {
   args: { empty: true, startupFailure: 'runtime-outdated' },

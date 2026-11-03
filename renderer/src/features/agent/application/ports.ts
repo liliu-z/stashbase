@@ -1,7 +1,10 @@
 /** The agent feature's ports: the services a conversation, its catalog,
  *  personas, tools, and context reach through, each implemented in
  *  `infrastructure/`. */
-import type { AgentContextExtra } from '@/features/agent/application/failure-messages';
+import type {
+  AgentContextExtra,
+  AgentHistoryExtra,
+} from '@/features/agent/application/failure-messages';
 import type { AgentAccessMode } from '@/features/agent/domain/access';
 import type { AgentCatalog } from '@/features/agent/domain/agent-catalog';
 import type { AgentHistoryEntry } from '@/features/agent/domain/conversation-history';
@@ -161,6 +164,9 @@ export interface AgentReconnectScheduler {
 
 export type AgentSessionError = FeatureError;
 export const AgentSessionError = featureErrorClass('AgentSessionError');
+
+export type AgentHistoryError = FeatureError<AgentHistoryExtra>;
+export const AgentHistoryError = featureErrorClass<AgentHistoryExtra>('AgentHistoryError');
 
 export type AgentContextError = FeatureError<AgentContextExtra>;
 export const AgentContextError = featureErrorClass<AgentContextExtra>('AgentContextError');

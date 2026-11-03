@@ -6,6 +6,29 @@ import { httpClient } from '@/test/fakes/http';
 import { createAgentSessionAdapter } from './session-api';
 
 describe('Agent session API', () => {
+  it('keeps a missing runtime distinct from a lost project or an unavailable history service', async () => {
+    const scope = { kind: 'folder', path: '/Research' } as const;
+    const signal = new AbortController().signal;
+    for (const [status, code, kind] of [
+      [412, 'AGENT_NOT_INSTALLED', 'installation-required'],
+      [412, 'NO_FOLDER', 'scope-lost'],
+      [500, 'AGENT_NOT_INSTALLED', 'unavailable'],
+    ] as const) {
+      const message =
+        'Codex CLI not found. Install Codex in Settings → Agents to access its chats.';
+      const adapter = createAgentSessionAdapter(
+        {
+          request: async () => ({ status, body: { code, error: message } }),
+        },
+        'http://127.0.0.1:1',
+      );
+      await expect(adapter.list('codex', scope, signal)).rejects.toMatchObject({
+        kind,
+        cause: { message },
+      });
+    }
+  });
+
   it('recognizes explicit clean server retirement while retaining unexpected closes and prior failures', () => {
     for (const scenario of ['retired', 'unknown-clean', 'lost', 'failed'] as const) {
       let receive: (message: { data: unknown }) => void = vi.fn();

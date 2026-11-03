@@ -25,6 +25,7 @@ export default function AgentWorkspaceSurface(props: AgentWorkspaceProps) {
         <ScheduledTasksView
           catalog={props.catalog}
           header={props.header !== false}
+          onOpenAgentSettings={props.onOpenAgentSettings}
           port={props.scheduledTasks}
           runtime={props.runtime}
           scope={scope}

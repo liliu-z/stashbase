@@ -166,6 +166,7 @@ function Preview({ schedule }: { schedule: ProjectSchedule }) {
         <ScheduledTasksView
           catalog={catalog}
           header
+          onOpenAgentSettings={() => undefined}
           port={port(schedule)}
           runtime={runtime}
           scope={SCOPE}

@@ -39,6 +39,7 @@ export interface ScheduledTasksViewProps {
   /** Whether the page draws its own name row, as the chat pane does beside
    *  Documents; in Chats the titlebar names it. */
   header: boolean;
+  onOpenAgentSettings(): void;
   port: ScheduledTasksPort;
   runtime: AgentWorkspaceRuntime;
   scope: AgentScope;
@@ -52,6 +53,7 @@ const SECTION_LABEL = 'm-0 text-caption font-medium text-muted-foreground';
 export function ScheduledTasksView({
   catalog,
   header,
+  onOpenAgentSettings,
   port,
   runtime,
   scope,
@@ -112,7 +114,11 @@ export function ScheduledTasksView({
           </h2>
           <div className="-mr-2 ml-auto flex shrink-0 items-center gap-1">
             <ScheduledTasksButton runtime={runtime} />
-            <ChatHistoryPopover runtime={runtime} scope={scope} />
+            <ChatHistoryPopover
+              onOpenAgentSettings={onOpenAgentSettings}
+              runtime={runtime}
+              scope={scope}
+            />
             <NewChatButton catalog={catalog} runtime={runtime} scope={scope} />
           </div>
         </div>

@@ -139,9 +139,7 @@ function ChatWorkspace({
   const rememberedModels = readyAgent?.models;
   const unstarted = state.connection.kind === 'draft';
   useEffect(() => {
-    if (unstarted && rememberedModels && rememberedModels.length > 0) {
-      active.seedModels(rememberedModels);
-    }
+    if (unstarted && rememberedModels?.length) active.seedModels(rememberedModels);
   }, [active, rememberedModels, unstarted]);
   const composerFocused = useAgentComposerFocused();
   const rotatingPrompt = useRotatingPrompt(EMPTY_CHAT_PROMPTS, composerFocused || !empty);
@@ -182,7 +180,11 @@ function ChatWorkspace({
         trailing={
           <>
             {scheduledTasks && <ScheduledTasksButton runtime={runtime} />}
-            <ChatHistoryPopover runtime={runtime} scope={state.scope} />
+            <ChatHistoryPopover
+              onOpenAgentSettings={onOpenAgentSettings}
+              runtime={runtime}
+              scope={state.scope}
+            />
             <NewChatButton catalog={catalogPort} runtime={runtime} scope={state.scope} />
           </>
         }

@@ -1,11 +1,11 @@
 /** The conversation list beside the canvas: which saved chats belong to this
  *  workspace, how one is restored, and how a row is renamed in place or
  *  deleted. */
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vite-plus/test';
 
-import type { AgentSessionPort } from '@/features/agent/application/ports';
+import { AgentHistoryError, type AgentSessionPort } from '@/features/agent/application/ports';
 import { registerWorkspaceCleanup, renderWorkspace } from '@/features/agent/ui/workspace.harness';
 import {
   agentDefinition,
@@ -17,6 +17,57 @@ import {
 registerWorkspaceCleanup();
 
 describe('AgentChats', () => {
+  it('opens installation settings without losing cached or other-agent chats, then rechecks the missing runtime', async () => {
+    let installed = true;
+    let claudeReadable = true;
+    const list = vi.fn<AgentSessionPort['list']>(async (agent, scope) => {
+      if (agent === 'codex' && !installed)
+        throw new AgentHistoryError('installation-required', 'Codex is not installed.');
+      if (agent === 'claude' && !claudeReadable)
+        throw new AgentHistoryError('unavailable', 'History read failed.');
+      return agent === 'codex' || agent === 'claude'
+        ? [
+            {
+              agent,
+              hasContent: true,
+              id: `${agent}-chat`,
+              lastModified: 20,
+              scope,
+              title: `${agent} saved work`,
+            },
+          ]
+        : [];
+    });
+    const { onOpenAgentSettings, view } = renderWorkspace(idleAgentSessionPort({ list }));
+    const user = userEvent.setup();
+    await screen.findByRole('button', { name: 'codex saved work' });
+    installed = false;
+    claudeReadable = false;
+    await act(async () => {
+      await view.client.invalidateQueries({ queryKey: ['agent', 'history'] });
+    });
+    await screen.findByText('Install Codex to access saved chats.');
+    expect(screen.getByRole('button', { name: 'codex saved work' })).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'claude saved work' })).not.toBeNull();
+    expect(screen.queryByText('Chats unavailable for Codex.')).toBeNull();
+    expect(screen.getByText('Chats unavailable for Claude.')).not.toBeNull();
+    claudeReadable = true;
+    list.mockClear();
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(screen.queryByText('Chats unavailable for Claude.')).toBeNull());
+    expect(list.mock.calls.map(([agent]) => agent)).toEqual(['claude']);
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Open Agents settings' }));
+    expect(onOpenAgentSettings).toHaveBeenCalledOnce();
+    installed = true;
+    list.mockClear();
+    await user.click(screen.getByRole('button', { name: 'Check again' }));
+    await waitFor(() =>
+      expect(screen.queryByText('Install Codex to access saved chats.')).toBeNull(),
+    );
+    expect(list.mock.calls.map(([agent]) => agent)).toEqual(['codex']);
+  });
+
   it('restores a scoped transcript before resuming its native session', async () => {
     const replay = vi.fn<AgentSessionPort['replay']>(async () => ({
       effort: 'high',

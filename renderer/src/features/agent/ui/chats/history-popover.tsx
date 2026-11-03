@@ -25,15 +25,19 @@ import { ageLabel } from '@/features/agent/domain/time';
 import { useConversationHistory } from '@/features/agent/hooks/use-conversation-history';
 import { SearchField, SearchPopup, useSearchListKeys } from '@/shared/ui/search-popover';
 
+import { HistoryRecovery } from './history-recovery';
+
 const ROW_LIMIT = 50;
 
 /** Five rows stand in the popover at once, so a page key moves by five. */
 const ROW_PAGE_SIZE = 5;
 
 export function ChatHistoryPopover({
+  onOpenAgentSettings,
   runtime,
   scope,
 }: {
+  onOpenAgentSettings(): void;
   runtime: AgentWorkspaceRuntime;
   scope: AgentScope;
 }) {
@@ -44,7 +48,7 @@ export function ChatHistoryPopover({
   // list is in front of the reader.
   const [now, setNow] = useState(() => Date.now());
   const [query, setQuery] = useState('');
-  const history = useConversationHistory(runtime, scope);
+  const history = useConversationHistory(runtime, scope, open);
   const activeId = useStore(runtime.store, (state) => state.activeId);
   const tabs = useStore(runtime.store, (state) => state.tabs);
   const rows = useMemo(() => {
@@ -70,7 +74,11 @@ export function ChatHistoryPopover({
   });
 
   const loading = history.historyLoading && rows.length === 0;
-  const empty = !loading && rows.length === 0 && !history.historyFailure;
+  const empty =
+    !loading &&
+    rows.length === 0 &&
+    !history.historyFailure &&
+    history.installationRequired.length === 0;
 
   return (
     <Popover.Root
@@ -108,12 +116,18 @@ export function ChatHistoryPopover({
             Loading chats…
           </p>
         )}
-        {history.historyFailure && (
+        {(history.historyFailure || history.installationRequired.length > 0) && (
           <div className="px-4 py-3 text-caption">
-            <p>{history.historyFailure}</p>
-            <Button size="compact" variant="tertiary" onClick={() => void history.retry()}>
-              Retry
-            </Button>
+            <HistoryRecovery
+              failure={history.historyFailure}
+              installationRequired={history.installationRequired}
+              onCheckInstallation={() => void history.checkInstallation()}
+              onOpenAgentSettings={() => {
+                setOpen(false);
+                onOpenAgentSettings();
+              }}
+              onRetry={() => void history.retry()}
+            />
           </div>
         )}
         {empty && (

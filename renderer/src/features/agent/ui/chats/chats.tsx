@@ -31,8 +31,10 @@ import { FailureLine } from '@/shared/ui/failure-notice';
 
 import { ConversationTree } from './conversation-tree';
 import { DeleteConversationDialog } from './delete-conversation-dialog';
+import { HistoryRecovery } from './history-recovery';
 
 export default function AgentChats({
+  onOpenAgentSettings,
   runtime,
   scheduledTasks,
   scope,
@@ -244,11 +246,14 @@ export default function AgentChats({
             {history.historyLoading && conversationCount === 0 && (
               <p className="px-2 py-1 text-caption text-muted-foreground">Loading chats…</p>
             )}
-            {!history.historyLoading && conversationCount === 0 && !history.historyFailure && (
-              <p className="px-2 py-1 text-caption text-muted-foreground">
-                No chats yet in {workspaceName}.
-              </p>
-            )}
+            {!history.historyLoading &&
+              conversationCount === 0 &&
+              !history.historyFailure &&
+              history.installationRequired.length === 0 && (
+                <p className="px-2 py-1 text-caption text-muted-foreground">
+                  No chats yet in {workspaceName}.
+                </p>
+              )}
             <ConversationTree
               groups={filteredGroups}
               onActivate={runtime.activate}
@@ -265,17 +270,15 @@ export default function AgentChats({
                 {history.mutationFailure}
               </FailureLine>
             )}
-            {history.historyFailure && (
+            {(history.historyFailure || history.installationRequired.length > 0) && (
               <div className="px-2 py-1">
-                <FailureLine tone="input">{history.historyFailure}</FailureLine>
-                <Button
-                  className="mt-2"
-                  onClick={() => void history.retry()}
-                  size="compact"
-                  variant="tertiary"
-                >
-                  Retry
-                </Button>
+                <HistoryRecovery
+                  failure={history.historyFailure}
+                  installationRequired={history.installationRequired}
+                  onCheckInstallation={() => void history.checkInstallation()}
+                  onOpenAgentSettings={onOpenAgentSettings}
+                  onRetry={() => void history.retry()}
+                />
               </div>
             )}
           </SidebarGroup>

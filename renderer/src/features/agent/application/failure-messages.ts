@@ -1,12 +1,12 @@
-import type { AgentSetupFailure } from '@/features/agent/domain/agent-catalog';
 /**
  * One reader-facing sentence per Agent refusal.
  *
  * A hook or a view reports a refusal by what it means rather than by whatever
  * sentence the transport happened to attach, and the map covers the whole
- * ladder, so adding a kind fails the build here. Both Agent ladders are
- * covered: a session failure can only be one of the shared transport kinds.
+ * ladder, so adding a kind fails the build here. Agent failures include
+ * installation prerequisites when reading native history.
  */
+import type { AgentSetupFailure } from '@/features/agent/domain/agent-catalog';
 import {
   isFeatureError,
   readFailure,
@@ -20,9 +20,12 @@ import { AgentSetupRefused, AgentUpdateRefused } from './connect-agent';
  *  its format is one the Agent cannot be given. */
 export type AgentContextExtra = 'not-found' | 'unsupported';
 
-export type AgentContextErrorKind = FeatureFailureKind<AgentContextExtra>;
+export type AgentHistoryExtra = 'installation-required';
+type AgentFailureExtra = AgentContextExtra | AgentHistoryExtra;
+export type AgentFailureKind = FeatureFailureKind<AgentFailureExtra>;
 
-const MESSAGES: Readonly<Record<AgentContextErrorKind, string>> = {
+const MESSAGES: Readonly<Record<AgentFailureKind, string>> = {
+  'installation-required': 'Install this agent in Settings → Agents to access its chats.',
   'invalid-response': 'The agent service returned an unexpected response.',
   'not-found': 'That file is no longer in this project.',
   'scope-lost': 'That project is no longer available in this window.',
@@ -31,12 +34,16 @@ const MESSAGES: Readonly<Record<AgentContextErrorKind, string>> = {
   unavailable: 'StashBase could not reach the agent service.',
 };
 
-/** A file the reader picked that the Agent cannot take is theirs to change;
+/** File choices and an installation prerequisite have a local recovery;
  *  everything else is a capability that could not answer. */
-const INPUT_KINDS: readonly AgentContextErrorKind[] = ['not-found', 'unsupported'];
+const INPUT_KINDS: readonly AgentFailureKind[] = [
+  'not-found',
+  'unsupported',
+  'installation-required',
+];
 
 /** The sentence one kind reads as. */
-export function failureMessage(kind: AgentContextErrorKind): string {
+export function failureMessage(kind: AgentFailureKind): string {
   return MESSAGES[kind];
 }
 
@@ -44,8 +51,8 @@ export function failureMessage(kind: AgentContextErrorKind): string {
  *  refusal it was rather than on what to tell the reader. A failure this
  *  feature raised names its own; anything else is a capability that could not
  *  be reached. */
-export function failureKind(error: unknown): AgentContextErrorKind {
-  return isFeatureError<AgentContextExtra>(error) ? error.kind : 'unavailable';
+export function failureKind(error: unknown): AgentFailureKind {
+  return isFeatureError<AgentFailureExtra>(error) ? error.kind : 'unavailable';
 }
 
 /** What a replay that could not be read leaves on the conversation. The
@@ -60,7 +67,7 @@ export const SURFACE_FAILED = 'The agent view could not load.';
 /** The sentence and tone a refusal shows, without repeating what it was thrown
  *  with. */
 export function agentFailure(error: unknown): FailureView {
-  return readFailure<AgentContextExtra>(error, MESSAGES, { inputKinds: INPUT_KINDS });
+  return readFailure<AgentFailureExtra>(error, MESSAGES, { inputKinds: INPUT_KINDS });
 }
 
 const SETUP_FAILURE_MESSAGES: Readonly<Record<AgentSetupFailure['stage'], string>> = {
@@ -94,7 +101,7 @@ function accessFailureLines(error: unknown): readonly string[] {
   // A service that answered wrote the sentence naming what stopped, such as a
   // sign-in already running; the mapped line stands only where it could not
   // be reached at all.
-  if (isFeatureError<AgentContextExtra>(error)) {
+  if (isFeatureError<AgentFailureExtra>(error)) {
     return [readFailure(error, MESSAGES, { serverSentenceFor: [error.kind] }).message];
   }
   return [error instanceof Error && error.message.trim() ? error.message.trim() : NOT_CONNECTED];

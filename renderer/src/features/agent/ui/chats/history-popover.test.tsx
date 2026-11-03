@@ -2,7 +2,7 @@ import { cleanup, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
 
-import type { AgentSessionPort } from '@/features/agent/application/ports';
+import { AgentHistoryError, type AgentSessionPort } from '@/features/agent/application/ports';
 import {
   createAgentWorkspaceRuntime,
   type AgentWorkspaceRuntime,
@@ -52,11 +52,66 @@ function renderPopover() {
   });
   runtimes.push(runtime);
   const restore = vi.spyOn(runtime, 'restore').mockResolvedValue(true);
-  withQueryClient(<ChatHistoryPopover runtime={runtime} scope={SCOPE} />, createTestQueryClient());
+  withQueryClient(
+    <ChatHistoryPopover onOpenAgentSettings={vi.fn()} runtime={runtime} scope={SCOPE} />,
+    createTestQueryClient(),
+  );
   return { entries, restore };
 }
 
 describe('ChatHistoryPopover', () => {
+  it('reads history only when opened and routes a missing runtime to settings while preserving other chats', async () => {
+    let installed = false;
+    const list = vi.fn<AgentSessionPort['list']>(async (agent, scope) => {
+      if (agent === 'codex' && !installed)
+        throw new AgentHistoryError('installation-required', 'Codex is not installed.');
+      return agent === 'claude'
+        ? [
+            {
+              agent,
+              hasContent: true,
+              id: 'claude-chat',
+              lastModified: Date.now(),
+              scope,
+              title: 'Saved Claude work',
+            },
+          ]
+        : [];
+    });
+    const runtime = createAgentWorkspaceRuntime({
+      autostart: false,
+      createId: () => 'chat-1',
+      folderPath: SCOPE.path,
+      port: idleAgentSessionPort({ list }),
+    });
+    runtimes.push(runtime);
+    const onOpenAgentSettings = vi.fn();
+    withQueryClient(
+      <ChatHistoryPopover
+        onOpenAgentSettings={onOpenAgentSettings}
+        runtime={runtime}
+        scope={SCOPE}
+      />,
+    );
+    const user = userEvent.setup();
+    expect(list).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Chat history' }));
+    await screen.findByText('Install Codex to access saved chats.');
+    expect(screen.getByRole('option', { name: /Saved Claude work/ })).not.toBeNull();
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Open Agents settings' }));
+    expect(onOpenAgentSettings).toHaveBeenCalledOnce();
+    await waitFor(() =>
+      expect(screen.queryByRole('combobox', { name: 'Search chat titles' })).toBeNull(),
+    );
+    installed = true;
+    await user.click(screen.getByRole('button', { name: 'Chat history' }));
+    await waitFor(() =>
+      expect(screen.queryByText('Install Codex to access saved chats.')).toBeNull(),
+    );
+    expect(screen.getByRole('option', { name: /Saved Claude work/ })).not.toBeNull();
+  });
+
   it('keeps the keyboard selection when the unchanged history is read again', async () => {
     const { entries, restore } = renderPopover();
     const user = userEvent.setup();
@@ -100,7 +155,7 @@ describe('ChatHistoryPopover', () => {
     });
     runtimes.push(runtime);
     withQueryClient(
-      <ChatHistoryPopover runtime={runtime} scope={SCOPE} />,
+      <ChatHistoryPopover onOpenAgentSettings={vi.fn()} runtime={runtime} scope={SCOPE} />,
       createTestQueryClient(),
     );
 
