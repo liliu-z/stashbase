@@ -129,9 +129,11 @@ describe('HTTP client', () => {
 it('reports transport failures without capturing the request and ignores requested cancellation', async () => {
   const error = new TypeError('Failed to fetch');
   const report = vi.fn();
+  const ids: string[] = [];
   const client = createHttpClient(
     'http://127.0.0.1:8090',
-    vi.fn(async () => {
+    vi.fn(async (_url, init) => {
+      ids.push(new Headers(init?.headers).get('x-stashbase-request-id') ?? '');
       throw error;
     }),
     report,
@@ -139,11 +141,50 @@ it('reports transport failures without capturing the request and ignores request
   await expect(
     client.request({ path: '/api/files/private.md?folder=private', body: { content: 'private' } }),
   ).rejects.toBe(error);
-  expect(report).toHaveBeenCalledExactlyOnceWith(error, 'http-transport', {
-    method: 'GET',
-    route: '/api/files/private.md',
-  });
+  expect(ids[0]).toMatch(/^[0-9a-f-]{36}$/);
+  expect(report).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({
+      message: error.message,
+      name: error.name,
+      request_id: ids[0],
+    }),
+    'http-transport',
+    {
+      method: 'GET',
+      route: '/api/files/*',
+      elapsed_ms: expect.any(Number),
+    },
+  );
   const signal = AbortSignal.abort();
   await expect(client.request({ path: '/api/files/private.md', signal })).rejects.toBe(error);
   expect(report).toHaveBeenCalledTimes(1);
+  expect(ids[1]).not.toBe(ids[0]);
+  expect(JSON.stringify(report.mock.calls)).not.toContain('private');
+});
+
+it('retains correlation when a response body times out without replaying the request', async () => {
+  const timeout = new DOMException('The operation timed out', 'TimeoutError');
+  const report = vi.fn();
+  let requestId = '';
+  const fetchRequest = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+    requestId = new Headers(init?.headers).get('x-stashbase-request-id') ?? '';
+    return Object.assign(Response.json({}), {
+      json: async () => {
+        throw timeout;
+      },
+    });
+  });
+  const client = createHttpClient('http://127.0.0.1:8090', fetchRequest, report);
+  const result = await client.request({ path: '/api/scheduled-tasks/projects?folder=secret' });
+  expect(result.bodyError).toBe(timeout);
+  expect(fetchRequest).toHaveBeenCalledOnce();
+  expect(report).toHaveBeenCalledWith(
+    expect.objectContaining({
+      request_id: requestId,
+      status: 200,
+      cause: timeout,
+    }),
+    'http-response',
+    expect.objectContaining({ route: '/api/scheduled-tasks/projects' }),
+  );
 });

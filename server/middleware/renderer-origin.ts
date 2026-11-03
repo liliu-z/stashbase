@@ -1,8 +1,8 @@
 import type express from 'express';
 
 const ALLOWED_METHODS = 'DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT';
-const ALLOWED_HEADERS = 'content-type';
-const EXPOSED_HEADERS = 'x-stashbase-file-version';
+const ALLOWED_HEADERS = 'content-type, x-stashbase-request-id';
+const EXPOSED_HEADERS = 'x-stashbase-file-version, x-request-id';
 
 export function createRendererOriginPolicy(
   allowedOrigins: ReadonlySet<string>,

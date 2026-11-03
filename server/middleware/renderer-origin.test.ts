@@ -44,11 +44,12 @@ test('renderer origin policy allows the exact app origin and answers preflight',
     /x-stashbase-file-version/ui,
   );
   assert.equal(allowed.headers.get('vary'), 'Origin');
+  assert.match(allowed.headers.get('access-control-expose-headers') ?? '', /x-request-id/u);
 
   const preflight = await fetch(`${baseUrl}/api/projects`, {
     method: 'OPTIONS',
     headers: {
-      'Access-Control-Request-Headers': 'content-type',
+      'Access-Control-Request-Headers': 'content-type, x-stashbase-request-id',
       'Access-Control-Request-Method': 'POST',
       Origin: 'app://renderer',
     },
@@ -56,6 +57,7 @@ test('renderer origin policy allows the exact app origin and answers preflight',
   assert.equal(preflight.status, 204);
   assert.match(preflight.headers.get('access-control-allow-methods') ?? '', /POST/u);
   assert.match(preflight.headers.get('access-control-allow-headers') ?? '', /content-type/u);
+  assert.match(preflight.headers.get('access-control-allow-headers') ?? '', /x-stashbase-request-id/u);
   assert.doesNotMatch(
     preflight.headers.get('access-control-allow-headers') ?? '',
     /x-stashbase-window-id/u,

@@ -7,11 +7,12 @@ import { telemetry } from './telemetry.ts';
 import { setLogErrorReporter } from './log.ts';
 import { AGENT_TOOL_RESULT_LIMIT, type ErrorContext, type AgentTurnStage, type AgentToolResult } from '../shared/protocols/http/telemetry.ts';
 import { agentClientEventSchema, type AgentServerEvent } from '../shared/protocols/websocket/agent-session.ts';
+import { HTTP_REQUEST_ID_HEADER, httpDiagnosticRoute, validHttpRequestId } from '../shared/protocols/http/request-diagnostics.ts';
 
 /** One fixed feature name, never a dynamic route, query, body, or file path. */
 const FEATURES = new Set(['account', 'agents', 'agent', 'project', 'upload', 'asset', 'asset-derived', 'appearance', 'attach', 'embedder', 'files',
   'folders', 'gallery', 'index-status', 'mcp', 'projects', 'search', 'sync', 'terminal',
-  'keyword-search', 'local-components', 'turn-changes', 'updates', 'workspace-preferences']);
+  'keyword-search', 'local-components', 'turn-changes', 'updates', 'workspace-preferences', 'scheduled-tasks']);
 
 /** A refused request (4xx) is an expected outcome such as a save conflict or a
  * missing file; only a server failure (5xx) is an application error. */
@@ -20,17 +21,60 @@ function captureHttp(service: typeof telemetry, status: number, error: unknown, 
   else service.captureWarning(error, { source: 'server', operation });
 }
 
-export function httpErrorReporting(service = telemetry): RequestHandler {
+export function httpErrorReporting(service = telemetry, options: { slowRequestMs?: number } = {}): RequestHandler {
+  // At most one pending observation and one terminal observation per tracked
+  // request. Telemetry also applies its shared observation admission budget.
+  let observedRequests = 0;
   return (req, res, next) => {
     const asset = /^\/(asset|asset-derived)\//.exec(req.path)?.[1];
     const feature = asset ?? req.path.split('/')[2] ?? '';
     if ((!asset && !req.path.startsWith('/api/')) || feature === 'telemetry' || feature === 'log') { next(); return; }
     const turnId = req.header('x-stashbase-agent-turn-id');
-    const scope = { request_id: randomUUID(), ...(turnId && validTurnId(turnId) ? { turn_id: turnId } : {}), context: { method: req.method, route: req.path } };
+    const suppliedId = req.header(HTTP_REQUEST_ID_HEADER);
+    const scope = { request_id: validHttpRequestId(suppliedId) ? suppliedId : randomUUID(),
+      ...(turnId && validTurnId(turnId) ? { turn_id: turnId } : {}),
+      context: { method: req.method, route: httpDiagnosticRoute(req.path) } };
     res.setHeader('x-request-id', scope.request_id);
+    const route = () => typeof req.route?.path === 'string' ? req.route.path : httpDiagnosticRoute(req.path);
+    // Only our correlated JSON clients opt into latency observations. Assets,
+    // external clients and event streams have different lifetime contracts.
+    if (!asset && validHttpRequestId(suppliedId) && req.header('accept')?.includes('application/json')
+      && observedRequests < 100) {
+      observedRequests += 1;
+      const startedAt = performance.now();
+      const capture = service.httpRequestObserver();
+      let pending = false;
+      let settled = false;
+      const jsonResponse = () => !res.getHeader('content-type')
+        || String(res.getHeader('content-type')).toLowerCase().includes('application/json');
+      const observe = (state: 'pending' | 'finished' | 'closed') => capture({
+        event: 'http_request_lifecycle', request_id: scope.request_id, state,
+        elapsed_ms: Math.max(0, Math.round(performance.now() - startedAt)), headers_sent: res.headersSent,
+        ...(res.headersSent ? { http_status: res.statusCode } : {}),
+        context: { ...scope.context, route: route(),
+          ...(validHttpRequestId(process.env.STASHBASE_SERVER_INSTANCE_ID)
+            ? { host_instance_id: process.env.STASHBASE_SERVER_INSTANCE_ID } : {}) },
+      });
+      const timer = setTimeout(() => {
+        if (!settled && jsonResponse()) { pending = true; observe('pending'); }
+      }, options.slowRequestMs ?? 10_000);
+      timer.unref();
+      const settle = (state: 'finished' | 'closed') => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        observedRequests -= 1;
+        // A close may be a deliberate cancellation. Record what happened,
+        // never infer a failed operation or retry a request from this signal.
+        if (jsonResponse() && (pending || state === 'closed')) observe(state);
+      };
+      res.once('finish', () => settle('finished'));
+      res.once('close', () => settle(res.writableFinished ? 'finished' : 'closed'));
+    }
     // Asset/HEAD/stream handlers can finish without JSON; preserve their body
     // and status while recording the same bounded operation/status once.
     res.once('finish', () => {
+      scope.context.route = route();
       if (res.statusCode >= 400 && !res.locals?.diagnosticReported) {
         diagnosticScope.run(scope, () => captureHttp(service, res.statusCode, { message: 'HTTP request failed', status: res.statusCode },
           `http.${FEATURES.has(feature) ? feature : 'other'}`));
@@ -40,7 +84,7 @@ export function httpErrorReporting(service = telemetry): RequestHandler {
     res.json = function (body: unknown) {
       if (res.statusCode >= 400 && !res.locals?.diagnosticReported) {
         res.locals.diagnosticReported = true;
-        scope.context.route = typeof req.route?.path === 'string' ? req.route.path : req.path;
+        scope.context.route = route();
         const value = body && typeof body === 'object' ? body as Record<string, unknown> : {};
         captureHttp(service, res.statusCode, {
           message: typeof value.error === 'string' ? value.error : 'HTTP request failed',

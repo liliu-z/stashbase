@@ -1,3 +1,5 @@
+import { HTTP_REQUEST_ID_HEADER, httpDiagnosticRoute } from '@/protocols/http/request-diagnostics';
+import { errorDiagnostic } from '@/protocols/http/telemetry';
 import type { ErrorReporter } from '@/shared/runtime/error-reporting';
 export interface HttpRequest {
   body?: unknown;
@@ -31,6 +33,9 @@ export function createHttpClient(
     ...(reportError ? { reportError } : {}),
     async request({ body, method = 'GET', path, signal, telemetryTurnId }) {
       const headers = new Headers({ accept: 'application/json' });
+      let requestId = crypto.randomUUID();
+      headers.set(HTTP_REQUEST_ID_HEADER, requestId);
+      const startedAt = performance.now();
       if (telemetryTurnId) headers.set('x-stashbase-agent-turn-id', telemetryTurnId);
       const correlation = telemetryTurnId ? { turn_id: telemetryTurnId } : {};
       // Local API data belongs to the live window/account. Chromium's HTTP
@@ -53,14 +58,17 @@ export function createHttpClient(
         // Never replay a mutation or a cancelled request.
         if (method === 'GET' && response.status === 304) {
           signal?.throwIfAborted();
+          requestId = crypto.randomUUID();
+          headers.set(HTTP_REQUEST_ID_HEADER, requestId);
           response = await fetchRequest(new URL(path, baseUrl), { ...init, cache: 'reload' });
         }
       } catch (error) {
         if (!signal?.aborted || signal.reason?.name === 'TimeoutError')
-          reportError?.(error, 'http-transport', {
+          reportError?.({ ...errorDiagnostic(error), request_id: requestId }, 'http-transport', {
             ...correlation,
             method,
-            route: path.split('?')[0] ?? path,
+            route: httpDiagnosticRoute(path),
+            elapsed_ms: Math.max(0, Math.round(performance.now() - startedAt)),
           });
         throw error;
       }
@@ -76,11 +84,16 @@ export function createHttpClient(
             Object.assign(new Error('Could not read the HTTP response as JSON', { cause: error }), {
               code: 'HTTP_RESPONSE_BODY_FAILED',
               status: response.status,
-              request_id: response.headers.get('x-request-id') ?? undefined,
+              request_id: response.headers.get('x-request-id') ?? requestId,
               content_type: response.headers.get('content-type') ?? undefined,
             }),
             'http-response',
-            { ...correlation, method, route: path.split('?')[0] ?? path },
+            {
+              ...correlation,
+              method,
+              route: httpDiagnosticRoute(path),
+              elapsed_ms: Math.max(0, Math.round(performance.now() - startedAt)),
+            },
           );
           if (signal?.aborted) throw signal.reason;
         }

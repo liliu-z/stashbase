@@ -1,6 +1,7 @@
 import { boundedDiagnosticContext, diagnosticContextSchema } from '../shared/protocols/http/telemetry.ts';
 import type { RequestHandler } from 'express';
 import { telemetry } from './telemetry.ts';
+import { validHttpRequestId } from '../shared/protocols/http/request-diagnostics.ts';
 import {
   prepareBugReportText,
   type PreparedBugReportText,
@@ -57,7 +58,9 @@ export function createClientErrorHandler(logger: ClientErrorLogger): RequestHand
     const operation = ['render', 'uncaught', 'unhandled-rejection', 'http-transport', 'http-response', 'startup', 'native', 'agent-connection', 'folder-picker', 'app-update', 'upload', 'attachment', 'docx-preview', 'pdf-preview', 'resource', 'workspace-session', 'project-lifecycle'].includes(String(body.operation))
       ? String(body.operation) : 'render';
     const context = diagnosticContextSchema.safeParse(boundedDiagnosticContext(body.context));
-    telemetry.captureError(body, { source: 'renderer', operation, ...(context.success && context.data.turn_id ? { turn_id: context.data.turn_id } : {}), ...(context.success ? { context: context.data } : {}) });
+    telemetry.captureError(body, { source: 'renderer', operation,
+      ...(validHttpRequestId(body.request_id) ? { request_id: body.request_id } : {}),
+      ...(context.success && context.data.turn_id ? { turn_id: context.data.turn_id } : {}), ...(context.success ? { context: context.data } : {}) });
     // Keep the existing local log sink. Automatic collection owns redaction
     // separately from a user-reviewed bug report.
     logger.warn(prepareClientErrorLog(req.body));

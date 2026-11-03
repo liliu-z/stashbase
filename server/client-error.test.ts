@@ -2,8 +2,22 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import test from 'node:test';
 import { createClientErrorHandler, prepareClientErrorLog } from './client-error.ts';
+import { telemetry } from './telemetry.ts';
 
 const require = createRequire(import.meta.url);
+
+test('renderer HTTP errors keep a validated correlation independently of the reporting request', (t) => {
+  const captures: unknown[][] = [];
+  t.mock.method(telemetry, 'captureError', (...args: unknown[]) => captures.push(args));
+  const handler = createClientErrorHandler({ warn() {} });
+  const requestId = '11111111-1111-4111-8111-111111111111';
+  for (const request_id of [requestId, 'private-invalid-header']) handler({
+    body: { operation: 'http-transport', message: 'Failed to fetch', request_id,
+      context: { method: 'GET', route: '/api/projects', elapsed_ms: 15000 } },
+  } as never, { json() { return this; } } as never, (() => {}) as never);
+  assert.equal((captures[0][1] as { request_id: string }).request_id, requestId);
+  assert.equal((captures[1][1] as { request_id?: string }).request_id, undefined);
+});
 
 test('renderer errors are redacted before entering a bug-reportable application log', () => {
   const homeDir = process.platform === 'win32'

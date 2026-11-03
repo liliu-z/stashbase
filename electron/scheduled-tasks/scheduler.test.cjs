@@ -5,9 +5,35 @@ const test = require('node:test');
 
 const {
   createScheduledTaskScheduler,
+  createScheduleServer,
   dueOccurrence,
   runTitle,
 } = require('../../dist/electron/scheduled-tasks/scheduler.cjs');
+
+test('scheduled HTTP failures keep request correlation through transport and body timeouts without replay', async () => {
+  const calls = [];
+  const failure = Object.assign(new Error('The operation timed out'), { name: 'TimeoutError' });
+  const server = createScheduleServer('http://127.0.0.1:8090', async (url, init) => {
+    calls.push({ url, init, id: new Headers(init.headers).get('x-stashbase-request-id') });
+    assert.equal(new Headers(init.headers).get('accept'), 'application/json');
+    if (init.method === 'POST') return { ok: true, json: async () => { throw failure; } };
+    throw failure;
+  });
+  for (const run of [() => server.listProjects(), () => server.claim({ folderPath: '/private/project', taskId: 'private-task', trigger: 'manual' }),
+    () => server.finish({ folderPath: '/private/project', taskId: 'private-task', runId: 'run', status: 'failed', reason: null, title: null, sessionId: null, agent: null })]) {
+    const before = calls.length;
+    await assert.rejects(run(), (error) => {
+      assert.equal(error.cause, failure);
+      assert.equal(error.name, 'TimeoutError');
+      assert.equal(error.request_id, calls.at(-1).id);
+      assert.match(error.request_id, /^[0-9a-f-]{36}$/);
+      assert.doesNotMatch(error.message, /private/);
+      return true;
+    });
+    assert.equal(calls.length, before + 1);
+  }
+  assert.equal(new Set(calls.map(call => call.id)).size, 3);
+});
 
 // Local wall-clock instants, so the rules read the same in every time zone.
 const at = (day, hours, minutes = 0) => new Date(2026, 9, day, hours, minutes);

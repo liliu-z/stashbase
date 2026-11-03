@@ -37,7 +37,7 @@ const DELIVERY_TIMEOUT = 12_000;
  * they cannot consume the budget of user operation results such as saves. */
 const RATE_LIMIT = 120;
 const OBSERVATIONS = new Set<TelemetryEvent['event']>(['application_error', 'application_warning', 'agent_turn_stage',
-  'agent_runtime_start_result', 'agent_runtime_stop_result', 'agent_connection_closed', 'agent_setup_stage', 'native_lifecycle']);
+  'agent_runtime_start_result', 'agent_runtime_stop_result', 'agent_connection_closed', 'agent_setup_stage', 'native_lifecycle', 'http_request_lifecycle']);
 const rateBudget = (event: TelemetryEvent): 'observation' | 'outcome' | null =>
   event.event === 'app_opened' || event.event === 'app_active' || event.event === 'document_engaged'
     || (event.event === 'agent_turn_started' && Boolean(event.turn_id)) ? null
@@ -82,7 +82,8 @@ export function createTelemetry(options: {
   const rendererDeliveryCurrent = (request: RendererTelemetryRequest) => !request.delivery
     || (Date.parse(request.delivery.started_at) > rendererSince
       && Date.parse(request.delivery.started_at) <= Date.parse(request.timestamp));
-  const retireRenderer = () => { rendererSince = now(); rendererReceipts.clear(); };
+  let observationGeneration = 0;
+  const retireRenderer = () => { rendererSince = now(); rendererReceipts.clear(); observationGeneration++; };
   const synchronizeRenderer = (config: AppConfigFile) => {
     const account = accountUsageId(config);
     if (rendererAccount !== account) { retireRenderer(); rendererAccount = account; }
@@ -526,6 +527,20 @@ export function createTelemetry(options: {
         if (status === 'accepted' || status === 'duplicate') rendererReceipts.set(request.id, now());
         return status;
       } catch { return 'retry'; }
+    },
+    /** Frequent HTTP reads usually produce no observation. Snapshot only the
+     * account/consent generation, without reading or writing configuration on
+     * every request. A boundary crossing drops these optional observations. */
+    httpRequestObserver() {
+      const observedGeneration = observationGeneration;
+      const observedAccount = rendererAccount;
+      return (event: Extract<TelemetryEvent, { event: 'http_request_lifecycle' }>) => {
+        if (!allowed() || observedGeneration !== observationGeneration) return;
+        try {
+          if (accountUsageId(options.read()) !== observedAccount) return;
+          capture(event);
+        } catch { /* Optional transport evidence cannot change the request. */ }
+      };
     },
     /** Capture before asynchronous host work to keep its terminal outcome on
      * the initiating account even if another window signs out or switches. */

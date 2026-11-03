@@ -171,6 +171,13 @@ export const telemetryEventSchema = z.discriminatedUnion('event', [
   z.object({ event: z.literal('application_error'), ...diagnosticFields }).strict(),
   z.object({ event: z.literal('application_warning'), ...diagnosticFields }).strict(),
   z.object({ event: z.literal('native_lifecycle'), operation: z.string().max(200), diagnostic, context: diagnosticContextSchema }).strict(),
+  // A closed HTTP response does not establish failure: it may be a deliberate
+  // cancellation. Keep transport observations outside user failure counts.
+  z.object({ event: z.literal('http_request_lifecycle'), request_id: z.string().uuid(),
+    state: z.enum(['pending', 'finished', 'closed']), elapsed_ms: z.number().nonnegative(),
+    headers_sent: z.boolean(), http_status: z.number().int().min(100).max(599).optional(),
+    context: diagnosticContextSchema,
+  }).strict(),
 ]);
 export type TelemetryEvent = z.infer<typeof telemetryEventSchema>;
 /** Authentication, billing and persisted writes are host facts. Renderers

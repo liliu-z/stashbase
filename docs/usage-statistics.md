@@ -53,6 +53,7 @@ in provider history; absence is not evidence of source use.
 | `agent_runtime_start_result` | One Default/OpenCode startup attempt settles, including history and prewarm | `purpose`, `outcome`, `stage`, `attempt_id`, optional `retry_of`, `elapsed_ms`/`first_output_ms`, phase `timings`, runtime version and optional diagnostic |
 | `agent_runtime_stop_result` | Managed OpenCode/Codex/Antigravity retirement succeeds, times out, or closes after timeout | `purpose`, initiating `reason`, stop `attempt_id`, original process-start ID, elapsed/deadline, exit/pipe observations and bounded termination evidence |
 | `agent_connection_closed` | Host observes socket closure, including idle and intentional closes | `runtime`, shared `context.connection_id`, close code/initiator/reason and available process evidence |
+| `http_request_lifecycle` | Host observes a slow local JSON request or a response closing before completion | `request_id`, `state`: pending / finished / closed, `elapsed_ms`, `headers_sent`, optional `http_status`, method, route template and available host instance ID |
 | `document_write_result` | Versioned editor save settles | `outcome`; success includes `changed` |
 | `project_file_operation` | Shared project file read, write or edit settles | `operation`, `origin`: agent / mcp / http, `outcome`, optional runtime and turn/request correlation; successful writes/edits include `changed` |
 | `account_login_started` | A browser sign-in flow starts | None |
@@ -114,7 +115,7 @@ and cookies are filtered at capture and again before sending. This is targeted
 filtering, not a promise to remove every personal detail from diagnostic prose.
 
 HTTP response diagnostics include the status even when a 2xx response cannot
-be decoded, its content type, the host-issued request ID, and the original
+be decoded, its content type, the shared request ID, and the original
 parsing/read cause. Requested cancellation is excluded. Default Agent failures
 can include the native message ID, finish reason and token counts, plus the
 current gateway request ID, retry attempt, byte/frame counts, stream-end and
@@ -122,6 +123,31 @@ DONE markers, finish reasons and explicit provider/transport errors. Stream
 observation retains protocol metadata only, not replies, tool arguments or
 prompts. Missing provider explanations remain missing; request IDs support
 follow-up investigation rather than implying a known root cause.
+
+The renderer and native scheduled-task HTTP client generate a random UUID before
+each request in `x-stashbase-request-id`. The host accepts a valid UUID or replaces
+it, returns it as `x-request-id`, and uses it in its diagnostics. A timeout before
+response headers can therefore retain the same ID as a host observation. Native
+scheduled-task failures retain it in `diagnostic.request_id`; renderer failures
+also expose it as the event's `request_id`. This identity grants no access and is
+not a replay or deduplication key. Requests are not retried by these diagnostics.
+
+`http_request_lifecycle` is an observation, not an application failure or an
+activity event. `pending` means a correlated JSON request has remained open for
+ten seconds; it does not establish a hang or impose a new request deadline.
+`finished` follows that observation when the host ends its response; it does not
+prove that the client received or decoded it. `closed` means the response closed
+before it finished, including deliberate cancellation, and does not identify
+which process or network component caused it. Each tracked request produces at
+most one pending and one terminal observation; ordinary fast completions produce
+none. The host tracks at most 100 concurrent requests, excludes assets, diagnostic
+delivery and event streams, and uses the existing shared observation admission
+budget. Account or consent changes retire these optional observations. Fast
+requests create no telemetry storage work. Admission or delivery loss means a
+missing record cannot establish that a request never reached the host.
+Metadata contains only method, a registered route template or allowlisted service
+name, timings, status and ephemeral correlation IDs; it contains no query,
+request/response body or user-supplied path components.
 
 Allowance-query failures keep the local response status separate from the
 upstream status/request ID or original network cause. Daemon and agent startup

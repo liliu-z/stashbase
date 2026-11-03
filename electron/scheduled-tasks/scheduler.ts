@@ -11,6 +11,7 @@
  * list reads its next run from. The server refuses a second claim for the
  * same occurrence, so a lost answer cannot make one occurrence run twice.
  */
+import { randomUUID } from 'node:crypto';
 import {
   scheduleClaimResponseSchema,
   scheduledProjectsSchema,
@@ -19,6 +20,7 @@ import {
 } from '../../shared/protocols/http/scheduled-tasks.ts';
 import type { ScheduledRunOutcome } from '../../shared/protocols/electron/scheduled-tasks.ts';
 import { dueOccurrence } from '../../shared/scheduled-task-timing.ts';
+import { HTTP_REQUEST_ID_HEADER } from '../../shared/protocols/http/request-diagnostics.ts';
 
 export { dueOccurrence } from '../../shared/scheduled-task-timing.ts';
 
@@ -67,29 +69,39 @@ export function createScheduleServer(serverUrl: string, fetchImpl: typeof fetch 
     body: JSON.stringify(body),
     headers: { 'content-type': 'application/json' },
   });
+  const request = async <T>(path: string, init: RequestInit, read: (response: Response) => Promise<T>): Promise<T> => {
+    const requestId = randomUUID();
+    const headers = new Headers(init.headers);
+    headers.set('accept', 'application/json');
+    headers.set(HTTP_REQUEST_ID_HEADER, requestId);
+    try {
+      return await read(await fetchImpl(url(path), { ...init, headers, signal: AbortSignal.timeout(15_000) }));
+    } catch (error) {
+      // Timeout can occur while reading a body too. Keep the original cause
+      // and the same correlation as the host, without retaining task content.
+      throw Object.assign(new Error(error instanceof Error ? error.message : 'Scheduled task request failed.', { cause: error }), {
+        name: error instanceof Error ? error.name : 'Error', request_id: requestId,
+      });
+    }
+  };
   return {
-    async listProjects() {
-      const response = await fetchImpl(url('/projects'), { signal: AbortSignal.timeout(15_000) });
-      if (!response.ok) throw new Error(`Scheduled tasks returned HTTP ${response.status}`);
-      return scheduledProjectsSchema.parse(await response.json()).projects;
-    },
-    async claim(request) {
-      const response = await fetchImpl(url('/runs'), {
-        ...json(request),
-        method: 'POST',
-        signal: AbortSignal.timeout(15_000),
+    listProjects() {
+      return request('/projects', {}, async (response) => {
+        if (!response.ok) throw new Error(`Scheduled tasks returned HTTP ${response.status}`);
+        return scheduledProjectsSchema.parse(await response.json()).projects;
       });
-      if (!response.ok) return { ok: false, reason: await responseMessage(response) };
-      const claimed = scheduleClaimResponseSchema.parse(await response.json());
-      return { ok: true, runId: claimed.runId, task: claimed.task };
     },
-    async finish(request) {
-      const response = await fetchImpl(url('/runs'), {
-        ...json(request),
-        method: 'PUT',
-        signal: AbortSignal.timeout(15_000),
+    claim(input) {
+      return request('/runs', { ...json(input), method: 'POST' }, async (response): Promise<ClaimResult> => {
+        if (!response.ok) return { ok: false, reason: await responseMessage(response) };
+        const claimed = scheduleClaimResponseSchema.parse(await response.json());
+        return { ok: true, runId: claimed.runId, task: claimed.task };
       });
-      if (!response.ok) throw new Error(`Recording a scheduled run returned HTTP ${response.status}`);
+    },
+    finish(input) {
+      return request('/runs', { ...json(input), method: 'PUT' }, async (response) => {
+        if (!response.ok) throw new Error(`Recording a scheduled run returned HTTP ${response.status}`);
+      });
     },
   };
 }

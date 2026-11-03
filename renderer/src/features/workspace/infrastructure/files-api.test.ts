@@ -268,7 +268,7 @@ it('retains the original JSON failure and response identity for a failed listing
   });
   expect(report.mock.calls[0]?.slice(1)).toEqual([
     'http-response',
-    { method: 'GET', route: '/api/files' },
+    { method: 'GET', route: '/api/files', elapsed_ms: expect.any(Number) },
   ]);
   expect(JSON.stringify(diagnostic)).not.toContain('/private/project');
 });

@@ -41,7 +41,7 @@ app
     let projectMembers = [];
     projectServer = http.createServer((request, response) => {
       response.setHeader('Access-Control-Allow-Origin', APP_ORIGIN);
-      response.setHeader('Access-Control-Allow-Headers', 'content-type');
+      response.setHeader('Access-Control-Allow-Headers', 'content-type, x-stashbase-request-id');
       response.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS, POST');
       if (request.method === 'OPTIONS') {
         response.statusCode = 204;

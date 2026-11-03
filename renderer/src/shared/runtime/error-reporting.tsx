@@ -8,6 +8,7 @@ export type ErrorReporter = (
     method?: string;
     route?: string;
     reason?: string;
+    elapsed_ms?: number;
     turn_id?: string | undefined;
     connection_id?: string;
     close_code?: number;

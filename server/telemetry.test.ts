@@ -410,8 +410,9 @@ test('HTTP failures retain route, method, request ID and original cause without 
   await new Promise<void>((resolve) => server.once('listening', resolve));
   const address = server.address(); assert.ok(address && typeof address === 'object');
   try {
+    const requestId = crypto.randomUUID();
     const response = await fetch(`http://127.0.0.1:${address.port}/api/files/customer.md?folder=private-project`, {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ content: 'private document content' }),
+      method: 'POST', headers: { 'content-type': 'application/json', 'x-stashbase-request-id': requestId }, body: JSON.stringify({ content: 'private document content' }),
     });
     assert.equal(response.status, 500);
     await tick();
@@ -420,10 +421,75 @@ test('HTTP failures retain route, method, request ID and original cause without 
     assert.equal(f.sent[0].body.properties.diagnostic.http_status, 500);
     assert.equal(f.sent[0].body.properties.diagnostic.code, 'EACCES');
     assert.deepEqual(f.sent[0].body.properties.context, { method: 'POST', route: '/api/files/*' });
-    assert.match(f.sent[0].body.properties.request_id, /^[0-9a-f-]{36}$/);
+    assert.equal(f.sent[0].body.properties.request_id, requestId);
     assert.equal(response.headers.get('x-request-id'), f.sent[0].body.properties.request_id);
     assert.match(f.sent[0].body.properties.diagnostic.causes[0].stack, /telemetry.test.ts/);
     for (const value of ['private-project', 'private document content']) assert.equal(JSON.stringify(f.sent).includes(value), false);
+  } finally { f.service.close(); server.closeAllConnections(); server.close(); }
+});
+
+test('slow JSON requests and early closure retain bounded lifecycle evidence without classifying cancellation or streams as failure', async () => {
+  const { httpErrorReporting } = await import('./error-reporting.ts');
+  const f = fixture();
+  const app = express(); app.use(httpErrorReporting(f.service, { slowRequestMs: 20 }));
+  let finishSlow!: () => void;
+  let closeRead!: () => void;
+  let enteredRead!: () => void;
+  const readEntered = new Promise<void>(resolve => { enteredRead = resolve; });
+  const readClosed = new Promise<void>(resolve => { closeRead = resolve; });
+  app.get('/api/scheduled-tasks/projects', (_req, res) => { finishSlow = () => res.json({ projects: [] }); });
+  app.get('/api/files/*', (_req, res) => { res.once('close', closeRead); enteredRead(); });
+  app.get('/api/projects', (_req, res) => res.json({ projects: [] }));
+  app.get('/api/agent/events', (_req, res) => { res.type('text/event-stream'); res.write(': connected\n\n'); });
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise<void>(resolve => server.once('listening', resolve));
+  const address = server.address(); assert.ok(address && typeof address === 'object');
+  const base = `http://127.0.0.1:${address.port}`;
+  const headers = (id: string) => ({ accept: 'application/json', 'x-stashbase-request-id': id });
+  try {
+    const slowId = crypto.randomUUID();
+    const slow = fetch(`${base}/api/scheduled-tasks/projects?folder=private-project`, { headers: headers(slowId) });
+    const until = Date.now() + 2000;
+    while (!f.sent.some(row => row.body.properties.request_id === slowId) && Date.now() < until)
+      await new Promise(resolve => setTimeout(resolve, 5));
+    assert.equal(f.sent.length, 1);
+    assert.equal(f.sent[0].body.properties.state, 'pending');
+    finishSlow();
+    assert.equal((await slow).headers.get('x-request-id'), slowId);
+    await tick();
+    assert.deepEqual(f.sent.map(row => row.body.properties.state), ['pending', 'finished']);
+    assert.equal(f.sent[0].body.properties.headers_sent, false);
+    assert.equal(f.sent[0].body.properties.http_status, undefined);
+    assert.equal(f.sent[1].body.properties.http_status, 200);
+    assert.ok(f.sent[1].body.properties.elapsed_ms >= f.sent[0].body.properties.elapsed_ms);
+
+    const closedId = crypto.randomUUID();
+    const abort = new AbortController();
+    const cancelled = fetch(`${base}/api/files/private-document.md?folder=private-project`, {
+      headers: headers(closedId), signal: abort.signal,
+    });
+    await readEntered;
+    abort.abort();
+    await assert.rejects(cancelled, { name: 'AbortError' });
+    await readClosed; await tick();
+    const closed = f.sent.filter(row => row.body.properties.request_id === closedId);
+    assert.equal(closed.length, 1);
+    assert.equal(closed[0].body.properties.state, 'closed');
+    assert.equal(closed[0].body.properties.context.route, '/api/files/*');
+    assert.ok(f.sent.every(row => row.body.event === 'http_request_lifecycle'));
+    assert.doesNotMatch(JSON.stringify(f.sent), /private-document|private-project/);
+
+    const before = f.sent.length;
+    const invalid = await fetch(`${base}/api/projects`, { headers: headers('private-invalid-id') });
+    assert.match(invalid.headers.get('x-request-id') ?? '', /^[0-9a-f-]{36}$/);
+    await fetch(`${base}/api/projects`, { headers: headers(crypto.randomUUID()) });
+    const streaming = new AbortController();
+    const stream = await fetch(`${base}/api/agent/events`, { headers: headers(crypto.randomUUID()), signal: streaming.signal });
+    assert.equal(stream.status, 200);
+    await new Promise(resolve => setTimeout(resolve, 35));
+    streaming.abort();
+    await tick(); await tick();
+    assert.equal(f.sent.length, before);
   } finally { f.service.close(); server.closeAllConnections(); server.close(); }
 });
 
@@ -613,7 +679,9 @@ test('undelivered events survive a three-week absence and leave on the next laun
 test('diagnostic bursts cannot crowd out core activity, turn starts or operation results', async () => {
   const f = fixture();
   for (let index = 0; index < 130; index++) {
-    f.service.captureWarning(new Error('refused request'), { source: 'server', operation: 'http', request_id: crypto.randomUUID() });
+    if (index % 2 === 0) f.service.captureWarning(new Error('refused request'), { source: 'server', operation: 'http', request_id: crypto.randomUUID() });
+    else f.service.capture({ event: 'http_request_lifecycle', request_id: crypto.randomUUID(), state: 'closed',
+      elapsed_ms: 10, headers_sent: false, context: { method: 'GET', route: '/api/projects' } });
   }
   const turn_id = crypto.randomUUID();
   f.service.capture({ event: 'agent_turn_started', runtime: 'stashbase', turn_id });
@@ -624,9 +692,40 @@ test('diagnostic bursts cannot crowd out core activity, turn starts or operation
   for (let index = 0; index < 130; index++) f.service.capture({ event: 'project_entry_result', outcome: 'failed', request_id: crypto.randomUUID() });
   await f.service.flush();
   const events = f.sent.map(({ body }) => body.event);
-  assert.equal(events.filter(event => event === 'application_warning').length, 120);
+  assert.equal(events.filter(event => event === 'application_warning').length, 60);
+  assert.equal(events.filter(event => event === 'http_request_lifecycle').length, 60);
   assert.equal(events.filter(event => event === 'project_entry_result').length, 119);
   for (const event of ['agent_turn_started', 'document_engaged', 'app_active', 'document_write_result', 'agent_turn_finished']) assert.ok(events.includes(event), event);
+  f.service.close();
+});
+
+test('HTTP observation scopes do no eager storage work and retire across account or consent changes', async (t) => {
+  const f = fixture();
+  const read = t.mock.method(f.options, 'read');
+  const write = t.mock.method(f.options, 'write');
+  const observe = f.service.httpRequestObserver();
+  assert.equal(read.mock.callCount(), 0);
+  assert.equal(write.mock.callCount(), 0);
+  const event = { event: 'http_request_lifecycle' as const, request_id: crypto.randomUUID(), state: 'closed' as const,
+    elapsed_ms: 10, headers_sent: false, context: { method: 'GET', route: '/api/projects' } };
+  observe(event);
+  await tick();
+  assert.equal(f.sent.filter(row => row.body.event === 'http_request_lifecycle').length, 1);
+  const previousAccount = f.service.httpRequestObserver();
+  account(f, 'A');
+  account(f); // Even a same-clock switch back cannot revive an old scope.
+  previousAccount(event);
+  const previousConsent = f.service.httpRequestObserver();
+  f.service.update({ enabled: false });
+  const disabled = f.service.httpRequestObserver();
+  disabled(event);
+  f.service.update({ enabled: true });
+  disabled(event);
+  previousConsent(event);
+  const receipt = f.service.captureRenderer({ id: crypto.randomUUID(), timestamp: new Date().toISOString(), event } as never);
+  assert.equal(receipt, 'discarded');
+  await tick();
+  assert.equal(f.sent.filter(row => row.body.event === 'http_request_lifecycle').length, 1);
   f.service.close();
 });
 
