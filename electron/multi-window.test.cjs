@@ -820,18 +820,21 @@ test('macOS folder matching follows real volume identity and keeps source spelli
   assert.equal(await registry.findByFolder(decomposed), sameUnicodeDirectory ? existing : null);
 });
 
-test('a folder lookup discards a match that changed while a later disk probe waited', async (t) => {
+test('a folder lookup discards a match that changed while a later disk probe waited', { timeout: 5000 }, async (t) => {
   if (process.platform !== 'darwin') return t.skip('requires macOS volume probes');
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-window-race-'));
   t.after(() => fs.rmSync(temp, { recursive: true, force: true }));
-  const first = path.join(temp, 'First'), second = path.join(temp, 'Second');
-  fs.mkdirSync(first); fs.mkdirSync(second);
+  // Only a possible case alias still needs a volume probe; unrelated names
+  // are rejected lexically without touching the disk.
+  const first = path.join(temp, 'First'), second = path.join(temp, 'first');
+  fs.mkdirSync(first);
   const registry = createWindowRegistry({ platform: 'darwin' });
   registry.add('first', {}, first);
   registry.add('second', {}, second);
   let release, reached;
   const gate = new Promise((resolve) => { release = resolve; });
   const started = new Promise((resolve) => { reached = resolve; });
+  t.after(() => release());
   const stat = fs.promises.stat;
   let held = false;
   t.mock.method(fs.promises, 'stat', async (...args) => {
@@ -839,9 +842,15 @@ test('a folder lookup discards a match that changed while a later disk probe wai
     return stat(...args);
   });
   const pending = registry.findByFolder(first);
-  await started;
-  registry.setFolder('first', second);
-  release();
+  try {
+    await started;
+    registry.setFolder('first', path.join(temp, 'Elsewhere'));
+    // The later candidate may itself alias First on this volume. Retire it
+    // so only the stale earlier match could incorrectly satisfy the lookup.
+    registry.remove('second');
+  } finally {
+    release();
+  }
   assert.equal(await pending, null);
 });
 
