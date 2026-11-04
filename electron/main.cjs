@@ -85,6 +85,14 @@ let serverLogPath = null;
 
 function getServerLogPath() {
   if (serverLogPath) return serverLogPath;
+  // An overridden data root is an isolated launch (tests, profiling). Its log
+  // stays inside that root: on macOS Electron's log directory ignores HOME, so
+  // the default would truncate the real app's log.
+  const isolatedRoot = process.env.STASHBASE_LOCAL_DATA_ROOT?.trim();
+  if (isolatedRoot) {
+    serverLogPath = path.join(path.resolve(isolatedRoot), 'logs', 'server.log');
+    return serverLogPath;
+  }
   try {
     // Electron chooses the platform-correct application log directory. This
     // must not fall back to a handwritten macOS-only location.
