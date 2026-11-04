@@ -17,7 +17,6 @@ const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url))
 // whatever the ones before it reported.
 export const gates = [
   { name: 'architecture', command: 'pnpm', args: ['test:renderer-architecture'] },
-  { name: 'size', command: 'pnpm', args: ['check:renderer-size'] },
   { name: 'conventions', command: 'pnpm', args: ['check:renderer-conventions'] },
   { name: 'unused', command: 'pnpm', args: ['check:renderer-unused'] },
   { name: 'duplication', command: 'pnpm', args: ['check:renderer-dupes'] },

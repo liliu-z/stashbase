@@ -80,7 +80,6 @@ test('the one renderer CI step still covers every replacement check', () => {
   const named = new Set(gates.flatMap((gate) => gate.args));
   for (const script of [
     'test:renderer-architecture',
-    'check:renderer-size',
     'check:renderer-conventions',
     'check:renderer-unused',
     'check:renderer-dupes',

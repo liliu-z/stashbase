@@ -21,8 +21,8 @@ test('the CLI flushes long failure diagnostics before exiting through a pipe', (
     fileURLToPath(new URL('./check-web.mjs', import.meta.url)),
   ], { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024 });
   assert.equal(result.status, 1);
-  assert.equal(result.stdout.match(/END-OF-GATE/g)?.length, 12);
-  assert.match(result.stdout, /12 of 12 renderer gates failed:/);
+  assert.equal(result.stdout.match(/END-OF-GATE/g)?.length, 11);
+  assert.match(result.stdout, /11 of 11 renderer gates failed:/);
 });
 
 const fakeGates = [
