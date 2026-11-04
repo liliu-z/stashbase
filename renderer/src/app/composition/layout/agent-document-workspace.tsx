@@ -192,7 +192,8 @@ export function AgentDocumentWorkspace({
       <motion.div
         animate={{ width: documentWidth }}
         aria-hidden={!hasDocuments}
-        className="relative h-full shrink-0 overflow-hidden"
+        // Each pane is contained, so work in one never relays out the other.
+        className="relative h-full shrink-0 overflow-hidden [contain:content]"
         data-testid="document-slot"
         inert={!hasDocuments}
         initial={false}
@@ -232,7 +233,7 @@ export function AgentDocumentWorkspace({
         <motion.div
           animate={{ width: agentBoxWidth }}
           className={cn(
-            'ml-auto h-full overflow-hidden bg-surface-2',
+            'ml-auto h-full overflow-hidden bg-surface-2 [contain:content]',
             // The rule is the seam. It rides the sweep in both directions and
             // rests only once the Agent has the row.
             (agentWidth !== null || settling) && 'border-l border-border',
