@@ -68,7 +68,8 @@ describe('virtual cursor', () => {
     view.dispatch(view.state.tr.insertText('!', 5));
     expect(measure).not.toHaveBeenCalled();
 
-    document.getSelection()?.collapse(view.dom.querySelector('strong')?.firstChild ?? null, 2);
+    const bold = view.dom.querySelector('strong'); // dom-contract: a text node inside the editor
+    document.getSelection()?.collapse(bold?.firstChild ?? null, 2);
     document.dispatchEvent(new Event('selectionchange'));
     expect(measure).toHaveBeenCalled();
   });
