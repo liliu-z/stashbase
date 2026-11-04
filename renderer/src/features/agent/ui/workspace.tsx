@@ -18,7 +18,7 @@ import {
   agentSessionIsBusy,
   agentCanChangeAgent,
 } from '@/features/agent/domain/session';
-import { EMPTY_CHAT_PROMPTS } from '@/features/agent/domain/starters';
+import { EMPTY_CHAT_PROMPT } from '@/features/agent/domain/starters';
 import { useAgentAccess } from '@/features/agent/hooks/use-agent-access';
 import { useAgentCatalog } from '@/features/agent/hooks/use-agent-catalog';
 import { useAgentModelRefresh } from '@/features/agent/hooks/use-agent-model-refresh';
@@ -27,7 +27,6 @@ import { useAgentRuntimeUpdate } from '@/features/agent/hooks/use-agent-runtime-
 import { useAttentionFocus } from '@/features/agent/hooks/use-attention-focus';
 import { useChangedSource } from '@/features/agent/hooks/use-changed-source';
 import { useRenameConversation } from '@/features/agent/hooks/use-conversation-history';
-import { useRotatingPrompt } from '@/features/agent/hooks/use-rotating-prompt';
 import { cn } from '@/lib/utils';
 import { useStickToBottom } from '@/shared/runtime/use-stick-to-bottom';
 
@@ -35,7 +34,6 @@ import { AgentAccessDialog } from './access-dialog';
 import { ChatHeader } from './chat-header';
 import { ChatHistoryPopover } from './chats/history-popover';
 import { AgentContextComposer } from './composer/context-composer';
-import { useAgentComposerFocused } from './composer/focus';
 import { AgentPermissionMode } from './composer/permission-mode';
 import { AgentProviderControl } from './composer/provider';
 import { AgentThinkingControl } from './composer/thinking';
@@ -141,9 +139,7 @@ function ChatWorkspace({
   useEffect(() => {
     if (unstarted && rememberedModels?.length) active.seedModels(rememberedModels);
   }, [active, rememberedModels, unstarted]);
-  const composerFocused = useAgentComposerFocused();
-  const rotatingPrompt = useRotatingPrompt(EMPTY_CHAT_PROMPTS, composerFocused || !empty);
-  const promptPlaceholder = empty && armedSkill === undefined ? rotatingPrompt : null;
+  const promptPlaceholder = empty && armedSkill === undefined ? EMPTY_CHAT_PROMPT : null;
   const sourceFor = useChangedSource(runtime, state.scope);
   const composerRef = useRef<HTMLDivElement>(null);
   const composerShown = state.connection.kind !== 'retired' && state.connection.kind !== 'disposed';

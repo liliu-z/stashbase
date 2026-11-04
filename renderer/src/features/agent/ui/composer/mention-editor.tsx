@@ -28,7 +28,6 @@ import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import type { InputMessageEditorContext } from '@/components/ui/input-message';
 import type { ContextStatus, MentionQuery } from '@/features/agent/domain/context';
 import { fontWeights } from '@/lib/font-weight';
-import { ambient } from '@/lib/springs';
 
 import {
   chipInPlace,
@@ -51,7 +50,6 @@ import {
   statusField,
 } from './mention-markers';
 import { mentionDecorations } from './mention-widgets';
-import { rollPlaceholder } from './placeholder-roll';
 
 export { chipRuns, serialize };
 
@@ -112,7 +110,6 @@ export const MentionEditor = forwardRef<MentionEditorHandle, MentionEditorProps>
     const dismissedRef = useRef(false);
     const editable = useRef(new Compartment());
     const placeholderCompartment = useRef(new Compartment());
-    const placeholderMotion = useRef(new Compartment());
     const attributes = useRef(new Compartment());
     const theme = useRef(new Compartment());
     ctxRef.current = ctx;
@@ -220,7 +217,6 @@ export const MentionEditor = forwardRef<MentionEditorHandle, MentionEditorProps>
               drop: (event) => Array.from(event.dataTransfer?.types ?? []).includes('Files'),
             }),
             placeholderCompartment.current.of(placeholder(ctxRef.current.placeholder)),
-            placeholderMotion.current.of([]),
             editable.current.of(EditorView.editable.of(!ctxRef.current.disabled)),
             attributes.current.of(EditorView.contentAttributes.of({})),
             theme.current.of([]),
@@ -282,17 +278,15 @@ export const MentionEditor = forwardRef<MentionEditorHandle, MentionEditorProps>
       });
     }, [ctx.disabled]);
 
-    // The first placeholder is set with the state; later ones roll in.
+    // The first placeholder is set with the state; later ones swap in place.
     const shownPlaceholder = useRef(ctxRef.current.placeholder);
     useEffect(() => {
       const view = viewRef.current;
       if (!view || shownPlaceholder.current === ctx.placeholder) return;
       shownPlaceholder.current = ctx.placeholder;
-      return rollPlaceholder(
-        view,
-        { motion: placeholderMotion.current, placeholder: placeholderCompartment.current },
-        ctx.placeholder,
-      );
+      view.dispatch({
+        effects: placeholderCompartment.current.reconfigure(placeholder(ctx.placeholder)),
+      });
     }, [ctx.placeholder]);
 
     const { fontSize, lineHeight, paddingX, paddingY } = ctx.metrics;
@@ -313,23 +307,7 @@ export const MentionEditor = forwardRef<MentionEditorHandle, MentionEditorProps>
             },
             '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--foreground)' },
             '.cm-line': { padding: '0' },
-            // Inline-block, so the swap can move it: a placeholder rolls up
-            // out of view and the next floats up into its place.
-            '.cm-placeholder': {
-              display: 'inline-block',
-              color: 'var(--muted-foreground)',
-              transition: `opacity ${ambient.crossfadeInMs}ms cubic-bezier(0.4, 0, 0.2, 1), transform ${ambient.crossfadeInMs}ms cubic-bezier(0.4, 0, 0.2, 1)`,
-            },
-            '.cm-content[data-placeholder-motion="leaving"] .cm-placeholder': {
-              opacity: '0',
-              transform: 'translateY(-0.45em)',
-              transitionDuration: `${ambient.crossfadeOutMs}ms`,
-            },
-            '.cm-content[data-placeholder-motion="entering"] .cm-placeholder': {
-              opacity: '0',
-              transform: 'translateY(0.45em)',
-              transition: 'none',
-            },
+            '.cm-placeholder': { color: 'var(--muted-foreground)' },
             '.cm-scroller': {
               fontFamily: 'inherit',
               lineHeight: 'inherit',
