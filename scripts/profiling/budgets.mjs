@@ -321,11 +321,15 @@ function report(results) {
   let over = 0;
   for (const budget of BUDGETS) {
     const values = results.map((result) => get(result, budget.metric)).filter((value) => typeof value === "number");
+    const unit = budget.unit ? ` ${budget.unit}` : "";
+    if (values.length === 0) {
+      rows.push([budget.name, `≤ ${budget.limit}${unit}`, "not measured", "—"]);
+      continue;
+    }
     const worst = Math.max(...values);
     const low = Math.min(...values);
-    const within = values.length > 0 && worst <= budget.limit;
+    const within = worst <= budget.limit;
     if (!within) over++;
-    const unit = budget.unit ? ` ${budget.unit}` : "";
     rows.push([budget.name, `≤ ${budget.limit}${unit}`, `${low === worst ? worst : `${low}–${worst}`}${unit}`, within ? "within" : "over"]);
   }
   const widths = rows[0].map((_, column) => Math.max(...rows.map((row) => row[column].length)));

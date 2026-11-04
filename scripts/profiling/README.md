@@ -97,7 +97,8 @@ memory reads `ps`, and child processes are stopped by process group.
   project matches the primed index and no resync overlaps the measurements.
 - The host's `server.log` stays in the isolated profile, under
   `profile/data/stashbase/logs/`, as for every launch with
-  `STASHBASE_LOCAL_DATA_ROOT` set.
+  `STASHBASE_LOCAL_DATA_ROOT` set. Each run restores the profile first, so
+  only the last run's log is kept.
 
 | Budget | Measured as |
 |---|---|
