@@ -41,3 +41,35 @@ export function writeEditingProject(projectDirectory) {
   fs.writeFileSync(documentPath, original);
   return { documentName: "big.md", documentPath, original, markdownFiles: 301 };
 }
+
+// Text near the top of each budget document. The runner treats a file as open
+// once its marker is on screen, whichever editor renders it.
+export const BUDGET_MARKERS = {
+  small: "Small file marker sentence.",
+  big: "Big file marker sentence.",
+};
+
+// Every budget fixture file carries this modification time, so rewriting the
+// project between runs leaves it exactly as the primed index last saw it and
+// starts no resync during the measurements.
+const BUDGET_FILE_TIME = new Date("2026-01-01T00:00:00Z");
+
+/** 1,000 notes in 20 folders, a 120 KB Markdown file and a 3-line one. */
+export function writeBudgetProject(projectDirectory) {
+  fs.rmSync(projectDirectory, { recursive: true, force: true });
+  fs.mkdirSync(projectDirectory, { recursive: true });
+  for (let folder = 1; folder <= 20; folder++) {
+    const directory = path.join(projectDirectory, `folder-${String(folder).padStart(2, "0")}`);
+    fs.mkdirSync(directory);
+    for (let note = 1; note <= 50; note++) {
+      fs.writeFileSync(path.join(directory, `note-${note}.md`), `# Note ${folder}-${note}\n\nSome body text for note ${note}.\n`);
+    }
+  }
+  fs.writeFileSync(path.join(projectDirectory, "small.md"), `# Small\n\n${BUDGET_MARKERS.small}\n`);
+  const big = longMarkdownDocument(120 * 1024).replace("# Big document\n\n", `# Big document\n\n${BUDGET_MARKERS.big}\n\n`);
+  fs.writeFileSync(path.join(projectDirectory, "big.md"), big);
+  for (const entry of fs.readdirSync(projectDirectory, { recursive: true })) {
+    fs.utimesSync(path.join(projectDirectory, entry), BUDGET_FILE_TIME, BUDGET_FILE_TIME);
+  }
+  return { small: "small.md", big: "big.md", folders: 20, markdownFiles: 1002 };
+}
