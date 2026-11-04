@@ -166,10 +166,14 @@ export function mcpAccessQuery(port: McpAccessPort) {
   } as const;
 }
 
+/** This window's saves write the cache, so a mounted reading menu never needs
+ *  to refetch. Returning to the window catches a change made in another one. */
 export function appearanceQuery(port: AppearancePort) {
   return {
     queryFn: ({ signal }: { signal: AbortSignal }) => port.load(signal),
     queryKey: settingsQueryKeys.appearance,
+    refetchOnWindowFocus: 'always',
     retry: false,
+    staleTime: Infinity,
   } as const;
 }
