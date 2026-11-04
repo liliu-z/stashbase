@@ -977,6 +977,10 @@ Host/services: `server/folder.ts`, `server/github-import.ts`, `server/project-fi
 
 ## J03: Documents
 
+Host text saves now start the same restricted write diagnostic trace described in
+[J07](#j07-converge). This observes the existing source/version transaction and
+keeps its original permissions and save result; it does not add source reads.
+
 **Math source preservation (2026-11-02):**
 `shared/runtime/markdown-math.ts` tokenizes formulas before Markdown consumes
 TeX escapes and retains source positions. Documents' `ui/markdown/math.ts`
@@ -3665,6 +3669,31 @@ pricing or a newly packaged desktop journey.
 
 ## J07: Converge
 
+**Write failure evidence (2026-11-04):** `write-diagnostic-context.ts` records
+actual checks in path, scope, edit, transaction and atomic publication owners;
+`write-diagnostics.ts` retains restricted attachments and temporary target timelines.
+`project-path-diagnostics.test.ts` and `write-diagnostic-evidence.test.ts` cover
+Windows lexical drive/case/separator/Unicode decisions, project/session rejection,
+realpath/symlink failure, absent source, permission/publish failure, edit matching
+and both version checks without including text. `scripts/write-diagnostic-replay.ts`
+reads only received evidence and generates temporary branch regressions. The
+store/replay tests cover limits, opt-out, failures and target changes. These are
+controlled reproductions, not native Windows/provider or production upload proof.
+An independent assessor given only numbered packets identified all 13 failure
+branches and executed their generated regressions; two additional successful
+path-semantics cases also ran (15/15). Evidence establishes policy branches and
+observed system-call failures, not the original OS permission configuration.
+Two further blind timelines reproduced same-target success and changed-target
+success (4/4 generated cases). The sequence regression also checks unchanged
+success and a symlink alias resolving to the same physical target after an early
+edit refusal.
+Settings' full-path disclosure was visually inspected through native Chrome in
+its isolated Story. The core gate, focused file/diagnostic and four-runtime checks,
+renderer Settings tests, formatting/lint, docs and service/MCP builds passed.
+The private upload service is absent: production delivery stays `unavailable`.
+See [write diagnostics](../docs/usage-statistics.md#write-failure-diagnostics) for
+coverage gaps and the evidence-only reproduction command.
+
 **Shared math workflow (2026-11-02):**
 `renderer/src/test/fixtures/math.ts` supplies one Markdown sample to the
 `app/composition/layout/math-workflow.test.tsx` regression and
@@ -3853,7 +3882,7 @@ suite exercises actual MCP and HTTP read/write/edit/conflict/no-change outcomes;
 the Project Operations suite covers delayed results through an account switch
 and opt-out. Native CLI/shell filesystem access outside this owner, move/delete,
 and interactive-note creation are outside this event's coverage. MCP requests
-without a supplied turn ID remain uncorrelated rather than guessed.
+without a reliable live-session or supplied turn ID remain uncorrelated rather than guessed.
 
 **Interactive notes (2026-10-28):** The shared MCP tool factory and stdio HTTP
 adapter expose `create_interactive_note` through Project Operations. The host test

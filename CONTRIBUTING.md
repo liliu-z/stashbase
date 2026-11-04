@@ -222,3 +222,8 @@ Packaging is release-only; outputs stay in `release.nosync/` and are never commi
 In development builds, Cmd/Ctrl+Alt+Shift+D opens Developer tools for agent setup
 and turn simulations and sidebar update previews. These controls are separate
 from Settings; the production application does not offer the shortcut.
+
+For restricted write-failure diagnosis, use the evidence-only reader and temporary
+regression generator in [Usage statistics](docs/usage-statistics.md#write-failure-diagnostics).
+Received attachments contain full paths and must not be committed or pasted into
+public issues. Run generated regressions with the isolated-home command shown there.

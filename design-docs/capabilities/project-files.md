@@ -255,6 +255,14 @@ recoverable work. Rollback must not replace newer user or external changes.
 | Outcome unknown | Establish the result before repeating a mutation; an import may require inspecting the refreshed file list. |
 | Search update fails after save | Confirm the save and report search lag separately. |
 
+Failed host text writes retain an operation timeline under the existing diagnostic
+preference. Evidence describes the checks actually executed, including exact path
+spelling and project/session decisions, without reading files again after failure.
+Full paths belong to a restricted diagnostic attachment; ordinary usage events
+carry classification and correlation IDs. A later success at another target is
+not recovery of the failed target. Diagnostic loss, limits and unavailable upload
+remain explicit. This does not change permission, matching or version rules.
+
 ## Document-specific Diff
 
 An agent applies requested document changes directly through StashBase's file

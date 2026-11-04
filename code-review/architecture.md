@@ -1375,6 +1375,36 @@ allowance snapshot to the gateway so their explanation reflects held capacity.
   proves neither abandonment nor continued use after opt-out; subscription rights
   observed by a desktop are not a hosted payment ledger.
 
+### Restricted Write Diagnostics
+
+`write-diagnostic-context.ts` observes existing checks through async-local scope;
+`project-operations` starts Agent/MCP write/edit traces and `saveFileContent` starts
+Documents traces. The path, membership, scope, snapshot, match, version and atomic
+publication owners record operands and results when executed. No diagnostic-only
+filesystem probes run on the success path. Explicit refusal branches have codes;
+uncaught exceptions retain type and application frames, never arbitrary messages.
+The operation keeps raw/escaped paths, the actual comparison identities, checked
+registered roots and session root. Failed steps and unexecuted stages stay distinct;
+ordered steps expose staging before the commit version recheck and cleanup after failure.
+
+`write-diagnostics.ts` owns bounded asynchronous attachment persistence (owner-only
+files/directory, seven-day retention). Telemetry's admission closure fences queued
+work by consent and account, and opt-out clears memory/disk and aborts upload.
+Routine event schema 9 exports operation/diagnostic/target IDs and fixed result
+facts. HTTP response headers and the structured StashBase MCP error join transport
+and tool observations to the same operation. A session's live socket supplies its
+turn; missing third-party IDs and runtime versions remain unavailable. Tool output
+is never copied into a package. Only a validated structured error can retroactively
+supply its tool-call ID; timing proximity never establishes a join.
+
+The production build currently has no private attachment upload destination.
+Attachments remain local with delivery `unavailable`; the injected uploader is
+covered by controlled tests, not production delivery evidence. Never send complete
+path attachments through PostHog. The local reader/replay script and current limits
+are documented in [Usage statistics](../docs/usage-statistics.md#write-failure-diagnostics).
+Native CLI/shell writes, file import/move/delete, exclusive creation and failures
+before the host text-write entry are coverage gaps, not inferred successes.
+
 ## Renderer Boundaries
 
 `app` binds adapters and coordinates features through public interfaces.

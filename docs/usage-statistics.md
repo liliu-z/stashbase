@@ -27,7 +27,7 @@ installation identity.
 
 ## Events and interpretation
 
-Schema version 8 carries an event UUID, occurrence time, app version, distribution, OS,
+Schema version 9 carries an event UUID, occurrence time, app version, distribution, OS,
 installation ID, anonymous ID, installation first-observed time, and, when signed
 in, the account ID. Active work also establishes a session ID shared across
 windows; 30 minutes without reported activity starts another session. The first
@@ -55,7 +55,8 @@ in provider history; absence is not evidence of source use.
 | `agent_connection_closed` | Host observes socket closure, including idle and intentional closes | `runtime`, shared `context.connection_id`, close code/initiator/reason and available process evidence |
 | `http_request_lifecycle` | Host observes a slow local JSON request or a response closing before completion | `request_id`, `state`: pending / finished / closed, `elapsed_ms`, `headers_sent`, optional `http_status`, method, route template and available host instance ID |
 | `document_write_result` | Versioned editor save settles | `outcome`; success includes `changed` |
-| `project_file_operation` | Shared project file read, write or edit settles | `operation`, `origin`: agent / mcp / http, `outcome`, optional runtime and turn/request correlation; successful writes/edits include `changed` |
+| `project_file_operation` | Shared project file read, write or edit settles | `operation`, `origin`, `outcome`, optional runtime and turn/request correlation; writes/edits include `operation_id`, temporary target identity/relation, failure classification and `diagnostic_id` when captured; successes include `changed` |
+| `write_diagnostic_delivery` | Restricted write attachment storage/delivery observation | `diagnostic_id`, `status`, `completeness`, occurrence count; no paths or content |
 | `account_login_started` | A browser sign-in flow starts | None |
 | `account_login_result` | Sign-in completes or fails | `outcome` |
 | `account_signed_out` | Local account is signed out | None |
@@ -581,3 +582,74 @@ An observed leader exit without pipe closure differs from a leader that has not
 exited. Windows does not report process-group presence as if it were observed.
 Neither fact alone establishes the cause of a slow close. Returning activity,
 editing, and the next successful Agent turn remain separate measures of recovery.
+
+## Write failure diagnostics
+
+The same Privacy switch controls restricted write diagnostics. These attachments
+preserve complete paths involved in a failed host text write, including the raw
+Agent string, an escaped representation, comparison identities, checked project
+roots, session root and actual realpath/case/Unicode decisions. They contain no
+file bodies, old/new edit text, directory listings, prompts or entire tool output.
+Unknown exception messages are excluded because they may quote document text;
+exception type, code, application stack frames and already-recorded steps remain.
+
+Stages are validation, path resolution, project matching, session scope, read,
+edit matching, version checks and persistence. `not_reached` means no stage ran;
+the ordered step timeline is authoritative when stages repeat. Missing files on
+an existing-source read differ from an accepted absent target for creation. Edit
+evidence records lengths, line endings, normalization facts and match counts.
+Version evidence preserves request, read and commit versions. Atomic write evidence
+names the actual syscall and distinguishes partial staging from target publication.
+
+The production attachment upload destination is **not configured**. Attachments
+currently remain under the application's local data directory in
+`write-diagnostics/<diagnostic_id>.json`; delivery is `unavailable`, never uploaded.
+The directory and files use owner-only modes (700/600; Windows inherits the local
+application-data ACL). PostHog's ID can locate the local package. A future private
+uploader must authenticate retrieval and enforce the same expiry; the ordinary
+PostHog event endpoint must never receive these packages. Controlled uploader tests
+do not establish production delivery or Windows ACL behavior.
+
+Limits: 768 KiB of captured step evidence and 2,048 steps per operation; 1 MiB per
+attachment, 32 retained samples/queued attachments and seven days on disk. Turn
+identity is temporary (128 turns, 30 minutes, at most 32 target identities each).
+Attachments retain at most 32 follow-up operations. Limits mark `partial` and name
+the missing evidence; they never mean a complete package. Identical evidence in
+one turn shares a sample with occurrence count and first/latest times; changed
+path, project, version or check evidence creates a new sample. Temporary staging
+names and wait durations do not split otherwise identical failures. Upload attempts
+are bounded (three attempts, five seconds each); unavailable/failed transport,
+storage refusal and queue limits are exposed by `/api/telemetry/delivery` and
+`write_diagnostic_delivery`. Opt-out aborts pending work and removes attachments.
+A restart retains local samples for reading; it does not resume turn identity or
+claim remote upload. Expiry is enforced on reads, at startup and every five minutes while the app runs.
+An offline installation is swept on its next launch; abandoned staging files are
+also removed by maintenance and opt-out.
+
+Count failures by distinct `operation_id`, joining HTTP and tool observations by
+that ID. Do not sum `project_file_operation`, HTTP warnings, tool failures and
+attachment-delivery events. Tool summaries remain tool workload, not additional
+file failures. Missing IDs stay uncorrelated. Same-target success and changed-target
+success are different timeline facts; neither automatically declares recovery.
+A successful unchanged write preserves `changed: false`.
+
+Read a received bundle and generate a safe regression environment:
+
+```sh
+node --import tsx scripts/write-diagnostic-replay.ts /path/to/received.json
+node --import tsx scripts/write-diagnostic-replay.ts /path/to/received.json --materialize
+node --import tsx --import ./server/__tests__/isolated-home.ts scripts/write-diagnostic-replay.ts /path/to/received.json --verify
+```
+
+The tool only materializes new temporary directories and opaque mapped targets.
+It never creates files at captured absolute paths. It evaluates captured comparisons
+and runs production failure branches using synthetic text or controlled syscall
+failures. This reproduces the observed branch, not a missing original document or
+a Windows filesystem from macOS. Contradictions and missing evidence are explicit;
+a successful command with no covered failure is not proof of a reproduction.
+
+Coverage includes host `write_file`/`edit_file` and Documents text saves. Native
+CLI/shell writes, imports, exclusive creation, move/delete, external-file grants,
+and refusals before these text-write entries remain gaps. Unstructured third-party
+errors retain `unknown` plus an uncorrelated status; no tool output is uploaded.
+The previously reported four Claude failures cannot be reconstructed retroactively.

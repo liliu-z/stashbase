@@ -330,6 +330,11 @@ reader to current credits rather than claiming all credits are spent.
   Diagnostic explanations, paths, stack traces, nested causes and bounded process
   output are retained to support debugging. Known credential patterns are filtered;
   documents, chats, arbitrary provider payloads and whole logs are not collected.
+  Failed host text writes additionally retain restricted diagnostic attachments
+  containing the complete involved paths, actual project/session checks and
+  content-free edit/version evidence. The same switch controls capture and
+  retention. Routine analytics carries IDs and classifications, not these paths.
+  Missing attachment delivery is reported explicitly; it is not successful upload.
   Bounded offline delivery preserves occurrence time and identity, follows the
   operating system's proxy settings like sign-in, and keeps undelivered events
   long enough to survive several weeks between uses. A submitted
