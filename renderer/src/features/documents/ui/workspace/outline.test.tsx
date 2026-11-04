@@ -61,7 +61,7 @@ function renderOutline(
     return select;
   };
   const select = republish(headings, activeId);
-  return { republish, runtime, select };
+  return { republish, rerender, runtime, select };
 }
 
 afterEach(() => {
@@ -177,6 +177,30 @@ describe('document outline collapse', () => {
 
     expect(screen.getByLabelText('other.md outline, 2 headings')).not.toBeNull();
     expect(screen.getByRole('button', { name: 'Collapse Plan' })).not.toBeNull();
+  });
+
+  it('keeps collapsed sections per document across a remount and a tab round trip', async () => {
+    const { republish, rerender, runtime } = renderOutline([PLAN, DETAILS], {
+      paths: ['report.md', 'other.md'],
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Collapse Plan' }));
+
+    rerender(<p>Files</p>);
+    expect(screen.queryByRole('button', { name: 'Expand Plan' })).toBeNull();
+    rerender(<DocumentOutline runtime={runtime} />);
+    expect(screen.getByRole('button', { name: 'Expand Plan' })).not.toBeNull();
+
+    await act(async () => {
+      await runtime.activate('tab-2');
+    });
+    republish([PLAN, DETAILS]);
+    expect(screen.getByRole('button', { name: 'Collapse Plan' })).not.toBeNull();
+
+    await act(async () => {
+      await runtime.activate('tab-1');
+    });
+    republish([PLAN, DETAILS]);
+    expect(screen.getByRole('button', { name: 'Expand Plan' })).not.toBeNull();
   });
 
   it('forgets a collapsed heading the document no longer publishes', async () => {

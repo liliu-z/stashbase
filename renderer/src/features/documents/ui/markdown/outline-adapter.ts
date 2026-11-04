@@ -110,17 +110,35 @@ export function scrollOutlineToHeading(
   return true;
 }
 
-export function activeHeadingId(
-  entries: DocumentHeading[],
-  positions: Array<{ id: string; top: number }>,
+/** The last rendered heading at or above `threshold`, or the first heading
+ *  when none is. Headings are in document order, so their tops only grow and a
+ *  binary search reads a handful of rects rather than every heading's. A
+ *  heading with no rendered element is skipped, as if it were not listed. */
+export function activeHeadingAt(
+  headings: readonly DocumentHeading[],
+  topOf: (heading: DocumentHeading) => number | undefined,
   threshold: number,
 ): string | null {
-  let active = entries[0]?.id ?? null;
-  for (const position of positions) {
-    if (position.top <= threshold) active = position.id;
-    else break;
+  let low = 0;
+  let high = headings.length - 1;
+  let found = -1;
+  while (low <= high) {
+    const middle = (low + high) >> 1;
+    let probe = middle;
+    let top: number | undefined;
+    for (; probe <= high; probe += 1) {
+      const heading = headings[probe];
+      top = heading ? topOf(heading) : undefined;
+      if (top !== undefined) break;
+    }
+    if (top !== undefined && top <= threshold) {
+      found = probe;
+      low = probe + 1;
+    } else {
+      high = middle - 1;
+    }
   }
-  return active;
+  return headings[Math.max(found, 0)]?.id ?? null;
 }
 
 function headingAnchors(doc: ProseMirrorNode): DecorationSet {
