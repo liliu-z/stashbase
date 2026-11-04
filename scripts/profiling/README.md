@@ -41,6 +41,12 @@ another checkout serves the wrong renderer, so stop it first.
 - **Isolation.** The host and Electron get a private `HOME`, `XDG_DATA_HOME`,
   `XDG_CONFIG_HOME` and Electron user-data directory. The real project
   registry, settings, session and index are never touched. Telemetry is off.
+- **Renderer.** `renderer: "dev"` (the default) serves the renderer from
+  Vite. `renderer: "build"` loads the production bundle in `dist/renderer`
+  over `app://renderer`, as a packaged app does; `buildRenderer()` builds it.
+- **Host ownership.** By default the harness starts the host before Electron.
+  `ownHost: true` lets Electron start it, as a normal launch does, so a
+  measurement from launch includes host startup.
 - **Ports.** The host runs on :8190 and DevTools on :9333, so a normal
   `pnpm dev` on :8090 can keep running. If either port is busy, the harness
   stops with an error. Vite on :5173 is shared.
@@ -53,6 +59,9 @@ another checkout serves the wrong renderer, so stop it first.
   keystrokes.
 - **Project open.** `openProject` opens the project through `/api/projects/open`
   and reloads the window. Without the reload, the window stays on Welcome.
+- **Relaunch.** `fresh: false` keeps the profile from an earlier launch, so
+  the window restores its last project. `rootPids` lists the app's process
+  group leaders (never Vite) for process-tree memory.
 - **Teardown.** Every child runs in its own process group and is stopped when
   the scenario ends, including when it fails. Logs stay in
   `profiling.nosync/<scenario>/logs/`.
