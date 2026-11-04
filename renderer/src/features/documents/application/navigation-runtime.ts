@@ -56,6 +56,9 @@ interface DocumentNavigationState {
   outlineFailed: boolean;
   find: DocumentFindState;
   outline: DocumentOutlineState;
+  /** Collapsed outline sections of the active tab. Kept per tab here, not in
+   *  the outline component, so they survive the outline unmounting. */
+  outlineCollapsed: ReadonlySet<string>;
   pendingAnchor: PendingDocumentAnchor | null;
 }
 
@@ -87,6 +90,7 @@ export interface DocumentNavigationRuntime {
   setFindCaseSensitive(value: boolean): void;
   setFindQuery(query: string): void;
   setFindWholeWord(value: boolean): void;
+  toggleOutlineSection(headingId: string): void;
 }
 
 interface SearchNotices {
@@ -136,8 +140,10 @@ export function createDocumentNavigationRuntime(
       wholeWord: false,
     },
     outline: emptyOutline(),
+    outlineCollapsed: new Set(),
     pendingAnchor: null,
   }));
+  const collapsedByTab = new Map<string, ReadonlySet<string>>();
   let activeTabId = initialActiveTabId;
   let disposed = false;
   let findController: DocumentFindController | null = null;
@@ -252,7 +258,11 @@ export function createDocumentNavigationRuntime(
     activate(tabId) {
       if (disposed || tabId === activeTabId) return;
       activeTabId = tabId;
-      store.setState({ searchNotice: null, outlineFailed: false });
+      store.setState({
+        searchNotice: null,
+        outlineFailed: false,
+        outlineCollapsed: (tabId && collapsedByTab.get(tabId)) || new Set(),
+      });
       clearFindOwner();
       clearOutlineOwner();
       pendingSearch = null;
@@ -330,9 +340,15 @@ export function createDocumentNavigationRuntime(
     publishOutline(tabId, owner, outline, select) {
       if (disposed || tabId !== activeTabId || outlineOwner !== owner) return;
       outlineSelect = select;
+      const ids = new Set(outline.headings.map((heading) => heading.id));
+      const collapsed = store.getState().outlineCollapsed;
+      const kept = [...collapsed].filter((id) => ids.has(id));
+      const outlineCollapsed = kept.length === collapsed.size ? collapsed : new Set(kept);
+      collapsedByTab.set(tabId, outlineCollapsed);
       store.setState((state) => ({
         ...state,
         outline: { ...outline, available: true },
+        outlineCollapsed,
       }));
     },
     requestAnchor(tabId, id) {
@@ -371,6 +387,14 @@ export function createDocumentNavigationRuntime(
       if (disposed) return;
       updateFind({ wholeWord: value });
       runQuery(false);
+    },
+    toggleOutlineSection(headingId) {
+      if (disposed || !activeTabId) return;
+      const next = new Set(store.getState().outlineCollapsed);
+      if (next.has(headingId)) next.delete(headingId);
+      else next.add(headingId);
+      collapsedByTab.set(activeTabId, next);
+      store.setState({ outlineCollapsed: next });
     },
   };
 }

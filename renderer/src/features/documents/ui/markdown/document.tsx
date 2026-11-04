@@ -41,7 +41,7 @@ import '@milkdown/crepe/theme/common/style.css';
 import '@milkdown/crepe/theme/frame.css';
 import './document.css';
 import {
-  activeHeadingId,
+  activeHeadingAt,
   attachHeadingAnchors,
   currentEditorView,
   documentScroller,
@@ -312,19 +312,29 @@ export function MarkdownDocument({
     const host = hostRef.current;
     if (!host) return;
     const scroller = documentScroller(host);
+    let frame = 0;
     const update = () => {
+      frame = 0;
       const view = currentEditorView(editorRef.current);
-      const currentHeadings = headingsForView(view, headingSnapshotRef);
       const threshold = scroller.getBoundingClientRect().top + 16;
-      const positions = currentHeadings.flatMap((heading) => {
-        const element = headingElementAtPosition(view, heading.position);
-        return element ? [{ id: heading.id, top: element.getBoundingClientRect().top }] : [];
-      });
-      setActiveHeading(activeHeadingId(currentHeadings, positions, threshold));
+      setActiveHeading(
+        activeHeadingAt(
+          headingsForView(view, headingSnapshotRef),
+          (heading) =>
+            headingElementAtPosition(view, heading.position)?.getBoundingClientRect().top,
+          threshold,
+        ),
+      );
     };
-    scroller.addEventListener('scroll', update, { passive: true });
+    const onScroll = () => {
+      if (frame === 0) frame = requestAnimationFrame(update);
+    };
+    scroller.addEventListener('scroll', onScroll, { passive: true });
     update();
-    return () => scroller.removeEventListener('scroll', update);
+    return () => {
+      scroller.removeEventListener('scroll', onScroll);
+      cancelAnimationFrame(frame);
+    };
   }, [active, creationState, headings]);
 
   useEffect(() => {

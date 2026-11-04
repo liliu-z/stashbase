@@ -226,11 +226,8 @@ describe('workspace shell', () => {
       },
       { timeout: 5_000 },
     );
-    await waitFor(() => {
-      const outline = view.getByLabelText('Document outline section');
-      expect(outline.closest('[data-sidebar="content"]')).not.toBeNull();
-      expect(outline.closest('[data-sidebar="footer"]')).toBeNull();
-    });
+    // A hidden outline is not mounted: a long document's outline is hundreds of rows.
+    expect(view.queryByLabelText('Document outline section')).toBeNull();
 
     const navigator = within(view.getByRole('tablist', { name: 'Sidebar navigator' }));
     const filesTab = navigator.getByRole('tab', { name: 'Files' });
@@ -286,6 +283,9 @@ describe('workspace shell', () => {
         .getElementById(outlineTab?.getAttribute('aria-controls') ?? '')
         ?.hasAttribute('hidden'),
     ).toBe(false);
+    const outline = view.getByLabelText('Document outline section');
+    expect(outline.closest('[data-sidebar="content"]')).not.toBeNull();
+    expect(outline.closest('[data-sidebar="footer"]')).toBeNull();
   });
 
   it('excludes the covered document from current context while New tab is selected', async () => {
