@@ -157,11 +157,11 @@ export function TextSurface({
           Read-only source from another project folder
         </NoticeStrip>
       )}
-      {source.isFetching && (
-        <span className="sr-only" role="status">
-          Refreshing {name}
-        </span>
-      )}
+      {/* Always mounted, so a background refresh changes only this text:
+          inserting the element shifted the column and relaid out the editor. */}
+      <span className="sr-only" role="status">
+        {source.isFetching ? `Refreshing ${name}` : ''}
+      </span>
       {source.isError && (
         <NoticeStrip action={{ label: 'Retry', onAct: () => void source.refetch() }} role="status">
           {source.error instanceof Error &&
