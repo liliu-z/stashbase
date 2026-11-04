@@ -142,7 +142,7 @@ export function usagePayload(entry: QueuedUsage) {
       ...(event === '$identify' ? { $anon_distinct_id: entry.anonymousId } : {}),
       ...(entry.delivery ? { delivery: entry.delivery } : {}),
       ...(entry.rendererDelivery ? { renderer_delivery: entry.rendererDelivery } : {}),
-      app_version: entry.version, app_distribution: entry.distribution, os: entry.os, schema_version: 8,
+      app_version: entry.version, app_distribution: entry.distribution, os: entry.os, schema_version: 9,
       $process_person_profile: Boolean(entry.userId), $geoip_disable: true, $ip: null,
     },
   };

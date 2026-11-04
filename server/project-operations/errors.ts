@@ -10,8 +10,9 @@ export class ProjectOperationError extends Error {
     message: string,
     readonly status = 400,
     readonly code?: string,
+    options?: ErrorOptions,
   ) {
-    super(message);
+    super(message, options);
     this.name = 'ProjectOperationError';
   }
 }

@@ -15,6 +15,7 @@ import path from 'node:path';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { logger } from './log.ts';
 import { filesystemPath } from './filesystem-path.ts';
+import { writeDiagnosticError, writeDiagnosticEvidence, writeDiagnosticStep } from './write-diagnostic-context.ts';
 import { projectRegistrySnapshotSchema, type ProjectRegistrySnapshotWire } from '../shared/protocols/http/project.ts';
 import { validateFolderName as validatePortableFolderName } from '../shared/folder-name.ts';
 import {
@@ -138,16 +139,26 @@ async function storedFolderPathEqualsAsync(value: unknown, target: string): Prom
 
 /** Return the retained spelling of an available exact project member. */
 export async function exactRegisteredFolderRootAsync(abs: string): Promise<string | null> {
-  const target = filesystemPath.absolute(abs);
-  const roots = await configuredFolderRootsAsync();
-  // An exact stored spelling needs no alias probes on other mounted volumes.
-  const candidates = roots.includes(target) ? [target, ...roots.filter((root) => root !== target)] : roots;
-  for (const root of candidates) {
-    if (!await filesystemPath.equalAsync(root, target)) continue;
-    try { if ((await fs.promises.stat(root)).isDirectory()) return root; }
-    catch { /* Missing or unreadable members remain registered, not authorized. */ }
-  }
-  return null;
+  return writeDiagnosticStep('project_match', 'folder.exact_registered_root', async () => {
+    const target = filesystemPath.absolute(abs);
+    const roots = await configuredFolderRootsAsync();
+    // An exact stored spelling needs no alias probes on other mounted volumes.
+    const candidates = roots.includes(target) ? [target, ...roots.filter((root) => root !== target)] : roots;
+    for (const root of candidates) {
+      const matched = await filesystemPath.equalAsync(root, target);
+      writeDiagnosticEvidence('folder.match', { root, target, matched, rule: 'exact' });
+      if (!matched) continue;
+      try {
+        const directory = (await fs.promises.stat(root)).isDirectory();
+        writeDiagnosticEvidence('folder.availability', { root, syscall: 'stat', is_directory: directory });
+        if (directory) return root;
+      } catch (error) {
+        writeDiagnosticEvidence('folder.availability', { root, syscall: 'stat', error: { ...writeDiagnosticError(error) }, disposition: 'not_authorized' });
+        /* Missing or unreadable members remain registered, not authorized. */
+      }
+    }
+    return null;
+  });
 }
 
 /** Return the stored spelling of an exact configured member even when its
@@ -178,28 +189,38 @@ export async function configuredDescendantProjectRootsAsync(parent: string): Pro
  *  the path isn't inside any member folder. The longest-prefix rule keeps
  *  nested members (`<root>/foo` and `<root>/foo/bar` both opened) correct. */
 export function registeredRootForAbs(abs: string): string | null {
-  const target = filesystemPath.absolute(abs);
-  let best: string | null = null;
-  for (const root of registeredFolderRoots()) {
-    if (filesystemPath.contains(root, target)) {
-      if (!best || filesystemPath.identity(root).length > filesystemPath.identity(best).length) best = root;
+  return writeDiagnosticStep('project_match', 'folder.registered_root_for_path', () => {
+    const target = filesystemPath.absolute(abs);
+    let best: string | null = null;
+    for (const root of registeredFolderRoots()) {
+      const matched = filesystemPath.contains(root, target);
+      if (matched) {
+        if (!best || filesystemPath.identity(root).length > filesystemPath.identity(best).length) best = root;
+      }
+      writeDiagnosticEvidence('folder.match', { root, target, matched, selected: best === root, rule: 'longest_prefix' });
     }
-  }
-  return best;
+    writeDiagnosticEvidence('folder.match_result', { target, selected_root: best });
+    return best;
+  });
 }
 
 /** Async request-path equivalent of `registeredRootForAbs()`. */
 export async function registeredRootForAbsAsync(abs: string): Promise<string | null> {
-  const target = filesystemPath.absolute(abs);
-  let best: string | null = null;
-  for (const root of await registeredFolderRootsAsync()) {
-    if (await filesystemPath.containsAsync(root, target)) {
-      if (!best || (await filesystemPath.identityAsync(root)).length > (await filesystemPath.identityAsync(best)).length) {
-        best = root;
+  return writeDiagnosticStep('project_match', 'folder.registered_root_for_path', async () => {
+    const target = filesystemPath.absolute(abs);
+    let best: string | null = null;
+    for (const root of await registeredFolderRootsAsync()) {
+      const matched = await filesystemPath.containsAsync(root, target);
+      if (matched) {
+        if (!best || (await filesystemPath.identityAsync(root)).length > (await filesystemPath.identityAsync(best)).length) {
+          best = root;
+        }
       }
+      writeDiagnosticEvidence('folder.match', { root, target, matched, selected: best === root, rule: 'longest_prefix' });
     }
-  }
-  return best;
+    writeDiagnosticEvidence('folder.match_result', { target, selected_root: best });
+    return best;
+  });
 }
 
 /** Resolve a folder reference asynchronously and require an existing directory.
@@ -212,8 +233,11 @@ export async function resolveFolderRootAsync(ref: string): Promise<string> {
   }
   const root = filesystemPath.absolute(ref, getFolderHome());
   try {
-    if ((await fs.promises.stat(root)).isDirectory()) return root;
-  } catch {
+    const directory = (await fs.promises.stat(root)).isDirectory();
+    writeDiagnosticEvidence('folder.resolve_root', { raw_path: ref, root, syscall: 'stat', is_directory: directory });
+    if (directory) return root;
+  } catch (error) {
+    writeDiagnosticEvidence('folder.resolve_root', { raw_path: ref, root, syscall: 'stat', error: { ...writeDiagnosticError(error) }, disposition: 'not_found' });
     /* fall through to the not-found error */
   }
   const err = new Error('folder not found');
@@ -480,7 +504,14 @@ export function getRecentFolders(): RecentFolder[] {
   // A Folder is openable from anywhere, so the only requirement is that it
   // still exists as a directory (handles a moved/deleted folder).
   return all.filter((v) => {
-    try { return fs.statSync(v.path).isDirectory(); } catch { return false; }
+    try {
+      const directory = fs.statSync(v.path).isDirectory();
+      writeDiagnosticEvidence('folder.availability', { root: v.path, syscall: 'stat', is_directory: directory });
+      return directory;
+    } catch (error) {
+      writeDiagnosticEvidence('folder.availability', { root: v.path, syscall: 'stat', error: { ...writeDiagnosticError(error) }, disposition: 'excluded' });
+      return false;
+    }
   });
 }
 
@@ -491,8 +522,14 @@ export async function getRecentFoldersAsync(): Promise<RecentFolder[]> {
 
 async function availableRecentFolders(all: RecentFolder[]): Promise<RecentFolder[]> {
   const checks = await Promise.all(all.map(async (value) => {
-    try { return (await fs.promises.stat(value.path)).isDirectory(); }
-    catch { return false; }
+    try {
+      const directory = (await fs.promises.stat(value.path)).isDirectory();
+      writeDiagnosticEvidence('folder.availability', { root: value.path, syscall: 'stat', is_directory: directory });
+      return directory;
+    } catch (error) {
+      writeDiagnosticEvidence('folder.availability', { root: value.path, syscall: 'stat', error: { ...writeDiagnosticError(error) }, disposition: 'excluded' });
+      return false;
+    }
   }));
   return all.filter((_, index) => checks[index]);
 }

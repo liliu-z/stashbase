@@ -17,6 +17,7 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import type { ProjectOperations } from '../server/project-operations/index.ts';
+import { writeDiagnosticErrorIds } from '../server/write-diagnostic-context.ts';
 import { parseProjectFileLineBound } from '../server/project-file-reader.ts';
 import type { McpAgentTool } from '../server/default-agent-tools.ts';
 import { AGENT_TOOL_MAX_FILES } from '../shared/protocols/http/agent-tools.ts';
@@ -82,6 +83,7 @@ export function createProjectMcpServer(opts: ProjectMcpServerOptions): Server {
   }));
 
   server.setRequestHandler(CallToolRequestSchema, async (req, extra) => {
+    try {
     const args = (req.params.arguments ?? {}) as Record<string, unknown>;
     const folder = typeof args.folder === 'string' && args.folder.trim() ? args.folder : undefined;
 
@@ -232,6 +234,14 @@ export function createProjectMcpServer(opts: ProjectMcpServerOptions): Server {
     }
 
     throw new Error(`unknown tool: ${req.params.name}`);
+    } catch (error) {
+      const ids = writeDiagnosticErrorIds(error);
+      if (!ids) throw error;
+      const failure = { stashbase_write_error: 1, error: { ...ids,
+        code: (error as { code?: string }).code ?? 'UNCLASSIFIED_EXCEPTION',
+        message: error instanceof Error ? error.message : 'File write failed' } };
+      return { isError: true, structuredContent: failure, content: [{ type: 'text', text: JSON.stringify(failure) }] };
+    }
   });
 
   return server;
@@ -249,6 +259,8 @@ function withMcpErrors(operations: ProjectOperations): ProjectOperations {
           const code = typeof (error as { code?: unknown })?.code === 'string'
             ? (error as { code: string }).code
             : undefined;
+          const ids = writeDiagnosticErrorIds(error);
+          if (ids) throw error;
           throw new Error(code ? `${code}: ${error instanceof Error ? error.message : String(error)}` : error instanceof Error ? error.message : String(error));
         }
       };

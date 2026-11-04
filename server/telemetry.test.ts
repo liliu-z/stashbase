@@ -181,7 +181,7 @@ test('default-on manual collection has only allowed fields and no source or acco
   f.service.capture({ event: 'project_entry_result', outcome: 'success', path: '/private' } as any);
   await tick();
   assert.equal(f.sent.length, 1);
-  assert.equal(f.sent[0].body.properties.schema_version, 8);
+  assert.equal(f.sent[0].body.properties.schema_version, 9);
   assert.equal(f.sent[0].body.properties.$process_person_profile, false);
   assert.equal(f.sent[0].body.properties.$geoip_disable, true);
   assert.equal(f.sent[0].body.properties.$ip, null);

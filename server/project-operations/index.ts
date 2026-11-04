@@ -40,7 +40,12 @@ import type { SearchTypeCategory } from '../../shared/search-types.ts';
 import type { ProjectKeywordFile } from '../../shared/search-results.ts';
 import { EMBEDDER_KEY_REQUIRED_CODE } from '../../shared/protocols/http/semantic-search.ts';
 import { telemetry } from '../telemetry.ts';
-import { projectFileOperationOrigin } from '../project-request-scope.ts';
+import { projectFileOperationOrigin, currentProjectDiagnosticScope } from '../project-request-scope.ts';
+import { diagnosticScope } from '../diagnostic-context.ts';
+import { writeDiagnosticStep, copyWriteDiagnosticErrorIds, writeDiagnosticErrorIds } from '../write-diagnostic-context.ts';
+import { diagnoseFileWrite } from '../write-diagnostics.ts';
+import type { WriteOperationDiagnostic } from '../../shared/protocols/write-diagnostics.ts';
+import { markDiagnosticReported } from '../error-diagnostics.ts';
 import type { TelemetryEvent } from '../../shared/protocols/http/telemetry.ts';
 
 export type { ProjectKeywordFile } from '../../shared/search-results.ts';
@@ -128,17 +133,32 @@ export function createProjectOperations(
 ): ProjectOperations {
   const deps = { ...productionDependencies, ...overrides };
   type FileOperation = Extract<TelemetryEvent, { event: 'project_file_operation' }>;
-  const fileOperation = async <T>(operation: FileOperation['operation'], work: () => Promise<T>, changed?: (result: T) => boolean): Promise<T> => {
+  const fileOperation = async <T>(operation: FileOperation['operation'], work: () => Promise<T>, changed?: (result: T) => boolean, rawPath?: unknown): Promise<T> => {
     // Capture the initiating identity and caller before file I/O can yield.
     const record = deps.scopedTelemetry();
     const origin = deps.fileOperationOrigin();
+    let observed: WriteOperationDiagnostic | undefined;
+    const evidence = () => observed ? {
+      operation_id: observed.operation_id, ...(observed.outcome === 'failed' ? { diagnostic_id: observed.diagnostic_id } : {}),
+      target_id: observed.target_id, target_relation: observed.target_relation,
+      ...(observed.error ? { error_code: observed.error.code } : {}), ...(observed.failed_stage ? { failed_stage: observed.failed_stage } : {}),
+      ...(observed.turn_id ? { turn_id: observed.turn_id } : {}),
+    } : {};
     try {
-      const result = await asProjectOperation(work);
+      const scope = diagnosticScope.getStore();
+      const session = currentProjectDiagnosticScope();
+      const result = await asProjectOperation(() => operation !== 'read'
+        ? diagnoseFileWrite({ operation, path: rawPath, ...origin, request_id: scope?.request_id,
+          turn_id: session.turn_id ?? scope?.turn_id, tool_call_id: scope?.context?.tool_call_id, runtime_version: session.runtime_version ?? scope?.context?.runtime_version,
+          session_root: session.folder }, work, (value) => { observed = value; })
+        : work());
       record({ event: 'project_file_operation', operation, ...origin, outcome: 'success',
+        ...evidence(),
         ...(changed ? { changed: changed(result) } : {}) });
       return result;
     } catch (error) {
       record({ event: 'project_file_operation', operation, ...origin,
+        ...evidence(),
         outcome: error instanceof ProjectOperationError && error.code === 'FILE_CHANGED' ? 'conflict' : 'failed' });
       throw error;
     }
@@ -237,14 +257,18 @@ export function createProjectOperations(
     read: (path, range) => fileOperation('read', () => deps.read(path, range)),
     createInteractiveNote: (input) => asProjectOperation(() => deps.createInteractiveNote(input)),
     write: ({ path, content, baseVersion }) => fileOperation('write', () => {
-      if (typeof content !== 'string') throw routeError('content (string) required', 400);
-      return deps.write(path, content, { baseVersion });
-    }, (result) => result.changed),
+      writeDiagnosticStep('validation', 'write.arguments', () => {
+        if (typeof content !== 'string') throw routeError('content (string) required', 400, 'INVALID_ARGUMENTS');
+      }, { content_type: typeof content, content_length: typeof content === 'string' ? content.length : null, requested_version: baseVersion ?? null });
+      return deps.write(path, content as string, { baseVersion });
+    }, (result) => result.changed, path),
     edit: ({ path, oldText, newText, replaceAll, baseVersion }) => fileOperation('edit', () => {
-      if (typeof oldText !== 'string') throw routeError('old_text (string) required', 400);
-      if (typeof newText !== 'string') throw routeError('new_text (string) required', 400);
-      return deps.edit(path, oldText, newText, { replaceAll, baseVersion });
-    }, (result) => result.changed),
+      writeDiagnosticStep('validation', 'edit.arguments', () => {
+        if (typeof oldText !== 'string') throw routeError('old_text (string) required', 400, 'INVALID_ARGUMENTS');
+        if (typeof newText !== 'string') throw routeError('new_text (string) required', 400, 'INVALID_ARGUMENTS');
+      }, { old_text_type: typeof oldText, new_text_type: typeof newText, requested_version: baseVersion ?? null });
+      return deps.edit(path, oldText as string, newText as string, { replaceAll, baseVersion });
+    }, (result) => result.changed, path),
     move: ({ path, newPath, cascade }) => asProjectOperation(() => deps.move(path, newPath, { cascade })),
     delete: (path) => asProjectOperation(() => deps.delete(path)),
   };
@@ -261,6 +285,10 @@ async function asProjectOperation<T>(work: () => Promise<T>): Promise<T> {
     const status = typeof (error as { status?: unknown })?.status === 'number'
       ? (error as { status: number }).status
       : code === 'FILE_CHANGED' ? 409 : 500;
-    throw new ProjectOperationError(errorMessage(error), status, code);
+    const wrapped = new ProjectOperationError(errorMessage(error), status, code, { cause: error });
+    copyWriteDiagnosticErrorIds(error, wrapped);
+    if (writeDiagnosticErrorIds(error)) markDiagnosticReported(wrapped);
+    if (error && typeof error === 'object' && 'currentVersion' in error) Object.assign(wrapped, { currentVersion: error.currentVersion });
+    throw wrapped;
   }
 }

@@ -8,6 +8,8 @@ import { setLogErrorReporter } from './log.ts';
 import { AGENT_TOOL_RESULT_LIMIT, type ErrorContext, type AgentTurnStage, type AgentToolResult } from '../shared/protocols/http/telemetry.ts';
 import { agentClientEventSchema, type AgentServerEvent } from '../shared/protocols/websocket/agent-session.ts';
 import { HTTP_REQUEST_ID_HEADER, httpDiagnosticRoute, validHttpRequestId } from '../shared/protocols/http/request-diagnostics.ts';
+import { writeDiagnosticErrorIds, attachWriteDiagnosticErrorIds } from './write-diagnostic-context.ts';
+import { writeDiagnostics } from './write-diagnostics.ts';
 
 /** One fixed feature name, never a dynamic route, query, body, or file path. */
 const FEATURES = new Set(['account', 'agents', 'agent', 'project', 'upload', 'asset', 'asset-derived', 'appearance', 'attach', 'embedder', 'files',
@@ -17,6 +19,14 @@ const FEATURES = new Set(['account', 'agents', 'agent', 'project', 'upload', 'as
 /** A refused request (4xx) is an expected outcome such as a save conflict or a
  * missing file; only a server failure (5xx) is an application error. */
 function captureHttp(service: typeof telemetry, status: number, error: unknown, operation: string): void {
+  const ids = writeDiagnosticErrorIds(error);
+  if (ids) {
+    // The operation event owns the failure count. This transport observation
+    // contains only correlation, never the original path-bearing exception.
+    service.captureWarning({ message: 'File write failed', code: 'WRITE_OPERATION_FAILED' },
+      { source: 'server', operation, context: { ...ids, diagnostic_correlation: 'linked' } });
+    return;
+  }
   if (status >= 500) service.captureError(error, { source: 'server', operation });
   else service.captureWarning(error, { source: 'server', operation });
 }
@@ -86,7 +96,8 @@ export function httpErrorReporting(service = telemetry, options: { slowRequestMs
         res.locals.diagnosticReported = true;
         scope.context.route = route();
         const value = body && typeof body === 'object' ? body as Record<string, unknown> : {};
-        captureHttp(service, res.statusCode, {
+        const original = res.locals?.diagnosticError;
+        captureHttp(service, res.statusCode, writeDiagnosticErrorIds(original) ? original : {
           message: typeof value.error === 'string' ? value.error : 'HTTP request failed',
           code: value.code ?? res.locals?.diagnosticError?.code, status: res.statusCode,
           ...(res.locals?.diagnosticError instanceof Error ? {
@@ -117,6 +128,11 @@ const agentStates = new WeakMap<object, { runtime?: NonNullable<ErrorContext['ru
 const agentCaptures = new WeakMap<object, ReturnType<typeof telemetry.scoped>>();
 const agentProcessSnapshots = new WeakMap<object, () => NonNullable<ErrorContext['context']>>();
 const agentDiagnostics = new WeakMap<object, Omit<ErrorContext, 'source' | 'operation' | 'runtime'>>();
+export function agentWriteDiagnosticContext(connection: object): { turn_id?: string; runtime_version?: string } {
+  const context = agentDiagnostics.get(connection);
+  return { ...(context?.turn_id ? { turn_id: context.turn_id } : {}),
+    ...(context?.context?.runtime_version ? { runtime_version: context.context.runtime_version } : {}) };
+}
 /** Installed before runtime listeners; connection identity exists even if setup fails. */
 export function attachAgentDiagnostics(connection: WebSocket, runtime: NonNullable<ErrorContext['runtime']>, connectionId?: string, windowId?: string): void {
   agentDiagnostics.set(connection, { context: { connection_id: connectionId && validTurnId(connectionId) ? connectionId : randomUUID(),
@@ -227,11 +243,31 @@ function toolFailureKind(content: string): NonNullable<NonNullable<ErrorContext[
 
 function toolFailurePrefix(content: string): NonNullable<NonNullable<ErrorContext['context']>['tool_failure_kind']> {
   const prefix = content.slice(0, 256).trimStart().replace(/^Error:\s*/i, '');
-  if (/^(ENOENT\b|file not found\b|no such file or directory\b)/i.test(prefix)) return 'not_found';
+  if (/^EDIT_MISMATCH\b/.test(prefix)) return 'edit_mismatch';
+  if (/^EDIT_AMBIGUOUS\b/.test(prefix)) return 'edit_ambiguous';
+  if (/^FILE_CHANGED\b/.test(prefix)) return 'version_conflict';
+  if (/^(PATH_[A-Z_]+|PROJECT_PATH_OUTSIDE|PROJECT_SCOPE_MISMATCH|FOLDER_REQUIRED|FILE_PATH_REQUIRED|DERIVED_NOTE_HIDDEN|DERIVED_PATH_FORBIDDEN|SESSION_UNAVAILABLE)\b/.test(prefix)) return 'path_rejected';
+  if (/^(UNSUPPORTED_FORMAT|NOT_REGULAR_FILE|FILE_TOO_LARGE|INVALID_UTF8|BINARY_FILE)\b/.test(prefix)) return 'unsupported_file';
+  if (/^INVALID_(ARGUMENTS|TEXT_CONTENT|FILE_WRITE)\b/.test(prefix)) return 'invalid_arguments';
+  if (/^(ENOENT\b|FILE_NOT_FOUND\b|file not found\b|no such file or directory\b)/i.test(prefix)) return 'not_found';
   if (/^(EACCES\b|EPERM\b|permission denied\b|access denied\b)/i.test(prefix)) return 'permission_denied';
   if (/^(invalid (arguments|parameters)\b|validation error\b)/i.test(prefix)) return 'invalid_arguments';
   if (/^(ETIMEDOUT\b|timeout\b|(?:operation|request|tool) timed out\b)/i.test(prefix)) return 'timeout';
   return 'unknown';
+}
+
+/** Our structured MCP error is the only reliable transport-to-tool join.
+ * Other third-party output is classified without retaining any of its text. */
+function toolWriteCorrelation(content: string) {
+  const input = content.trim().replace(/^Error:\s*/i, '');
+  if (input.length > 16_384 || !input.startsWith('{')) return undefined;
+  try {
+    const value = JSON.parse(input);
+    if (value?.stashbase_write_error !== 1 || !value.error || typeof value.error !== 'object') return undefined;
+    const error = {};
+    attachWriteDiagnosticErrorIds(error, value.error);
+    return writeDiagnosticErrorIds(error);
+  } catch { return undefined; }
 }
 
 /** Native adapters expose both MCP names and display names. Classify only the
@@ -286,9 +322,12 @@ export function reportAgentRuntimeError(runtime: NonNullable<ErrorContext['runti
       }, { ...context, source: 'agent', operation: event.t === 'exit' ? 'connection' : 'runtime', runtime });
     }
   } else if (event.t === 'tool-result' && event.isError && !duplicateToolResult) {
+    const candidate = toolWriteCorrelation(event.content);
+    const writeCorrelation = candidate && writeDiagnostics.linkTool(candidate, event.id, { turn_id: context.turn_id, runtime }) ? candidate : undefined;
     // Tool output can contain source text. Export only fixed categories, never the matched text.
     capture({ message: 'Agent tool call failed', code: 'AGENT_TOOL_FAILED' }, { ...context,
       context: { ...context.context, tool_call_id: event.id, tool_category: state?.tools?.get(event.id) ?? 'other',
+        ...(writeCorrelation ?? {}), diagnostic_correlation: writeCorrelation ? 'linked' : 'unavailable',
         tool_failure_kind: toolFailureKind(event.content) },
       source: 'agent', operation: 'tool', runtime });
   } else if (event.t === 'skills' && event.state === 'failed') {

@@ -12,6 +12,7 @@ import path from 'node:path';
 import { logger, errorMessage, errorCode } from './log.ts';
 import { filesystemPath } from './filesystem-path.ts';
 import { getCurrentFolder, runWithWindowId, WINDOW_ID_HEADER } from './folder.ts';
+import { writeDiagnosticErrorIds } from './write-diagnostic-context.ts';
 
 const log = logger('http');
 
@@ -21,6 +22,8 @@ const log = logger('http');
  *  conventional 412 the client expects. */
 export function sendError(res: express.Response, err: unknown): void {
   if (res.locals) res.locals.diagnosticError = err;
+  const diagnostic = writeDiagnosticErrorIds(err);
+  if (diagnostic) { res.setHeader('x-stashbase-operation-id', diagnostic.operation_id); res.setHeader('x-stashbase-diagnostic-id', diagnostic.diagnostic_id); }
   if (errorCode(err) === 'NO_FOLDER') {
     res.status(412).json({ error: 'no folder open', code: 'NO_FOLDER' });
     return;

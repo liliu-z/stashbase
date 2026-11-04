@@ -17,6 +17,7 @@ import destination from './telemetry-destination.json' with { type: 'json' };
 import { hostedUsageFetch } from './hosted-auth-transport.ts';
 import { usageBatchUrl } from '../shared/hosted-auth-network.ts';
 import packageInfo from '../package.json' with { type: 'json' };
+import { resetWriteDiagnostics } from './write-diagnostic-lifecycle.ts';
 export type { TelemetryState } from './telemetry-state.ts';
 
 const turnIdentity = (turn: PendingTurn): UsageIdentity => ({ installationId: turn.installationId, anonymousId: turn.anonymousId, firstSeenAt: turn.firstSeenAt, ...(turn.userId ? { userId: turn.userId } : {}) });
@@ -493,6 +494,23 @@ export function createTelemetry(options: {
   retireTurns('host_restarted');
   return {
     preferences,
+    /** A queued restricted attachment may not outlive consent/account scope. */
+    diagnosticAdmission() {
+      const capturedGeneration = generation;
+      let account: string | undefined;
+      try {
+        const config = options.read();
+        if (!allowed() || !usageState(config, now()).enabled) return undefined;
+        synchronizeRenderer(config);
+        account = accountUsageId(config);
+      }
+      catch { return undefined; }
+      const capturedObservationGeneration = observationGeneration;
+      return () => {
+        try { return allowed() && capturedGeneration === generation && capturedObservationGeneration === observationGeneration && usageState(options.read(), now()).enabled && accountUsageId(options.read()) === account; }
+        catch { return false; }
+      };
+    },
     rendererDeliveryCurrent,
     delivery() {
       if (!allowed()) return null;
@@ -597,7 +615,7 @@ export function createTelemetry(options: {
       catch { /* Never replace the original condition. */ }
     },
     update(next: { enabled: boolean }) {
-      if (!next.enabled) { collectionStopped = true; cancel(); options.native?.clear(); }
+      if (!next.enabled) { collectionStopped = true; cancel(); options.native?.clear(); resetWriteDiagnostics(); }
       const config = options.read();
       const state = usageState(config, now());
       // Disabling erases the queue and all local analytics identity. No final

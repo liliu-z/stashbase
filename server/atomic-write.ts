@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { writeDiagnosticEvidence, writeDiagnosticStep } from './write-diagnostic-context.ts';
 
 /** Hidden sibling temp file, so the rename stays on one filesystem and a
  *  crash leaves a dot-file instead of a half-written target. */
@@ -32,17 +33,39 @@ export async function writeFileAtomicAsync(
   data: string | Uint8Array,
   options: { mode?: number; beforeRename?: () => Promise<void> } = {},
 ): Promise<void> {
-  await fs.promises.mkdir(path.dirname(file), { recursive: true });
+  await writeDiagnosticStep('persist', 'atomic_create_parent', () => fs.promises.mkdir(path.dirname(file), { recursive: true }), {
+    path: path.dirname(file), target_path: file, syscall: 'mkdir', recursive: true, target_partial_write_possible: false,
+  });
   const tmp = temporarySibling(file);
+  writeDiagnosticEvidence('atomic_write_plan', {
+    path: file, temporary_path: tmp, strategy: 'temporary_sibling_then_rename',
+    target_partial_write_possible: false, staging_partial_write_possible: true,
+  });
   try {
-    await fs.promises.writeFile(tmp, data, options.mode === undefined ? undefined : { mode: options.mode });
+    await writeDiagnosticStep('persist', 'write_staging_file', () => fs.promises.writeFile(tmp, data, options.mode === undefined ? undefined : { mode: options.mode }), {
+      path: tmp, target_path: file, syscall: 'writeFile', mode: options.mode ?? null,
+      size_bytes: typeof data === 'string' ? Buffer.byteLength(data, 'utf8') : data.byteLength,
+      target_partial_write_possible: false, staging_partial_write_possible: true,
+    });
     // Creation applies umask; an explicit mode (including a source file's
     // existing permissions) must survive replacement exactly.
-    if (options.mode !== undefined) await fs.promises.chmod(tmp, options.mode);
+    if (options.mode !== undefined) {
+      await writeDiagnosticStep('persist', 'restore_staging_permissions', () => fs.promises.chmod(tmp, options.mode!), {
+        path: tmp, target_path: file, syscall: 'chmod', mode: options.mode,
+      });
+    }
     await options.beforeRename?.();
-    await fs.promises.rename(tmp, file);
+    await writeDiagnosticStep('persist', 'publish_staging_file', () => fs.promises.rename(tmp, file), {
+      path: tmp, target_path: file, syscall: 'rename', target_partial_write_possible: false,
+    });
+    writeDiagnosticEvidence('atomic_write_published', { path: file, published: true, target_partial_write_possible: false });
   } catch (err) {
-    try { await fs.promises.rm(tmp, { force: true }); } catch { /* best-effort */ }
+    try {
+      await writeDiagnosticStep('persist', 'cleanup_staging_file', () => fs.promises.rm(tmp, { force: true }), { path: tmp, syscall: 'rm' });
+      writeDiagnosticEvidence('atomic_write_cleanup', { temporary_path: tmp, cleanup_complete: true, published: false, target_partial_write_possible: false });
+    } catch {
+      writeDiagnosticEvidence('atomic_write_cleanup', { temporary_path: tmp, cleanup_complete: false, published: false, target_partial_write_possible: false });
+    }
     throw err;
   }
 }

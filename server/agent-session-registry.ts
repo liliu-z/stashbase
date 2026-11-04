@@ -19,6 +19,8 @@ export interface AttributedAgentSession {
   /** True while the session is running a turn (a tool call from the agent
    * necessarily happens inside its own active turn). */
   turnInFlight(): boolean;
+  /** Captured from this session's live socket, never a global active turn. */
+  diagnosticContext?(): { turn_id?: string; runtime_version?: string };
 }
 
 const sessions = new Map<string, AttributedAgentSession>();

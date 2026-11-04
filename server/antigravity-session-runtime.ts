@@ -1,5 +1,5 @@
 import { AGENT_SESSION_CLOSE } from '../shared/agent-protocol.ts';
-import { agentDiagnosticStage, beginAgentDiagnosticTurn, markAgentDiagnosticClosing, reportAgentRuntimeError } from './error-reporting.ts';
+import { agentWriteDiagnosticContext, agentDiagnosticStage, beginAgentDiagnosticTurn, markAgentDiagnosticClosing, reportAgentRuntimeError } from './error-reporting.ts';
 import { retireAgentProcess, ownAgentProcess, type AgentStopReason } from './agent-process.ts';
 /**
  * Live Antigravity WebSocket session runtime.
@@ -190,6 +190,8 @@ export class AntigravitySession implements AttributedAgentSession {
   boundFolder(): string | null {
     return this.cwd ?? this.folder ?? null;
   }
+
+  diagnosticContext() { return agentWriteDiagnosticContext(this.ws); }
 
   turnInFlight(): boolean {
     return this.busy;

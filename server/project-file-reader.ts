@@ -18,6 +18,7 @@ import {
   routeError,
   type AgentContextFile,
 } from './project-file-access.ts';
+import { writeDiagnosticStep } from './write-diagnostic-context.ts';
 
 export interface ProjectFileRead {
   path: string;
@@ -62,7 +63,7 @@ export async function agentContextFile(rawPath: unknown): Promise<AgentContextFi
   return runWithFolderRoot(target.folderRoot, async () => {
     const sourceFormat = detectViewerFormat(target.folderRel) ?? 'generic';
     if (sourceFormat === 'audio') throw routeError('unsupported format', 415, 'UNSUPPORTED_FORMAT');
-    if (!(await pathExistsAsync(target.folderRel))) throw routeError('not found', 404);
+    if (!(await pathExistsAsync(target.folderRel))) throw routeError('not found', 404, 'FILE_NOT_FOUND');
 
     if (sourceFormat !== 'pdf' && sourceFormat !== 'docx') {
       return {
@@ -161,7 +162,7 @@ async function readWholeProjectFile(rawPath: unknown): Promise<ProjectFileRead> 
   try { sourcePath = sourceForDerivedText(resolveProjectAbs(rawPath)) ?? rawPath; }
   catch { /* Normal path validation below owns malformed-input errors. */ }
   const target = await normalizeProjectFilePath(sourcePath);
-  return runWithFolderRoot(target.folderRoot, async () => {
+  return runWithFolderRoot(target.folderRoot, () => writeDiagnosticStep('read', 'read_project_source', async () => {
     const format = detectFormat(target.folderRel);
     if (!format) {
       const viewerFormat = detectViewerFormat(target.folderRel);
@@ -178,19 +179,19 @@ async function readWholeProjectFile(rawPath: unknown): Promise<ProjectFileRead> 
       if (isKnownBinaryFile(target.folderRel)) throw routeError('unsupported format: binary files cannot be read as text', 415, 'UNSUPPORTED_FORMAT');
     }
     const snapshot = await readTextSnapshotAsync(target.folderRel);
-    if (snapshot == null) throw routeError('not found', 404);
+    if (snapshot == null) throw routeError('not found', 404, 'FILE_NOT_FOUND');
     return {
       path: target.abs,
       format: format ?? 'txt',
       ...snapshot,
     };
-  });
+  }, { path: target.abs, purpose: 'existing_source' }));
 }
 
 /** The workbook through the same parse the preview uses, as Markdown with
  *  sheet names, column letters and row numbers. The source stays untouched. */
 async function readSpreadsheetFile(sourceAbs: string, folderRel: string): Promise<ProjectFileRead> {
-  if (!(await pathExistsAsync(folderRel))) throw routeError('not found', 404);
+  if (!(await pathExistsAsync(folderRel))) throw routeError('not found', 404, 'FILE_NOT_FOUND');
   const preview = await spreadsheetFilePreview(await readFileBytesBoundedAsync(sourceAbs), folderRel);
   if (preview.kind !== 'spreadsheet') {
     throw routeError(preview.kind === 'invalid-spreadsheet' && preview.message ? preview.message : 'This workbook could not be read.', 422, 'UNSUPPORTED_FORMAT');
@@ -211,7 +212,7 @@ async function readSourceDerivedFile(
   sourceFormat: 'pdf' | 'docx',
 ): Promise<ProjectFileRead> {
   const label = sourceFormat === 'docx' ? 'HTML' : 'Markdown';
-  if (!(await pathExistsAsync(folderRel))) throw routeError('not found', 404);
+  if (!(await pathExistsAsync(folderRel))) throw routeError('not found', 404, 'FILE_NOT_FOUND');
   const derivedAbs = sourceFormat === 'docx'
     ? derivedHtmlPathForDocx(sourceAbs)
     : derivedNoteFor(sourceAbs);

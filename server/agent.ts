@@ -1,5 +1,5 @@
 import { AGENT_SESSION_CLOSE } from '../shared/agent-protocol.ts';
-import { agentDiagnosticStage, beginAgentDiagnosticTurn, markAgentDiagnosticClosing, reportAgentRuntimeError } from './error-reporting.ts';
+import { agentWriteDiagnosticContext, agentDiagnosticStage, beginAgentDiagnosticTurn, markAgentDiagnosticClosing, reportAgentRuntimeError } from './error-reporting.ts';
 /**
  * Structured-agent sidecar. Where `terminal.ts` bridges a raw PTY to an
  * xterm, this bridges the **Claude Agent SDK** to a WebSocket as a
@@ -375,6 +375,8 @@ export class AgentSession implements AttributedAgentSession {
   boundFolder(): string | null {
     return this.cwd ?? this.folder ?? null;
   }
+
+  diagnosticContext() { return agentWriteDiagnosticContext(this.ws); }
 
   turnInFlight(): boolean {
     return this.turnActive;

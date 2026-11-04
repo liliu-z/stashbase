@@ -3,6 +3,7 @@ import { toSearchMode, toRetrievalMode, type SearchMode } from '../shared/search
 import type { ProjectOperations } from '../server/project-operations/index.ts';
 import { ProjectOperationError } from '../server/project-operations/errors.ts';
 import { AGENT_SESSION_ID_HEADER } from '../server/agent-session-registry.ts';
+import { attachWriteDiagnosticErrorIds } from '../server/write-diagnostic-context.ts';
 
 export function createHttpProjectOperations(
   webBase: string,
@@ -30,11 +31,13 @@ export function createHttpProjectOperations(
     }
     if (response.ok) return response.json() as Promise<T>;
     const detail = await response.json().catch(() => ({})) as { error?: unknown; code?: unknown };
-    throw new ProjectOperationError(
+    const error = new ProjectOperationError(
       typeof detail.error === 'string' ? detail.error : `StashBase request failed: ${response.status}`,
       response.status,
       typeof detail.code === 'string' ? detail.code : undefined,
     );
+    attachWriteDiagnosticErrorIds(error, { operation_id: response.headers.get('x-stashbase-operation-id'), diagnostic_id: response.headers.get('x-stashbase-diagnostic-id') });
+    throw error;
   };
   const pathQuery = (path: unknown) => `path=${encodeURIComponent(typeof path === 'string' ? path : '')}`;
   return {

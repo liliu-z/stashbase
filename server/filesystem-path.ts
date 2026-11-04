@@ -8,16 +8,62 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { writeDiagnosticEvidence, writeDiagnosticStep } from './write-diagnostic-context.ts';
+
+type PathEvidence = Record<string, string | number | boolean | null>;
+
+/** Observe a check where it executes. These helpers never repeat a filesystem
+ * call, include file bytes, or retain directory enumeration results. */
+function observePathCheck<T>(action: string, evidence: PathEvidence, work: () => T): T {
+  const started = performance.now();
+  try {
+    const result = work();
+    writeDiagnosticEvidence(action, { ...evidence, outcome: 'ok', duration_ms: performance.now() - started,
+      ...(typeof result === 'string' || typeof result === 'boolean' ? { result } : {}) });
+    return result;
+  } catch (error) {
+    recordPathCheckError(action, evidence, error, started);
+    throw error;
+  }
+}
+
+async function observePathCheckAsync<T>(action: string, evidence: PathEvidence, work: () => Promise<T>): Promise<T> {
+  const started = performance.now();
+  try {
+    const result = await work();
+    writeDiagnosticEvidence(action, { ...evidence, outcome: 'ok', duration_ms: performance.now() - started,
+      ...(typeof result === 'string' || typeof result === 'boolean' ? { result } : {}) });
+    return result;
+  } catch (error) {
+    recordPathCheckError(action, evidence, error, started);
+    throw error;
+  }
+}
+
+function recordPathCheckError(action: string, evidence: PathEvidence, error: unknown, started?: number): void {
+  const value = error as NodeJS.ErrnoException | null;
+  writeDiagnosticEvidence(action, {
+    ...evidence, outcome: 'error', duration_ms: started === undefined ? null : performance.now() - started,
+    error_type: error instanceof Error ? error.name : typeof error,
+    code: typeof value?.code === 'string' ? value.code : null,
+    errno: typeof value?.errno === 'number' ? value.errno : null,
+    syscall: typeof value?.syscall === 'string' ? value.syscall : null,
+  });
+}
+
+function pathError(message: string, code: string): Error {
+  return Object.assign(new Error(message), { code });
+}
 
 // fs.promises.realpath() has no `.native` counterpart (unlike the sync and
 // callback APIs), so wrap the callback-style native binding directly.
 function realpathNativeAsync(input: fs.PathLike): Promise<string> {
-  return new Promise((resolve, reject) => {
+  return observePathCheckAsync('path.realpath', { path: String(input), syscall: 'realpath', mode: 'async' }, () => new Promise((resolve, reject) => {
     fs.realpath.native(input, (error, resolvedPath) => {
       if (error) reject(error);
       else resolve(resolvedPath);
     });
-  });
+  }));
 }
 
 export type FilesystemPlatform = 'win32' | 'darwin' | 'posix';
@@ -88,9 +134,18 @@ export function createFilesystemPath(
 
   function identity(input: string): string {
     const source = absolute(input);
-    if (platform === 'win32') return source.toLowerCase();
-    if (platform === 'darwin') return darwinIdentity(source);
-    return source;
+    const result = platform === 'win32' ? source.toLowerCase() : platform === 'darwin' ? darwinIdentity(source) : source;
+    recordIdentity(source, result);
+    return result;
+  }
+
+  function recordIdentity(source: string, result: string): void {
+    writeDiagnosticEvidence('path.identity', {
+      path: source, comparison_identity: result, platform,
+      case_rule: platform === 'win32' ? 'lowercase' : platform === 'darwin' ? 'per_volume' : 'sensitive',
+      unicode_rule: platform === 'darwin' ? 'NFC' : 'preserve',
+      separator_rule: platform === 'win32' ? 'backslash_to_slash' : 'preserve',
+    });
   }
 
   function darwinIdentity(source: string): string {
@@ -98,6 +153,7 @@ export function createFilesystemPath(
     const identitySegments: string[] = [];
     let cursor = '/';
     let insensitive = isCaseInsensitiveVolume(cursor);
+    const caseRules = [{ from_component: 0, case_insensitive: insensitive }];
 
     for (let i = 0; i < segments.length; i += 1) {
       const segment = segments[i];
@@ -113,7 +169,9 @@ export function createFilesystemPath(
         }
         cursor = candidate;
         insensitive = isCaseInsensitiveVolume(cursor);
-      } catch {
+        if (caseRules.at(-1)?.case_insensitive !== insensitive) caseRules.push({ from_component: i + 1, case_insensitive: insensitive });
+      } catch (error) {
+        recordPathCheckError('path.identity_suffix', { path: candidate, fallback: 'retain_remaining_segments' }, error);
         for (const suffix of segments.slice(i + 1)) {
           identitySegments.push(macIdentitySegment(suffix, insensitive));
         }
@@ -121,6 +179,7 @@ export function createFilesystemPath(
       }
     }
 
+    writeDiagnosticEvidence('path.volume_rules', { path: source, rules: caseRules, unicode_rule: 'NFC' });
     return `/${identitySegments.join('/')}`;
   }
 
@@ -133,7 +192,8 @@ export function createFilesystemPath(
         directory = path.posix.dirname(directory);
         directoryStat = fs.statSync(directory);
       }
-    } catch {
+    } catch (error) {
+      recordPathCheckError('path.volume_case', { path: directory, fallback: 'case_sensitive' }, error);
       return false;
     }
     const cached = volumeCaseInsensitive.get(directoryStat.dev);
@@ -151,23 +211,28 @@ export function createFilesystemPath(
           if (sameFilesystemAlias(
             path.posix.join(cursor, entry),
             path.posix.join(cursor, alias),
+            false,
           )) {
             volumeCaseInsensitive.set(device, true);
+            writeDiagnosticEvidence('path.volume_case', { path: directory, device, case_insensitive: true, source: 'observed_alias' });
             return true;
           }
         }
         if (inspectedAlias) {
           volumeCaseInsensitive.set(device, false);
+          writeDiagnosticEvidence('path.volume_case', { path: directory, device, case_insensitive: false, source: 'observed_distinct_entries' });
           return false;
         }
-      } catch {
+      } catch (error) {
+        recordPathCheckError('path.volume_case_probe', { path: cursor, syscall: 'readdir', fallback: 'case_sensitive' }, error);
         break;
       }
       const parent = path.posix.dirname(cursor);
       if (parent === cursor) break;
       try {
         if (fs.statSync(parent).dev !== device) break;
-      } catch {
+      } catch (error) {
+        recordPathCheckError('path.volume_case_probe', { path: parent, syscall: 'stat', fallback: 'case_sensitive' }, error);
         break;
       }
       cursor = parent;
@@ -175,6 +240,7 @@ export function createFilesystemPath(
 
     // Empty/unreadable case-sensitive volumes must not collapse distinct names.
     volumeCaseInsensitive.set(device, false);
+    writeDiagnosticEvidence('path.volume_case', { path: directory, device, case_insensitive: false, source: 'fallback_unproven' });
     return false;
   }
 
@@ -187,8 +253,14 @@ export function createFilesystemPath(
 
   function equal(a: string, b: string): boolean {
     const quick = lexicalEquality(a, b);
-    if (quick !== undefined) return quick;
-    return identity(a) === identity(b);
+    if (quick !== undefined) {
+      writeDiagnosticEvidence('path.equal', { a, b, matches: quick, rule: 'lexical_fast_path', platform });
+      return quick;
+    }
+    const aKey = identity(a), bKey = identity(b);
+    const matches = aKey === bKey;
+    writeDiagnosticEvidence('path.equal', { a, b, a_identity: aKey, b_identity: bKey, matches, rule: 'volume_identity', platform });
+    return matches;
   }
 
   /** Volume rules can change case sensitivity, never other characters.
@@ -204,14 +276,16 @@ export function createFilesystemPath(
   function contains(root: string, candidate: string): boolean {
     const rootKey = identity(root);
     const candidateKey = identity(candidate);
-    return candidateKey === rootKey || candidateKey.startsWith(childPrefix(rootKey));
+    const matches = candidateKey === rootKey || candidateKey.startsWith(childPrefix(rootKey));
+    writeDiagnosticEvidence('path.contains', { root, candidate, root_identity: rootKey, candidate_identity: candidateKey, matches, platform });
+    return matches;
   }
 
   async function identityAsync(input: string): Promise<string> {
     const source = absolute(input);
-    if (platform === 'win32') return source.toLowerCase();
-    if (platform === 'darwin') return darwinIdentityAsync(source);
-    return source;
+    const result = platform === 'win32' ? source.toLowerCase() : platform === 'darwin' ? await darwinIdentityAsync(source) : source;
+    recordIdentity(source, result);
+    return result;
   }
 
   async function darwinIdentityAsync(source: string): Promise<string> {
@@ -219,6 +293,7 @@ export function createFilesystemPath(
     const identitySegments: string[] = [];
     let cursor = '/';
     let insensitive = await isCaseInsensitiveVolumeAsync(cursor);
+    const caseRules = [{ from_component: 0, case_insensitive: insensitive }];
 
     for (let i = 0; i < segments.length; i += 1) {
       const segment = segments[i];
@@ -234,7 +309,9 @@ export function createFilesystemPath(
         }
         cursor = candidate;
         insensitive = await isCaseInsensitiveVolumeAsync(cursor);
-      } catch {
+        if (caseRules.at(-1)?.case_insensitive !== insensitive) caseRules.push({ from_component: i + 1, case_insensitive: insensitive });
+      } catch (error) {
+        recordPathCheckError('path.identity_suffix', { path: candidate, fallback: 'retain_remaining_segments' }, error);
         for (const suffix of segments.slice(i + 1)) {
           identitySegments.push(macIdentitySegment(suffix, insensitive));
         }
@@ -242,6 +319,7 @@ export function createFilesystemPath(
       }
     }
 
+    writeDiagnosticEvidence('path.volume_rules', { path: source, rules: caseRules, unicode_rule: 'NFC' });
     return `/${identitySegments.join('/')}`;
   }
 
@@ -254,7 +332,8 @@ export function createFilesystemPath(
         directory = path.posix.dirname(directory);
         directoryStat = await fs.promises.stat(directory);
       }
-    } catch {
+    } catch (error) {
+      recordPathCheckError('path.volume_case', { path: directory, fallback: 'case_sensitive' }, error);
       return false;
     }
     const cached = volumeCaseInsensitive.get(directoryStat.dev);
@@ -272,29 +351,35 @@ export function createFilesystemPath(
           if (await sameFilesystemAliasAsync(
             path.posix.join(cursor, entry),
             path.posix.join(cursor, alias),
+            false,
           )) {
             volumeCaseInsensitive.set(device, true);
+            writeDiagnosticEvidence('path.volume_case', { path: directory, device, case_insensitive: true, source: 'observed_alias' });
             return true;
           }
         }
         if (inspectedAlias) {
           volumeCaseInsensitive.set(device, false);
+          writeDiagnosticEvidence('path.volume_case', { path: directory, device, case_insensitive: false, source: 'observed_distinct_entries' });
           return false;
         }
-      } catch {
+      } catch (error) {
+        recordPathCheckError('path.volume_case_probe', { path: cursor, syscall: 'readdir', fallback: 'case_sensitive' }, error);
         break;
       }
       const parent = path.posix.dirname(cursor);
       if (parent === cursor) break;
       try {
         if ((await fs.promises.stat(parent)).dev !== device) break;
-      } catch {
+      } catch (error) {
+        recordPathCheckError('path.volume_case_probe', { path: parent, syscall: 'stat', fallback: 'case_sensitive' }, error);
         break;
       }
       cursor = parent;
     }
 
     volumeCaseInsensitive.set(device, false);
+    writeDiagnosticEvidence('path.volume_case', { path: directory, device, case_insensitive: false, source: 'fallback_unproven' });
     return false;
   }
 
@@ -303,14 +388,21 @@ export function createFilesystemPath(
       identityAsync(root),
       identityAsync(candidate),
     ]);
-    return candidateKey === rootKey || candidateKey.startsWith(childPrefix(rootKey));
+    const matches = candidateKey === rootKey || candidateKey.startsWith(childPrefix(rootKey));
+    writeDiagnosticEvidence('path.contains', { root, candidate, root_identity: rootKey, candidate_identity: candidateKey, matches, platform });
+    return matches;
   }
 
   async function equalAsync(a: string, b: string): Promise<boolean> {
     const quick = lexicalEquality(a, b);
-    if (quick !== undefined) return quick;
+    if (quick !== undefined) {
+      writeDiagnosticEvidence('path.equal', { a, b, matches: quick, rule: 'lexical_fast_path', platform });
+      return quick;
+    }
     const [aKey, bKey] = await Promise.all([identityAsync(a), identityAsync(b)]);
-    return aKey === bKey;
+    const matches = aKey === bKey;
+    writeDiagnosticEvidence('path.equal', { a, b, a_identity: aKey, b_identity: bKey, matches, rule: 'volume_identity', platform });
+    return matches;
   }
 
   function relative(root: string, candidate: string): string | null {
@@ -360,13 +452,16 @@ export function createFilesystemPath(
       try {
         const found = matchingExistingEntry(cursor, segment, platform === 'darwin');
         if (found) spelling = found;
-      } catch {
+      } catch (error) {
+        recordPathCheckError('path.canonical_component', { path: pathApi.join(cursor, segment), fallback: 'caller_spelling' }, error);
         // A create target may have a missing suffix. Preserve caller spelling.
       }
       canonical.push(spelling);
       cursor = pathApi.join(cursor, spelling);
     }
-    return canonical.join('/');
+    const result = canonical.join('/');
+    writeDiagnosticEvidence('path.canonical_relative', { root, relative_path: relativePath, canonical_relative: result, platform });
+    return result;
   }
 
   function canonicalCreatableRelative(root: string, relativePath: string): string {
@@ -382,44 +477,47 @@ export function createFilesystemPath(
     relativePath: string,
     options: ResolveUnderOptions = {},
   ): string {
-    const access = options.access ?? 'lexical';
-    const label = options.label ?? 'path';
-    const rootSource = absolute(root);
-    const resolvedRelative = access === 'lexical'
-      ? relativePath
-      : access === 'creatable'
-        ? canonicalCreatableRelative(rootSource, relativePath)
-        : canonicalRelative(rootSource, relativePath);
-    const targetSource = joinLexically(rootSource, resolvedRelative);
-    const rootNative = toNative(rootSource, platform);
-    const targetNative = toNative(targetSource, platform);
-    if (access === 'lexical') return targetSource;
+    return writeDiagnosticStep('path_resolution', 'path.resolve_under', () => {
+      const access = options.access ?? 'lexical';
+      const label = options.label ?? 'path';
+      const rootSource = absolute(root);
+      const resolvedRelative = access === 'lexical'
+        ? relativePath
+        : access === 'creatable'
+          ? canonicalCreatableRelative(rootSource, relativePath)
+          : canonicalRelative(rootSource, relativePath);
+      const targetSource = joinLexically(rootSource, resolvedRelative);
+      const rootNative = toNative(rootSource, platform);
+      const targetNative = toNative(targetSource, platform);
+      writeDiagnosticEvidence('path.resolve_under.inputs', { root, relative_path: relativePath, root_source: rootSource, target_source: targetSource, root_native: rootNative, target_native: targetNative, access, platform });
+      if (access === 'lexical') return targetSource;
 
-    const rootReal = fs.realpathSync.native(rootNative);
-    if (access === 'existing') {
-      const targetReal = fs.realpathSync.native(targetNative);
-      if (!contains(rootReal, targetReal)) {
-        throw new Error(`${label} escapes folder through symlink`);
+      const rootReal = observePathCheck('path.realpath', { path: rootNative, syscall: 'realpath', mode: 'sync' }, () => fs.realpathSync.native(rootNative));
+      if (access === 'existing') {
+        const targetReal = observePathCheck('path.realpath', { path: targetNative, syscall: 'realpath', mode: 'sync' }, () => fs.realpathSync.native(targetNative));
+        if (!contains(rootReal, targetReal)) {
+          throw pathError(`${label} escapes folder through symlink`, 'PATH_SYMLINK_ESCAPE');
+        }
+        return targetSource;
+      }
+
+      // Start at the target itself. If it already exists as a symlink, checking
+      // only its parent would approve a subsequent write that follows outside
+      // the folder. Missing suffixes naturally walk up to their first existing
+      // ancestor.
+      let probe = targetNative;
+      while (!observePathCheck('path.exists', { path: probe, syscall: 'existsSync', errors_available: false }, () => fs.existsSync(probe))) {
+        const parent = pathApi.dirname(probe);
+        if (parent === probe) break;
+        probe = parent;
+      }
+      if (!contains(rootNative, probe)) throw pathError(`${label} escapes folder`, 'PATH_OUTSIDE_ROOT');
+      const probeReal = observePathCheck('path.realpath', { path: probe, syscall: 'realpath', mode: 'sync' }, () => fs.realpathSync.native(probe));
+      if (!contains(rootReal, probeReal)) {
+        throw pathError(`${label} escapes folder through symlink`, 'PATH_SYMLINK_ESCAPE');
       }
       return targetSource;
-    }
-
-    // Start at the target itself. If it already exists as a symlink, checking
-    // only its parent would approve a subsequent write that follows outside
-    // the folder. Missing suffixes naturally walk up to their first existing
-    // ancestor.
-    let probe = targetNative;
-    while (!fs.existsSync(probe)) {
-      const parent = pathApi.dirname(probe);
-      if (parent === probe) break;
-      probe = parent;
-    }
-    if (!contains(rootNative, probe)) throw new Error(`${label} escapes folder`);
-    const probeReal = fs.realpathSync.native(probe);
-    if (!contains(rootReal, probeReal)) {
-      throw new Error(`${label} escapes folder through symlink`);
-    }
-    return targetSource;
+    });
   }
 
   // --- Async mirrors for the request-handling path -------------------------
@@ -441,13 +539,16 @@ export function createFilesystemPath(
       try {
         const found = await matchingExistingEntryAsync(cursor, segment, platform === 'darwin');
         if (found) spelling = found;
-      } catch {
+      } catch (error) {
+        recordPathCheckError('path.canonical_component', { path: pathApi.join(cursor, segment), fallback: 'caller_spelling' }, error);
         // A create target may have a missing suffix. Preserve caller spelling.
       }
       canonical.push(spelling);
       cursor = pathApi.join(cursor, spelling);
     }
-    return canonical.join('/');
+    const result = canonical.join('/');
+    writeDiagnosticEvidence('path.canonical_relative', { root, relative_path: relativePath, canonical_relative: result, platform });
+    return result;
   }
 
   async function canonicalCreatableRelativeAsync(root: string, relativePath: string): Promise<string> {
@@ -463,44 +564,47 @@ export function createFilesystemPath(
     relativePath: string,
     options: ResolveUnderOptions = {},
   ): Promise<string> {
-    const access = options.access ?? 'lexical';
-    const label = options.label ?? 'path';
-    const rootSource = absolute(root);
-    const resolvedRelative = access === 'lexical'
-      ? relativePath
-      : access === 'creatable'
-        ? await canonicalCreatableRelativeAsync(rootSource, relativePath)
-        : await canonicalRelativeAsync(rootSource, relativePath);
-    const targetSource = joinLexically(rootSource, resolvedRelative);
-    const rootNative = toNative(rootSource, platform);
-    const targetNative = toNative(targetSource, platform);
-    if (access === 'lexical') return targetSource;
+    return writeDiagnosticStep('path_resolution', 'path.resolve_under', async () => {
+      const access = options.access ?? 'lexical';
+      const label = options.label ?? 'path';
+      const rootSource = absolute(root);
+      const resolvedRelative = access === 'lexical'
+        ? relativePath
+        : access === 'creatable'
+          ? await canonicalCreatableRelativeAsync(rootSource, relativePath)
+          : await canonicalRelativeAsync(rootSource, relativePath);
+      const targetSource = joinLexically(rootSource, resolvedRelative);
+      const rootNative = toNative(rootSource, platform);
+      const targetNative = toNative(targetSource, platform);
+      writeDiagnosticEvidence('path.resolve_under.inputs', { root, relative_path: relativePath, root_source: rootSource, target_source: targetSource, root_native: rootNative, target_native: targetNative, access, platform });
+      if (access === 'lexical') return targetSource;
 
-    const rootReal = await realpathNativeAsync(rootNative);
-    if (access === 'existing') {
-      const targetReal = await realpathNativeAsync(targetNative);
-      if (!(await containsAsync(rootReal, targetReal))) {
-        throw new Error(`${label} escapes folder through symlink`);
+      const rootReal = await realpathNativeAsync(rootNative);
+      if (access === 'existing') {
+        const targetReal = await realpathNativeAsync(targetNative);
+        if (!(await containsAsync(rootReal, targetReal))) {
+          throw pathError(`${label} escapes folder through symlink`, 'PATH_SYMLINK_ESCAPE');
+        }
+        return targetSource;
+      }
+
+      // Start at the target itself. If it already exists as a symlink, checking
+      // only its parent would approve a subsequent write that follows outside
+      // the folder. Missing suffixes naturally walk up to their first existing
+      // ancestor.
+      let probe = targetNative;
+      while (!(await existsAsync(probe))) {
+        const parent = pathApi.dirname(probe);
+        if (parent === probe) break;
+        probe = parent;
+      }
+      if (!(await containsAsync(rootNative, probe))) throw pathError(`${label} escapes folder`, 'PATH_OUTSIDE_ROOT');
+      const probeReal = await realpathNativeAsync(probe);
+      if (!(await containsAsync(rootReal, probeReal))) {
+        throw pathError(`${label} escapes folder through symlink`, 'PATH_SYMLINK_ESCAPE');
       }
       return targetSource;
-    }
-
-    // Start at the target itself. If it already exists as a symlink, checking
-    // only its parent would approve a subsequent write that follows outside
-    // the folder. Missing suffixes naturally walk up to their first existing
-    // ancestor.
-    let probe = targetNative;
-    while (!(await existsAsync(probe))) {
-      const parent = pathApi.dirname(probe);
-      if (parent === probe) break;
-      probe = parent;
-    }
-    if (!(await containsAsync(rootNative, probe))) throw new Error(`${label} escapes folder`);
-    const probeReal = await realpathNativeAsync(probe);
-    if (!(await containsAsync(rootReal, probeReal))) {
-      throw new Error(`${label} escapes folder through symlink`);
-    }
-    return targetSource;
+    });
   }
 
   return {
@@ -527,7 +631,7 @@ export function createFilesystemPath(
 export const filesystemPath = createFilesystemPath();
 
 function requirePath(input: string): void {
-  if (typeof input !== 'string' || input.length === 0) throw new Error('path required');
+  if (typeof input !== 'string' || input.length === 0) throw pathError('path required', 'PATH_REQUIRED');
 }
 
 function defaultCwdFor(platform: FilesystemPlatform): string {
@@ -541,19 +645,19 @@ function defaultCwdFor(platform: FilesystemPlatform): string {
 function prepareInput(input: string, platform: FilesystemPlatform): string {
   if (platform !== 'win32') {
     if (/^[A-Za-z]:[\\/]/.test(input)) {
-      throw new Error('Windows drive paths are only valid on Windows');
+      throw pathError('Windows drive paths are only valid on Windows', 'PATH_PLATFORM_MISMATCH');
     }
     return input;
   }
   const native = input.replace(/\//g, '\\');
-  if (/^\\\\\.\\/.test(native)) throw new Error('Windows device paths are not supported');
+  if (/^\\\\\.\\/.test(native)) throw pathError('Windows device paths are not supported', 'PATH_DEVICE_UNSUPPORTED');
   if (/^[A-Za-z]:($|[^\\])/.test(native)) {
-    throw new Error('drive-relative Windows paths are not supported');
+    throw pathError('drive-relative Windows paths are not supported', 'PATH_DRIVE_RELATIVE');
   }
   if (/^\\\\\?\\UNC\\/i.test(native)) return `\\\\${native.slice(8)}`;
   if (/^\\\\\?\\[A-Za-z]:\\/.test(native)) return native.slice(4);
   if (/^\\\\\?\\/.test(native) || /^\\(?:\?\?|GLOBALROOT)\\/i.test(native)) {
-    throw new Error('unsupported Windows namespace path');
+    throw pathError('unsupported Windows namespace path', 'PATH_NAMESPACE_UNSUPPORTED');
   }
   return native;
 }
@@ -571,14 +675,14 @@ function childPrefix(root: string): string {
 }
 
 function normalizeRelative(input: string, platform: FilesystemPlatform): string {
-  if (typeof input !== 'string') throw new Error('path required');
+  if (typeof input !== 'string') throw pathError('path required', 'PATH_REQUIRED');
   const source = input.replace(/\\/g, '/');
   if (source.startsWith('/') || (platform === 'win32' && /^[A-Za-z]:/.test(source))) {
-    throw new Error('path must be relative to the folder');
+    throw pathError('path must be relative to the folder', 'PATH_NOT_RELATIVE');
   }
   const segments = source.split('/').filter(Boolean);
   if (segments.some((segment) => segment === '.' || segment === '..')) {
-    throw new Error('invalid path segment');
+    throw pathError('invalid path segment', 'PATH_INVALID_SEGMENT');
   }
   return segments.join('/');
 }
@@ -601,21 +705,28 @@ function swapAsciiLetterCase(input: string): string {
   return input;
 }
 
-function sameFilesystemEntry(a: string, b: string): boolean {
+function sameFilesystemEntry(a: string, b: string, includePaths = true): boolean {
   try {
     const aStat = fs.statSync(a);
     const bStat = fs.statSync(b);
-    return aStat.dev === bStat.dev && aStat.ino === bStat.ino;
-  } catch {
+    const same = aStat.dev === bStat.dev && aStat.ino === bStat.ino;
+    if (includePaths) writeDiagnosticEvidence('path.same_entry', { a, b, a_device: aStat.dev, b_device: bStat.dev, a_inode: aStat.ino, b_inode: bStat.ino, same });
+    return same;
+  } catch (error) {
+    recordPathCheckError('path.same_entry', includePaths ? { a, b, fallback: 'not_same' } : { purpose: 'volume_case_probe', paths: 'unrelated_entries_omitted', fallback: 'not_same' }, error);
     return false;
   }
 }
 
-function sameFilesystemAlias(a: string, b: string): boolean {
-  if (!sameFilesystemEntry(a, b)) return false;
+function sameFilesystemAlias(a: string, b: string, includePaths = true): boolean {
+  if (!sameFilesystemEntry(a, b, includePaths)) return false;
   try {
-    return fs.realpathSync.native(a) === fs.realpathSync.native(b);
-  } catch {
+    const aReal = fs.realpathSync.native(a), bReal = fs.realpathSync.native(b);
+    const same = aReal === bReal;
+    if (includePaths) writeDiagnosticEvidence('path.same_alias', { a, b, a_realpath: aReal, b_realpath: bReal, same });
+    return same;
+  } catch (error) {
+    recordPathCheckError('path.same_alias', includePaths ? { a, b, fallback: 'not_same' } : { purpose: 'volume_case_probe', paths: 'unrelated_entries_omitted', fallback: 'not_same' }, error);
     return false;
   }
 }
@@ -624,7 +735,8 @@ function matchingExistingEntry(cursor: string, segment: string, verifyAlias: boo
   let entries: string[];
   try {
     entries = fs.readdirSync(cursor);
-  } catch {
+  } catch (error) {
+    recordPathCheckError('path.canonical_readdir', { path: cursor, syscall: 'readdir', fallback: 'caller_spelling' }, error);
     return undefined;
   }
   const exact = entries.find((entry) => entry === segment);
@@ -640,31 +752,37 @@ function matchingExistingEntry(cursor: string, segment: string, verifyAlias: boo
 
 async function existsAsync(target: string): Promise<boolean> {
   try {
-    await fs.promises.access(target);
+    await observePathCheckAsync('path.exists', { path: target, syscall: 'access', mode: 'async', fallback_on_error: 'not_exists' }, () => fs.promises.access(target));
     return true;
   } catch {
     return false;
   }
 }
 
-async function sameFilesystemEntryAsync(a: string, b: string): Promise<boolean> {
+async function sameFilesystemEntryAsync(a: string, b: string, includePaths = true): Promise<boolean> {
   try {
     const [aStat, bStat] = await Promise.all([fs.promises.stat(a), fs.promises.stat(b)]);
-    return aStat.dev === bStat.dev && aStat.ino === bStat.ino;
-  } catch {
+    const same = aStat.dev === bStat.dev && aStat.ino === bStat.ino;
+    if (includePaths) writeDiagnosticEvidence('path.same_entry', { a, b, a_device: aStat.dev, b_device: bStat.dev, a_inode: aStat.ino, b_inode: bStat.ino, same });
+    return same;
+  } catch (error) {
+    recordPathCheckError('path.same_entry', includePaths ? { a, b, fallback: 'not_same' } : { purpose: 'volume_case_probe', paths: 'unrelated_entries_omitted', fallback: 'not_same' }, error);
     return false;
   }
 }
 
-async function sameFilesystemAliasAsync(a: string, b: string): Promise<boolean> {
-  if (!(await sameFilesystemEntryAsync(a, b))) return false;
+async function sameFilesystemAliasAsync(a: string, b: string, includePaths = true): Promise<boolean> {
+  if (!(await sameFilesystemEntryAsync(a, b, includePaths))) return false;
   try {
     const [aReal, bReal] = await Promise.all([
-      realpathNativeAsync(a),
-      realpathNativeAsync(b),
+      includePaths ? realpathNativeAsync(a) : new Promise<string>((resolve, reject) => fs.realpath.native(a, (error, value) => error ? reject(error) : resolve(value))),
+      includePaths ? realpathNativeAsync(b) : new Promise<string>((resolve, reject) => fs.realpath.native(b, (error, value) => error ? reject(error) : resolve(value))),
     ]);
-    return aReal === bReal;
-  } catch {
+    const same = aReal === bReal;
+    if (includePaths) writeDiagnosticEvidence('path.same_alias', { a, b, a_realpath: aReal, b_realpath: bReal, same });
+    return same;
+  } catch (error) {
+    recordPathCheckError('path.same_alias', includePaths ? { a, b, fallback: 'not_same' } : { purpose: 'volume_case_probe', paths: 'unrelated_entries_omitted', fallback: 'not_same' }, error);
     return false;
   }
 }
@@ -677,7 +795,8 @@ async function matchingExistingEntryAsync(
   let entries: string[];
   try {
     entries = await fs.promises.readdir(cursor);
-  } catch {
+  } catch (error) {
+    recordPathCheckError('path.canonical_readdir', { path: cursor, syscall: 'readdir', fallback: 'caller_spelling' }, error);
     return undefined;
   }
   const exact = entries.find((entry) => entry === segment);

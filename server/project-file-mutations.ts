@@ -28,6 +28,8 @@ import { errorCode, errorMessage, logger } from './log.ts';
 import { bundleRenameEntryAsync } from './rename-helpers.ts';
 import { indexer } from './state.ts';
 import { noteTreeChanged } from './watcher.ts';
+import { isWriteDiagnosticActive, writeDiagnosticEvidence, writeDiagnosticStep } from './write-diagnostic-context.ts';
+import { writeDiagnosticTextMetrics } from './write-diagnostic-text.ts';
 
 const log = logger('project-file-mutations');
 
@@ -37,8 +39,10 @@ export async function writeProjectFile(
   opts: { baseVersion?: string } = {},
 ): Promise<{ path: string; version?: string; indexWarning?: string; changed: boolean }> {
   const target = await normalizeProjectFilePath(rawPath);
-  validateProjectWritableFolderRel(target.folderRel);
-  validateProjectTextMutation(content);
+  writeDiagnosticStep('validation', 'validate_write_target_and_text', () => {
+    validateProjectWritableFolderRel(target.folderRel);
+    validateProjectTextMutation(content);
+  }, { content: writeDiagnosticTextMetrics(content) });
   return runWithFolderRoot(target.folderRoot, async () => {
     const result = await saveTextFileContent(target.folderRel, content, opts);
     return { path: target.abs, version: result.version, indexWarning: result.indexWarning, changed: result.changed };
@@ -52,24 +56,51 @@ export async function editProjectFile(
   opts: { replaceAll?: boolean; baseVersion?: string } = {},
 ): Promise<{ path: string; replacements: number; version?: string; indexWarning?: string; changed: boolean }> {
   const current = await readProjectFile(rawPath);
-  if (current.derived) {
-    throw routeError('edit_file cannot edit derived PDF, DOCX or XLSX text; create or edit a UTF-8 text source file instead', 415, 'UNSUPPORTED_FORMAT');
-  }
-  if (!oldText) {
-    if (current.content !== '') throw routeError('empty old_text only matches an empty file', 409, 'EDIT_MISMATCH');
-    const written = await writeProjectFile(rawPath, newText, { baseVersion: opts.baseVersion ?? current.version });
-    return { ...written, replacements: 1 };
-  }
-  const count = countOccurrences(current.content, oldText);
-  if (count === 0) throw routeError('old_text not found', 409, 'EDIT_MISMATCH');
-  if (!opts.replaceAll && count > 1) {
-    throw routeError('old_text matched multiple times; set replace_all=true or provide a more specific old_text', 409, 'EDIT_AMBIGUOUS');
-  }
-  const next = opts.replaceAll
-    ? current.content.split(oldText).join(newText)
-    : current.content.replace(oldText, () => newText);
+  const { next, replacements } = writeDiagnosticStep('edit_match', 'match_edit_text', () => {
+    if (current.derived) {
+      throw routeError('edit_file cannot edit derived PDF, DOCX or XLSX text; create or edit a UTF-8 text source file instead', 415, 'UNSUPPORTED_FORMAT');
+    }
+    const count = oldText ? countOccurrences(current.content, oldText) : Number(current.content === '');
+    // These comparisons explain a refused literal edit; they never authorize a
+    // replacement or retain either string in the diagnostic attachment.
+    let normalizedCounts: Record<string, number> | null = null;
+    if (count === 0 && oldText && isWriteDiagnosticActive()) {
+      const normalizeLines = (text: string) => text.replace(/\r\n?/g, '\n');
+      const sourceNfc = current.content.normalize('NFC');
+      const needleNfc = oldText.normalize('NFC');
+      normalizedCounts = {
+        nfc: countOccurrences(sourceNfc, needleNfc),
+        line_endings: countOccurrences(normalizeLines(current.content), normalizeLines(oldText)),
+        nfc_and_line_endings: countOccurrences(normalizeLines(sourceNfc), normalizeLines(needleNfc)),
+      };
+    }
+    writeDiagnosticEvidence('edit_match_result', {
+      match_count: count,
+      replace_all: opts.replaceAll === true,
+      comparison: 'literal_utf16',
+      normalization_applied: 'none',
+      diagnostic_normalized_match_counts: normalizedCounts,
+      source: writeDiagnosticTextMetrics(current.content),
+      old_text: writeDiagnosticTextMetrics(oldText),
+      new_text: writeDiagnosticTextMetrics(newText),
+      read_version: current.version ?? null,
+      request_version: opts.baseVersion ?? null,
+    });
+    if (!oldText) {
+      if (count === 0) throw routeError('empty old_text only matches an empty file', 409, 'EDIT_MISMATCH');
+      return { next: newText, replacements: 1 };
+    }
+    if (count === 0) throw routeError('old_text not found', 409, 'EDIT_MISMATCH');
+    if (!opts.replaceAll && count > 1) {
+      throw routeError('old_text matched multiple times; set replace_all=true or provide a more specific old_text', 409, 'EDIT_AMBIGUOUS');
+    }
+    return {
+      next: opts.replaceAll ? current.content.split(oldText).join(newText) : current.content.replace(oldText, () => newText),
+      replacements: opts.replaceAll ? count : 1,
+    };
+  });
   const written = await writeProjectFile(rawPath, next, { baseVersion: opts.baseVersion ?? current.version });
-  return { ...written, replacements: opts.replaceAll ? count : 1 };
+  return { ...written, replacements };
 }
 
 function countOccurrences(content: string, needle: string): number {

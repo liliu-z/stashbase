@@ -14,6 +14,8 @@ import { requireProjectStatusFolder } from '../project-file-access.ts';
 import { agentContextFile, parseProjectFileLineBound } from '../project-file-reader.ts';
 import { AGENT_SESSION_ID_HEADER } from '../agent-session-registry.ts';
 import { createProjectOperations, type ProjectOperations } from '../project-operations/index.ts';
+import { diagnoseFileWrite } from '../write-diagnostics.ts';
+import { writeDiagnosticStep } from '../write-diagnostic-context.ts';
 import {
   parseSearchMode,
   toRetrievalMode,
@@ -39,11 +41,19 @@ export function mount(app: express.Express, operations: ProjectOperations = crea
     }
   });
 
-  app.use('/api/project', (req, res, next) => {
+  app.use('/api/project', async (req, res, next) => {
     try {
       withAgentProjectScope(req.header(AGENT_SESSION_ID_HEADER), next,
         req.header('x-stashbase-project-client') === 'mcp' ? 'mcp' : 'http');
     } catch (error) {
+      const write = req.method === 'PUT' && req.path === '/file';
+      const edit = req.method === 'POST' && req.path === '/file/edit';
+      if (write || edit) {
+        try {
+          await diagnoseFileWrite({ operation: edit ? 'edit' : 'write', path: req.body?.path, origin: 'http' }, async () =>
+            writeDiagnosticStep('session_scope', 'session_scope.resolve_session', () => { throw error; }, { session_available: false }));
+        } catch { /* Preserve the exact scope rejection below. */ }
+      }
       sendError(res, error);
     }
   });

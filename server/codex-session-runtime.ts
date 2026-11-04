@@ -1,5 +1,5 @@
 import { AGENT_SESSION_CLOSE } from '../shared/agent-protocol.ts';
-import { setAgentProcessSnapshot, updateAgentDiagnosticContext, markAgentDiagnosticClosing, agentDiagnosticStage, beginAgentDiagnosticTurn, reportAgentRuntimeError } from './error-reporting.ts';
+import { agentWriteDiagnosticContext, setAgentProcessSnapshot, updateAgentDiagnosticContext, markAgentDiagnosticClosing, agentDiagnosticStage, beginAgentDiagnosticTurn, reportAgentRuntimeError } from './error-reporting.ts';
 import { isStashbaseWorkspaceEdit, isWorkspaceFileChange } from './agent-file-permissions.ts';
 import { agentProcessClosed, retireAgentProcess } from './agent-process.ts';
 /**
@@ -164,6 +164,8 @@ export class CodexSession implements AttributedAgentSession {
   boundFolder(): string | null {
     return this.cwd ?? this.folder ?? null;
   }
+
+  diagnosticContext() { return agentWriteDiagnosticContext(this.ws); }
 
   turnInFlight(): boolean {
     return this.busy;

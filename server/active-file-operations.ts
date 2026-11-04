@@ -12,6 +12,7 @@ import {
 } from './file-paths.ts';
 import { MAX_INDEXABLE_BYTES } from './indexable.ts';
 import { decodeDirectTextBytes } from './text-decoding.ts';
+import { writeDiagnosticEvidence, writeDiagnosticStep } from './write-diagnostic-context.ts';
 
 /** One synchronous text read is capped to the same admission ceiling as the
  * local index. This bounds HTTP/MCP response memory and main-loop stalls. */
@@ -24,23 +25,31 @@ export async function readUtf8FileBoundedAsync(absPath: string, maxBytes = MAX_T
 /** Bounded, complete reads shared by source snapshots and text consumers. */
 export async function readFileBytesBoundedAsync(absPath: string, maxBytes = MAX_TEXT_READ_BYTES): Promise<Buffer> {
   // Opening a FIFO must not block before the regular-file check below.
-  const handle = await fs.promises.open(absPath, fs.constants.O_RDONLY | (fs.constants.O_NONBLOCK ?? 0));
+  const flags = fs.constants.O_RDONLY | (fs.constants.O_NONBLOCK ?? 0);
+  const handle = await writeDiagnosticStep('read', 'open_source', () => fs.promises.open(absPath, flags), { path: absPath, syscall: 'open', flags });
   try {
-    const stat = await handle.stat();
-    if (!stat.isFile()) throw new Error('path is not a file');
-    if (stat.size > maxBytes) throw textReadSizeError(stat.size, maxBytes);
+    const stat = await writeDiagnosticStep('read', 'stat_open_source', () => handle.stat(), { path: absPath, syscall: 'fstat' });
+    writeDiagnosticStep('read', 'validate_source_snapshot', () => {
+      if (!stat.isFile()) throw Object.assign(new Error('path is not a file'), { code: 'NOT_REGULAR_FILE' });
+      if (stat.size > maxBytes) throw textReadSizeError(stat.size, maxBytes);
+    }, { path: absPath, is_regular_file: stat.isFile(), size_bytes: stat.size, max_bytes: maxBytes });
     const chunks: Buffer[] = [];
     let total = 0;
     while (total <= maxBytes) {
       const bytes = Buffer.alloc(Math.min(64 * 1024, maxBytes + 1 - total));
-      const { bytesRead } = await handle.read(bytes, 0, bytes.length, total);
+      const { bytesRead } = await writeDiagnosticStep('read', 'read_source_chunk', () => handle.read(bytes, 0, bytes.length, total), {
+        path: absPath, syscall: 'read', offset: total, requested_bytes: bytes.length,
+      });
       if (!bytesRead) break;
       chunks.push(bytes.subarray(0, bytesRead));
       total += bytesRead;
     }
     if (total > maxBytes) throw textReadSizeError(total, maxBytes);
+    writeDiagnosticEvidence('read_source_complete', { path: absPath, bytes_read: total });
     return Buffer.concat(chunks, total);
-  } finally { await handle.close(); }
+  } finally {
+    await writeDiagnosticStep('read', 'close_source', () => handle.close(), { path: absPath, syscall: 'close' });
+  }
 }
 
 function textReadSizeError(actual: number, max: number): Error {
@@ -98,15 +107,18 @@ export async function saveTextAsync(relPath: string, content: string, beforePubl
 
 export async function saveBytesAsync(relPath: string, bytes: Buffer, beforePublish?: () => Promise<void>): Promise<void> {
   const target = await resolveSafeAsync(relPath, 'creatable');
-  await fs.promises.mkdir(path.dirname(target), { recursive: true });
+  await writeDiagnosticStep('persist', 'create_target_parent', () => fs.promises.mkdir(path.dirname(target), { recursive: true }), {
+    path: path.dirname(target), target_path: target, syscall: 'mkdir', recursive: true, target_partial_write_possible: false,
+  });
   await resolveSafeAsync(relPath, 'creatable');
-  const mode = await fs.promises.stat(target).then(
+  const mode = await writeDiagnosticStep('persist', 'stat_target_permissions', () => fs.promises.stat(target), { path: target, syscall: 'stat' }).then(
     (stat) => stat.mode & 0o777,
     (err: unknown) => {
       if (errorCode(err) !== 'ENOENT') throw err;
       return undefined;
     },
   );
+  writeDiagnosticEvidence('target_permissions', { path: target, mode: mode ?? null, existing: mode !== undefined });
   await writeFileAtomicAsync(target, bytes, { mode, beforeRename: beforePublish });
 }
 

@@ -1,5 +1,5 @@
 import { AGENT_SESSION_CLOSE } from '../shared/agent-protocol.ts';
-import { agentDiagnosticStage, beginAgentDiagnosticTurn, markAgentDiagnosticClosing, reportAgentRuntimeError } from './error-reporting.ts';
+import { agentWriteDiagnosticContext, agentDiagnosticStage, beginAgentDiagnosticTurn, markAgentDiagnosticClosing, reportAgentRuntimeError } from './error-reporting.ts';
 /** OpenCode implementation of StashBase's Shared Agent Contract. */
 import { prepareAgentAttachments } from './agent-attachments.ts';
 import { agentClientEventSchema } from '../shared/protocols/websocket/agent-session.ts';
@@ -412,6 +412,8 @@ export class OpenCodePanelSession {
   }
 
   boundFolder(): string | null { return this.cwd; }
+  diagnosticContext() { return agentWriteDiagnosticContext(this.ws); }
+
   turnInFlight(): boolean { return this.translator.isTurnActive(); }
 
   /** Runs an enabled tool for the main agent, inside its running turn: one
