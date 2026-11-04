@@ -156,6 +156,11 @@ export function createWriteDiagnosticStore(options: {
     if (!pending.has(bundle.diagnostic_id) && pending.size >= LIMIT) { health.queue_refused++; report(bundle, 'refused'); return; }
     pending.set(bundle.diagnostic_id, { bundle, valid }); schedule();
   }
+  function appendOperation(bundle: WriteDiagnosticBundle, operation: WriteOperationDiagnostic): void {
+    if (bundle.operations.some(item => item.operation_id === operation.operation_id)) return;
+    if (bundle.operations.length < LIMIT) bundle.operations.push(operation);
+    else { bundle.completeness = 'partial'; if (!bundle.gaps.includes('timeline_limit')) bundle.gaps.push('timeline_limit'); }
+  }
   return {
     health: () => ({ ...health, pending: pending.size, remote_available: !!options.upload }),
     async maintain(): Promise<void> {
@@ -188,12 +193,18 @@ export function createWriteDiagnosticStore(options: {
       }
       if (operation.outcome === 'failed') {
         const temporary = new Set(operation.steps.map(step => step.evidence.temporary_path).filter((item): item is string => typeof item === 'string'));
-        const fingerprint = createHash('sha256').update(JSON.stringify([operation.turn_id, operation.raw_path, operation.session_root, operation.operation, operation.error,
+        const fingerprint = createHash('sha256').update(JSON.stringify([operation.turn_id, operation.raw_path, operation.session_root, operation.operation,
+          operation.origin, operation.runtime, operation.runtime_version, operation.app_version, operation.node_version, operation.os, operation.arch, operation.error,
           operation.steps.map(({ stage, action, result, evidence, error }) => ({ stage, action, result, evidence, error }))],
         (key, value) => key === 'wait_duration_ms' || key === 'duration_ms' ? undefined : typeof value === 'string' && temporary.has(value) ? '<staging-file>' : value)).digest('hex');
         const previousId = fingerprints.get(fingerprint) ?? '';
         const previous = admissions.get(previousId)?.() ? samples.get(previousId) : undefined;
-        if (previous) { operation.diagnostic_id = previous.diagnostic_id; previous.occurrences++; previous.last_seen = operation.finished_at; }
+        if (previous) {
+          operation.diagnostic_id = previous.diagnostic_id; previous.occurrences++; previous.last_seen = operation.finished_at;
+          // External HTTP/MCP writes have no turn timeline. Their distinct IDs
+          // must still be retrievable when identical evidence shares a sample.
+          appendOperation(previous, operation);
+        }
         else {
           const bundle: WriteDiagnosticBundle = { schema_version: 1, diagnostic_id: operation.diagnostic_id, first_seen: operation.started_at, last_seen: operation.finished_at,
             expires_at: new Date(now() + WRITE_DIAGNOSTIC_TTL).toISOString(), occurrences: 1, operations: [operation], completeness: operation.completeness, gaps: [...operation.gaps], delivery: { status: 'pending', attempts: 0 } };
@@ -210,10 +221,7 @@ export function createWriteDiagnosticStore(options: {
         const bundle = samples.get(id);
         const originalAdmission = admissions.get(id);
         if (!bundle || !originalAdmission?.()) continue;
-        if (!bundle.operations.some(item => item.operation_id === operation.operation_id)) {
-          if (bundle.operations.length < LIMIT) bundle.operations.push(operation);
-          else { bundle.completeness = 'partial'; if (!bundle.gaps.includes('timeline_limit')) bundle.gaps.push('timeline_limit'); }
-        }
+        appendOperation(bundle, operation);
         enqueue(bundle, originalAdmission);
       }
     },

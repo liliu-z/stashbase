@@ -3677,7 +3677,10 @@ Windows lexical drive/case/separator/Unicode decisions, project/session rejectio
 realpath/symlink failure, absent source, permission/publish failure, edit matching
 and both version checks without including text. `scripts/write-diagnostic-replay.ts`
 reads only received evidence and generates temporary branch regressions. The
-store/replay tests cover limits, opt-out, failures and target changes. These are
+store/replay tests cover limits, opt-out, failures, target changes and distinct
+operation IDs for repeated external writes; changed caller sources keep separate
+samples. Windows fixtures compare native-equivalent paths and do not treat POSIX
+mode bits as Windows ACL evidence. These are
 controlled reproductions, not native Windows/provider or production upload proof.
 An independent assessor given only numbered packets identified all 13 failure
 branches and executed their generated regressions; two additional successful

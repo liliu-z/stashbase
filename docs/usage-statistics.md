@@ -616,7 +616,10 @@ identity is temporary (128 turns, 30 minutes, at most 32 target identities each)
 Attachments retain at most 32 follow-up operations. Limits mark `partial` and name
 the missing evidence; they never mean a complete package. Identical evidence in
 one turn shares a sample with occurrence count and first/latest times; changed
-path, project, version or check evidence creates a new sample. Temporary staging
+path, project, caller source, runtime/build version or check evidence creates a
+new sample. Repeated external writes without a turn retain their distinct operation
+IDs while the sample has timeline capacity; exhaustion is explicitly partial.
+Temporary staging
 names and wait durations do not split otherwise identical failures. Upload attempts
 are bounded (three attempts, five seconds each); unavailable/failed transport,
 storage refusal and queue limits are exposed by `/api/telemetry/delivery` and

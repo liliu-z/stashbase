@@ -285,6 +285,31 @@ test('attachment size truncation is explicit and reporting failures stay inside 
   await throwingReporter.clear();
 });
 
+test('repeated external writes retain each operation ID and a changed source keeps a separate sample', async () => {
+  const store = createWriteDiagnosticStore({ directory: directory() });
+  const first = await sample();
+  const repeat = await sample();
+  const otherSource = await sample();
+  first.origin = repeat.origin = 'http';
+  otherSource.origin = 'mcp';
+  repeat.request_id = 'second-request';
+  store.record(first, valid);
+  store.record(repeat, valid);
+  store.record(otherSource, valid);
+  assert.equal(first.diagnostic_id, repeat.diagnostic_id);
+  assert.notEqual(first.diagnostic_id, otherSource.diagnostic_id);
+  await store.flush();
+  const repeated = await store.read(first.diagnostic_id);
+  assert.ok(repeated);
+  assert.equal(repeated.occurrences, 2);
+  assert.deepEqual(repeated.operations.map(operation => operation.operation_id), [first.operation_id, repeat.operation_id]);
+  assert.equal(repeated.operations[1].request_id, 'second-request');
+  const separate = await store.read(otherSource.diagnostic_id);
+  assert.ok(separate);
+  assert.deepEqual(separate.operations.map(operation => operation.operation_id), [otherSource.operation_id]);
+  await store.clear();
+});
+
 test('HTTP and MCP correlate restricted writes while routine events contain no source paths', async (t) => {
   const [{ default: express }, { mount: mountProjects }, { mount: mountMcp }, reporting, { registerProjectFolderAsync }, { HTTP_REQUEST_ID_HEADER }] = await Promise.all([
     import('express'), import('./routes/project-files.ts'), import('./routes/mcp-http.ts'), import('./error-reporting.ts'),

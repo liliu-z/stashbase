@@ -128,14 +128,14 @@ test('system publication refusal retains syscall and partial-write facts without
   fs.writeFileSync(target, 'original');
   const rename = fs.promises.rename;
   t.mock.method(fs.promises, 'rename', async (...[from, to]: Parameters<typeof rename>) => {
-    if (String(to) === target) throw Object.assign(new Error('document excerpt must stay private'), { code: 'EACCES', errno: -13, syscall: 'rename', path: String(from), dest: String(to) });
+    if (path.resolve(String(to)) === path.resolve(target)) throw Object.assign(new Error('document excerpt must stay private'), { code: 'EACCES', errno: -13, syscall: 'rename', path: String(from), dest: String(to) });
     return rename(from, to);
   });
   const denied = await capture('write', target, () => writeProjectFile(target, 'private new content'));
   assert.equal(denied.diagnostic.failed_action, 'publish_staging_file');
   assert.equal(denied.diagnostic.error?.syscall, 'rename');
   assert.equal(denied.diagnostic.error?.errno, -13);
-  assert.equal(denied.diagnostic.error?.dest, target);
+  assert.equal(path.resolve(denied.diagnostic.error!.dest!), path.resolve(target));
   assert.equal(evidence(denied.diagnostic, 'atomic_write_plan').target_partial_write_possible, false);
   assert.equal(evidence(denied.diagnostic, 'atomic_write_cleanup').cleanup_complete, true);
   assert.equal(JSON.stringify(denied.diagnostic).includes('document excerpt'), false);

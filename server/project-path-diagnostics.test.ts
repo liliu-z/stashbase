@@ -92,7 +92,7 @@ test('Windows path evidence reproduces actual drive, case, separator and Unicode
 });
 
 test('registered-project refusal and live-session refusal retain different authoritative roots', async (t) => {
-  const roots = [path.join(scratch, 'p0'), path.join(scratch, 'p1')];
+  const roots = ['p0', 'p1'].map(name => filesystemPath.absolute(path.join(scratch, name)));
   for (const root of roots) { fs.mkdirSync(root); await registerProjectFolderAsync(root); }
   const outside = path.join(scratch, 'p2', 'entry.ts');
   const rejected = await capture(outside, () => normalizeProjectFilePath(outside));

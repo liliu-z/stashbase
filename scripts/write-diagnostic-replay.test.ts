@@ -129,8 +129,11 @@ test('materialization only writes opaque files in a fresh restricted temporary d
   assert.deepEqual((await fs.promises.readdir(fixtureDirectory)).sort(), ['environment.json', 'regression.test.ts']);
   assert.match(fixtureDirectory, /stashbase-write-replay-/);
   assert.equal(fs.existsSync('/this-original-path-must-never-be-created'), false);
-  assert.equal((await fs.promises.stat(fixtureDirectory)).mode & 0o777, 0o700);
-  assert.equal((await fs.promises.stat(path.join(fixtureDirectory, 'environment.json'))).mode & 0o777, 0o600);
+  // Node's Windows mode bits do not represent the inherited user Temp ACL.
+  if (process.platform !== 'win32') {
+    assert.equal((await fs.promises.stat(fixtureDirectory)).mode & 0o777, 0o700);
+    assert.equal((await fs.promises.stat(path.join(fixtureDirectory, 'environment.json'))).mode & 0o777, 0o600);
+  }
   assert.match(await fs.promises.readFile(path.join(fixtureDirectory, 'regression.test.ts'), 'utf8'), /executeWriteReplayCase/);
 });
 
