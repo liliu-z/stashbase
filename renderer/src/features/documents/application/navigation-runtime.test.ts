@@ -36,6 +36,22 @@ describe('document navigation runtime', () => {
     expect(runtime.store.getState().find.query).toBe('plan');
   });
 
+  it('keeps collapsed outline sections per tab until the tab closes', () => {
+    const runtime = createDocumentNavigationRuntime('one');
+    const collapsed = () => [...runtime.store.getState().outlineCollapsed];
+    runtime.toggleOutlineSection('plan');
+
+    runtime.activate('two');
+    expect(collapsed()).toEqual([]);
+    runtime.activate('one');
+    expect(collapsed()).toEqual(['plan']);
+
+    runtime.activate('two');
+    runtime.forgetTab('one');
+    runtime.activate('one');
+    expect(collapsed()).toEqual([]);
+  });
+
   it('scopes outline selection and pending anchors to the active tab', () => {
     const runtime = createDocumentNavigationRuntime('one');
     const owner = Symbol('outline');

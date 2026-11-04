@@ -56,7 +56,7 @@ describe('virtual cursor', () => {
     expect(view.state.storedMarks).toHaveLength(1);
   });
 
-  it('does not measure the editor for a selection elsewhere in the window', () => {
+  it('does not measure the editor while the selection is elsewhere in the window', () => {
     const view = boldEdgeView();
     const measure = vi.spyOn(view.dom, 'getBoundingClientRect');
     const chat = document.createElement('div');
@@ -65,6 +65,7 @@ describe('virtual cursor', () => {
 
     document.getSelection()?.selectAllChildren(chat);
     document.dispatchEvent(new Event('selectionchange'));
+    view.dispatch(view.state.tr.insertText('!', 5));
     expect(measure).not.toHaveBeenCalled();
 
     document.getSelection()?.collapse(view.dom.querySelector('strong')?.firstChild ?? null, 2);
