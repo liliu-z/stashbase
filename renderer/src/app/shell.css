@@ -1,6 +1,9 @@
 /* The shell is the Electron window surface: the titlebar accepts window drag,
    while its explicit control island remains interactive. */
-html:has(.workspace-shell) {
+/* The workspace window never scrolls its page. Marked in index.html rather
+   than matched with `html:has(.workspace-shell)`: a `:has()` on the root made
+   DOM changes anywhere recalculate the style of the whole document. */
+html[data-window='workspace'] {
   scrollbar-gutter: auto;
 }
 
