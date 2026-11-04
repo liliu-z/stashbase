@@ -77,6 +77,8 @@ export interface DocumentNavigationRuntime {
   findNext(): boolean;
   /** Steps Find backward; answers whether Find was open to take the step. */
   findPrevious(): boolean;
+  /** Drops what navigation keeps for a tab that has closed. */
+  forgetTab(tabId: string): void;
   openFind(): boolean;
   publishOutline(
     tabId: string,
@@ -314,6 +316,7 @@ export function createDocumentNavigationRuntime(
     dispose() {
       if (disposed) return;
       disposed = true;
+      collapsedByTab.clear();
       clearFindOwner();
       clearOutlineOwner();
       activeTabId = null;
@@ -329,6 +332,9 @@ export function createDocumentNavigationRuntime(
       if (disposed || !store.getState().find.open) return false;
       if (findController) applyMatch(findController.previous());
       return true;
+    },
+    forgetTab(tabId) {
+      collapsedByTab.delete(tabId);
     },
     openFind() {
       if (disposed || !findController) return false;
