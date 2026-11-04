@@ -20,6 +20,7 @@ import {
 import { genericFilePreviewQuery } from '@/features/documents/application/queries';
 import type { DocumentSelection } from '@/features/documents/domain/selection';
 import { useDocumentRefresh } from '@/features/documents/hooks/use-document-refresh';
+import { usePreparedRead } from '@/features/documents/hooks/use-prepared-read';
 import { RefreshFailedBanner } from '@/features/documents/ui/banner';
 import { CodeEditorDocument } from '@/features/documents/ui/code-editor/document';
 import { FilePlaceholder } from '@/features/documents/ui/file-placeholder';
@@ -53,8 +54,10 @@ export function GenericFileDocument({
   runtime,
   status,
 }: GenericFileDocumentProps) {
-  const preview = useQuery(genericFilePreviewQuery(api, runtime.scope));
-  useDocumentRefresh(active, preview.refetch);
+  const previewQuery = genericFilePreviewQuery(api, runtime.scope);
+  const prepared = usePreparedRead(previewQuery.queryKey);
+  const preview = useQuery({ ...previewQuery, refetchOnMount: !prepared });
+  useDocumentRefresh(active, preview.refetch, prepared);
   const signalFor = useRequestSignals<'reveal'>();
   const [revealState, setRevealState] = useState<'error' | 'idle' | 'pending'>('idle');
   const name = runtime.scope.source.path.split('/').at(-1) ?? runtime.scope.source.path;

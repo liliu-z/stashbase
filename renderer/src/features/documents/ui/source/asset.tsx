@@ -5,6 +5,7 @@ import type { DocumentRuntime } from '@/features/documents/application/document-
 import type { DocumentAsset, DocumentAssetPort } from '@/features/documents/application/ports';
 import { documentAssetQuery } from '@/features/documents/application/queries';
 import { useDocumentRefresh } from '@/features/documents/hooks/use-document-refresh';
+import { usePreparedRead } from '@/features/documents/hooks/use-prepared-read';
 import { RefreshFailedBanner } from '@/features/documents/ui/banner';
 import type { SourceReference } from '@/shared/domain/source-reference';
 
@@ -50,8 +51,10 @@ export function AssetSurface({
   runtime,
   status,
 }: AssetSurfaceProps) {
-  const asset = useQuery({ ...documentAssetQuery(api, runtime.scope), enabled: active });
-  useDocumentRefresh(active, asset.refetch);
+  const assetQuery = documentAssetQuery(api, runtime.scope);
+  const prepared = usePreparedRead(assetQuery.queryKey);
+  const asset = useQuery({ ...assetQuery, enabled: active, refetchOnMount: !prepared });
+  useDocumentRefresh(active, asset.refetch, prepared);
   const source = runtime.scope.source;
 
   // Fire once per mounted document, independent of the asset load.
