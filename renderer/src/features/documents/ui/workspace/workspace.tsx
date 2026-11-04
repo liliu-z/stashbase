@@ -135,10 +135,18 @@ export function DocumentWorkspace({
     const document = runtime.getDocument(tabId);
     if (!tab || !document) return null;
     return (
+      // A retained tab skips rendering but keeps its layout, at the visible
+      // pane's size, so returning to a long document does not lay it out again
+      // from nothing the way `display: none` did.
       <div
+        aria-hidden={hidden || undefined}
         aria-label={`${sourceName(tab.source)} document`}
-        className={hidden ? 'hidden' : 'flex min-h-0 flex-1 flex-col'}
-        hidden={hidden}
+        className={
+          hidden
+            ? 'pointer-events-none absolute inset-0 flex flex-col [content-visibility:hidden]'
+            : 'flex min-h-0 flex-1 flex-col'
+        }
+        inert={hidden}
         key={tab.id}
         role="region"
       >

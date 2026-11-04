@@ -163,7 +163,8 @@ describe('document tabs', () => {
     // getByRole excludes elements hidden from the accessibility tree, so the inactive panel — the
     // very thing under test — has to be found through getByLabelText, which does not filter on it.
     const inactive = screen.getByLabelText('other.md document');
-    expect(inactive.hasAttribute('hidden')).toBe(true);
+    expect(inactive.getAttribute('aria-hidden')).toBe('true');
+    expect(inactive.inert).toBe(true);
   });
 
   it('closes the focused tab with Delete and exposes an active-tab close control', async () => {

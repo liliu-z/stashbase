@@ -10,7 +10,6 @@
 import type { ReactNode } from 'react';
 
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
-import { agentSurfaceProps } from '@/features/agent/public';
 import type { WorkspaceSessionController } from '@/features/workspace/public';
 
 import '@/app/shell.css';
@@ -66,11 +65,7 @@ export function WorkspaceLayout({
         {titlebar}
         {notices}
 
-        <section
-          aria-label="Agent workspace"
-          className="relative min-h-0 flex-1"
-          {...agentSurfaceProps}
-        >
+        <section aria-label="Agent workspace" className="relative min-h-0 flex-1">
           {started ? (
             <div className="h-full min-h-0">
               <div

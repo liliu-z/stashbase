@@ -19,6 +19,7 @@ import {
 import type { DelimitedTablePage } from '@/features/documents/domain/table';
 
 import { useDocumentRefresh } from './use-document-refresh';
+import { usePreparedRead } from './use-prepared-read';
 
 type LoadedTable = Extract<DelimitedTablePage, { kind: 'table' }>;
 
@@ -37,9 +38,11 @@ export function useDelimitedTable(
 ): DelimitedTableView {
   const queryClient = useQueryClient();
   const scope = runtime.scope;
-  const head = useQuery(delimitedTableHeadQuery(api, scope));
+  const headQuery = delimitedTableHeadQuery(api, scope);
+  const prepared = usePreparedRead(headQuery.queryKey);
+  const head = useQuery({ ...headQuery, refetchOnMount: !prepared });
   const { refetch } = head;
-  useDocumentRefresh(active, refetch);
+  useDocumentRefresh(active, refetch, prepared);
 
   // A save from the source view changes the file; read the table again then
   // rather than at the next poll.

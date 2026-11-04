@@ -1477,7 +1477,9 @@ registered host boundaries; renderer shared types are a different layer.
   window focus, and return from hidden. App composition also deactivates viewers
   while Chat mode or New tab covers the retained workspace. Text, generic previews,
   and versioned assets share this trigger; derived DOCX conversion remains version-keyed.
-  Checks share a pending read rather than restarting it. Publishing an accepted
+  Opening a document reads it once in `prepareDocument`; the viewer that mounts
+  within two seconds uses that read instead of refetching on mount or checking on
+  its first activation. Checks share a pending read rather than restarting it. Publishing an accepted
   source write cancels older reads before updating the cache, so a late response
   cannot roll a newly clean editor back to its previous disk text.
   `server/document-asset-version.ts` owns HTML preview invalidation: its bounded

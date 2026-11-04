@@ -8,6 +8,7 @@ import { documentSourceQuery } from '@/features/documents/application/queries';
 import type { DocumentConflictResolution } from '@/features/documents/domain/document';
 
 import { useDocumentRefresh } from './use-document-refresh';
+import { usePreparedRead } from './use-prepared-read';
 
 export function useDocumentSource(
   runtime: DocumentRuntime,
@@ -19,8 +20,10 @@ export function useDocumentSource(
   const editor = useStore(runtime.store, (state) => state.editor);
   const markdownMode = useStore(runtime.store, (state) => state.markdownMode);
   const revision = useStore(runtime.store, (state) => state.revision);
-  const source = useQuery(documentSourceQuery(api, runtime.scope));
-  useDocumentRefresh(active, source.refetch);
+  const query = documentSourceQuery(api, runtime.scope);
+  const prepared = usePreparedRead(query.queryKey);
+  const source = useQuery({ ...query, refetchOnMount: !prepared });
+  useDocumentRefresh(active, source.refetch, prepared);
 
   useEffect(() => {
     if (source.data) runtime.reconcile(source.data);
