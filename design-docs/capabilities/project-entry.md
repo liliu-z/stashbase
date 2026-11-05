@@ -29,9 +29,10 @@ usable; agent setup and indexing are independent.
   Welcome. Startup never seeds projects or native instruction files. Only
   explicit removal forgets registration.
 - An occupied window keeps its project. Its sidebar's project name opens a
-  switcher: recent projects, Open, Create, and Import from GitHub. Each follows
-  the window rule, so another project opens in its own window or focuses the
-  window already showing it. File → New Window still opens Welcome, which
+  switcher: recent projects, Show in Finder (the platform's file-manager name)
+  for the current project's folder, then Open, Create, and Import from GitHub.
+  Each entry follows the window rule, so another project opens in its own window
+  or focuses the window already showing it. File → New Window still opens Welcome, which
   also offers removal; keep that menu visible on Linux.
 - Removing a project preserves source files and separately registered nested
   projects. It retires that project's background work and disables sending in

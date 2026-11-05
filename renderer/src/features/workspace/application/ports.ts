@@ -28,6 +28,8 @@ export interface ProjectRegistryPort {
   load(signal: AbortSignal): Promise<ProjectRegistrySnapshot>;
   openFolder(path: string, signal: AbortSignal): Promise<ProjectRegistrySnapshot>;
   removeFolder(path: string, signal: AbortSignal): Promise<ProjectRegistrySnapshot>;
+  /** Shows a registered project's folder in the system file manager. */
+  revealFolder(path: string, signal: AbortSignal): Promise<void>;
 }
 
 interface FolderPickerOptions {

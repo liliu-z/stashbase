@@ -64,6 +64,7 @@ Journey-specific entry points and evidence stay in [Journey Coverage](journey-co
   and window binding. A newer open, close, or retirement invalidates pending work.
   Directory absence never silently removes membership or favorites.
 - Project creation stays beneath the default home or an authorized location.
+  Revealing a project in the file manager names a registered member only.
   Entry and agent startup never seed or rewrite user-owned instruction files.
   Startup creates only the default home directory; it never populates it with
   sample content or registers projects automatically.

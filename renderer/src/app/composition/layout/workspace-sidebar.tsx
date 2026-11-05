@@ -128,6 +128,7 @@ export function WorkspaceSidebar({
         onCollapseAll={creates && workspace ? () => workspace.collapseAll() : undefined}
         onOpenChange={setFolderOpen}
         open={folderOpen}
+        revealLabel={dependencies.workspace.revealLabel}
       />
     </SidebarGroup>
   );

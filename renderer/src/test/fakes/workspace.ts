@@ -102,6 +102,7 @@ export function projectApi(overrides: Partial<ProjectRegistryPort> = {}): Projec
     load: vi.fn(async () => projectRegistrySnapshot()),
     openFolder: vi.fn(async () => projectRegistrySnapshot()),
     removeFolder: vi.fn(async () => projectRegistrySnapshot({ activeFolder: null, projects: [] })),
+    revealFolder: vi.fn(async () => undefined),
     ...overrides,
   };
 }

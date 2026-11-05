@@ -869,7 +869,10 @@ Host/services: `server/folder.ts`, `server/github-import.ts`, `server/project-fi
   menu of recent projects plus Open, Create, and Import from GitHub, driving the
   window's shared `useProjectEntry`; the leading folder glyph owns the fold.
   `sidebar.test.tsx` covers the routing to entry, the current project as a
-  no-op, same-name disambiguation, and the failure line. An isolated macOS
+  no-op, same-name disambiguation, the failure line, and Show in Finder
+  revealing the current project (with its failure line). `routes/project.test.ts`
+  refuses to reveal an unregistered or missing folder; a successful reveal
+  opens the OS file manager and is not exercised by any test or driven pass. An isolated macOS
   built-app pass opened a seeded project, chose another recent project from the
   switcher, and got a second window on it while the first kept its project and
   closed the menu. Open, Create, and Import through the switcher reuse the

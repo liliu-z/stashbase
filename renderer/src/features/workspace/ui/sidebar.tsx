@@ -5,11 +5,12 @@
  * in its own window, or focuses the window already showing it; removing a
  * project stays on the welcome screen.
  */
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
   ChevronDown,
   ChevronRight,
+  ExternalLink,
   FilePlus,
   Folder,
   FolderDown,
@@ -45,6 +46,7 @@ import { useShape } from '@/lib/shape-context';
 import { spring } from '@/lib/springs';
 import { useMotionTier } from '@/lib/use-motion-tier';
 import { cn } from '@/lib/utils';
+import { useRequestSignals } from '@/shared/runtime/use-request-signals';
 import { FailureLine } from '@/shared/ui/failure-notice';
 
 export interface ProjectSidebarProps {
@@ -65,6 +67,8 @@ export interface ProjectSidebarProps {
   /** Whether the folder's section is unfolded. The header is the toggle;
    *  the region it folds is the caller's, beneath it. */
   open: boolean;
+  /** The platform's name for showing a folder in its file manager. */
+  revealLabel: string;
 }
 
 /** Enough recent projects to switch between without the menu scrolling;
@@ -83,8 +87,14 @@ export function ProjectSidebar({
   onNewFolder,
   onOpenChange,
   open,
+  revealLabel,
 }: ProjectSidebarProps) {
   const project = useQuery(projectQuery(api));
+  // A second reveal replaces the one still in flight, and unmounting drops it.
+  const signalFor = useRequestSignals<'reveal'>();
+  const reveal = useMutation({
+    mutationFn: (path: string) => api.revealFolder(path, signalFor('reveal')),
+  });
   // The section header is the kit's collapsible group label, fed the group
   // context by hand: the region it folds is the sidebar's filling pane
   // column, which a measured-height group could not hold, so the fold lives
@@ -251,6 +261,15 @@ export function ProjectSidebar({
               />
             ))}
             {recent.length > 0 && <DropdownSeparator />}
+            {/* The one row about this project rather than another: where its
+             *  folder sits on disk, which the name alone does not say. */}
+            <MenuItem
+              className={MENU_ROW}
+              icon={ExternalLink}
+              label={revealLabel}
+              onSelect={() => reveal.mutate(activeFolder.path)}
+            />
+            <DropdownSeparator />
             <MenuItem
               className={MENU_ROW}
               icon={FolderOpen}
@@ -327,6 +346,11 @@ export function ProjectSidebar({
       {entry.failure && (
         <FailureLine className="px-2 pb-1" tone="input">
           {entry.failure}
+        </FailureLine>
+      )}
+      {reveal.isError && (
+        <FailureLine className="px-2 pb-1" tone="input">
+          The project folder could not be shown. Check that it is still available.
         </FailureLine>
       )}
     </div>

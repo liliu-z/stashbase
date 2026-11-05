@@ -48,9 +48,11 @@ function projectEntry(overrides: Partial<ProjectEntry> = {}): ProjectEntry {
 
 type SidebarTestProps = Omit<
   ProjectSidebarProps,
-  'api' | 'contentId' | 'entry' | 'onOpenChange' | 'open'
+  'api' | 'contentId' | 'entry' | 'onOpenChange' | 'open' | 'revealLabel'
 > &
-  Partial<Pick<ProjectSidebarProps, 'contentId' | 'entry' | 'onOpenChange' | 'open'>> & {
+  Partial<
+    Pick<ProjectSidebarProps, 'contentId' | 'entry' | 'onOpenChange' | 'open' | 'revealLabel'>
+  > & {
     api: Partial<ProjectRegistryPort>;
   };
 
@@ -61,6 +63,7 @@ function renderProject({ api, ...props }: SidebarTestProps) {
       entry={projectEntry()}
       onOpenChange={vi.fn()}
       open
+      revealLabel="Show in Finder"
       {...props}
       api={projectApi(api)}
     />,
@@ -140,6 +143,29 @@ describe('project sidebar', () => {
     expect(entry.create).toHaveBeenCalledWith('/project');
     await choose('Import from GitHub…');
     expect(entry.importDialog.start).toHaveBeenCalledOnce();
+  });
+
+  it('shows the current project in the file manager, and says when it cannot', async () => {
+    const revealFolder = vi
+      .fn<ProjectRegistryPort['revealFolder']>()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('gone'));
+    renderProject({ api: { load: vi.fn(async () => activeProject), revealFolder } });
+    const user = userEvent.setup();
+    const reveal = async () => {
+      await user.click(await screen.findByRole('button', { name: 'Switch project: Research' }));
+      await user.click(await screen.findByRole('menuitem', { name: 'Show in Finder' }));
+    };
+
+    await reveal();
+    await waitFor(() => expect(revealFolder).toHaveBeenCalledOnce());
+    expect(revealFolder.mock.calls[0]?.[0]).toBe('/project/research');
+    expect(screen.queryByRole('alert')).toBeNull();
+
+    await reveal();
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'The project folder could not be shown.',
+    );
   });
 
   it('says why an entry from the switcher failed', async () => {

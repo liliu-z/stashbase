@@ -7,6 +7,8 @@ import {
   projectOpenFolderRequestSchema,
   projectRemoveFolderRequestSchema,
   projectRegistrySnapshotSchema,
+  projectRevealFolderRequestSchema,
+  projectRevealFolderResponseSchema,
 } from '@/protocols/http/project';
 import type { ProjectRegistrySnapshotWire } from '@/protocols/http/project';
 
@@ -57,5 +59,17 @@ export function createProjectRegistryAdapter(client: HttpClient): ProjectRegistr
       snapshot('/api/projects/open', signal, projectOpenFolderRequestSchema.parse({ path })),
     removeFolder: (path, signal) =>
       snapshot('/api/projects/remove', signal, projectRemoveFolderRequestSchema.parse({ path })),
+    async revealFolder(path, signal) {
+      await request(client, {
+        body: projectRevealFolderRequestSchema.parse({ path }),
+        error: ProjectError,
+        failure: projectFailure,
+        failureSchema: projectFailureSchema,
+        method: 'POST',
+        path: '/api/projects/reveal',
+        schema: projectRevealFolderResponseSchema,
+        signal,
+      });
+    },
   };
 }

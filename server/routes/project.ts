@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { githubImportRequestSchema } from '../../shared/protocols/http/github-import.ts';
 import { getLastCopyLocation, rememberCopyLocation } from '../app-config.ts';
+import { revealInOsFileManager } from '../http.ts';
 import { createProjectImportOperations } from '../project-import-operations.ts';
 import {
   clearFolderPathAsync,
@@ -39,6 +40,7 @@ import { stopAgentRuntimesForFolder } from '../agent-contract.ts';
 import {
   projectOpenFolderRequestSchema,
   projectRemoveFolderRequestSchema,
+  projectRevealFolderRequestSchema,
 } from '../../shared/protocols/http/project.ts';
 import { GitHubImportError, importPublicGitHubRepository } from '../github-import.ts';
 
@@ -257,6 +259,28 @@ export function mount(app: express.Express): void {
   app.delete('/api/github/import/:operationId', (req, res) => {
     imports.cancel(currentWindowId(), req.params.operationId, { status: 499, body: { code: 'IMPORT_CANCELLED', error: 'The import was cancelled.' } });
     res.json({ ok: true });
+  });
+
+  // Show a registered project's folder in the system file manager. Only a
+  // member is revealed: the path names a project, not an arbitrary place.
+  app.post('/api/projects/reveal', async (req, res) => {
+    const request = projectRevealFolderRequestSchema.safeParse(req.body);
+    if (!request.success) {
+      res.status(400).json({ error: 'path required', code: 'INVALID_FOLDER' });
+      return;
+    }
+    try {
+      const root = await exactConfiguredProjectRootAsync(request.data.path);
+      const stat = root ? await fs.promises.stat(root).catch(() => null) : null;
+      if (!root || !stat?.isDirectory()) {
+        res.status(404).json({ error: 'folder is not available', code: 'FOLDER_NOT_FOUND' });
+        return;
+      }
+      revealInOsFileManager(root);
+      res.json({});
+    } catch (err: unknown) {
+      sendFolderOperationError(res, err);
+    }
   });
 
   // Star / unstar a member folder. Pure project metadata — never touches

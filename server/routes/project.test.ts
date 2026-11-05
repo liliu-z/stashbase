@@ -123,6 +123,15 @@ test('project routes return authoritative membership and open the selected folde
   fs.rmSync(elsewhere, { recursive: true });
   assert.equal(await copyLocation(), homePath);
 
+  // Reveal names a registered project only; anywhere else is not shown.
+  const revealUnregistered = await fetch(`${baseUrl}/api/projects/reveal`, {
+    body: JSON.stringify({ path: testHome }), headers, method: 'POST',
+  });
+  assert.equal(revealUnregistered.status, 404);
+  const revealMalformed = await fetch(`${baseUrl}/api/projects/reveal`, {
+    body: JSON.stringify({ path: '' }), headers, method: 'POST',
+  });
+  assert.equal(revealMalformed.status, 400);
 
   const malformed = await fetch(`${baseUrl}/api/projects/open`, {
     body: JSON.stringify({ create: true, path: selectedFolder }),
@@ -176,6 +185,11 @@ test('project routes return authoritative membership and open the selected folde
   });
   assert.equal(openedMissing.status, 200);
   fs.rmSync(missingFolder, { recursive: true, maxRetries: 10, retryDelay: 100 });
+  // A member whose directory is gone is reported missing, not revealed.
+  const revealMissing = await fetch(`${baseUrl}/api/projects/reveal`, {
+    body: JSON.stringify({ path: missingFolder }), headers, method: 'POST',
+  });
+  assert.equal(revealMissing.status, 404);
 
   const lost = await fetch(`${baseUrl}/api/projects`, { headers });
   assert.equal(lost.status, 200);

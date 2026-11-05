@@ -33,6 +33,14 @@ export const projectRemoveFolderRequestSchema = z
   })
   .strict();
 
+export const projectRevealFolderRequestSchema = z
+  .object({
+    path: folderPathSchema,
+  })
+  .strict();
+
+export const projectRevealFolderResponseSchema = z.object({}).strict();
+
 export const projectFailureSchema = z.object({
   code: z.string().trim().min(1).max(64).optional(),
   error: z.string().trim().min(1).max(500),
