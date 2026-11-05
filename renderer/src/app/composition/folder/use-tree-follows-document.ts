@@ -8,11 +8,13 @@
  * this the highlighted row is only ever the last row that was clicked, so it
  * outlives the document it named.
  *
- * The rule is one sentence: a document coming in front selects its own row,
- * and when the last one goes the selection it put there leaves with it. A row
- * the reader pointed at themselves — a folder they expanded, a file whose tab
- * they have since closed — is not theirs to clear, so only the row this hook
- * last followed is dropped.
+ * The rule: a document coming in front selects its own row, opening the
+ * folders above it and bringing the row into view so the reader sees where it
+ * lives, and when the last one goes the selection it put there leaves with it.
+ * A row the reader pointed at themselves — a folder they expanded, a file
+ * whose tab they have since closed — is not theirs to clear, so only the row
+ * this hook last followed is dropped. A folder the reader folds stays folded
+ * until a document from inside it comes in front again.
  */
 import { useEffect } from 'react';
 
@@ -41,7 +43,7 @@ export function useTreeFollowsDocument(
       if (path === followed) return;
       const left = followed;
       followed = path;
-      if (path !== null) workspace.selectPath(path);
+      if (path !== null) workspace.revealPath(path);
       else if (workspace.store.getState().selectedPath === left) workspace.selectPath(null);
     });
   }, [documents, workspace]);

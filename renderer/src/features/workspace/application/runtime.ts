@@ -8,6 +8,7 @@ import {
   disposeWorkspaceState,
   collapseAllTreeFolders,
   requestTreeCreate,
+  revealTreePath,
   selectTreePath,
   type TreeCreateRequest,
   type WorkspaceScope,
@@ -45,9 +46,12 @@ export interface WorkspaceRuntime {
    *  folder itself stays open: rebinding it re-reads the tree from scratch, and
    *  a completion aimed at the tree before that is no longer about this one. */
   retireOperations(): void;
-  /** Points the tree at `path`, or at no row with `null`. The window uses it
-   *  to keep the tree on the document in front of the reader; a gesture on a
-   *  row goes through the tree's own hook. */
+  /** Selects `path`, opens the folders above it, and asks the tree to bring
+   *  its row into view. The window uses it to keep the tree on the document
+   *  in front of the reader; a gesture on a row goes through the tree's own
+   *  hook. */
+  revealPath(path: string): void;
+  /** Points the tree at `path`, or at no row with `null`. */
   selectPath(path: string | null): void;
   /** The folder's presentation state as of now, for the saved session. */
   toSession(): WorkspaceState;
@@ -120,6 +124,10 @@ export function createWorkspaceRuntime({
       finish(true);
     },
     retireOperations: guard.retireOperations,
+    revealPath(path) {
+      if (disposed) return;
+      store.setState((state) => revealTreePath(state, path));
+    },
     selectPath(path) {
       if (disposed) return;
       store.setState((state) => selectTreePath(state, path));

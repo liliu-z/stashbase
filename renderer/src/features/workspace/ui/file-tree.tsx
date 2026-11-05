@@ -53,6 +53,7 @@ import {
   type TreeItem,
 } from './file-tree-model';
 import { DraftNameRow, RenameNameRow } from './file-tree-naming';
+import { useTreePage } from './file-tree-page';
 import { FileTreeRow, type FileTreeRowMarker } from './file-tree-rows';
 import { useTreeSpaceContextMenu } from './file-tree-space-menu';
 import { FileTreeLoading, FileTreeUnavailable } from './file-tree-status';
@@ -63,7 +64,6 @@ const EMPTY_LISTING: WorkspaceListing = {
   folders: [],
   showHiddenFiles: false,
 };
-const TREE_PAGE_SIZE = 240;
 export type { FileTreeRowMarker };
 
 export interface FileTreeProps {
@@ -111,7 +111,6 @@ export function FileTree({
     onOpenSource,
     mutateSources,
   });
-  const [limit, setLimit] = useState(TREE_PAGE_SIZE);
   const [renameCaret, setRenameCaret] = useState<number | undefined>();
   const treeElement = useRef<HTMLDivElement>(null);
   const sectionElement = useRef<HTMLElement>(null);
@@ -128,7 +127,8 @@ export function FileTree({
   } = useProximityHover(treeElement);
   const { naming } = operations;
 
-  const renderedRows = useMemo(() => tree.rows.slice(0, limit), [limit, tree.rows]);
+  const page = useTreePage(runtime, tree.rows, treeElement);
+  const { renderedRows } = page;
   const renderedPathKey = useMemo(() => pathKeyOf(renderedRows), [renderedRows]);
   const rowFocus = useTreeRowFocus(renderedPathKey);
   const { focus, registerRow, reset: resetRoving, setRovingPath } = rowFocus;
@@ -139,10 +139,7 @@ export function FileTree({
     }
   }, [files.error, onScopeLost, runtime]);
 
-  useEffect(() => {
-    setLimit(TREE_PAGE_SIZE);
-    resetRoving();
-  }, [resetRoving, runtime.scope.generation]);
+  useEffect(() => resetRoving(), [resetRoving, runtime.scope.generation]);
 
   const items = useMemo(() => treeItems(renderedRows, naming), [naming, renderedRows]);
   const nodes = useMemo(() => nestTreeItems(items), [items]);
@@ -294,7 +291,12 @@ export function FileTree({
           {folder !== null && (
             <AnimatePresence initial={false}>
               {node.children.length > 0 && (
-                <TreeGroup key={folder} onSettle={bumpLayout} reduceMotion={reduceMotion}>
+                <TreeGroup
+                  appear={!page.opened.includes(folder)}
+                  key={folder}
+                  onSettle={bumpLayout}
+                  reduceMotion={reduceMotion}
+                >
                   {renderNodes(node.children)}
                 </TreeGroup>
               )}
@@ -364,13 +366,9 @@ export function FileTree({
         </div>
       )}
 
-      {tree.rows.length > renderedRows.length && (
-        <Button
-          className="mt-1 w-full justify-start"
-          onClick={() => setLimit((current) => current + TREE_PAGE_SIZE)}
-          variant="ghost"
-        >
-          Show {Math.min(TREE_PAGE_SIZE, tree.rows.length - renderedRows.length)} more
+      {page.more > 0 && (
+        <Button className="mt-1 w-full justify-start" onClick={page.showMore} variant="ghost">
+          Show {page.more} more
         </Button>
       )}
 

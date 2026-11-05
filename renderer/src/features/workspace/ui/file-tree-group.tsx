@@ -14,6 +14,8 @@ import { collapseTween, spring, tween } from '@/lib/springs';
 import { cn } from '@/lib/utils';
 
 export interface TreeGroupProps {
+  /** False for a group that stands at full height from its first frame. */
+  appear: boolean;
   children: ReactNode;
   onSettle(): void;
   reduceMotion: boolean;
@@ -31,7 +33,7 @@ export interface TreeGroupProps {
  * happening, which is the space closing; folding a branch and folding the
  * navigator's region are then the same gesture at two scales.
  */
-export function TreeGroup({ children, onSettle, reduceMotion }: TreeGroupProps) {
+export function TreeGroup({ appear, children, onSettle, reduceMotion }: TreeGroupProps) {
   const present = useIsPresent();
   const [moving, setMoving] = useState(false);
   return (
@@ -45,7 +47,7 @@ export function TreeGroup({ children, onSettle, reduceMotion }: TreeGroupProps) 
         transition: reduceMotion ? { duration: 0 } : collapseTween.moderate.exit,
       }}
       inert={!present}
-      initial={{ height: 0 }}
+      initial={appear ? { height: 0 } : false}
       onAnimationComplete={() => {
         setMoving(false);
         onSettle();

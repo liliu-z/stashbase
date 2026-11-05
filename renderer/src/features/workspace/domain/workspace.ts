@@ -1,6 +1,6 @@
 import type { ActiveProjectFolder } from './project';
 import type { FolderSessionState } from './session';
-import { renamedTreePath, treePathWithin, type ExpandedFolders } from './tree';
+import { parentTreePath, renamedTreePath, treePathWithin, type ExpandedFolders } from './tree';
 
 export interface WorkspaceScope {
   readonly folder: ActiveProjectFolder;
@@ -19,11 +19,22 @@ export interface TreeCreateRequest {
   revision: number;
 }
 
+/** A row the window asked the tree to bring into view: the document in front
+ *  of the reader, already selected, with the folders above it opened. */
+export interface TreeRevealRequest {
+  /** The folders this reveal opened. They appear at once rather than easing
+   *  open, so the row already stands where the scroll lands. */
+  opened: readonly string[];
+  path: string;
+}
+
 export interface WorkspaceState {
   expanded: ExpandedFolders;
   lifecycle: 'active' | 'disposed';
   /** The create the tree has been asked to start and has not yet taken up. */
   pendingCreate: TreeCreateRequest | null;
+  /** The row the tree has been asked to bring into view and has not yet shown. */
+  pendingReveal: TreeRevealRequest | null;
   selectedPath: string | null;
   scope: WorkspaceScope;
 }
@@ -36,6 +47,7 @@ export function createWorkspaceState(
     expanded: Object.fromEntries(restored?.expandedPaths.map((path) => [path, true]) ?? []),
     lifecycle: 'active',
     pendingCreate: null,
+    pendingReveal: null,
     scope,
     selectedPath: restored?.selectedPath ?? null,
   };
@@ -62,6 +74,23 @@ export function disposeWorkspaceState(state: WorkspaceState): WorkspaceState {
 /** Points the tree at `selectedPath`, or at no row at all with `null`. */
 export function selectTreePath(state: WorkspaceState, selectedPath: string | null): WorkspaceState {
   return state.selectedPath === selectedPath ? state : { ...state, selectedPath };
+}
+
+/** Selects `path`, opens every folder above it, and asks the tree to bring
+ *  its row into view. */
+export function revealTreePath(state: WorkspaceState, path: string): WorkspaceState {
+  const opened: string[] = [];
+  for (let folder = parentTreePath(path); folder !== ''; folder = parentTreePath(folder)) {
+    if (!state.expanded[folder]) opened.push(folder);
+  }
+  const expanded = { ...state.expanded };
+  for (const folder of opened) expanded[folder] = true;
+  return { ...state, expanded, pendingReveal: { opened, path }, selectedPath: path };
+}
+
+/** The tree brought the revealed row into view. */
+export function clearTreeReveal(state: WorkspaceState): WorkspaceState {
+  return state.pendingReveal === null ? state : { ...state, pendingReveal: null };
 }
 
 export function toggleTreeFolder(state: WorkspaceState, folderPath: string): WorkspaceState {

@@ -370,3 +370,37 @@ describe('file tree keep and create', () => {
     expect(api.createEntry).not.toHaveBeenCalled();
   });
 });
+
+describe('file tree reveal', () => {
+  it('brings a revealed row into view once the page and the listing show it', async () => {
+    const scroll = vi.spyOn(Element.prototype, 'scrollIntoView');
+    const many = Array.from({ length: 250 }, (_, index) =>
+      listingFile({ format: 'txt', path: `file-${String(index).padStart(3, '0')}.txt`, size: 1 }),
+    );
+    const written = listingFile({ path: 'docs/drafts/new.md', size: 1 });
+    const load = vi
+      .fn<FilesPort['load']>()
+      .mockResolvedValueOnce(listing([PLAN, ...many], ['docs']))
+      .mockResolvedValue(listing([PLAN, written, ...many], ['docs', 'docs/drafts']));
+    const { client } = renderTree(filesApi({ load }));
+    const runtime = runtimes.at(-1);
+    await screen.findByRole('tree');
+
+    // A row past the rendered page extends the page rather than waiting.
+    act(() => runtime?.revealPath('file-245.txt'));
+    const far = await screen.findByRole('treeitem', { name: 'file-245.txt' });
+    expect(scroll.mock.contexts.at(-1)).toBe(far);
+    expect(runtime?.store.getState().pendingReveal).toBeNull();
+
+    // A file the agent has just written is not listed yet: the reveal waits
+    // for the listing that has it, with the folders above it already open.
+    act(() => runtime?.revealPath('docs/drafts/new.md'));
+    expect(screen.getByRole('treeitem', { name: 'plan.md' })).not.toBeNull();
+    expect(runtime?.store.getState().pendingReveal?.path).toBe('docs/drafts/new.md');
+    await act(() => client.invalidateQueries());
+    const fresh = await screen.findByRole('treeitem', { name: 'new.md' });
+    expect(scroll.mock.contexts.at(-1)).toBe(fresh);
+    expect(runtime?.store.getState().pendingReveal).toBeNull();
+    scroll.mockRestore();
+  });
+});

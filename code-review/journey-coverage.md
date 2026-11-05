@@ -981,6 +981,25 @@ Host text saves now start the same restricted write diagnostic trace described i
 [J07](#j07-converge). This observes the existing source/version transaction and
 keeps its original permissions and save result; it does not add source reads.
 
+**Files follows the open document (2026-11-05):** App composition's
+`use-tree-follows-document.ts` calls the workspace runtime's `revealPath` when a
+document from this folder comes in front. `domain/workspace.ts`
+(`revealTreePath`) selects the row, opens its folders and leaves a
+`pendingReveal` naming the folders it opened. Workspace UI's `file-tree-page.ts`
+owns the rendered page and takes the request up: it extends the page to the row,
+waits for a listing that does not show the file yet, and waits for a hidden
+Files pane through a `ResizeObserver`. It then scrolls with `block: 'nearest'`.
+Rows carry a scroll margin equal to `--scroll-fade-size`, and groups the reveal
+opened skip their opening animation, so the scroll lands on the row's final
+position. `workspace.test.ts`, `use-tree-follows-document.test.tsx` and
+`file-tree.test.tsx` cover ancestor expansion, page extension and the wait for a
+newly listed file. An isolated macOS Electron source pass (renderer through
+Vite) opened deep files with Quick Open, Back, from behind Document outline and
+from Chats mode. Each time the folders opened and the row was selected and fully
+visible. A folder folded by the reader stayed folded. A chat file link uses the
+same `openSource` navigation but was not driven with a live agent. Packaged and
+Windows/Linux behavior remain unverified.
+
 **Math source preservation (2026-11-02):**
 `shared/runtime/markdown-math.ts` tokenizes formulas before Markdown consumes
 TeX escapes and retains source positions. Documents' `ui/markdown/math.ts`

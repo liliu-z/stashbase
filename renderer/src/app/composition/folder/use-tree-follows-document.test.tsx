@@ -37,9 +37,14 @@ describe('useTreeFollowsDocument', () => {
     expect(selectionOf(workspace)).toBe('notes.md');
 
     // A browse reuses the standing preview, so the row it replaces must not
-    // stay highlighted behind it.
+    // stay highlighted behind it. A document inside a folder opens the folder,
+    // so its row can be seen as well as selected.
     await documents.open(plan, { preview: true });
     expect(selectionOf(workspace)).toBe('drafts/plan.md');
+    expect(workspace.store.getState()).toMatchObject({
+      expanded: { drafts: true },
+      pendingReveal: { opened: ['drafts'], path: 'drafts/plan.md' },
+    });
 
     // Switching tabs in the strip never touches the tree, which is the whole
     // reason the tree has to follow the open set rather than the last click.

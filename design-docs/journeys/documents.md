@@ -10,6 +10,11 @@ source mutations, saving, and release guarantees.
 1. Browse Files, Quick Open, a link, or a search result through the same document
    navigation. Reuse an open tab; otherwise open a replaceable preview. A failed
    open preserves the last usable view. Search navigation locates the supported match.
+   Files follows the document in front, however it got there: a chat link, Quick
+   Open, a tab, or Back. It opens the folders above the document, selects its row
+   and scrolls the row fully into view. A folder the reader folds
+   stays folded until a document inside it comes in front again. While another
+   panel covers Files, the row is brought into view when Files is shown.
 2. Keep a preview or start editing to retain its tab. New tab offers **Create text
    note**, which opens a blank Markdown file, and **Create interactive note**, which
    opens a usable blank HTML note in its own directory with `index.html` and

@@ -230,8 +230,9 @@ export function FileTreeRow({
         className={cn(
           // gap-2 over the compact button gap lands the label on the sidebar's
           // menu rows' text line, 38px in, so the tree and the rows around it
-          // share one text edge.
-          'w-full justify-start gap-2',
+          // share one text edge. A row scrolled into view clears the list's
+          // edge fade, so the document the tree reveals is never left dimmed.
+          'w-full scroll-my-(--scroll-fade-size) justify-start gap-2',
           '[&>span:last-child]:w-full [&>span:last-child]:min-w-0 [&>span:last-child]:justify-start',
           '[&>span:last-child>span]:min-w-0 [&>span:last-child>span]:flex-1 [&>span:last-child>span]:truncate [&>span:last-child>span]:text-left [&>span:last-child>span]:[text-box:normal]',
           // The row rests in ink, label and glyph alike, over the ghost

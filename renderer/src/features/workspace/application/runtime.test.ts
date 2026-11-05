@@ -26,6 +26,7 @@ describe('Workspace runtime', () => {
       expanded: {},
       lifecycle: 'active',
       pendingCreate: null,
+      pendingReveal: null,
       selectedPath: null,
       scope: {
         folder: { name: 'Notes', path: '/project/notes' },

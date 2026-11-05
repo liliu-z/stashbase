@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vite-plus/test';
 
 import {
   clearTreeCreate,
+  clearTreeReveal,
   createWorkspaceState,
   collapseAllTreeFolders,
   expandTreeFolder,
   forgetTreePath,
   renameTreePath,
   requestTreeCreate,
+  revealTreePath,
   selectTreePath,
   toggleTreeFolder,
 } from './workspace';
@@ -49,6 +51,7 @@ describe('workspace tree state', () => {
       expanded: { drafts: true },
       lifecycle: 'active',
       pendingCreate: null,
+      pendingReveal: null,
       scope: {
         folder: { name: 'Notes', path: '/project/notes' },
         generation: 9,
@@ -106,5 +109,29 @@ describe('workspace create requests', () => {
 
     expect(clearTreeCreate(asked).pendingCreate).toBeNull();
     expect(clearTreeCreate(state)).toBe(state);
+  });
+});
+
+describe('workspace reveal requests', () => {
+  it('opens the folders above a revealed row and names only the ones it opened', () => {
+    const state = toggleTreeFolder(
+      createWorkspaceState({ folder: { name: 'Notes', path: '/project/notes' }, generation: 1 }),
+      'drafts',
+    );
+
+    const revealed = revealTreePath(state, 'drafts/2026/q4/plan.md');
+    expect(revealed).toMatchObject({
+      expanded: { drafts: true, 'drafts/2026': true, 'drafts/2026/q4': true },
+      pendingReveal: { opened: ['drafts/2026/q4', 'drafts/2026'], path: 'drafts/2026/q4/plan.md' },
+      selectedPath: 'drafts/2026/q4/plan.md',
+    });
+    // A row at the root has no folder to open, and still asks to be shown.
+    expect(revealTreePath(state, 'notes.md').pendingReveal).toEqual({
+      opened: [],
+      path: 'notes.md',
+    });
+
+    expect(clearTreeReveal(revealed).pendingReveal).toBeNull();
+    expect(clearTreeReveal(state)).toBe(state);
   });
 });
