@@ -25,6 +25,63 @@ function paragraphs(text: string): { key: string; text: string }[] {
     });
 }
 
+/** A run of "1. …" paragraphs is a list of steps; anything else stays prose.
+ *  Prose after the steps is a closing note, a step quieter than what the
+ *  project does, who it is for, and how to use it. */
+type AboutBlock =
+  | { kind: 'paragraph'; aside: boolean; key: string; text: string }
+  | { kind: 'steps'; key: string; steps: { key: string; lead: string | null; text: string }[] };
+
+const STEP = /^\d+\.\s+(.*)$/su;
+/** "Set up: say …" leads with a short name worth catching at a glance. */
+const STEP_LEAD = /^([^:]{1,24}):\s+(.*)$/su;
+
+function aboutBlocks(text: string): AboutBlock[] {
+  const blocks: AboutBlock[] = [];
+  for (const paragraph of paragraphs(text)) {
+    const step = STEP.exec(paragraph.text);
+    if (!step) {
+      const aside = blocks.some((block) => block.kind === 'steps');
+      blocks.push({ aside, kind: 'paragraph', ...paragraph });
+      continue;
+    }
+    const body = step[1] ?? '';
+    const lead = STEP_LEAD.exec(body);
+    const item = {
+      key: paragraph.key,
+      lead: lead ? (lead[1] ?? null) : null,
+      text: lead ? (lead[2] ?? '') : body,
+    };
+    const last = blocks.at(-1);
+    if (last?.kind === 'steps') last.steps.push(item);
+    else blocks.push({ key: paragraph.key, kind: 'steps', steps: [item] });
+  }
+  return blocks;
+}
+
+const SAID = /"([^"]+)"|“([^”]+)”/gu;
+
+/** A step's quoted phrases are what the reader types in Chat, so each wears
+ *  an ink-tint chip instead of a pair of quote marks. */
+function StepText({ text }: { text: string }) {
+  const parts: React.ReactNode[] = [];
+  let from = 0;
+  for (const match of text.matchAll(SAID)) {
+    if (match.index > from) parts.push(text.slice(from, match.index));
+    parts.push(
+      <span
+        className="rounded-md bg-foreground/[0.07] px-1.5 py-0.5 whitespace-nowrap"
+        key={match.index}
+      >
+        {match[1] ?? match[2]}
+      </span>,
+    );
+    from = match.index + match[0].length;
+  }
+  if (from < text.length) parts.push(text.slice(from));
+  return parts;
+}
+
 /** A section of the spec sheet: one quiet label over one artifact. */
 function Section({
   children,
@@ -92,15 +149,32 @@ export function GalleryEntryPage({
         <div className="scroll-fade flex min-w-0 flex-col gap-5 [--scroll-fade-size:1.25rem] @2xl:min-h-0 @2xl:overflow-y-auto">
           <Section label="About">
             {entry.about ? (
-              <div className="flex flex-col gap-2">
-                {paragraphs(entry.about).map((paragraph) => (
-                  <p
-                    className="m-0 text-subtitle leading-relaxed text-foreground"
-                    key={paragraph.key}
-                  >
-                    {paragraph.text}
-                  </p>
-                ))}
+              <div className="flex flex-col gap-3 text-body leading-relaxed text-foreground">
+                {aboutBlocks(entry.about).map((block) =>
+                  block.kind === 'paragraph' ? (
+                    <p
+                      className={cn('m-0', block.aside && 'text-muted-foreground')}
+                      key={block.key}
+                    >
+                      {block.text}
+                    </p>
+                  ) : (
+                    <ol
+                      className="m-0 flex list-none flex-col gap-2 p-0 [counter-reset:step]"
+                      key={block.key}
+                    >
+                      {block.steps.map((step) => (
+                        <li
+                          className="relative pl-6 [counter-increment:step] before:absolute before:left-0 before:text-muted-foreground before:tabular-nums before:content-[counter(step)'.']"
+                          key={step.key}
+                        >
+                          {step.lead ? <span className="font-medium">{step.lead}: </span> : null}
+                          <StepText text={step.text} />
+                        </li>
+                      ))}
+                    </ol>
+                  ),
+                )}
               </div>
             ) : (
               <p className="m-0 text-body leading-relaxed text-muted-foreground">

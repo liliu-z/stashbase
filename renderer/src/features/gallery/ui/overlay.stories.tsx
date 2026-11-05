@@ -10,7 +10,7 @@ import { GalleryOverlay, type GallerySection } from './overlay';
 const ENTRIES: GalleryEntry[] = [
   {
     about:
-      'A founder playbook built from twenty lecture transcripts. Read the course as a whole and connect the ideas across lectures.',
+      'A founder playbook built from twenty lecture transcripts. Read the course as a whole and connect the ideas across lectures.\n\n1. Set up: say "Set me up." and tell it which lectures you care about.\n\n2. Read: open the index and follow a theme across lectures.\n\n3. Ask: ask a question and get an answer from the lectures, with sources.\n\nA dashboard shows which lectures you have read and the themes they share.',
     category: 'course',
     description: "Sam Altman's Stanford CS183B course with YC.",
     id: 'cs183b',
