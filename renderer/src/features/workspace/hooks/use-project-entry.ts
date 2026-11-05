@@ -19,7 +19,12 @@ import { useRequestSignals } from '@/shared/runtime/use-request-signals';
 
 export interface GitHubImportView {
   folderName: string;
-  destination: string | null;
+  /** The directory the copy is created in: the reader's choice, otherwise
+   *  where the last copy went, otherwise the folder home. */
+  location: string | null;
+  /** The Gallery entry being copied. Its repository is fixed, so the URL is
+   *  not the reader's to see or change; null for an import from GitHub. */
+  source: string | null;
   nameIssue: string | null;
   urlIssue: string | null;
   failure: FailureView | null;
@@ -31,6 +36,7 @@ export interface GitHubImportView {
   inputLocked: boolean;
   checkingOutcome: boolean;
   cancel(): void;
+  chooseLocation(): void;
   setFolderName(next: string): void;
   setUrl(next: string): void;
   submit(): void;
@@ -39,8 +45,23 @@ export interface GitHubImportView {
 }
 
 type Request = { kind: 'open' | 'create' | 'copy' } | { kind: 'select'; path: string };
-type Draft = { url: string; name: string | null; path: string | null; unknown: boolean };
-const emptyDraft: Draft = { url: '', name: null, path: null, unknown: false };
+type Draft = {
+  url: string;
+  name: string | null;
+  location: string | null;
+  path: string | null;
+  source: string | null;
+  unknown: boolean;
+};
+const emptyDraft: Draft = {
+  url: '',
+  name: null,
+  location: null,
+  path: null,
+  source: null,
+  unknown: false,
+};
+const COPY_LOCATION_KEY = ['project', 'copy-location'] as const;
 
 /** One user operation per window, from acquisition through workspace readiness.
  * A retained path is a completed acquisition, so Retry cannot download it again. */
@@ -55,9 +76,9 @@ export function useProjectEntry(
   const [pendingRequest, setPendingRequest] = useState<Request | null>(null);
   const [failure, setFailure] = useState<FailureView | null>(null);
   const [conflict, setConflict] = useState<string | null>(null);
-  const home = useQuery({
-    queryKey: ['project', 'copy-home'],
-    queryFn: ({ signal }) => importer.home(signal),
+  const remembered = useQuery({
+    queryKey: COPY_LOCATION_KEY,
+    queryFn: ({ signal }) => importer.location(signal),
     enabled: dialogOpen,
     retry: false,
   });
@@ -86,12 +107,15 @@ export function useProjectEntry(
         if (!acquired) {
           const parsed = importer.readUrl(copy.url);
           const name = copy.name ?? (parsed.ok ? parsed.folderName : '');
-          if (!parsed.ok || !name || importer.folderNameIssue(name)) return;
-          acquired = await importer.run(copy.url, name, signal);
+          const location = copy.location ?? remembered.data ?? null;
+          if (!parsed.ok || !name || importer.folderNameIssue(name) || !location) return;
+          acquired = await importer.run(copy.url, name, location, signal);
+          // The next copy starts where this one went.
+          void cache.invalidateQueries({ queryKey: COPY_LOCATION_KEY });
           // Even if Cancel won the race with the response, remember committed
           // files. Cancellation stops entry, not ownership of those files.
           if (mounted.current && operation.current === signal)
-            setDraft({ ...copy, name, path: acquired, unknown: false });
+            setDraft({ ...copy, location, name, path: acquired, unknown: false });
         }
         path = acquired;
       } else if (request.kind === 'select') path = request.path;
@@ -135,6 +159,8 @@ export function useProjectEntry(
   const parsed = importer.readUrl(draft.url);
   const folderName = draft.name ?? (parsed.ok ? parsed.folderName : '');
   const nameIssue = folderName ? importer.folderNameIssue(folderName) : null;
+  const location = draft.location ?? remembered.data ?? null;
+  const inputLocked = !!pendingRequest || !!draft.path || draft.unknown;
   const cancel = () => {
     signalFor('entry');
     setFailure(null);
@@ -143,19 +169,41 @@ export function useProjectEntry(
   const request: GitHubImportView = {
     url: draft.url,
     folderName,
-    destination:
-      draft.path ?? (home.data && folderName && !nameIssue ? `${home.data}/${folderName}` : null),
+    location,
+    source: draft.source,
     nameIssue,
     urlIssue: draft.url.trim() && !parsed.ok ? parsed.message : null,
     failure,
     retainedPath: draft.path,
     existingPath: conflict,
-    inputLocked: !!pendingRequest || !!draft.path || draft.unknown,
+    inputLocked,
     checkingOutcome: draft.unknown,
     pending: pendingRequest !== null,
     canSubmit:
-      !pendingRequest && (draft.path !== null || (parsed.ok && !!folderName && !nameIssue)),
+      !pendingRequest &&
+      (draft.path !== null || (parsed.ok && !!folderName && !nameIssue && !!location)),
     cancel,
+    chooseLocation: () => {
+      if (inputLocked) return;
+      void (async () => {
+        const chosen = await picker.chooseFolder(location ? { defaultPath: location } : undefined);
+        if (!mounted.current || chosen.status === 'cancelled') return;
+        if (chosen.status === 'failed') {
+          setFailure({
+            tone: 'capability',
+            message: 'The folder picker is unavailable, so the location was not changed.',
+          });
+          return;
+        }
+        // The choice arrives after the picker closes; a copy that started or
+        // settled meanwhile keeps the location it was made in.
+        setDraft((current) =>
+          current.path || current.unknown ? current : { ...current, location: chosen.folderPath },
+        );
+        setFailure(null);
+        setConflict(null);
+      })();
+    },
     setUrl: (url) => {
       if (!operation.current && !draft.path && !draft.unknown) {
         setDraft({ ...draft, url });
@@ -165,7 +213,19 @@ export function useProjectEntry(
     },
     startAnotherCopy: () => {
       if (operation.current) return;
-      setDraft(emptyDraft);
+      // A Gallery entry's repository is not on screen to type again, so its
+      // next copy keeps the source, name and location for the reader to adjust.
+      setDraft(
+        draft.source
+          ? {
+              ...emptyDraft,
+              location: draft.location,
+              name: draft.name,
+              source: draft.source,
+              url: draft.url,
+            }
+          : emptyDraft,
+      );
       setFailure(null);
       setConflict(null);
     },
@@ -206,11 +266,16 @@ export function useProjectEntry(
       close: cancel,
       start: () => {
         if (!operation.current) {
+          // An unconfirmed Gallery copy is not an import someone began; a
+          // retained or unknown one still has to be settled first.
+          if (draft.source && !draft.path && !draft.unknown) setDraft(emptyDraft);
           setDialogOpen(true);
           setFailure(null);
         }
       },
     },
+    // A Gallery copy waits for the reader to confirm its name and location;
+    // nothing is downloaded until they do.
     copy: (source: { repo: string; name: string }) => {
       if (operation.current) return;
       // An unresolved receipt must be settled before starting another copy.
@@ -228,10 +293,11 @@ export function useProjectEntry(
       const next =
         draft.url === source.repo && draft.name === name && draft.path
           ? draft
-          : { url: source.repo, name, path: null, unknown: false };
+          : { ...emptyDraft, name, source: source.name, url: source.repo };
       setDraft(next);
+      setFailure(null);
+      setConflict(null);
       setDialogOpen(true);
-      void run({ kind: 'copy' }, next);
     },
   };
 }

@@ -17,6 +17,21 @@ test('a request carries the pasted URL and the chosen folder name', () => {
   );
 });
 
+test('a request may name the location the copy is created in', () => {
+  assert.deepEqual(
+    githubImportRequestSchema.parse({
+      folderName: 'notes',
+      location: '/Users/me/Projects',
+      url: 'https://github.com/owner/repo',
+    }),
+    { folderName: 'notes', location: '/Users/me/Projects', url: 'https://github.com/owner/repo' },
+  );
+  assert.equal(
+    githubImportRequestSchema.safeParse({ folderName: 'n', location: '', url: 'https://x' }).success,
+    false,
+  );
+});
+
 test('a request refuses an unknown key, an empty name, and an over-long name', () => {
   assert.equal(
     githubImportRequestSchema.safeParse({ folderName: 'n', rogue: 1, url: 'https://x' }).success,

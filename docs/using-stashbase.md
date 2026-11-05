@@ -8,7 +8,9 @@ brainstorm with an agent, and begin drafting when ready.
 The first launch opens at Welcome. Later launches, including a restart to
 update, reopen the projects you had open. Open an existing folder, create an empty
 project, import a public GitHub repository, or choose **Make a copy** in the
-Gallery. Chat becomes available inside the project, even if it contains no
+Gallery. Importing and making a copy both ask for the folder name and where to
+put it; **Change…** picks another location, and the next copy starts where the
+last one went. Chat becomes available inside the project, even if it contains no
 files. An entry's **Copy prompt** copies its build request for you to paste;
 it does not start a conversation automatically.
 

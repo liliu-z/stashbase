@@ -150,6 +150,10 @@ export interface AppConfigFile {
    *  run went. The tasks themselves live in the project's `.schedules.json`;
    *  `scheduled-tasks.ts` owns this record's shape. */
   scheduledTasks?: Array<{ scope: string; tasks?: Record<string, unknown> }>;
+  /** The directory the last Gallery or GitHub copy was created in, where the
+   * next one starts. A memory rather than a preference: losing it only
+   * returns the next copy to the folder home. */
+  lastCopyLocation?: string;
 }
 
 export function readAppConfigStrict(file = CONFIG_FILE): AppConfigFile {
@@ -254,6 +258,24 @@ export function writeAppConfigStrict(cfg: AppConfigFile): void {
   } catch (err) {
     if (!isConfigAccessError(err)) throw err;
     throw configAccessError(err);
+  }
+}
+
+export function getLastCopyLocation(): string | undefined {
+  const value = readAppConfig().lastCopyLocation;
+  return typeof value === 'string' && path.isAbsolute(value) ? value : undefined;
+}
+
+/** Best effort: a copy that landed is not failed by a config that cannot be
+ * written, so the next copy simply starts in the folder home again. */
+export function rememberCopyLocation(location: string): void {
+  try {
+    const cfg = readAppConfigStrict();
+    if (cfg.lastCopyLocation === location) return;
+    cfg.lastCopyLocation = location;
+    writeAppConfigStrict(cfg);
+  } catch (err: unknown) {
+    log.warn('could not remember the copy location:', err);
   }
 }
 

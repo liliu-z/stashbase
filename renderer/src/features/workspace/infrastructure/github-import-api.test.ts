@@ -36,15 +36,21 @@ describe('GitHub import adapter', () => {
     expect(adapter().folderNameIssue('.hidden')).toBe('name cannot start with "."');
   });
 
-  it('sends the pasted URL and the chosen name, and answers the published path', async () => {
+  it('sends the pasted URL, the chosen name and location, and answers the published path', async () => {
     const request = vi.fn(async () => ({ body: { path: '/home/me/notes' }, status: 200 }));
-    const path = await adapter({ request }).run('https://github.com/owner/repo', 'notes', signal());
+    const path = await adapter({ request }).run(
+      'https://github.com/owner/repo',
+      'notes',
+      '/home/me',
+      signal(),
+    );
 
     expect(path).toBe('/home/me/notes');
     expect(request).toHaveBeenCalledWith(
       expect.objectContaining({
         body: {
           folderName: 'notes',
+          location: '/home/me',
           url: 'https://github.com/owner/repo',
           operationId: expect.any(String),
         },
@@ -77,7 +83,7 @@ describe('GitHub import adapter', () => {
         status: 400,
       }));
       await expect(
-        adapter({ request }).run('https://github.com/owner/repo', 'notes', signal()),
+        adapter({ request }).run('https://github.com/owner/repo', 'notes', '/home/me', signal()),
       ).rejects.toMatchObject({ kind: 'rejected', message });
     }
   });
@@ -85,7 +91,7 @@ describe('GitHub import adapter', () => {
   it('does not treat an unrecognized response as permission to download again', async () => {
     const request = vi.fn(async () => ({ body: { error: 'Something specific.' }, status: 400 }));
     await expect(
-      adapter({ request }).run('https://github.com/owner/repo', 'notes', signal()),
+      adapter({ request }).run('https://github.com/owner/repo', 'notes', '/home/me', signal()),
     ).rejects.toMatchObject({ outcome: 'unknown' });
   });
 });
@@ -96,9 +102,9 @@ it('recovers a lost response using the same receipt without another POST', async
     .mockRejectedValueOnce(new Error('disconnected'))
     .mockResolvedValueOnce({ status: 200, body: { path: '/home/me/notes' } });
   const port = adapter({ request });
-  await expect(port.run('https://github.com/owner/repo', 'notes', signal())).resolves.toBe(
-    '/home/me/notes',
-  );
+  await expect(
+    port.run('https://github.com/owner/repo', 'notes', '/home/me', signal()),
+  ).resolves.toBe('/home/me/notes');
   const id = request.mock.calls[0]?.[0].body.operationId;
   expect(request.mock.calls[1]?.[0].path).toBe(`/api/github/import/${id}`);
   expect(request.mock.calls.filter(([call]) => call.method === 'POST')).toHaveLength(1);
@@ -110,10 +116,14 @@ it('keeps an unknown receipt across retries instead of guessing from the folder 
     .mockRejectedValueOnce(new Error('disconnected'))
     .mockResolvedValue({ status: 404, body: { code: 'OUTCOME_UNKNOWN', error: 'Unknown' } });
   const port = adapter({ request });
-  await expect(port.run('https://github.com/owner/repo', 'notes', signal())).rejects.toMatchObject({
+  await expect(
+    port.run('https://github.com/owner/repo', 'notes', '/home/me', signal()),
+  ).rejects.toMatchObject({
     outcome: 'unknown',
   });
-  await expect(port.run('https://github.com/owner/repo', 'notes', signal())).rejects.toMatchObject({
+  await expect(
+    port.run('https://github.com/owner/repo', 'notes', '/home/me', signal()),
+  ).rejects.toMatchObject({
     outcome: 'unknown',
   });
   expect(request.mock.calls.filter(([call]) => call.method === 'POST')).toHaveLength(1);

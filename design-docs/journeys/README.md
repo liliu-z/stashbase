@@ -258,8 +258,8 @@ completeness, grounding, and link quality require real-agent evaluation.
 
 ### Flow
 
-Browse Gallery → inspect its single cover and introduction → make a local project
-copy → enter.
+Browse Gallery → inspect its single cover and introduction → Make a copy → confirm
+the folder name and location → enter.
 
 Ready-made personas share the Gallery's catalog but not its name or shelf: the
 composer's persona picker opens **Browse personas** → read a persona's sample reply and
@@ -269,7 +269,8 @@ and Browse personas only personas, so personas never read as template projects.
 ### Required Results
 
 Browsing requires no project/account. Project entries show one cover and an
-introduction, without a generating prompt or thumbnail strip. Use the current catalog
+introduction, without a generating prompt or thumbnail strip. Make a copy asks for
+the folder name and location before downloading and never shows the repository URL. Use the current catalog
 entry and shared project-entry rules; a withdrawn
 entry cannot still be copied. Adding a persona copies it: later Gallery changes never
 reach it, it is edited like the reader's own, and adding it does not choose it for any

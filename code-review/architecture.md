@@ -175,7 +175,11 @@ preview, content editing, and rename/delete are separate permissions.
 ### Import Publication
 
 File uploads use disk staging and no-clobber publication. GitHub import accepts
-only the supported public HTTPS repository URL and a portable direct-child name;
+only the supported public HTTPS repository URL, a portable direct-child name, and
+an optional absolute location that must already be a directory (absent, the
+folder home). Staging lives in that location so publication stays on one volume.
+The location comes from the reader's system-picker choice or the remembered last
+copy location, a best-effort config memory that falls back to the folder home;
 Gallery and GitHub Import share anonymous HTTPS default-branch archive downloads,
 without Git execution or source `.git` metadata. Only the GitHub API and archive
 hosts may receive redirects. Download bytes, expanded bytes, entries and network

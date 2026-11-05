@@ -11,6 +11,7 @@ import express from 'express';
 import fs from 'node:fs';
 import path from 'node:path';
 import { githubImportRequestSchema } from '../../shared/protocols/http/github-import.ts';
+import { getLastCopyLocation, rememberCopyLocation } from '../app-config.ts';
 import { createProjectImportOperations } from '../project-import-operations.ts';
 import {
   clearFolderPathAsync,
@@ -186,19 +187,41 @@ export function mount(app: express.Express): void {
     res.json({ path: root });
   });
 
+  // Where a Gallery or GitHub copy starts: the last copy's location while it
+  // is still a directory, so a reader who keeps projects elsewhere is not
+  // sent back to the folder home each time.
+  app.get('/api/copy-location', async (_req, res) => {
+    const remembered = getLastCopyLocation();
+    if (remembered) {
+      const stat = await fs.promises.stat(remembered).catch(() => null);
+      if (stat?.isDirectory()) {
+        res.json({ path: remembered });
+        return;
+      }
+    }
+    const root = getFolderHome();
+    await fs.promises.mkdir(root, { recursive: true });
+    res.json({ path: root });
+  });
+
   // Receipts survive HTTP disconnection. Explicit cancellation, not losing a
   // response, owns cancellation for receipt-bearing clients.
   const imports = createProjectImportOperations<{ status: number; body: unknown }>();
-  async function acquire(input: { url: string; folderName: string }, signal: AbortSignal) {
+  async function acquire(
+    input: { url: string; folderName: string; location?: string | undefined },
+    signal: AbortSignal,
+  ) {
     try {
-      return { status: 200, body: await importPublicGitHubRepository({ ...input, signal }) };
+      const result = await importPublicGitHubRepository({ ...input, signal });
+      rememberCopyLocation(path.dirname(result.path));
+      return { status: 200, body: result };
     } catch (err) {
       if (!(err instanceof GitHubImportError)) {
         return { status: 500, body: { code: 'LOCAL_IMPORT_FAILED', error: 'The local import failed.' } };
       }
       let destination;
       if (err.code === 'DESTINATION_EXISTS') {
-        const target = path.join(getFolderHome(), input.folderName);
+        const target = path.join(input.location ?? getFolderHome(), input.folderName);
         const stat = await fs.promises.stat(target).catch(() => null);
         destination = stat ? { path: target, directory: stat.isDirectory() } : undefined;
       }

@@ -171,6 +171,8 @@ export const productionGitHubImportDeps: GitHubImportDeps = {
 export interface ImportPublicGitHubRepositoryInput {
   url: unknown;
   folderName?: unknown;
+  /** The existing directory to create the copy in; absent, the folder home. */
+  location?: unknown;
   signal?: AbortSignal;
 }
 
@@ -246,13 +248,14 @@ async function runImport(
   }
 
   throwIfCancelled(signal);
-  const folderHome = deps.folderHome();
-  await fs.promises.mkdir(folderHome, { recursive: true });
+  const location = await copyLocation(input.location, deps);
   throwIfCancelled(signal);
-  const target = path.join(folderHome, rawFolderName);
+  const target = path.join(location, rawFolderName);
   if (await pathExists(target)) throw destinationExists(rawFolderName);
 
-  const operationRoot = path.join(folderHome, `.import-staging-${randomUUID()}`);
+  // Staging shares the destination's volume, so publication can hard-link
+  // rather than copy every file a second time.
+  const operationRoot = path.join(location, `.import-staging-${randomUUID()}`);
   const stagedRepository = path.join(operationRoot, 'repository');
 
   try {
@@ -301,6 +304,23 @@ async function runImport(
       log.warn('GitHub import staging cleanup failed');
     }
   }
+}
+
+/** The folder home is created on demand; a chosen location must already be a
+ *  directory, since the reader picked it in the system picker and a missing
+ *  one means it moved since. */
+async function copyLocation(raw: unknown, deps: GitHubImportDeps): Promise<string> {
+  if (raw === undefined) {
+    const folderHome = deps.folderHome();
+    await fs.promises.mkdir(folderHome, { recursive: true });
+    return folderHome;
+  }
+  const invalid = () =>
+    new GitHubImportError('Choose a location that exists.', 'INVALID_LOCATION', 400);
+  if (typeof raw !== 'string' || !path.isAbsolute(raw)) throw invalid();
+  const stat = await fs.promises.stat(raw).catch(() => null);
+  if (!stat?.isDirectory()) throw invalid();
+  return path.resolve(raw);
 }
 
 async function repositoryDeclaresGitLfs(root: string, signal: AbortSignal): Promise<boolean> {
@@ -353,7 +373,7 @@ function isDestinationCollision(err: unknown): boolean {
 
 function destinationExists(folderName: string): GitHubImportError {
   return new GitHubImportError(
-    `A folder named "${folderName}" already exists in your folder home.`,
+    `A folder named "${folderName}" already exists in that location.`,
     'DESTINATION_EXISTS',
     409,
   );

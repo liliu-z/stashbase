@@ -51,7 +51,7 @@ test('project routes return authoritative membership and open the selected folde
   process.env.STASHBASE_LOCAL_DATA_ROOT = path.join(testHome, 'stashbase-data');
   process.env.STASHBASE_FOLDER_HOME = path.join(testHome, 'default-home');
 
-  const [{ default: express }, folder, { withWindowContext }, projectRoutes, state, stateDb] =
+  const [{ default: express }, folder, { withWindowContext }, projectRoutes, state, stateDb, appConfig] =
     await Promise.all([
       import('express'),
       import('../folder.ts'),
@@ -59,6 +59,7 @@ test('project routes return authoritative membership and open the selected folde
       import('./project.ts'),
       import('../state.ts'),
       import('../state-db.ts'),
+      import('../app-config.ts'),
     ]);
   closeIndexer = () => state.indexer.close();
   closeStateDb = stateDb.closeStateDb;
@@ -106,6 +107,22 @@ test('project routes return authoritative membership and open the selected folde
   const { path: homePath } = await folderHome.json() as { path: string };
   assert.equal(homePath, filesystemPath.absolute(process.env.STASHBASE_FOLDER_HOME));
   assert.deepEqual(fs.readdirSync(homePath), [], 'picker setup must not seed the introduction');
+
+  // A copy starts where the last one went while that directory remains,
+  // and falls back to the folder home once it is gone.
+  const copyLocation = async () => {
+    const response = await fetch(`${baseUrl}/api/copy-location`, { headers });
+    assert.equal(response.status, 200);
+    return (await response.json() as { path: string }).path;
+  };
+  assert.equal(await copyLocation(), homePath);
+  const elsewhere = path.join(testHome, 'Elsewhere');
+  fs.mkdirSync(elsewhere);
+  appConfig.rememberCopyLocation(elsewhere);
+  assert.equal(await copyLocation(), elsewhere);
+  fs.rmSync(elsewhere, { recursive: true });
+  assert.equal(await copyLocation(), homePath);
+
 
   const malformed = await fetch(`${baseUrl}/api/projects/open`, {
     body: JSON.stringify({ create: true, path: selectedFolder }),

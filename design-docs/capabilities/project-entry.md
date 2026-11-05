@@ -43,11 +43,13 @@ usable; agent setup and indexing are independent.
 |---|---|
 | Open / Create | Select an existing directory, or create one in the system picker. An empty project is valid. |
 | Recent | Resolve a remembered directory; retain the record if it is unavailable. |
-| GitHub / Gallery | Download a public repository’s default-branch file snapshot and register the local copy before attempting window entry. |
+| GitHub / Gallery | Confirm the folder name and its location, then download a public repository’s default-branch file snapshot and register the local copy before attempting window entry. Nothing downloads before the confirmation. A Gallery copy names its entry and never shows the repository URL. |
 | MCP-created project | Explicit authorized creation registers a folder. Opening it follows ordinary entry; existing conversations keep their project. |
 
-GitHub Import and Gallery Copy require neither a local Git installation nor a
-GitHub account. A copy contains project files without the source repository’s
+The location starts where the last copy was created while that directory
+still exists, otherwise in the folder home, and the system folder picker
+changes it. GitHub Import and Gallery Copy require neither a local Git
+installation nor a GitHub account. A copy contains project files without the source repository’s
 Git metadata or history; later upstream changes do not update it. Repositories
 using submodules or Git LFS remain unsupported.
 
@@ -56,6 +58,7 @@ using submodules or Git LFS remain unsupported.
 - Checking a registered project must not wait for an unrelated unavailable
   directory. A missing project keeps its membership and can recover when its
   directory returns; malformed registry entries never grant access.
+- A chosen location that no longer exists is refused before any download.
 - New-copy conflicts preserve the destination and the proposed name. Choose
   another name or explicitly open the existing folder; never silently merge or
   overwrite. Existing directory names do not inherit new-copy naming restrictions.

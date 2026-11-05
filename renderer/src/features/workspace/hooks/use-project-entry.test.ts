@@ -9,11 +9,14 @@ import { useProjectEntry } from './use-project-entry';
 
 afterEach(cleanup);
 const source = { name: 'Notes', repo: 'https://github.com/owner/notes' };
+const HOME = '/home/person/Documents/StashBase';
 function setup(
   run = vi.fn(async () => '/home/Notes'),
   enterFolder = vi.fn(async (_path: string) => {}),
+  chooseFolder: ReturnType<typeof folderPicker>['chooseFolder'] = vi.fn(async () => ({
+    status: 'cancelled' as const,
+  })),
 ) {
-  const chooseFolder = vi.fn(async () => ({ status: 'cancelled' as const }));
   const hook = renderHook(
     () =>
       useProjectEntry(
@@ -26,15 +29,49 @@ function setup(
   return { ...hook, run, enterFolder, chooseFolder };
 }
 
+/** Opens a Gallery copy and waits until it can be confirmed: the location
+ *  the copy goes to arrives from the server. */
+async function openCopy(result: { current: ReturnType<typeof useProjectEntry> }, from = source) {
+  act(() => result.current.copy(from));
+  await waitFor(() => expect(result.current.importDialog.request.canSubmit).toBe(true));
+}
+
 describe('shared project entry', () => {
+  it('waits for the reader to confirm a Gallery copy and creates it where they chose', async () => {
+    const chooseFolder = vi.fn(async () => ({
+      folderPath: '/Users/me/Projects',
+      status: 'selected' as const,
+    }));
+    const { result, run } = setup(undefined, undefined, chooseFolder);
+    await openCopy(result);
+    const request = () => result.current.importDialog.request;
+    expect(run).not.toHaveBeenCalled();
+    expect(request().source).toBe('Notes');
+    expect(request().location).toBe(HOME);
+
+    act(() => request().chooseLocation());
+    await waitFor(() => expect(request().location).toBe('/Users/me/Projects'));
+    expect(chooseFolder).toHaveBeenCalledWith({ defaultPath: HOME });
+    act(() => request().submit());
+    await waitFor(() => expect(result.current.importDialog.open).toBe(false));
+    expect(run).toHaveBeenCalledWith(
+      source.repo,
+      'Notes',
+      '/Users/me/Projects',
+      expect.any(AbortSignal),
+    );
+  });
+
   it('retains a completed copy and retries entry without cloning again', async () => {
     const enter = vi
       .fn()
       .mockRejectedValueOnce(new ProjectError('unavailable', 'window failed'))
       .mockResolvedValue(undefined);
     const { result, run } = setup(undefined, enter);
+    await openCopy(result);
     act(() => {
-      result.current.copy(source);
+      result.current.importDialog.request.submit();
+      result.current.importDialog.request.submit();
       result.current.copy(source);
       result.current.open();
     });
@@ -55,7 +92,8 @@ describe('shared project entry', () => {
       });
     });
     const { result, enterFolder } = setup(run);
-    act(() => result.current.copy(source));
+    await openCopy(result);
+    act(() => result.current.importDialog.request.submit());
     await waitFor(() =>
       expect(result.current.importDialog.request.existingPath).toBe('/home/Notes'),
     );
@@ -78,13 +116,15 @@ describe('shared project entry', () => {
       )
       .mockResolvedValue('/home/Other');
     const { result } = setup(run);
-    act(() => result.current.copy(source));
+    await openCopy(result);
+    act(() => result.current.importDialog.request.submit());
+    await waitFor(() => expect(run).toHaveBeenCalledOnce());
     await waitFor(() => expect(result.current.isPending).toBe(false));
     expect(result.current.importDialog.request.existingPath).toBeNull();
     act(() => result.current.importDialog.request.setFolderName('Other'));
     act(() => result.current.importDialog.request.submit());
     await waitFor(() =>
-      expect(run).toHaveBeenLastCalledWith(source.repo, 'Other', expect.any(AbortSignal)),
+      expect(run).toHaveBeenLastCalledWith(source.repo, 'Other', HOME, expect.any(AbortSignal)),
     );
   });
 
@@ -97,12 +137,15 @@ describe('shared project entry', () => {
         }),
     );
     const { result, enterFolder } = setup(run);
-    act(() => result.current.copy(source));
+    await openCopy(result);
+    act(() => result.current.importDialog.request.submit());
     act(() => result.current.importDialog.close());
     await act(async () => finish('/home/Notes'));
     expect(enterFolder).not.toHaveBeenCalled();
     expect(result.current.failure).toBeNull();
     act(() => result.current.copy(source));
+    expect(result.current.importDialog.request.retainedPath).toBe('/home/Notes');
+    act(() => result.current.importDialog.request.submit());
     await waitFor(() => expect(enterFolder).toHaveBeenCalledOnce());
     expect(run).toHaveBeenCalledOnce();
   });
@@ -113,7 +156,9 @@ describe('shared project entry', () => {
       .mockRejectedValueOnce(new ProjectImportError('Check result', 'unknown'))
       .mockResolvedValue('/home/Notes');
     const { result } = setup(run);
-    act(() => result.current.copy(source));
+    await openCopy(result);
+    act(() => result.current.importDialog.request.submit());
+    await waitFor(() => expect(run).toHaveBeenCalledOnce());
     await waitFor(() => expect(result.current.isPending).toBe(false));
     act(() => {
       result.current.importDialog.request.setFolderName('Other');
@@ -123,7 +168,7 @@ describe('shared project entry', () => {
     expect(run).toHaveBeenCalledOnce();
     act(() => result.current.importDialog.request.submit());
     await waitFor(() => expect(result.current.importDialog.open).toBe(false));
-    expect(run).toHaveBeenLastCalledWith(source.repo, 'Notes', expect.any(AbortSignal));
+    expect(run).toHaveBeenLastCalledWith(source.repo, 'Notes', HOME, expect.any(AbortSignal));
   });
 
   it('treats native cancellation as no entry and shares the entry command with Recent', async () => {

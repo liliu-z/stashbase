@@ -6,6 +6,7 @@ import { z } from 'zod';
 const githubImportErrorCodeSchema = z.enum([
   'INVALID_GITHUB_URL',
   'INVALID_FOLDER_NAME',
+  'INVALID_LOCATION',
   'DESTINATION_EXISTS',
   'PRIVATE_OR_NOT_FOUND',
   'UNSUPPORTED_LFS',
@@ -27,8 +28,15 @@ export const githubImportRequestSchema = z
     operationId: z.string().uuid().optional(),
     url: z.string().trim().min(1).max(2_048),
     folderName: z.string().trim().min(1).max(64),
+    /** The existing directory the copy is created in. Absent, the copy lands
+     *  in the folder home. */
+    location: z.string().min(1).max(4_096).optional(),
   })
   .strict();
+
+/** Where the next copy starts: the location the last copy went to while it
+ *  still exists, otherwise the folder home. */
+export const copyLocationSchema = z.object({ path: z.string().min(1) }).strip();
 
 /** Success carries only the published destination. Nothing about staging
  *  reaches the renderer, because staging is not a place it may act on. */

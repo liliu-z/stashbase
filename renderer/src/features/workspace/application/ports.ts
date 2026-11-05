@@ -75,7 +75,9 @@ export interface WorkspacePreferencesPort {
  *  the caller turns into a sentence, so no transport prose reaches a reader,
  *  and a cancelled request leaves no partial member behind. */
 export interface GitHubImportPort {
-  home(signal: AbortSignal): Promise<string>;
+  /** Where the next copy starts: the last copy's location while it remains,
+   *  otherwise the folder home. */
+  location(signal: AbortSignal): Promise<string>;
   /** Why the server would refuse this destination name, or null when usable.
    *  Carried here rather than re-derived in the feature so inline feedback is
    *  the same rule the request will meet. */
@@ -83,8 +85,8 @@ export interface GitHubImportPort {
   /** The destination name the server would derive from this URL, or why it
    *  would refuse the URL. */
   readUrl(raw: string): { folderName: string; ok: true } | { message: string; ok: false };
-  /** Resolves the published folder path. */
-  run(url: string, folderName: string, signal: AbortSignal): Promise<string>;
+  /** Resolves the published folder path, created inside `location`. */
+  run(url: string, folderName: string, location: string, signal: AbortSignal): Promise<string>;
 }
 
 export interface FilesPort {

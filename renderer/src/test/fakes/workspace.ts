@@ -181,7 +181,7 @@ export function workspaceRuntimeOptions(
  *  proof somewhere it does not belong. */
 export function githubImportApi(overrides: Partial<GitHubImportPort> = {}): GitHubImportPort {
   return {
-    home: vi.fn(async () => '/home/person/Documents/StashBase'),
+    location: vi.fn(async () => '/home/person/Documents/StashBase'),
     folderNameIssue: (name: string) => (name.includes('/') ? 'name cannot contain slashes' : null),
     readUrl: (raw: string) => {
       const match = /^https:\/\/github\.com\/[^/]+\/([^/]+)$/.exec(raw.trim());

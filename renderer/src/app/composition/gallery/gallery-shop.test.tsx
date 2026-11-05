@@ -108,11 +108,26 @@ describe('Gallery shop', () => {
     expect(within(page).queryByRole('button', { name: 'Prompt' })).toBeNull();
     expect(within(page).queryByRole('button', { name: 'Copy prompt' })).toBeNull();
 
+    // Make a copy asks first: the folder name and where it goes, never the
+    // repository behind the entry, and nothing downloads until confirmed.
     await user.click(within(page).getByRole('button', { name: 'Make a copy' }));
+    const confirm = await screen.findByRole('dialog', { name: 'Make a copy' });
+    expect(within(confirm).queryByRole('textbox', { name: 'Repository URL' })).toBeNull();
+    expect(
+      within(confirm).getByRole<HTMLInputElement>('textbox', { name: 'Folder name' }).value,
+    ).toBe('Widget Handbook');
+    await waitFor(() =>
+      expect(
+        within(confirm).getByRole<HTMLInputElement>('textbox', { name: 'Location' }).value,
+      ).toBe('/home/person/Documents/StashBase'),
+    );
+    expect(copy).not.toHaveBeenCalled();
+    await user.click(within(confirm).getByRole('button', { name: 'Make a copy' }));
     await waitFor(() =>
       expect(copy).toHaveBeenCalledWith(
         'https://github.com/owner/widgets',
         'Widget Handbook',
+        '/home/person/Documents/StashBase',
         expect.anything(),
       ),
     );

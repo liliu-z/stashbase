@@ -4054,7 +4054,7 @@ structure); they come from the request or the user's
 
 **Intent:** [J13](../design-docs/journeys/README.md#j13-download-a-ready-made-wiki-from-the-gallery).
 
-**Implementation:** Renderer: `renderer/src/app/composition/gallery/use-gallery-shop.tsx`, `renderer/src/features/workspace/hooks/use-project-entry.ts`.
+**Implementation:** Renderer: `renderer/src/app/composition/gallery/use-gallery-shop.tsx`, `renderer/src/features/workspace/hooks/use-project-entry.ts`, `renderer/src/features/workspace/ui/import-github-dialog.tsx` (the Make a copy confirmation).
 Personas: `renderer/src/features/gallery/ui/persona-page.tsx`, `renderer/src/features/gallery/domain/persona-snapshot.ts`, `renderer/src/app/shell.tsx` (add through `useAgentPersonaLibrary`).
 Host/services: `server/routes/gallery.ts`, `server/github-import.ts`, `server/github-snapshot.ts`, `electron/multi-window.cjs`, `server/agent-persona.ts`.
 
@@ -4077,6 +4077,16 @@ Host/services: `server/routes/gallery.ts`, `server/github-import.ts`, `server/gi
   fallback is `use-gallery.test.tsx`; a Gallery add landing in the picker's
   cache is `use-agent-persona.test.ts`; the two entrances never showing each
   other's shelf is `gallery-refresh.test.tsx`.
+- **Confirmed copy and location (2026-11-05):** Make a copy opens a
+  confirmation with the folder name and location and no repository URL;
+  nothing downloads until it is confirmed. `gallery-shop.test.tsx` covers the
+  confirmation through the shell, `use-project-entry.test.ts` the picker-chosen
+  location reaching the import, and `__tests__/github-import.test.ts` the copy
+  and its staging landing in the chosen location, plus refusal of a missing,
+  relative or non-directory location before download. `routes/project.test.ts`
+  covers the remembered location and its folder-home fallback. The dialog was
+  reviewed in its Story (light and dark); no built-app pass drove the native
+  picker or a real copy into a non-default location.
 - **Snapshot runtime pass (2026-10-09):** an isolated macOS Electron app with
   the built renderer, native boundary and built Node service imported real
   `octocat/Hello-World` through GitHub Import and Gallery Copy with no executables

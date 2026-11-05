@@ -12,6 +12,7 @@ import { parseGitHubRepositoryUrl } from '@/contracts/github-import';
 import { ProjectImportError, type GitHubImportPort } from '@/features/workspace/application/ports';
 import type { HttpClient } from '@/platform/http/client';
 import {
+  copyLocationSchema,
   githubImportFailureSchema,
   githubImportRequestSchema,
   githubImportResultSchema,
@@ -32,6 +33,7 @@ const REFUSALS: Readonly<Record<GitHubImportErrorCode, string>> = {
   OUTCOME_UNKNOWN:
     'The import result could not be confirmed. Check again before starting another copy.',
   INVALID_FOLDER_NAME: 'That folder name cannot be used. Choose a different one.',
+  INVALID_LOCATION: 'That location is no longer available. Choose another one.',
   INVALID_GITHUB_URL: 'Enter a complete https://github.com/<owner>/<repo> URL.',
   PRIVATE_OR_NOT_FOUND: 'That repository is private or does not exist.',
   UNSUPPORTED_LFS: 'Repositories that use Git LFS are not supported yet.',
@@ -42,9 +44,9 @@ export function createGitHubImportAdapter(client: HttpClient): GitHubImportPort 
   const receipts = new Map<string, string>();
   const unknown = () => new ProjectImportError(REFUSALS.OUTCOME_UNKNOWN, 'unknown');
   return {
-    async home(signal) {
-      const response = await client.request({ path: '/api/folder-home', signal });
-      const parsed = githubImportResultSchema.safeParse(response.body);
+    async location(signal) {
+      const response = await client.request({ path: '/api/copy-location', signal });
+      const parsed = copyLocationSchema.safeParse(response.body);
       if (response.status !== 200 || !parsed.success)
         throw new ProjectImportError('The copy destination is unavailable.', 'refused');
       return parsed.data.path;
@@ -61,8 +63,8 @@ export function createGitHubImportAdapter(client: HttpClient): GitHubImportPort 
         ? { folderName: parsed.parsed.defaultFolderName, ok: true as const }
         : { message: parsed.message, ok: false as const };
     },
-    async run(url, folderName, signal) {
-      const input = githubImportRequestSchema.parse({ folderName, url });
+    async run(url, folderName, location, signal) {
+      const input = githubImportRequestSchema.parse({ folderName, location, url });
       const key = JSON.stringify(input);
       const previous = receipts.get(key);
       const id = previous ?? crypto.randomUUID();

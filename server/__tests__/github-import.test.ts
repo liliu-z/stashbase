@@ -157,6 +157,39 @@ test('importPublicGitHubRepository rejects a destination already in the folder h
   assert.equal(log.requests.length, 0, 'No request should be sent when destination exists');
 });
 
+test('a copy lands in the chosen location, staged beside it, and leaves the folder home alone', async () => {
+  const { deps, log, home } = fakeDeps({});
+  const location = fs.mkdtempSync(path.join(scratch, 'chosen-'));
+  let stagedIn: string | null = null;
+  const publish = deps.publish;
+  deps.publish = async (staged, target, signal, commit) => {
+    stagedIn = path.dirname(path.dirname(staged));
+    await publish(staged, target, signal, commit);
+  };
+  const result = await importPublicGitHubRepository(
+    { url: 'https://github.com/owner/repo', folderName: 'Notes', location },
+    deps,
+  );
+  assert.equal(result.path, path.join(location, 'Notes'));
+  assert.equal(stagedIn, location);
+  assert.deepEqual(fs.readdirSync(location), ['Notes']);
+  assert.deepEqual(fs.readdirSync(home), []);
+  assert.deepEqual(log.registered, [path.join(location, 'Notes')]);
+});
+
+test('a missing, relative, or non-directory location is refused before download', async () => {
+  const { deps, log } = fakeDeps({});
+  const file = path.join(scratch, 'not-a-directory');
+  fs.writeFileSync(file, '');
+  for (const location of [path.join(scratch, 'gone'), 'relative/place', file, 42]) {
+    await assert.rejects(
+      () => importPublicGitHubRepository({ url: 'https://github.com/owner/repo', location }, deps),
+      (err: Error & { status?: number; code?: string }) => err.status === 400 && err.code === 'INVALID_LOCATION',
+    );
+  }
+  assert.equal(log.requests.length, 0);
+});
+
 test('importPublicGitHubRepository classifies private or not-found responses', async () => {
   const { deps, home } = fakeDeps({ status: 404 });
   await assert.rejects(
