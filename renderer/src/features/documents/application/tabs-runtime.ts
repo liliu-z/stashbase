@@ -151,6 +151,7 @@ export function createDocumentTabsRuntime({
     editWatches.delete(id);
     document.dispose();
     documents.delete(id);
+    navigation.forgetTab(id);
     sourceIds.delete(sourceIdentity(document.scope.source));
     // An external file's grant ends with its tab, so history cannot step back
     // to it once the tab is gone.
@@ -359,7 +360,6 @@ export function createDocumentTabsRuntime({
       void preparing?.cancel();
       preparing?.remove();
       preparing = null;
-
       for (const id of documents.keys()) retireChild(id);
       navigation.dispose();
       store.setState(disposeDocumentTabsState);

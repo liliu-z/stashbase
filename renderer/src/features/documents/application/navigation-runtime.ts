@@ -14,6 +14,8 @@ import type {
 } from '@/features/documents/domain/location';
 import type { DocumentHeading } from '@/features/documents/domain/outline';
 
+import { createOutlineCollapse } from './outline-collapse';
+
 export type { FindOptions };
 
 export interface FindMatchInfo {
@@ -56,6 +58,8 @@ interface DocumentNavigationState {
   outlineFailed: boolean;
   find: DocumentFindState;
   outline: DocumentOutlineState;
+  /** Collapsed outline sections of the active tab, kept per tab in `collapsed`. */
+  outlineCollapsed: ReadonlySet<string>;
   pendingAnchor: PendingDocumentAnchor | null;
 }
 
@@ -74,6 +78,8 @@ export interface DocumentNavigationRuntime {
   findNext(): boolean;
   /** Steps Find backward; answers whether Find was open to take the step. */
   findPrevious(): boolean;
+  /** Drops what navigation keeps for a tab that has closed. */
+  forgetTab(tabId: string): void;
   openFind(): boolean;
   publishOutline(
     tabId: string,
@@ -87,6 +93,7 @@ export interface DocumentNavigationRuntime {
   setFindCaseSensitive(value: boolean): void;
   setFindQuery(query: string): void;
   setFindWholeWord(value: boolean): void;
+  toggleOutlineSection(headingId: string): void;
 }
 
 interface SearchNotices {
@@ -136,8 +143,10 @@ export function createDocumentNavigationRuntime(
       wholeWord: false,
     },
     outline: emptyOutline(),
+    outlineCollapsed: new Set(),
     pendingAnchor: null,
   }));
+  const collapsed = createOutlineCollapse();
   let activeTabId = initialActiveTabId;
   let disposed = false;
   let findController: DocumentFindController | null = null;
@@ -252,7 +261,11 @@ export function createDocumentNavigationRuntime(
     activate(tabId) {
       if (disposed || tabId === activeTabId) return;
       activeTabId = tabId;
-      store.setState({ searchNotice: null, outlineFailed: false });
+      store.setState({
+        searchNotice: null,
+        outlineFailed: false,
+        outlineCollapsed: collapsed.of(tabId),
+      });
       clearFindOwner();
       clearOutlineOwner();
       pendingSearch = null;
@@ -304,6 +317,7 @@ export function createDocumentNavigationRuntime(
     dispose() {
       if (disposed) return;
       disposed = true;
+      collapsed.clear();
       clearFindOwner();
       clearOutlineOwner();
       activeTabId = null;
@@ -320,6 +334,9 @@ export function createDocumentNavigationRuntime(
       if (findController) applyMatch(findController.previous());
       return true;
     },
+    forgetTab(tabId) {
+      collapsed.forget(tabId);
+    },
     openFind() {
       if (disposed || !findController) return false;
       const state = store.getState().find;
@@ -330,9 +347,11 @@ export function createDocumentNavigationRuntime(
     publishOutline(tabId, owner, outline, select) {
       if (disposed || tabId !== activeTabId || outlineOwner !== owner) return;
       outlineSelect = select;
+      const outlineCollapsed = collapsed.prune(tabId, outline.headings);
       store.setState((state) => ({
         ...state,
         outline: { ...outline, available: true },
+        outlineCollapsed,
       }));
     },
     requestAnchor(tabId, id) {
@@ -371,6 +390,10 @@ export function createDocumentNavigationRuntime(
       if (disposed) return;
       updateFind({ wholeWord: value });
       runQuery(false);
+    },
+    toggleOutlineSection(headingId) {
+      if (disposed || !activeTabId) return;
+      store.setState({ outlineCollapsed: collapsed.toggle(activeTabId, headingId) });
     },
   };
 }

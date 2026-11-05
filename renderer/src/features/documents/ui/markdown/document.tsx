@@ -14,7 +14,7 @@ import { placeholder } from '@milkdown/crepe/feature/placeholder';
 import { table } from '@milkdown/crepe/feature/table';
 import { toolbar } from '@milkdown/crepe/feature/toolbar';
 import { editorViewOptionsCtx } from '@milkdown/kit/core';
-import { replaceAll } from '@milkdown/kit/utils';
+import { $prose, replaceAll } from '@milkdown/kit/utils';
 import { BookOpen, PenLine } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useStore } from 'zustand';
@@ -41,7 +41,7 @@ import '@milkdown/crepe/theme/common/style.css';
 import '@milkdown/crepe/theme/frame.css';
 import './document.css';
 import {
-  activeHeadingId,
+  activeHeadingAt,
   attachHeadingAnchors,
   currentEditorView,
   documentScroller,
@@ -56,6 +56,7 @@ import { selectionToolbar } from './selection-toolbar';
 import { useDocumentLinks } from './use-document-links';
 import { useMarkdownHighlights } from './use-markdown-highlights';
 import { useRevisionReview, type RevisionBinding } from './use-revision-review';
+import { createVirtualCursor } from './virtual-cursor';
 import { attachWritingAids, createWordCounter, WordCount } from './writing-aids';
 
 type CreationState = 'creating' | 'failed' | 'ready';
@@ -171,7 +172,9 @@ export function MarkdownDocument({
 
     const editor = new CrepeBuilder({ root: host, defaultValue: initial.body })
       .addFeature(placeholder, { mode: 'block', text: 'Start writing… or type /' })
-      .addFeature(cursor)
+      // Crepe's own virtual cursor measures on every selection change in the
+      // window; the vendored one below measures only inside this editor.
+      .addFeature(cursor, { virtual: false })
       .addFeature(listItem)
       .addFeature(listItemSemantics)
       .addFeature(linkTooltip, {
@@ -200,6 +203,7 @@ export function MarkdownDocument({
         }),
       })),
     );
+    editor.editor.use($prose(() => createVirtualCursor()));
     attachHeadingAnchors(editor);
     const releaseHighlights = attachHighlights(editor);
     const releaseReview = attachReview(editor);
@@ -312,19 +316,29 @@ export function MarkdownDocument({
     const host = hostRef.current;
     if (!host) return;
     const scroller = documentScroller(host);
+    let frame = 0;
     const update = () => {
+      frame = 0;
       const view = currentEditorView(editorRef.current);
-      const currentHeadings = headingsForView(view, headingSnapshotRef);
       const threshold = scroller.getBoundingClientRect().top + 16;
-      const positions = currentHeadings.flatMap((heading) => {
-        const element = headingElementAtPosition(view, heading.position);
-        return element ? [{ id: heading.id, top: element.getBoundingClientRect().top }] : [];
-      });
-      setActiveHeading(activeHeadingId(currentHeadings, positions, threshold));
+      setActiveHeading(
+        activeHeadingAt(
+          headingsForView(view, headingSnapshotRef),
+          (heading) =>
+            headingElementAtPosition(view, heading.position)?.getBoundingClientRect().top,
+          threshold,
+        ),
+      );
     };
-    scroller.addEventListener('scroll', update, { passive: true });
+    const onScroll = () => {
+      if (frame === 0) frame = requestAnimationFrame(update);
+    };
+    scroller.addEventListener('scroll', onScroll, { passive: true });
     update();
-    return () => scroller.removeEventListener('scroll', update);
+    return () => {
+      scroller.removeEventListener('scroll', onScroll);
+      cancelAnimationFrame(frame);
+    };
   }, [active, creationState, headings]);
 
   useEffect(() => {

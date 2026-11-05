@@ -4,15 +4,7 @@
  * document whose outline has not arrived.
  */
 import { ChevronDown, ChevronRight, FileText } from 'lucide-react';
-import {
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-  type ReactNode,
-} from 'react';
+import { useEffect, useId, useMemo, useRef, type CSSProperties, type ReactNode } from 'react';
 import { useStore } from 'zustand';
 
 import {
@@ -143,26 +135,14 @@ export function DocumentOutline({ runtime }: { runtime: DocumentTabsRuntime }) {
   );
   const failed = useStore(runtime.navigation.store, (state) => state.outlineFailed);
   const outline = useStore(runtime.navigation.store, (state) => state.outline);
-  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+  const collapsed = useStore(runtime.navigation.store, (state) => state.outlineCollapsed);
   const menuRef = useRef<HTMLUListElement | null>(null);
-
-  useEffect(() => {
-    setCollapsed(new Set());
-  }, [activeTabId]);
 
   useEffect(() => {
     menuRef.current
       ?.querySelector<HTMLElement>('[aria-current="location"]')
       ?.scrollIntoView({ block: 'nearest' });
   }, [outline.activeId]);
-
-  useEffect(() => {
-    const ids = new Set(outline.headings.map((heading) => heading.id));
-    setCollapsed((current) => {
-      const next = new Set([...current].filter((id) => ids.has(id)));
-      return next.size === current.size ? current : next;
-    });
-  }, [outline.headings]);
 
   const tree = useMemo(() => buildDocumentOutline(outline.headings), [outline.headings]);
   if (!activeTabId) return <DocumentOutlineEmpty />;
@@ -180,14 +160,7 @@ export function DocumentOutline({ runtime }: { runtime: DocumentTabsRuntime }) {
         : 'loading'
       : 'not available for this file type';
 
-  const toggle = (id: string) => {
-    setCollapsed((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+  const toggle = (id: string) => runtime.navigation.toggleOutlineSection(id);
 
   return (
     <SidebarGroup aria-label="Document outline section" className="min-h-0 p-0">

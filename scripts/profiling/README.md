@@ -1,8 +1,9 @@
 # Profiling
 
 These scripts measure isolated StashBase runtimes so you can compare two
-versions of the code. Renderer scenarios drive a development window through
-the Chrome DevTools Protocol; host scenarios use the native runtime directly. Each scenario measures one user task. Run a scenario
+versions of the code. Renderer scenarios drive a window through the Chrome
+DevTools Protocol, either the development renderer or the production build
+(`budgets`); host scenarios use the native runtime directly. Each scenario measures one user task. Run a scenario
 before and after a change, then compare the two labels.
 
 Results and CPU profiles go to `profiling.nosync/<scenario>/`, which Git ignores.
@@ -22,9 +23,10 @@ Results and CPU profiles go to `profiling.nosync/<scenario>/`, which Git ignores
    CPU profiling slows the renderer, so compare profiled runs only with other
    profiled runs.
 
-Run at least two runs per label (`--runs`, default 2) and report ranges. The
-renderer is React's development build, so absolute times are inflated. Compare
-ratios between labels, not against a fixed budget.
+Run at least two runs per label (`--runs`, default 2) and report ranges. Most
+scenarios use React's development build, so their absolute times are inflated:
+compare ratios between labels. Only `budgets` measures the production build
+against fixed limits.
 
 To profile an older commit, use a worktree. It needs `node_modules`,
 `renderer/node_modules` and `python/.venv.nosync`, so symlink them from the
@@ -41,6 +43,12 @@ another checkout serves the wrong renderer, so stop it first.
 - **Isolation.** The host and Electron get a private `HOME`, `XDG_DATA_HOME`,
   `XDG_CONFIG_HOME` and Electron user-data directory. The real project
   registry, settings, session and index are never touched. Telemetry is off.
+- **Renderer.** `renderer: "dev"` (the default) serves the renderer from
+  Vite. `renderer: "build"` loads the production bundle in `dist/renderer`
+  over `app://renderer`, as a packaged app does; `buildRenderer()` builds it.
+- **Host ownership.** By default the harness starts the host before Electron.
+  `ownHost: true` lets Electron start it, as a normal launch does, so a
+  measurement from launch includes host startup.
 - **Ports.** The host runs on :8190 and DevTools on :9333, so a normal
   `pnpm dev` on :8090 can keep running. If either port is busy, the harness
   stops with an error. Vite on :5173 is shared.
@@ -53,6 +61,9 @@ another checkout serves the wrong renderer, so stop it first.
   keystrokes.
 - **Project open.** `openProject` opens the project through `/api/projects/open`
   and reloads the window. Without the reload, the window stays on Welcome.
+- **Relaunch.** `fresh: false` keeps the profile from an earlier launch, so
+  the window restores its last project. `rootPids` lists the app's process
+  group leaders (never Vite) for process-tree memory.
 - **Teardown.** Every child runs in its own process group and is stopped when
   the scenario ends, including when it fails. Logs stay in
   `profiling.nosync/<scenario>/logs/`.
@@ -60,6 +71,72 @@ another checkout serves the wrong renderer, so stop it first.
 Fixtures are generated fresh for every invocation (`fixtures.mjs`). They live
 outside hidden directories and outside `/tmp`, because projects inside hidden
 directories index no files and the Recent list hides `/tmp` projects.
+
+## Scenario: budgets
+
+`pnpm profile:budgets --label after --runs 3` measures the performance budgets
+against the production renderer. Run it before and after any change aimed at
+speed or memory. It builds `dist/renderer` first and prints each budget with
+its range and whether the worst run is within the limit. `--skip-build` reuses
+the current build and records the revision the runner last built it from, or
+`unknown` for a bundle built another way. The limits are the `BUDGETS` table
+at the top of `budgets.mjs`. They are informational: nothing gates on them
+until the thresholds are agreed.
+
+The runner supports Linux and macOS. Windows is unsupported: process-tree
+memory reads `ps`, and child processes are stopped by process group.
+
+**Setup**
+
+- The project has 1,000 notes in 20 folders, `big.md` (124 KB, about 2,300
+  editor paragraphs) and `small.md` (3 lines).
+- A priming launch opens and indexes the project and saves that profile.
+  Each run restores the documents and that profile, then launches Electron,
+  which starts its own host and reopens the project with no documents open.
+  Every fixture file keeps one fixed modification time, so the restored
+  project matches the primed index and no resync overlaps the measurements.
+- The host's `server.log` stays in the isolated profile, under
+  `profile/data/stashbase/logs/`, as for every launch with
+  `STASHBASE_LOCAL_DATA_ROOT` set. Each run restores the profile first, so
+  only the last run's log is kept.
+
+| Budget | Measured as |
+|---|---|
+| Cold start | Electron launch → the restored project's tree shows its files. Includes host startup. |
+| Startup JS | Minified size of every script parsed at that moment. |
+| Folder expand | Click on a collapsed folder → its first child row on screen, before any document opens. |
+| Open small / 120 KB file | Tree click → the editor shows the file's marker sentence. |
+| Switch tab | Tab click → the other kept document is visible again. |
+| Idle long tasks | Long tasks during 10 s with `big.md` in front. |
+| Idle memory | PSS summed over the whole process tree after the idle period (RSS outside Linux), grouped into Electron, host, Python and agents. |
+| Typing p99 | 150 keys at 60 ms in `big.md` and then the chat box; `beforeinput` → next frame → next task. |
+
+Timed actions report `visibleMs`, when the result is first on screen, and
+`settledMs`, which also runs to the end of any long task starting within the
+following 2 s. The budget uses `settledMs`, because a freeze right after the
+first paint is part of the action.
+
+**Limits of the measurement**
+
+- The profile is signed out, so the Default agent never starts or pre-warms
+  OpenCode, and agent memory is not counted. Agent process startup is covered
+  by the Default session scenario.
+- The host runs from source through `tsx`, so cold start includes TypeScript
+  loading that a packaged app does not do.
+
+**Reference ranges** (Linux x64, `ef80f7bd`, 2 runs)
+
+| Budget | Limit | Measured |
+|---|---|---|
+| Open small file | 50 ms | 496–509 ms |
+| Open 120 KB file | 200 ms | 2,485–2,705 ms |
+| Switch to small / 120 KB tab | 50 ms | 510–526 / 545–551 ms |
+| Folder expand | 16 ms | 74–91 ms |
+| Idle long tasks, 10 s | 0 | 0–1 |
+| Typing p99, editor / chat | 16 ms | 29–35 / 22–24 ms |
+| Cold start | 1,000 ms | 2,477–2,585 ms |
+| Idle memory (PSS) | 600 MB | 955–959 MB (Electron 489, host 293, Python 177) |
+| Startup JS | 350 KB | 2,317 KB |
 
 ## Scenario: editing
 

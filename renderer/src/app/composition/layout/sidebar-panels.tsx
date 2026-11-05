@@ -85,7 +85,9 @@ export function sidebarPanels({
       id: 'outline',
       label: 'Document outline',
       mode: 'documents',
-      render: () => (outline ? <DocumentOutline runtime={outline} /> : <DocumentOutlineEmpty />),
+      // Mounted only while shown: a long document's outline is hundreds of rows.
+      render: (active) =>
+        active ? outline ? <DocumentOutline runtime={outline} /> : <DocumentOutlineEmpty /> : null,
     },
     {
       hidesTree: true,
