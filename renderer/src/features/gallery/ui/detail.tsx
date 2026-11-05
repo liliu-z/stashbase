@@ -5,6 +5,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { GalleryEntry } from '@/features/gallery/domain/entry';
+import { useShape } from '@/lib/shape-context';
 import { cn } from '@/lib/utils';
 
 import { GalleryScreenshot } from './screenshots';
@@ -64,13 +65,14 @@ const SAID = /"([^"]+)"|“([^”]+)”/gu;
 /** A step's quoted phrases are what the reader types in Chat, so each wears
  *  an ink-tint chip instead of a pair of quote marks. */
 function StepText({ text }: { text: string }) {
+  const shape = useShape();
   const parts: React.ReactNode[] = [];
   let from = 0;
   for (const match of text.matchAll(SAID)) {
     if (match.index > from) parts.push(text.slice(from, match.index));
     parts.push(
       <span
-        className="rounded-md bg-foreground/[0.07] px-1.5 py-0.5 whitespace-nowrap"
+        className={cn('bg-foreground/[0.07] px-1.5 py-0.5 whitespace-nowrap', shape.chip)}
         key={match.index}
       >
         {match[1] ?? match[2]}

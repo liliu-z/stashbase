@@ -1,3 +1,8 @@
+/**
+ * One window's workspace state for its project: the tree's expanded folders
+ * and selection, and the create or reveal the window has asked the tree to
+ * take up. Each transition returns the next state from the previous one.
+ */
 import type { ActiveProjectFolder } from './project';
 import type { FolderSessionState } from './session';
 import { parentTreePath, renamedTreePath, treePathWithin, type ExpandedFolders } from './tree';
@@ -21,7 +26,7 @@ export interface TreeCreateRequest {
 
 /** A row the window asked the tree to bring into view: the document in front
  *  of the reader, already selected, with the folders above it opened. */
-export interface TreeRevealRequest {
+interface TreeRevealRequest {
   /** The folders this reveal opened. They appear at once rather than easing
    *  open, so the row already stands where the scroll lands. */
   opened: readonly string[];
