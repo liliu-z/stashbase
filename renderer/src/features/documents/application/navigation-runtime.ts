@@ -14,6 +14,8 @@ import type {
 } from '@/features/documents/domain/location';
 import type { DocumentHeading } from '@/features/documents/domain/outline';
 
+import { createOutlineCollapse } from './outline-collapse';
+
 export type { FindOptions };
 
 export interface FindMatchInfo {
@@ -56,8 +58,7 @@ interface DocumentNavigationState {
   outlineFailed: boolean;
   find: DocumentFindState;
   outline: DocumentOutlineState;
-  /** Collapsed outline sections of the active tab. Kept per tab here, not in
-   *  the outline component, so they survive the outline unmounting. */
+  /** Collapsed outline sections of the active tab, kept per tab in `collapsed`. */
   outlineCollapsed: ReadonlySet<string>;
   pendingAnchor: PendingDocumentAnchor | null;
 }
@@ -145,7 +146,7 @@ export function createDocumentNavigationRuntime(
     outlineCollapsed: new Set(),
     pendingAnchor: null,
   }));
-  const collapsedByTab = new Map<string, ReadonlySet<string>>();
+  const collapsed = createOutlineCollapse();
   let activeTabId = initialActiveTabId;
   let disposed = false;
   let findController: DocumentFindController | null = null;
@@ -263,7 +264,7 @@ export function createDocumentNavigationRuntime(
       store.setState({
         searchNotice: null,
         outlineFailed: false,
-        outlineCollapsed: (tabId && collapsedByTab.get(tabId)) || new Set(),
+        outlineCollapsed: collapsed.of(tabId),
       });
       clearFindOwner();
       clearOutlineOwner();
@@ -316,7 +317,7 @@ export function createDocumentNavigationRuntime(
     dispose() {
       if (disposed) return;
       disposed = true;
-      collapsedByTab.clear();
+      collapsed.clear();
       clearFindOwner();
       clearOutlineOwner();
       activeTabId = null;
@@ -334,7 +335,7 @@ export function createDocumentNavigationRuntime(
       return true;
     },
     forgetTab(tabId) {
-      collapsedByTab.delete(tabId);
+      collapsed.forget(tabId);
     },
     openFind() {
       if (disposed || !findController) return false;
@@ -346,11 +347,7 @@ export function createDocumentNavigationRuntime(
     publishOutline(tabId, owner, outline, select) {
       if (disposed || tabId !== activeTabId || outlineOwner !== owner) return;
       outlineSelect = select;
-      const ids = new Set(outline.headings.map((heading) => heading.id));
-      const collapsed = store.getState().outlineCollapsed;
-      const kept = [...collapsed].filter((id) => ids.has(id));
-      const outlineCollapsed = kept.length === collapsed.size ? collapsed : new Set(kept);
-      collapsedByTab.set(tabId, outlineCollapsed);
+      const outlineCollapsed = collapsed.prune(tabId, outline.headings);
       store.setState((state) => ({
         ...state,
         outline: { ...outline, available: true },
@@ -396,11 +393,7 @@ export function createDocumentNavigationRuntime(
     },
     toggleOutlineSection(headingId) {
       if (disposed || !activeTabId) return;
-      const next = new Set(store.getState().outlineCollapsed);
-      if (next.has(headingId)) next.delete(headingId);
-      else next.add(headingId);
-      collapsedByTab.set(activeTabId, next);
-      store.setState({ outlineCollapsed: next });
+      store.setState({ outlineCollapsed: collapsed.toggle(activeTabId, headingId) });
     },
   };
 }

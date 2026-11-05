@@ -360,7 +360,6 @@ export function createDocumentTabsRuntime({
       void preparing?.cancel();
       preparing?.remove();
       preparing = null;
-
       for (const id of documents.keys()) retireChild(id);
       navigation.dispose();
       store.setState(disposeDocumentTabsState);
