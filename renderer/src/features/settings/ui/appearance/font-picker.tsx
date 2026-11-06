@@ -86,7 +86,9 @@ export function FontPicker({
   }, [included, installed, missing, monospaceOnly, query, value]);
 
   const choose = (row: FontRow) => {
+    // Closing here is not the popover's own close, so the search clears too.
     setOpen(false);
+    setQuery('');
     if (row.kind === 'included') onChooseIncluded(row.font.value);
     else onChooseInstalled(row.family);
   };
