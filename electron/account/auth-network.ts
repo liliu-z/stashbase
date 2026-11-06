@@ -3,7 +3,7 @@ import http from 'node:http';
 import {
   AUTH_PATHS, AUTH_REQUEST_LIMIT, AUTH_RESPONSE_LIMIT, AUTH_TIMEOUT_MS,
   AUTH_BASE_URL, USAGE_RELAY_PATH, USAGE_REQUEST_LIMIT, authMethod, authNetworkError, usageBatchUrl,
-  ALLOWANCE_RELAY_PATH, ALLOWANCE_API_URL,
+  ALLOWANCE_RELAY_PATH, ALLOWANCE_API_URL, GALLERY_DOWNLOAD_RELAY_PATH, GALLERY_DOWNLOAD_API_URL,
 } from '../../shared/hosted-auth-network.ts';
 import destination from '../../server/telemetry-destination.json' with { type: 'json' };
 
@@ -24,7 +24,8 @@ export async function createAuthNetworkBridge(options: { fetch: typeof fetch; us
     }
     const usage = request.url === USAGE_RELAY_PATH;
     const allowance = request.url === ALLOWANCE_RELAY_PATH;
-    if (request.method !== 'POST' || (request.url !== '/' && !usage && !allowance) || (usage && !usageUrl)) {
+    const gallery = request.url === GALLERY_DOWNLOAD_RELAY_PATH;
+    if (request.method !== 'POST' || (request.url !== '/' && !usage && !allowance && !gallery) || (usage && !usageUrl)) {
       response.writeHead(404).end(); return;
     }
     if (pending.size >= 8) { response.writeHead(503).end(); return; }
@@ -50,7 +51,14 @@ export async function createAuthNetworkBridge(options: { fetch: typeof fetch; us
       try { input = JSON.parse(raw); }
       catch { response.writeHead(400).end(); return; }
       let target: { url: string; init: RequestInit };
-      if (usage) {
+      if (gallery) {
+        if (!input || typeof input.templateId !== 'string' || !/^[a-z0-9][a-z0-9-]{0,199}$/.test(input.templateId)
+          || typeof input.operationId !== 'string' || !/^[0-9a-f-]{36}$/i.test(input.operationId)
+          || Object.keys(input).some(key => key !== 'templateId' && key !== 'operationId')) {
+          response.writeHead(400).end(); return;
+        }
+        target = { url: GALLERY_DOWNLOAD_API_URL, init: { method: 'POST', headers: { 'content-type': 'application/json' }, body: raw } };
+      } else if (usage) {
         if (!input || typeof input !== 'object' || !Array.isArray(input.batch)) { response.writeHead(400).end(); return; }
         target = { url: usageUrl!, init: { method: 'POST', headers: { 'content-type': 'application/json' }, body: raw } };
       } else if (allowance) {

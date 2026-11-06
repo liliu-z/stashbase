@@ -8,7 +8,7 @@ import { createTestQueryClient, queryWrapper } from '@/test/query';
 import { useProjectEntry } from './use-project-entry';
 
 afterEach(cleanup);
-const source = { name: 'Notes', repo: 'https://github.com/owner/notes' };
+const source = { id: 'notes', name: 'Notes', repo: 'https://github.com/owner/notes' };
 const HOME = '/home/person/Documents/StashBase';
 function setup(
   run = vi.fn(async () => '/home/Notes'),
@@ -59,6 +59,7 @@ describe('shared project entry', () => {
       'Notes',
       '/Users/me/Projects',
       expect.any(AbortSignal),
+      source.id,
     );
   });
 
@@ -124,7 +125,13 @@ describe('shared project entry', () => {
     act(() => result.current.importDialog.request.setFolderName('Other'));
     act(() => result.current.importDialog.request.submit());
     await waitFor(() =>
-      expect(run).toHaveBeenLastCalledWith(source.repo, 'Other', HOME, expect.any(AbortSignal)),
+      expect(run).toHaveBeenLastCalledWith(
+        source.repo,
+        'Other',
+        HOME,
+        expect.any(AbortSignal),
+        source.id,
+      ),
     );
   });
 
@@ -168,7 +175,13 @@ describe('shared project entry', () => {
     expect(run).toHaveBeenCalledOnce();
     act(() => result.current.importDialog.request.submit());
     await waitFor(() => expect(result.current.importDialog.open).toBe(false));
-    expect(run).toHaveBeenLastCalledWith(source.repo, 'Notes', HOME, expect.any(AbortSignal));
+    expect(run).toHaveBeenLastCalledWith(
+      source.repo,
+      'Notes',
+      HOME,
+      expect.any(AbortSignal),
+      source.id,
+    );
   });
 
   it('treats native cancellation as no entry and shares the entry command with Recent', async () => {

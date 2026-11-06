@@ -26,6 +26,8 @@ export const githubImportRequestSchema = z
      *  The server parses it again; sending the raw text keeps one owner for
      *  the rule rather than trusting a client-side normalization. */
     operationId: z.string().uuid().optional(),
+    /** Attribution for a Gallery copy; absent for ordinary GitHub imports. */
+    templateId: z.string().min(1).max(200).regex(/^[a-z0-9][a-z0-9-]*$/).optional(),
     url: z.string().trim().min(1).max(2_048),
     folderName: z.string().trim().min(1).max(64),
     /** The existing directory the copy is created in. Absent, the copy lands

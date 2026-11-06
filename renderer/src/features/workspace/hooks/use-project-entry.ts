@@ -46,6 +46,7 @@ export interface GitHubImportView {
 
 type Request = { kind: 'open' | 'create' | 'copy' } | { kind: 'select'; path: string };
 type Draft = {
+  templateId?: string;
   url: string;
   name: string | null;
   location: string | null;
@@ -109,7 +110,7 @@ export function useProjectEntry(
           const name = copy.name ?? (parsed.ok ? parsed.folderName : '');
           const location = copy.location ?? remembered.data ?? null;
           if (!parsed.ok || !name || importer.folderNameIssue(name) || !location) return;
-          acquired = await importer.run(copy.url, name, location, signal);
+          acquired = await importer.run(copy.url, name, location, signal, copy.templateId);
           // The next copy starts where this one went.
           void cache.invalidateQueries({ queryKey: COPY_LOCATION_KEY });
           // Even if Cancel won the race with the response, remember committed
@@ -222,6 +223,7 @@ export function useProjectEntry(
               location: draft.location,
               name: draft.name,
               source: draft.source,
+              ...(draft.templateId ? { templateId: draft.templateId } : {}),
               url: draft.url,
             }
           : emptyDraft,
@@ -276,7 +278,7 @@ export function useProjectEntry(
     },
     // A Gallery copy waits for the reader to confirm its name and location;
     // nothing is downloaded until they do.
-    copy: (source: { repo: string; name: string }) => {
+    copy: (source: { id?: string; repo: string; name: string }) => {
       if (operation.current) return;
       // An unresolved receipt must be settled before starting another copy.
       if (draft.unknown) {
@@ -291,9 +293,18 @@ export function useProjectEntry(
             ? derived.folderName
             : source.name;
       const next =
-        draft.url === source.repo && draft.name === name && draft.path
+        draft.templateId === source.id &&
+        draft.url === source.repo &&
+        draft.name === name &&
+        draft.path
           ? draft
-          : { ...emptyDraft, name, source: source.name, url: source.repo };
+          : {
+              ...emptyDraft,
+              name,
+              source: source.name,
+              url: source.repo,
+              ...(source.id ? { templateId: source.id } : {}),
+            };
       setDraft(next);
       setFailure(null);
       setConflict(null);
@@ -309,7 +320,7 @@ export interface ProjectEntry {
   create(homeDirectory: string): void;
   open(): void;
   select(path: string): void;
-  copy(source: { repo: string; name: string }): void;
+  copy(source: { id?: string; repo: string; name: string }): void;
   importDialog: {
     open: boolean;
     request: GitHubImportView;

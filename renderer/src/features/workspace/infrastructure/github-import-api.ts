@@ -63,8 +63,13 @@ export function createGitHubImportAdapter(client: HttpClient): GitHubImportPort 
         ? { folderName: parsed.parsed.defaultFolderName, ok: true as const }
         : { message: parsed.message, ok: false as const };
     },
-    async run(url, folderName, location, signal) {
-      const input = githubImportRequestSchema.parse({ folderName, location, url });
+    async run(url, folderName, location, signal, templateId) {
+      const input = githubImportRequestSchema.parse({
+        folderName,
+        location,
+        url,
+        ...(templateId ? { templateId } : {}),
+      });
       const key = JSON.stringify(input);
       const previous = receipts.get(key);
       const id = previous ?? crypto.randomUUID();

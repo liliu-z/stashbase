@@ -4060,6 +4060,37 @@ structure); they come from the request or the user's
 
 ## J13: Gallery download
 
+Gallery catalog synchronization (2026-11-06): the published catalog and desktop/
+website bundled metadata now retain the same seven template IDs and target
+`stashbase-org/template-*` repositories. Removed X Content Starter and POC Deck
+Builder entries no longer appear in the new snapshots; the website redirects
+their former detail routes to Gallery. Using the unchanged v2.18.10 snapshot
+downloader, all seven original personal-account URLs followed GitHub's two-hop
+redirects to the renamed repositories and downloaded/extracted successfully in
+temporary directories. This verifies archive acquisition, not seven full GUI
+project-entry flows. The Gallery publication and CDN match the new metadata.
+
+Download-count implementation (2026-11-06): stable template IDs reach the shared
+import operation; `server/routes/project.ts` records only committed acquisitions.
+`server/telemetry.ts` reuses durable privacy-aware delivery, with a restricted
+native relay in `electron/account/auth-network.ts`. The separate hosted API
+repository owns the PostgreSQL operation ledger and public aggregate endpoint.
+Focused import tests exercise receipt replay, conflicts, cancellation and ordinary
+imports; telemetry tests exercise retry/restart, payload minimization, independent
+destination recovery and opt-out. Validation: `pnpm check`, focused import,
+telemetry and native-relay suites, the 17 affected renderer checks, documentation
+validation, and fresh-build Electron smoke passed. The hosted repository's
+HTTP/catalog tests, PostgreSQL concurrent replay/rate-limit integration, typecheck
+and generated OpenAPI checks passed. Hosted deployment and live end-to-end counting
+remain unverified until the API migration and service are deployed. Card display
+is not part of this implementation.
+
+The withdrawn-template regression covers a per-template 503 followed by a
+current template and ordinary analytics, repeated drains with a new completed
+copy, and eventual catalog propagation using the original operation ID. A
+separate outage check verifies that generic service failures defer the whole
+destination rather than probing every queued download.
+
 **Intent:** [J13](../design-docs/journeys/README.md#j13-download-a-ready-made-wiki-from-the-gallery).
 
 **Implementation:** Renderer: `renderer/src/app/composition/gallery/use-gallery-shop.tsx`, `renderer/src/features/workspace/hooks/use-project-entry.ts`, `renderer/src/features/workspace/ui/import-github-dialog.tsx` (the Make a copy confirmation).

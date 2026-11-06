@@ -1387,3 +1387,83 @@ test('a refused context request carries only its explicitly supplied turn ID', a
     assert.equal(failures[0].body.properties.diagnostic.http_status, 415);
   } finally { f.service.close(); server.closeAllConnections(); server.close(); }
 });
+
+test('Gallery counters retain operation identity through restart, omit private metadata, and obey opt-out', async () => {
+  const f = fixture();
+  f.service.close();
+  const requests: Array<{ url: string; body: unknown }> = [];
+  const event = { event: 'gallery_download_completed' as const, template_id: 'resume-builder', operation_id: '11111111-1111-4111-8111-111111111111' };
+  const service = createTelemetry({ ...f.options, fetch: async (url, init) => {
+    requests.push({ url: String(url), body: JSON.parse(String(init?.body)) });
+    return new Response(null, { status: String(url).includes('/gallery/') ? 503 : 200 });
+  } });
+  service.capture(event);
+  service.capture({ event: 'app_opened' });
+  await service.flush();
+  assert.equal(requests.length, 2, 'a counter outage must not block ordinary analytics');
+  assert.deepEqual(requests[0], { url: 'https://api.stashbase.ai/v1/gallery/downloads', body: { templateId: event.template_id, operationId: event.operation_id } });
+  assert.equal(f.config().telemetry?.queue?.length, 1);
+  service.close();
+  const resumed = createTelemetry({ ...f.options, fetch: async (url, init) => {
+    requests.push({ url: String(url), body: JSON.parse(String(init?.body)) });
+    return new Response(null, { status: 200 });
+  } });
+  await resumed.flush();
+  assert.deepEqual(requests[2], requests[0]);
+  assert.equal(f.config().telemetry?.queue?.length, 0);
+  resumed.update({ enabled: false });
+  resumed.capture(event);
+  await resumed.flush();
+  assert.equal(requests.length, 3);
+  resumed.close();
+});
+
+test('an unlisted Gallery report retries without blocking current templates or analytics', async () => {
+  const f = fixture();
+  f.service.close();
+  const requests: Array<Record<string, any>> = [];
+  let listed = false;
+  const retired = { event: 'gallery_download_completed' as const, template_id: 'retired-template', operation_id: '11111111-1111-4111-8111-111111111111' };
+  const current = { ...retired, template_id: 'resume-builder', operation_id: '22222222-2222-4222-8222-222222222222' };
+  const service = createTelemetry({ ...f.options, fetch: async (_url, init) => {
+    const body = JSON.parse(String(init?.body));
+    requests.push(body);
+    return body.templateId === retired.template_id && !listed
+      ? Response.json({ code: 'gallery_template_unavailable' }, { status: 503 })
+      : new Response(null, { status: 200 });
+  } });
+  try {
+    service.capture(retired);
+    service.capture(current);
+    service.capture({ event: 'app_opened' });
+    await service.flush();
+    assert.deepEqual(requests.map(body => body.templateId ?? 'analytics'), ['retired-template', 'resume-builder', 'analytics']);
+    assert.deepEqual(f.config().telemetry?.queue?.map(item => item.event), [retired]);
+    service.capture({ ...current, operation_id: '33333333-3333-4333-8333-333333333333' });
+    await service.flush();
+    assert.deepEqual(requests.slice(3).map(body => body.templateId), ['retired-template', 'resume-builder']);
+    listed = true;
+    await service.flush();
+    assert.deepEqual(requests.at(-1), requests[0], 'catalog propagation retries the original operation');
+    assert.equal(f.config().telemetry?.queue?.length, 0);
+  } finally { service.close(); }
+});
+
+test('a Gallery service outage defers the destination without probing every queued download', async () => {
+  const f = fixture();
+  f.service.close();
+  const requests: string[] = [];
+  const service = createTelemetry({ ...f.options, fetch: async (_url, init) => {
+    const body = JSON.parse(String(init?.body));
+    requests.push(body.templateId ?? 'analytics');
+    return Response.json({ code: 'service_unavailable' }, { status: body.templateId ? 503 : 200 });
+  } });
+  try {
+    service.capture({ event: 'gallery_download_completed', template_id: 'resume-builder', operation_id: '11111111-1111-4111-8111-111111111111' });
+    service.capture({ event: 'gallery_download_completed', template_id: 'software-architect', operation_id: '22222222-2222-4222-8222-222222222222' });
+    service.capture({ event: 'app_opened' });
+    await service.flush();
+    assert.deepEqual(requests, ['resume-builder', 'analytics']);
+    assert.equal(f.config().telemetry?.queue?.length, 2);
+  } finally { service.close(); }
+});

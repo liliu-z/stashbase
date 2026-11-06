@@ -36,13 +36,14 @@ describe('GitHub import adapter', () => {
     expect(adapter().folderNameIssue('.hidden')).toBe('name cannot start with "."');
   });
 
-  it('sends the pasted URL, the chosen name and location, and answers the published path', async () => {
+  it('sends Gallery attribution with the chosen destination and answers the published path', async () => {
     const request = vi.fn(async () => ({ body: { path: '/home/me/notes' }, status: 200 }));
     const path = await adapter({ request }).run(
       'https://github.com/owner/repo',
       'notes',
       '/home/me',
       signal(),
+      'resume-builder',
     );
 
     expect(path).toBe('/home/me/notes');
@@ -51,6 +52,7 @@ describe('GitHub import adapter', () => {
         body: {
           folderName: 'notes',
           location: '/home/me',
+          templateId: 'resume-builder',
           url: 'https://github.com/owner/repo',
           operationId: expect.any(String),
         },

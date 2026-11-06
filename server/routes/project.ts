@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { telemetry } from '../telemetry.ts';
 /**
  * Project registration and removal, window folder bindings, and imports.
@@ -210,11 +211,16 @@ export function mount(app: express.Express): void {
   // response, owns cancellation for receipt-bearing clients.
   const imports = createProjectImportOperations<{ status: number; body: unknown }>();
   async function acquire(
-    input: { url: string; folderName: string; location?: string | undefined },
+    input: { url: string; folderName: string; location?: string | undefined; templateId?: string | undefined },
     signal: AbortSignal,
+    operationId: string,
   ) {
+    const record = telemetry.scoped();
     try {
       const result = await importPublicGitHubRepository({ ...input, signal });
+      // Acquisition is committed even if a later window handoff fails.
+      // Receipt recovery does not re-enter this operation. Reporting never waits for network.
+      if (input.templateId) record({ event: 'gallery_download_completed', template_id: input.templateId, operation_id: operationId });
       rememberCopyLocation(path.dirname(result.path));
       return { status: 200, body: result };
     } catch (err) {
@@ -243,8 +249,8 @@ export function mount(app: express.Express): void {
     if (!operationId) res.once('close', abort);
     try {
       const result = await (operationId
-        ? imports.start(currentWindowId(), operationId, JSON.stringify(input), (signal) => acquire(input, signal))
-        : acquire(input, controller.signal));
+        ? imports.start(currentWindowId(), operationId, JSON.stringify(input), (signal) => acquire(input, signal, operationId))
+        : acquire(input, controller.signal, randomUUID()));
       if (!res.destroyed) res.status(result.status).json(result.body);
     } catch {
       if (!res.destroyed) res.status(409).json({ error: 'That receipt belongs to another import request.' });
