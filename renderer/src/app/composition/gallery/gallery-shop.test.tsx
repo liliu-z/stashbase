@@ -129,6 +129,7 @@ describe('Gallery shop', () => {
         'Widget Handbook',
         '/home/person/Documents/StashBase',
         expect.anything(),
+        'widgets',
       ),
     );
     // The shop stays put for the next entry: a copy opens a window of its own.

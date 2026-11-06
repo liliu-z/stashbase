@@ -15,7 +15,7 @@ import { accountUsageId, usageState, usageIdentity, usagePayload, QUEUE_LIMIT,
 import { finishTelemetryTurn, recordTelemetryToolResult, type TurnObservation } from './telemetry-turns.ts';
 import destination from './telemetry-destination.json' with { type: 'json' };
 import { hostedUsageFetch } from './hosted-auth-transport.ts';
-import { usageBatchUrl } from '../shared/hosted-auth-network.ts';
+import { GALLERY_DOWNLOAD_API_URL, usageBatchUrl } from '../shared/hosted-auth-network.ts';
 import packageInfo from '../package.json' with { type: 'json' };
 import { resetWriteDiagnostics } from './write-diagnostic-lifecycle.ts';
 export type { TelemetryState } from './telemetry-state.ts';
@@ -154,19 +154,40 @@ export function createTelemetry(options: {
     if ('operation' in payload.properties) payload.properties.operation = diagnosticOperation(payload.properties.operation);
     return JSON.stringify(payload);
   };
-  const send = async (batch: string[], controller: AbortController): Promise<'delivered' | 'rejected' | 'transport_failed'> => {
+  const send = async (batch: string[], controller: AbortController, gallery = false): Promise<'delivered' | 'rejected' | 'transport_failed' | 'event_deferred'> => {
     const timeout = setTimeout(() => controller.abort(), DELIVERY_TIMEOUT);
     timeout.unref();
     try {
-      const response = await sendFetch(`${options.host.replace(/\/$/, '')}/batch/`, {
+      const response = await sendFetch(gallery ? GALLERY_DOWNLOAD_API_URL : `${options.host.replace(/\/$/, '')}/batch/`, {
         method: 'POST', redirect: 'error', signal: controller.signal,
         headers: { 'Content-Type': 'application/json' },
-        body: `{"api_key":${JSON.stringify(options.projectToken)},"historical_migration":false,"batch":[${batch.join(',')}]}`,
+        body: gallery ? batch[0] : `{"api_key":${JSON.stringify(options.projectToken)},"historical_migration":false,"batch":[${batch.join(',')}]}`,
       });
+      if (gallery && response.status === 503 && response.body) {
+        // Only an explicit per-template refusal may bypass the failed record.
+        // Generic outages still defer the destination, bounding failed requests.
+        const reader = response.body.getReader();
+        const chunks: Uint8Array[] = [];
+        let size = 0;
+        try {
+          for (;;) {
+            const part = await reader.read();
+            if (part.done) break;
+            size += part.value.byteLength;
+            if (size > 1024) return 'transport_failed';
+            chunks.push(part.value);
+          }
+          const error = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+          return error?.code === 'gallery_template_unavailable' ? 'event_deferred' : 'transport_failed';
+        } catch { return 'transport_failed'; }
+        finally { await reader.cancel().catch(() => {}); }
+      }
       await response.body?.cancel();
       // Retrying a refused payload cannot repair it. Network failures, timeouts,
       // rate limits and service failures retain the same UUID and timestamp.
       if (response.ok) return 'delivered';
+      // A desktop can arrive before the hosted counter deployment.
+      if (gallery && response.status === 404) return 'transport_failed';
       return response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429
         ? 'rejected' : 'transport_failed';
     } finally { clearTimeout(timeout); }
@@ -179,6 +200,8 @@ export function createTelemetry(options: {
   };
   const drain = async () => {
     const capturedGeneration = generation;
+    const deferred = new Set<boolean>();
+    const deferredEvents = new Set<string>();
     while (allowed() && capturedGeneration === generation) {
       const config = options.read();
       const state = usageState(config, now());
@@ -191,8 +214,16 @@ export function createTelemetry(options: {
       const uuids = new Set<string>();
       const batch: string[] = [];
       let bytes = 0;
-      for (const queued of state.queue) {
-        const body = outbound(queued);
+      const ready = state.queue.filter(item => !deferredEvents.has(item.uuid) && !deferred.has(item.event.event === 'gallery_download_completed'));
+      if (!ready.length) return;
+      const gallery = ready[0]!.event.event === 'gallery_download_completed';
+      for (const queued of ready) {
+        const download = queued.event.event === 'gallery_download_completed';
+        if (download !== gallery || (gallery && batch.length)) break;
+        // Public counters receive no analytics identity, paths or account metadata.
+        const body = queued.event.event === 'gallery_download_completed'
+          ? JSON.stringify({ templateId: queued.event.template_id, operationId: queued.event.operation_id })
+          : outbound(queued);
         if (batch.length && (batch.length >= (isolate ? 1 : BATCH_EVENTS) || bytes + body.length > BATCH_BYTES)) break;
         batch.push(body);
         uuids.add(queued.uuid);
@@ -201,7 +232,7 @@ export function createTelemetry(options: {
       const controller = new AbortController();
       pending = controller;
       let result: Awaited<ReturnType<typeof send>> = 'transport_failed';
-      try { result = await send(batch, controller); } catch { /* bounded retry below */ }
+      try { result = await send(batch, controller, gallery); } catch { /* bounded retry below */ }
       if (capturedGeneration !== generation || !allowed()) return;
       pending = null;
       // Nothing is dropped yet: resend the batch singly to find the refused events.
@@ -212,8 +243,8 @@ export function createTelemetry(options: {
         const latest = options.read();
         const current = usageState(latest, now());
         if (!current.enabled) return;
-        noteDelivery(current, result, now(), batch.length);
-        if (result !== 'transport_failed') current.queue = current.queue?.filter((item) => !uuids.has(item.uuid));
+        noteDelivery(current, result === 'event_deferred' ? 'transport_failed' : result, now(), batch.length);
+        if (result === 'delivered' || result === 'rejected') current.queue = current.queue?.filter((item) => !uuids.has(item.uuid));
         save(latest, current);
       } catch {
         // Collection was confirmed above; an acknowledgement that cannot be
@@ -222,7 +253,12 @@ export function createTelemetry(options: {
         schedule();
         return;
       }
-      if (result === 'transport_failed') { schedule(); return; }
+      if (result === 'event_deferred') {
+        for (const uuid of uuids) deferredEvents.add(uuid);
+        schedule();
+        continue;
+      }
+      if (result === 'transport_failed') { deferred.add(gallery); schedule(); continue; }
       if (isolate) isolate--;
       retryDelay = 1000;
     }

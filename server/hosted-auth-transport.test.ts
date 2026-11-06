@@ -204,3 +204,27 @@ test('desktop missing or failed relay never silently falls back to direct fetch'
     assert.equal(direct, 1);
   } finally { globalThis.fetch = oldFetch; }
 });
+
+test('Gallery reports use a fixed anonymous native destination and cannot carry account or file data', async t => {
+  const { GALLERY_DOWNLOAD_API_URL, GALLERY_DOWNLOAD_RELAY_PATH } = await import('../shared/hosted-auth-network.ts');
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+  const bridge = await createAuthNetworkBridge({ fetch: async (url, init) => {
+    calls.push({ url: String(url), init });
+    return Response.json({ ok: true });
+  } });
+  t.after(() => bridge.close());
+  const send = createHostedUsageFetch({ port: String(bridge.port), token: bridge.token, required: true });
+  const body = { templateId: 'resume-builder', operationId: '11111111-1111-4111-8111-111111111111' };
+  const response = await send(GALLERY_DOWNLOAD_API_URL, { method: 'POST', body: JSON.stringify(body) });
+  assert.equal(response.status, 200);
+  assert.equal(calls[0].url, GALLERY_DOWNLOAD_API_URL);
+  assert.equal(new Headers(calls[0].init?.headers).get('authorization'), null);
+  assert.equal(calls[0].init?.credentials, 'omit');
+  for (const extra of [{ path: '/private/project' }, { accessToken: 'secret' }, { url: 'https://other.test' }]) {
+    const result = await fetch(`http://127.0.0.1:${bridge.port}${GALLERY_DOWNLOAD_RELAY_PATH}`, {
+      method: 'POST', headers: { 'x-stashbase-auth-network-token': bridge.token }, body: JSON.stringify({ ...body, ...extra }),
+    });
+    assert.equal(result.status, 400);
+  }
+  assert.equal(calls.length, 1);
+});

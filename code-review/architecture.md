@@ -1033,7 +1033,9 @@ data migration is not required by [maintenance policy](../MAINTENANCE.md#previou
   native transport cannot fall back to direct Node fetch.
   Its separate usage route forwards analytics batches only to the ingestion URL
   derived from `server/telemetry-destination.json`; it refuses that route when the
-  destination is unset and never accepts a caller-supplied host.
+  destination is unset and never accepts a caller-supplied host. A separate
+  Gallery route accepts only template/operation IDs and posts to the fixed
+  hosted download counter without account headers.
   Email attempts carry host-owned flow IDs. Cancel, a new login, or sign-out
   retires older continuations; late issued sessions are revoked before they can
   replace the current account. Browser-link permissions contain no session token
@@ -1819,6 +1821,20 @@ Preparing, downloading, and opening GitHub remain explicit separate actions;
 artifact bytes, paths, logs, and internal identities never enter a GitHub URL.
 
 ### Gallery
+
+Gallery copy attribution carries the stable catalog ID through project entry and
+the import request. The import route records `gallery_download_completed` only
+after publication/registration succeeds, inside the receipt-owned operation.
+Window handoff is independent. The existing telemetry queue owns admission,
+privacy, expiry and retries; no second local durable queue is introduced.
+Download facts go to the fixed hosted `/v1/gallery/downloads` endpoint through
+the private native relay, with only template and operation IDs. They do not send
+analytics identities to the public counter. A failed destination does not block
+the other telemetry destination. A retryable `gallery_template_unavailable`
+response defers only that queued completion for the current drain; later
+templates continue. Generic outages still defer the destination. Hosted storage deduplicates operation IDs;
+GET returns only current catalog IDs and aggregate counts. UI display is not
+implemented in this change. Catalog and cover addresses remain unchanged.
 
 Node proxies a validated whole index and restricted screenshots; the renderer
 never contacts arbitrary catalog hosts. Screenshot URLs resolve against the

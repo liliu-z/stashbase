@@ -496,3 +496,39 @@ test('cancellation before membership commit removes the published copy without r
   assert.deepEqual(fs.readdirSync(home), []);
   assert.equal(getRecentFolders().some((folder) => folder.path === filesystemPath.absolute(path.join(home, 'cancel-commit'))), false);
 });
+
+test('Gallery completion is recorded after publication once per receipt; conflicts, cancellation and ordinary imports do not count', async t => {
+  const { telemetry } = await import('../telemetry.ts');
+  const { randomUUID } = await import('node:crypto');
+  const { deps, log, home } = fakeDeps({});
+  t.mock.method(productionGitHubImportDeps, 'fetch', deps.fetch);
+  t.mock.method(productionGitHubImportDeps, 'register', deps.register);
+  const recorded: unknown[] = [];
+  t.mock.method(telemetry, 'scoped', () => (event: unknown) => {
+    assert.ok(log.registered.length > 0, 'registration must precede counting');
+    recorded.push(event);
+  });
+  const app = express();
+  app.use(express.json());
+  mountProjectRoutes(app);
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise<void>(resolve => server.once('listening', resolve));
+  t.after(() => { server.closeAllConnections(); server.close(); });
+  const address = server.address();
+  assert.ok(address && typeof address === 'object');
+  const base = `http://127.0.0.1:${address.port}/api/github/import`;
+  const operationId = randomUUID();
+  const input = { operationId, templateId: 'resume-builder', url: 'https://github.com/owner/repo', folderName: 'Copy', location: home };
+  const post = (body: unknown) => fetch(base, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  assert.equal((await post(input)).status, 200);
+  assert.equal((await post(input)).status, 200);
+  assert.equal((await fetch(`${base}/${operationId}`)).status, 200);
+  assert.deepEqual(recorded, [{ event: 'gallery_download_completed', template_id: 'resume-builder', operation_id: operationId }]);
+  assert.equal((await post({ ...input, operationId: randomUUID() })).status, 409);
+  const cancelled = randomUUID();
+  await fetch(`${base}/${cancelled}`, { method: 'DELETE' });
+  assert.equal((await post({ ...input, operationId: cancelled, folderName: 'Cancelled' })).status, 499);
+  const { templateId: _templateId, ...ordinary } = input;
+  assert.equal((await post({ ...ordinary, operationId: randomUUID(), folderName: 'Ordinary' })).status, 200);
+  assert.equal(recorded.length, 1);
+});

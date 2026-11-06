@@ -2,8 +2,9 @@
 
 Packaged desktop builds and source runs (including `pnpm dev` and `pnpm start`)
 send product activity and detailed error diagnostics to
-PostHog by default. **Settings → General → Privacy → Share usage statistics**
-controls both. All features remain available when collection is off. Automated
+PostHog by default. Successful Gallery copies also send anonymous completion
+reports to StashBase's download counter (see [Gallery download counts](#gallery-download-counts)).
+**Settings → General → Privacy → Share usage statistics** controls all three. All features remain available when collection is off. Automated
 tests, explicitly suppressed runs and builds without a destination do not send. Website activity is outside
 this desktop collection.
 
@@ -656,3 +657,30 @@ CLI/shell writes, imports, exclusive creation, move/delete, external-file grants
 and refusals before these text-write entries remain gaps. Unstructured third-party
 errors retain `unknown` plus an uncorrelated status; no tool output is uploaded.
 The previously reported four Claude failures cannot be reconstructed retroactively.
+
+## Gallery download counts
+
+`gallery_download_completed` is a host-only fact: a Gallery copy's files have
+been published and its project registered. `template_id` is the stable catalog
+ID and `operation_id` is the import receipt UUID. Recovery of the same receipt
+never creates another completion. Window-entry failure does not undo a copy;
+opening that copy again does not count. Ordinary GitHub imports, failed copies,
+and cancellations before publication do not emit this event.
+
+The existing queue delivers these facts to StashBase's public download counter,
+not PostHog. Only the two IDs leave this delivery path: no account, installation,
+local directory, project name, document or conversation content. Collection,
+opt-out, test suppression, expiry and bounded retries follow the same rules as
+other usage statistics. Network outages at either destination do not block the
+other destination. The public API deduplicates retries by operation ID.
+A template absent from the current catalog remains queued for retry without
+blocking reports for other templates. A service-wide outage still backs off
+delivery to that destination.
+
+Totals measure received successful-copy reports, including source distributions
+unless explicitly suppressed. They exclude older clients and disabled collection;
+queue refusal, expiry, a crash before capture, and templates withdrawn before
+queued delivery can also leave gaps. Reports are anonymous client assertions,
+not independently attested downloads, people or subsequent template usage.
+The public count endpoint is available for later Gallery/website display; this
+change does not add a card badge or modify the static catalog publication.

@@ -268,7 +268,14 @@ and Browse personas only personas, so personas never read as template projects.
 
 ### Required Results
 
-Browsing requires no project/account. Project entries show one cover and an
+Browsing requires no project/account. A Gallery download counts once when a new
+local copy is successfully published and registered, before window entry. Retry,
+cancellation before publication, failed acquisition, opening an existing folder,
+and ordinary GitHub imports do not count. Another completed copy counts again.
+Reporting follows the usage-statistics preference and never blocks acquisition;
+public totals describe received completions, not unique users or subsequent use.
+An unlisted template's pending report must not block reports for other templates.
+Project entries show one cover and an
 introduction, without a generating prompt or thumbnail strip. Make a copy asks for
 the folder name and location before downloading and never shows the repository URL. Use the current catalog
 entry and shared project-entry rules; a withdrawn

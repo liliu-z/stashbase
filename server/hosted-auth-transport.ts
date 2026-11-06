@@ -2,7 +2,7 @@ import http from 'node:http';
 import {
   AUTH_PATHS, AUTH_REQUEST_LIMIT, AUTH_RESPONSE_LIMIT, AUTH_TIMEOUT_MS,
   AUTH_BASE_URL, USAGE_RELAY_PATH, USAGE_REQUEST_LIMIT, authMethod, authNetworkError,
-  ALLOWANCE_RELAY_PATH, ALLOWANCE_API_URL,
+  ALLOWANCE_RELAY_PATH, ALLOWANCE_API_URL, GALLERY_DOWNLOAD_RELAY_PATH, GALLERY_DOWNLOAD_API_URL,
 } from '../shared/hosted-auth-network.ts';
 
 type NativeBridge = { port?: string | undefined; token?: string | undefined; required: boolean };
@@ -95,7 +95,7 @@ export function createHostedUsageFetch(bridge: NativeBridge): typeof fetch {
     if (!relayAvailable(bridge)) return fetch(url, init);
     const body = typeof init?.body === 'string' ? init.body : '';
     if (Buffer.byteLength(body) > USAGE_REQUEST_LIMIT) throw { code: 'USAGE_REQUEST_TOO_LARGE' };
-    return relay(bridge, USAGE_RELAY_PATH, body, init?.signal ?? AbortSignal.timeout(AUTH_TIMEOUT_MS + 1000));
+    return relay(bridge, String(url) === GALLERY_DOWNLOAD_API_URL ? GALLERY_DOWNLOAD_RELAY_PATH : USAGE_RELAY_PATH, body, init?.signal ?? AbortSignal.timeout(AUTH_TIMEOUT_MS + 1000));
   }) as typeof fetch;
 }
 

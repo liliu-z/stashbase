@@ -88,7 +88,13 @@ export interface GitHubImportPort {
    *  would refuse the URL. */
   readUrl(raw: string): { folderName: string; ok: true } | { message: string; ok: false };
   /** Resolves the published folder path, created inside `location`. */
-  run(url: string, folderName: string, location: string, signal: AbortSignal): Promise<string>;
+  run(
+    url: string,
+    folderName: string,
+    location: string,
+    signal: AbortSignal,
+    templateId?: string,
+  ): Promise<string>;
 }
 
 export interface FilesPort {

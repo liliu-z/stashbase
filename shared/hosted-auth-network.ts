@@ -15,6 +15,8 @@ export const AUTH_PATHS = new Set([
 /** Usage delivery shares the relay so analytics follow the system proxy too.
  * The relay owns the fixed ingestion destination; callers supply only a batch. */
 export const USAGE_RELAY_PATH = '/usage';
+export const GALLERY_DOWNLOAD_RELAY_PATH = '/gallery-download';
+export const GALLERY_DOWNLOAD_API_URL = 'https://api.stashbase.ai/v1/gallery/downloads';
 export const USAGE_REQUEST_LIMIT = 4 * 1024 * 1024;
 
 export function usageBatchUrl(destination: { projectToken: string; host: string }): string | undefined {
