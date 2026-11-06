@@ -30,6 +30,12 @@ const choice = async (group: string, name: string) =>
     },
   );
 
+/** The installed-font list's rows, by name, in order. */
+const optionNames = async () =>
+  within(await screen.findByRole('listbox', { name: 'Document font' }))
+    .getAllByRole('option')
+    .map((row) => row.getAttribute('aria-label'));
+
 describe('AppearanceMenu', () => {
   it('saves only the reading font and applies it at once', async () => {
     const port = appearancePort();
@@ -39,10 +45,7 @@ describe('AppearanceMenu', () => {
     await user.click(await choice('Font', 'Sans'));
 
     await waitFor(() =>
-      expect(port.update).toHaveBeenCalledWith(
-        { readingFont: 'sans', writingFont: null },
-        expect.any(AbortSignal),
-      ),
+      expect(port.update).toHaveBeenCalledWith({ readingFont: 'sans' }, expect.any(AbortSignal)),
     );
     expect(document.documentElement.dataset.readingFont).toBe('sans');
     expect((await choice('Font', 'Sans')).checked).toBe(true);
@@ -62,6 +65,57 @@ describe('AppearanceMenu', () => {
       expect(port.update).toHaveBeenCalledWith({ readingTextSize: 4 }, expect.any(AbortSignal)),
     );
     expect(document.documentElement.dataset.readingTextSize).toBe('4');
+  });
+
+  it('opens the installed fonts from the custom font and keeps its family beside Serif and Sans', async () => {
+    const port = appearancePort();
+    withQueryClient(
+      <AppearanceMenu
+        appearanceApi={port}
+        systemTextApi={{
+          listFonts: async () => [
+            { family: 'Bradley Hand', monospace: false },
+            { family: 'Hannotate SC', monospace: false },
+          ],
+          spellcheckLanguages: async () => [],
+        }}
+      />,
+    );
+    const user = await open();
+
+    // The list holds installed fonts only; Serif and Sans stand beside it.
+    await user.click(await screen.findByRole('button', { name: 'Custom font' }));
+    expect(await optionNames()).toEqual(['Bradley Hand', 'Hannotate SC']);
+    await user.click(screen.getByRole('option', { name: 'Hannotate SC' }));
+    await waitFor(() =>
+      expect(port.update).toHaveBeenCalledWith(
+        { readingFont: 'custom', writingFont: 'Hannotate SC' },
+        expect.any(AbortSignal),
+      ),
+    );
+    expect(
+      await screen.findByRole('button', { name: 'Custom font: Hannotate SC, in use' }),
+    ).toBeDefined();
+    await waitFor(() =>
+      expect(screen.queryByRole('listbox', { name: 'Document font' })).toBeNull(),
+    );
+
+    // Serif is chosen in place and leaves the family on its tile.
+    await user.click(await choice('Font', 'Serif'));
+    await waitFor(() =>
+      expect(port.update).toHaveBeenCalledWith({ readingFont: 'serif' }, expect.any(AbortSignal)),
+    );
+    await user.click(await screen.findByRole('button', { name: 'Custom font: Hannotate SC' }));
+
+    // Reopened, the list leads with that family, so going back is one click.
+    expect(await optionNames()).toEqual(['Hannotate SC', 'Bradley Hand']);
+    await user.click(screen.getByRole('option', { name: 'Hannotate SC' }));
+    await waitFor(() =>
+      expect(port.update).toHaveBeenLastCalledWith(
+        { readingFont: 'custom', writingFont: 'Hannotate SC' },
+        expect.any(AbortSignal),
+      ),
+    );
   });
 
   it('chooses a page colour as its light and dark pair', async () => {

@@ -11,8 +11,9 @@ const appearanceScaleSchema = z.enum(['small', 'default', 'large']);
 export const READING_TEXT_SIZE_STEPS = 7;
 const readingTextSizeSchema = z.number().int().min(1).max(READING_TEXT_SIZE_STEPS);
 
-/** The two reading fonts StashBase ships for Markdown prose. */
-const readingFontSchema = z.enum(['serif', 'sans']);
+/** Which font sets Markdown prose: one of the two StashBase ships, or the
+ *  custom font the reader chose from those installed (`writingFont`). */
+const readingFontSchema = z.enum(['serif', 'sans', 'custom']);
 
 /** A font family the reader chose from the fonts installed on their system.
  *  It is the one free-form appearance value, and it ends up inside a CSS
@@ -41,8 +42,10 @@ export const appearancePreferencesSchema = z
     uiScale: appearanceScaleSchema,
     readingTextSize: readingTextSizeSchema,
     readingFont: readingFontSchema,
-    /** An installed font that overrides the reading font; null keeps the
-     *  preset. The code font's null is the bundled Geist Mono. */
+    /** The installed family the custom font holds. It sets the prose only
+     *  while `readingFont` is `custom`, and stays chosen when the reader
+     *  switches to Serif or Sans and back. The code font's null is the
+     *  bundled Geist Mono. */
     writingFont: fontFamilySchema.nullable(),
     codeFont: fontFamilySchema.nullable(),
     lineSpacing: z.enum(['compact', 'default', 'relaxed']),
@@ -104,6 +107,10 @@ export function normalizeAppearancePreferences(value: unknown): AppearancePrefer
   for (const key of Object.keys(fields) as (keyof AppearancePreferencesWire)[]) {
     const parsed = fields[key].safeParse(raw[key]);
     resolved[key] = parsed.success ? parsed.data : DEFAULT_APPEARANCE_PREFERENCES[key];
+  }
+  // The custom font with no family to show would draw nothing of its own.
+  if (resolved.readingFont === 'custom' && resolved.writingFont === null) {
+    resolved.readingFont = DEFAULT_APPEARANCE_PREFERENCES.readingFont;
   }
   return appearancePreferencesSchema.parse(resolved);
 }

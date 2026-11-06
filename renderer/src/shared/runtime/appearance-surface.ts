@@ -46,7 +46,12 @@ export function applyAppearanceSurface(surface: AppearanceSurface): void {
   root.classList.toggle('dark', surface.theme === 'dark');
   stampTokens(root, 'light', lightThemeTokens(surface.lightTheme));
   stampTokens(root, 'dark', darkThemeTokens(surface.darkTheme));
-  stampFont(root, '--writing-font', surface.writingFont, 'var(--font-sans)');
+  stampFont(
+    root,
+    '--writing-font',
+    surface.readingFont === 'custom' ? surface.writingFont : null,
+    'var(--font-sans)',
+  );
   stampFont(root, '--code-font', surface.codeFont, 'var(--font-mono)');
   root.dataset.uiScale = surface.uiScale;
   root.dataset.readingTextSize = String(surface.readingTextSize);

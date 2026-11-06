@@ -65,27 +65,28 @@ const SCALE_CHOICES = [
   { label: 'Large', value: 'large' },
 ] as const;
 
-type ReadingFont = AppearancePreferences['readingFont'];
+/** A font StashBase ships, as opposed to the reader's custom one. */
+type IncludedReadingFont = Exclude<AppearancePreferences['readingFont'], 'custom'>;
 
 /** The two reading fonts StashBase ships, shared by the Settings font picker
  *  and the document's own reading menu so both use the same names. */
 export const READING_FONT_CHOICES: readonly {
   readonly fontFamily: string;
   readonly label: string;
-  readonly value: ReadingFont;
+  readonly value: IncludedReadingFont;
 }[] = [
   { fontFamily: 'var(--font-reading-serif)', label: 'Serif', value: 'serif' },
   { fontFamily: 'var(--font-reading-sans)', label: 'Sans', value: 'sans' },
 ];
 
-export function isReadingFont(value: string): value is ReadingFont {
+export function isIncludedReadingFont(value: string): value is IncludedReadingFont {
   return READING_FONT_CHOICES.some((choice) => choice.value === value);
 }
 
-/** Choosing an included reading font retires an installed writing font, or
- *  the choice would not show. */
-export function readingFontChange(readingFont: ReadingFont): AppearanceChange {
-  return { readingFont, writingFont: null };
+/** Choosing an installed family fills the custom font and puts it in use;
+ *  Serif or Sans leave that family chosen for the next switch back. */
+export function customFontChange(family: string): AppearanceChange {
+  return { readingFont: 'custom', writingFont: family };
 }
 
 /** Every segmented row, and the only list of their labels, so a panel holds

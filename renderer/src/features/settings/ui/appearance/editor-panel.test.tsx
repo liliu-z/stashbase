@@ -76,19 +76,16 @@ describe('EditorPanel', () => {
     await user.click(within(writing).getByRole('option', { name: 'Literata' }));
     await waitFor(() =>
       expect(port.update).toHaveBeenCalledWith(
-        { writingFont: 'Literata' },
+        { readingFont: 'custom', writingFont: 'Literata' },
         expect.any(AbortSignal),
       ),
     );
 
-    // An included font retires the installed one, or it would not show.
+    // An included font puts the installed one aside without forgetting it.
     await user.click(await screen.findByRole('button', { name: 'Document font: Literata' }));
     await user.click(await screen.findByRole('option', { name: 'Sans, Included' }));
     await waitFor(() =>
-      expect(port.update).toHaveBeenCalledWith(
-        { readingFont: 'sans', writingFont: null },
-        expect.any(AbortSignal),
-      ),
+      expect(port.update).toHaveBeenCalledWith({ readingFont: 'sans' }, expect.any(AbortSignal)),
     );
 
     await user.click(screen.getByRole('button', { name: 'Code font: Geist Mono' }));
@@ -104,7 +101,11 @@ describe('EditorPanel', () => {
     withQueryClient(
       <EditorPanel
         appearanceApi={appearancePort({
-          load: async () => ({ ...appearanceSurface(), writingFont: 'Gone Serif' }),
+          load: async () => ({
+            ...appearanceSurface(),
+            readingFont: 'custom',
+            writingFont: 'Gone Serif',
+          }),
         })}
         systemTextApi={systemText(async () => [{ family: 'Literata', monospace: false }])}
       />,

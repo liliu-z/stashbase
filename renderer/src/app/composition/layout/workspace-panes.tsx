@@ -205,7 +205,10 @@ export function WorkspacePanes({
                     )
                   }
                   renderReadingControl={() => (
-                    <AppearanceMenu appearanceApi={dependencies.settings.appearanceApi} />
+                    <AppearanceMenu
+                      appearanceApi={dependencies.settings.appearanceApi}
+                      systemTextApi={dependencies.settings.systemTextApi}
+                    />
                   )}
                   revealLabel={dependencies.workspace.revealLabel}
                   runtime={documents}

@@ -1,14 +1,15 @@
 /**
  * A font choice from the fonts on this computer: a trigger that names the
- * current family, and a popover with a search field and the families to
+ * current family (or a caller's element it hangs from instead), and a
+ * popover with a search field and the families to
  * choose from, each with a sample drawn in its own face. The fonts StashBase
  * ships come first, so a choice that looks the same on every computer is
- * always at hand; a chosen family that has since been uninstalled is kept and
- * marked.
+ * always at hand, then the chosen family, so reopening the list lands on it;
+ * one that has since been uninstalled is kept and marked.
  */
 import { Popover } from '@base-ui/react/popover';
 import { ChevronDown } from 'lucide-react';
-import { useId, useMemo, useRef, useState } from 'react';
+import { useId, useMemo, useRef, useState, type RefObject } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { CommandItem, CommandList } from '@/components/ui/command-menu';
@@ -38,10 +39,20 @@ export interface FontPickerProps {
   readonly label: string;
   /** Only monospaced families, for the code font. */
   readonly monospaceOnly?: boolean;
+  /** Opened and closed by the caller and hung from its element, in place of
+   *  the select that names the current family: the reading menu's custom
+   *  font tile. */
+  readonly control?: FontPickerControl;
   /** The installed family chosen, or null for the included font. */
   readonly value: string | null;
   onChooseIncluded(value: string): void;
   onChooseInstalled(family: string): void;
+}
+
+export interface FontPickerControl {
+  readonly anchor: RefObject<Element | null>;
+  readonly open: boolean;
+  onOpenChange(open: boolean): void;
 }
 
 export function FontPicker({
@@ -53,12 +64,15 @@ export function FontPicker({
   label,
   monospaceOnly = false,
   onChooseIncluded,
+  control,
   onChooseInstalled,
   value,
 }: FontPickerProps) {
   const listId = useId();
   const searchField = useRef<HTMLInputElement>(null);
-  const [open, setOpen] = useState(false);
+  const [ownOpen, setOwnOpen] = useState(false);
+  const open = control?.open ?? ownOpen;
+  const setOpen = control?.onOpenChange ?? setOwnOpen;
   const [query, setQuery] = useState('');
 
   const current =
@@ -74,12 +88,13 @@ export function FontPicker({
     const matches = (family: string) => needle === '' || family.toLowerCase().includes(needle);
     const all: FontRow[] = [
       ...included.map((font) => ({ font, kind: 'included' as const, note: 'Included' })),
-      ...(missing && value
-        ? [{ family: value, kind: 'installed' as const, note: 'Not installed' }]
+      ...(value
+        ? [{ family: value, kind: 'installed' as const, note: missing ? 'Not installed' : null }]
         : []),
       ...(installed ?? [])
         .filter((font) => !monospaceOnly || font.monospace)
         .filter((font) => !included.some((own) => own.label === font.family))
+        .filter((font) => font.family !== value)
         .map((font) => ({ family: font.family, kind: 'installed' as const, note: null })),
     ];
     return all.filter((row) => matches(rowName(row))).slice(0, ROW_LIMIT);
@@ -109,28 +124,36 @@ export function FontPicker({
       }}
       open={open}
     >
-      <Popover.Trigger
-        disabled={disabled}
-        render={
-          <Button
-            aria-label={`${label}: ${current}${missing ? ' (not installed)' : ''}`}
-            className={cn(
-              'w-56',
-              // The label's wrapper and the label fill the trigger, so the
-              // chevron sits at its right edge as a select's does, and a long
-              // name ends in an ellipsis. Truncation clips, so the label drops
-              // the primitive's cap trim, which would cut off descenders.
-              '[&>span:last-child]:flex-1 [&>span:last-child>span]:flex-1 [&>span:last-child>span]:truncate [&>span:last-child>span]:text-left [&>span:last-child>span]:[text-box:normal]',
-            )}
-            size="compact"
-            trailingIcon={ChevronDown}
-            variant="tertiary"
-          />
-        }
+      {control ? null : (
+        <Popover.Trigger
+          disabled={disabled}
+          render={
+            <Button
+              aria-label={`${label}: ${current}${missing ? ' (not installed)' : ''}`}
+              className={cn(
+                'w-56',
+                // The label's wrapper and the label fill the trigger, so the
+                // chevron sits at its right edge as a select's does, and a long
+                // name ends in an ellipsis. Truncation clips, so the label drops
+                // the primitive's cap trim, which would cut off descenders.
+                '[&>span:last-child]:flex-1 [&>span:last-child>span]:flex-1 [&>span:last-child>span]:truncate [&>span:last-child>span]:text-left [&>span:last-child>span]:[text-box:normal]',
+              )}
+              size="compact"
+              trailingIcon={ChevronDown}
+              variant="tertiary"
+            />
+          }
+        >
+          {current}
+        </Popover.Trigger>
+      )}
+      {/* Settings' select ends its row, so the list hangs back from its end;
+          the menu's tile is the row's last, so the list hangs on from it. */}
+      <SearchPopup
+        align={control ? 'start' : 'end'}
+        {...(control ? { anchor: control.anchor } : {})}
+        label={label}
       >
-        {current}
-      </Popover.Trigger>
-      <SearchPopup label={label}>
         <SearchField
           activeIndex={activeIndex}
           field={searchField}

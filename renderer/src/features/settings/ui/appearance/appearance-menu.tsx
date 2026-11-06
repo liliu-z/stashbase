@@ -1,32 +1,42 @@
 /** The document's appearance panel, offered on the page the way an e-reader
- *  offers its type panel: the reading font, each set in its own face; the
- *  text size on a slider; the page colour, each a light and a dark theme that
- *  follow the system together; the page texture; then line width and line
- *  spacing. All are the app-wide Appearance preferences, edited through the
- *  same optimistic write as their Settings rows, so the two can never
- *  disagree. The panel stays open while the reader tries choices; a refused
- *  save rolls the choice back and names the failure inside it. The trigger is
- *  a glyph alone, named by its tooltip, so the bar stays quiet over the page. */
+ *  offers its type panel: the reading font, each set in its own face, and a
+ *  custom one from the computer's own fonts; the text size on a slider; the
+ *  page colour, each a light and a dark theme that follow the system
+ *  together; the page texture; then line width and line spacing. All are the
+ *  app-wide Appearance preferences, edited through the same optimistic write
+ *  as their Settings rows, so the two can never disagree. The panel stays
+ *  open while the reader tries choices; a refused save rolls the choice back
+ *  and names the failure inside it. The trigger is a glyph alone, named by
+ *  its tooltip, so the bar stays quiet over the page. */
 import { Popover } from '@base-ui/react/popover';
-import { useId, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
+import { ChevronDown, Plus } from 'lucide-react';
+import {
+  useId,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Elevated } from '@/components/ui/elevated';
 import { Tooltip } from '@/components/ui/tooltip';
-import type { AppearancePort } from '@/features/settings/application/ports';
+import type { AppearancePort, SystemTextPort } from '@/features/settings/application/ports';
 import {
   PAGE_COLORS,
   pageColorSwatch,
   PRESET_ROWS,
   presetChange,
   READING_FONT_CHOICES,
-  readingFontChange,
   textureSwatch,
   type AppearancePreferences,
   type PresetRow,
   type SwatchSide,
 } from '@/features/settings/domain/appearance';
 import { useAppearance, type AppearanceViewModel } from '@/features/settings/hooks/use-appearance';
+import { useSystemText } from '@/features/settings/hooks/use-system-text';
+import { DocumentFontPicker } from '@/features/settings/ui/appearance/document-font-picker';
 import { PresetChoice } from '@/features/settings/ui/appearance/preset-choice';
 import { ReadingSizeSlider } from '@/features/settings/ui/appearance/reading-size-slider';
 import { useShape } from '@/lib/shape-context';
@@ -64,9 +74,20 @@ function Section({ children, title }: { children: ReactNode; title: string }) {
   );
 }
 
+/** The frame every large sample shares, a choice or the empty custom font:
+ *  the chosen one wears an ink ring. */
+function sampleFrame(shapeBg: string, checked: boolean, disabled: boolean) {
+  return cn(
+    shapeBg,
+    'flex min-w-0 flex-1 flex-col items-center gap-1.5 px-1 pt-2 pb-1.5 text-caption transition-colors duration-fast has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[color:var(--focus-ring)]',
+    checked ? 'text-foreground ring-1 ring-foreground/70' : 'text-muted-foreground',
+    disabled ? 'cursor-default opacity-60' : 'cursor-pointer hover:bg-hover',
+  );
+}
+
 /** One choice in a row of large samples: a font or a page colour. Native
  *  radios, as in the segmented picker, give the group its arrow keys and
- *  single tab stop; the chosen sample wears an ink ring. */
+ *  single tab stop. */
 function SampleChoice({
   children,
   checked,
@@ -84,14 +105,7 @@ function SampleChoice({
 }) {
   const shape = useShape();
   return (
-    <label
-      className={cn(
-        shape.bg,
-        'flex min-w-0 flex-1 flex-col items-center gap-1.5 px-1 pt-2 pb-1.5 text-caption transition-colors duration-fast has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[color:var(--focus-ring)]',
-        checked ? 'text-foreground ring-1 ring-foreground/70' : 'text-muted-foreground',
-        disabled ? 'cursor-default opacity-60' : 'cursor-pointer hover:bg-hover',
-      )}
-    >
+    <label className={sampleFrame(shape.bg, checked, disabled)}>
       <input
         checked={checked}
         className="sr-only"
@@ -107,48 +121,112 @@ function SampleChoice({
   );
 }
 
-function FontChoices({ appearance }: { appearance: AppearanceViewModel }) {
+const sampleText = 'text-ui-26 leading-none';
+
+/** The custom font: a family from those installed on this computer, a
+ *  handwriting face among them, as the row's third sample. Serif and Sans are
+ *  chosen where they stand; this one always opens the list, which its
+ *  chevron says, with its family first so going back to it is one more
+ *  click. It wears the ring while in use and keeps its family while Serif or
+ *  Sans is. Outside the desktop app there is nothing installed to list, so
+ *  it is not offered. */
+function CustomFont({
+  appearance,
+  systemTextApi,
+}: {
+  appearance: AppearanceViewModel;
+  systemTextApi: SystemTextPort;
+}) {
+  const shape = useShape();
+  const anchor = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  const system = useSystemText(systemTextApi);
+  const preferences = appearance.preferences;
+  const family = preferences?.writingFont ?? null;
+  const inUse = preferences?.readingFont === 'custom';
+  const tile = (
+    <button
+      aria-expanded={open}
+      aria-haspopup="dialog"
+      aria-label={family ? `Custom font: ${family}${inUse ? ', in use' : ''}` : 'Custom font'}
+      className={sampleFrame(shape.bg, inUse, preferences === null)}
+      disabled={preferences === null}
+      onClick={() => setOpen(true)}
+      ref={anchor}
+      type="button"
+    >
+      {family ? (
+        <span
+          aria-hidden
+          className={sampleText}
+          style={{ fontFamily: `"${family}", var(--font-sans)` }}
+        >
+          Aa
+        </span>
+      ) : (
+        <Plus aria-hidden className="size-6.5" strokeWidth={1.5} />
+      )}
+      <span className="flex max-w-full items-center gap-0.5">
+        <span className="truncate">{family ?? 'Custom'}</span>
+        <ChevronDown aria-hidden className="size-3 shrink-0" />
+      </span>
+    </button>
+  );
+  return (
+    <>
+      {/* A long family truncates on the tile; the tooltip names it whole. */}
+      {family ? (
+        <Tooltip content={family} side="top">
+          {tile}
+        </Tooltip>
+      ) : (
+        tile
+      )}
+      {/* The list is the tile's sibling, never its child: React carries a
+          click in the portaled list up its own tree, and through the tile it
+          would reopen the list it just closed. */}
+      <DocumentFontPicker
+        appearance={appearance}
+        control={{ anchor, onOpenChange: setOpen, open }}
+        system={system}
+      />
+    </>
+  );
+}
+
+function FontChoices({
+  appearance,
+  systemTextApi,
+}: {
+  appearance: AppearanceViewModel;
+  systemTextApi: SystemTextPort | undefined;
+}) {
   const name = useId();
   const preferences = appearance.preferences;
-  // An installed writing font, chosen in Settings, stands in for either preset
-  // until an included font is chosen here again.
-  const installed = preferences?.writingFont ?? null;
+  // The custom font opens a list rather than being chosen in place, so it
+  // stands beside the radio group rather than in it.
   return (
-    <div aria-label="Font" className="flex gap-1.5" role="radiogroup">
-      {READING_FONT_CHOICES.map((choice) => (
-        <SampleChoice
-          checked={installed === null && preferences?.readingFont === choice.value}
-          disabled={preferences === null}
-          key={choice.value}
-          label={choice.label}
-          name={name}
-          onChoose={() => appearance.change(readingFontChange(choice.value))}
-        >
-          <span
-            aria-hidden
-            className="text-ui-26 leading-none"
-            style={{ fontFamily: choice.fontFamily }}
+    <div className="flex gap-1.5">
+      <div aria-label="Font" className="flex min-w-0 flex-[2] gap-1.5" role="radiogroup">
+        {READING_FONT_CHOICES.map((choice) => (
+          <SampleChoice
+            checked={preferences?.readingFont === choice.value}
+            disabled={preferences === null}
+            key={choice.value}
+            label={choice.label}
+            name={name}
+            onChoose={() => appearance.change({ readingFont: choice.value })}
           >
-            Aa
-          </span>
-        </SampleChoice>
-      ))}
-      {installed !== null && (
-        <SampleChoice
-          checked
-          disabled={false}
-          label={installed}
-          name={name}
-          onChoose={() => undefined}
-        >
-          <span
-            aria-hidden
-            className="text-ui-26 leading-none"
-            style={{ fontFamily: `"${installed}"` }}
-          >
-            Aa
-          </span>
-        </SampleChoice>
+            <span aria-hidden className={sampleText} style={{ fontFamily: choice.fontFamily }}>
+              Aa
+            </span>
+          </SampleChoice>
+        ))}
+      </div>
+      {systemTextApi && (
+        <div className="flex min-w-0 flex-1">
+          <CustomFont appearance={appearance} systemTextApi={systemTextApi} />
+        </div>
       )}
     </div>
   );
@@ -288,7 +366,13 @@ function TextureChoices({ appearance }: { appearance: AppearanceViewModel }) {
   );
 }
 
-export function AppearanceMenu({ appearanceApi }: { appearanceApi: AppearancePort }) {
+export function AppearanceMenu({
+  appearanceApi,
+  systemTextApi,
+}: {
+  appearanceApi: AppearancePort;
+  systemTextApi?: SystemTextPort | undefined;
+}) {
   const appearance = useAppearance(appearanceApi);
   const shape = useShape();
   const preferences = appearance.preferences;
@@ -325,7 +409,7 @@ export function AppearanceMenu({ appearanceApi }: { appearanceApi: AppearancePor
           >
             <SizeProvider size="compact">
               <Section title="Font">
-                <FontChoices appearance={appearance} />
+                <FontChoices appearance={appearance} systemTextApi={systemTextApi} />
               </Section>
               <Section title="Text size">
                 <ReadingSizeSlider appearance={appearance} />

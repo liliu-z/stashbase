@@ -714,8 +714,9 @@ Host/services: `electron/main.cjs`, `server/folder.ts`.
   escape CSS; `electron/text-services/text-services.test.cjs` covers font listing,
   capability refusal, and the spelling menu; `appearance-panel.test.tsx`, `editor-panel.test.tsx`, and
   `writing-aids.test.ts` cover the Settings rows, font picker, word count, and
-  focus-mode marking. `appearance-menu.test.tsx` covers the page texture write
-  and the note that grain shows only on light pages. The painted textures are
+  focus-mode marking. `appearance-menu.test.tsx` covers the page texture write,
+  the note that grain shows only on light pages, and filling, keeping and
+  reopening the menu's custom font. The painted textures are
   stylesheet-only (`markdown/document.css`); an isolated built Electron pass
   (2026-11-06) captured None, Dots and Grain on White and Paper in light and
   dark. **Gap:** font enumeration on macOS and Windows and native

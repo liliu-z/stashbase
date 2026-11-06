@@ -78,11 +78,14 @@ describe('theme and font overrides', () => {
   });
 
   it('carries a chosen font with the bundled stack behind it', () => {
-    applyAppearanceSurface(surface({ codeFont: 'JetBrains Mono', writingFont: 'Literata' }));
+    applyAppearanceSurface(
+      surface({ codeFont: 'JetBrains Mono', readingFont: 'custom', writingFont: 'Literata' }),
+    );
     expect(root().style.getPropertyValue('--writing-font')).toBe('"Literata", var(--font-sans)');
     expect(root().style.getPropertyValue('--code-font')).toBe('"JetBrains Mono", var(--font-mono)');
 
-    applyAppearanceSurface(surface());
+    // A custom family kept aside while Serif is in use does not write.
+    applyAppearanceSurface(surface({ readingFont: 'serif', writingFont: 'Literata' }));
     expect(root().style.getPropertyValue('--writing-font')).toBe('');
   });
 

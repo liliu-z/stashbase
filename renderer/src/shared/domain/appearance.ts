@@ -12,9 +12,10 @@ export interface AppearanceSurface {
   readonly uiScale: Scale;
   /** A step from 1 to 7; 3 is the reading font's own size. */
   readonly readingTextSize: number;
-  /** The included reading font; an installed `writingFont` overrides it. */
-  readonly readingFont: 'serif' | 'sans';
-  /** Null keeps the reading font above for writing and Geist Mono for code. */
+  /** Serif or Sans, which StashBase ships, or the custom `writingFont`. */
+  readonly readingFont: 'serif' | 'sans' | 'custom';
+  /** The custom font's installed family, kept while another font is in
+   *  use; null until the reader chooses one. */
   readonly writingFont: string | null;
   readonly codeFont: string | null;
   readonly lineSpacing: 'compact' | 'default' | 'relaxed';

@@ -50,18 +50,19 @@ platform capabilities stay named and disabled in navigation.
     code font, from the bundled monospace or installed monospaced fonts; and
     reading text size (a slider of seven steps), line spacing, line width, and
     page texture (none, dots, or grain).
-    The document's Appearance menu edits the same font, text size, page
-    texture, line width and line spacing, and offers the page colour as a
-    pair: choosing White, Paper or Green sets the light and the dark theme
-    together, beside the mode.
+    The document's Appearance menu edits the same font (its custom font
+    opens the same installed-font list), text size, page texture, line width
+    and line spacing, and offers the page colour as a pair: choosing White,
+    Paper or Green sets the light and the dark theme together, beside the
+    mode.
   - **Writing:** what helps while writing: spellcheck and its language (where
     the system offers a choice), focus mode, typewriter scrolling, and word
     count.
 
   Every appearance value is a preset or a step except the two font names, which are
-  validated as names before they are stored. An installed writing font
-  overrides the Serif/Sans preset and keeps that preset's size steps and
-  measure; choosing Serif or Sans again clears it. A chosen font that is later
+  validated as names before they are stored. An installed font becomes the
+  custom font, which takes Sans's size steps and measure; choosing Serif or
+  Sans puts it aside, still chosen, for switching back. A chosen font that is later
   uninstalled stays selected, is marked as not installed, and falls back to
   the included default. The installed-font list never leaves the device.
   Custom colors, custom CSS, imported editor themes, and per-project

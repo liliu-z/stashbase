@@ -5,11 +5,8 @@ import {
   appearanceChange,
   EDITOR_TOGGLES,
   INCLUDED_CODE_FONTS,
-  isReadingFont,
   PRESET_ROWS,
-  READING_FONT_CHOICES,
   READING_TEXT_SIZE_DETAIL,
-  readingFontChange,
   spellcheckLanguageLabel,
 } from '@/features/settings/domain/appearance';
 import { useAppearance } from '@/features/settings/hooks/use-appearance';
@@ -23,6 +20,7 @@ import {
 import { FailureNotice } from '@/shared/ui/failure-notice';
 
 import { ChoiceSelect } from './choice-select';
+import { DocumentFontPicker } from './document-font-picker';
 import { FontPicker } from './font-picker';
 import { PresetRowView } from './preset-row-view';
 import { ReadingSizeSlider } from './reading-size-slider';
@@ -56,23 +54,7 @@ export function EditorPanel({
           <SettingsRow
             detail="The typeface for your documents."
             title="Font"
-            trail={
-              <FontPicker
-                disabled={loading}
-                included={READING_FONT_CHOICES}
-                includedValue={preferences?.readingFont ?? null}
-                installed={system.fonts}
-                installedFailure={system.fontsFailure?.message ?? null}
-                label="Document font"
-                onChooseIncluded={(value) => {
-                  if (isReadingFont(value)) appearance.change(readingFontChange(value));
-                }}
-                onChooseInstalled={(family) =>
-                  appearance.change(appearanceChange('writingFont', family))
-                }
-                value={preferences?.writingFont ?? null}
-              />
-            }
+            trail={<DocumentFontPicker appearance={appearance} system={system} />}
           />
           <SettingsRow
             detail="The typeface for code blocks and inline code."

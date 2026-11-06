@@ -13,6 +13,7 @@ import {
   appearancePreferencesRequestSchema,
   appearancePreferencesSchema,
   DEFAULT_APPEARANCE_PREFERENCES,
+  normalizeAppearancePreferences,
 } from './appearance.ts';
 
 test('a response drops a preference this renderer has no reader for', () => {
@@ -34,6 +35,16 @@ test('a write carries the one field a row changed and refuses unknown keys', () 
   assert.equal(
     appearancePreferencesRequestSchema.safeParse({ theme: 'light', rogue: 1 }).success,
     false,
+  );
+});
+
+test('the custom font keeps its family aside and needs one to be in use', () => {
+  const aside = { ...DEFAULT_APPEARANCE_PREFERENCES, writingFont: 'Hannotate SC' };
+  assert.deepEqual(normalizeAppearancePreferences(aside), aside);
+  assert.equal(
+    normalizeAppearancePreferences({ ...DEFAULT_APPEARANCE_PREFERENCES, readingFont: 'custom' })
+      .readingFont,
+    DEFAULT_APPEARANCE_PREFERENCES.readingFont,
   );
 });
 

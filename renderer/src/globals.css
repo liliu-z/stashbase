@@ -496,8 +496,9 @@ body {
      furniture keeps the prose size they chose. Each reading font carries its
      own size steps, line height, and measure because a serif's smaller
      x-height needs a larger base than the interface sans. CJK falls through
-     to each platform's sans under either font. An installed writing font
-     (--writing-font) keeps the metrics of the preset it replaces. */
+     to each platform's sans under either font. The custom font, installed
+     on the computer (--writing-font), takes the base metrics below, the
+     ones Sans uses. */
   --font-reading-sans:
     'Inter Variable', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC',
     system-ui, sans-serif;

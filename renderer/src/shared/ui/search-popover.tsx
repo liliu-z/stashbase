@@ -111,12 +111,31 @@ export function SearchField({
 
 /** The popup under a trigger: the kit's menu width and the compact step, so
  *  rows sit on the sidebar's 28px rhythm and the popover reads as one more of
- *  the app's menus rather than the full-size command palette. */
-export function SearchPopup({ children, label }: { children: ReactNode; label: string }) {
+ *  the app's menus rather than the full-size command palette. It hangs from
+ *  the trigger's end, where a row's control sits, unless the caller hangs
+ *  it from the start of an element of its own. */
+export function SearchPopup({
+  align = 'end',
+  anchor,
+  children,
+  label,
+}: {
+  align?: 'start' | 'end';
+  /** The element it hangs from when the popover has no trigger of its own. */
+  anchor?: RefObject<Element | null>;
+  children: ReactNode;
+  label: string;
+}) {
   const shape = useShape();
   return (
     <Popover.Portal>
-      <Popover.Positioner align="end" className="z-50 outline-none" side="bottom" sideOffset={6}>
+      <Popover.Positioner
+        align={align}
+        anchor={anchor}
+        className="z-50 outline-none"
+        side="bottom"
+        sideOffset={6}
+      >
         <Popover.Popup
           aria-label={label}
           className={cn(
