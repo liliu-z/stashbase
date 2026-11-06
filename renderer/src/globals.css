@@ -286,6 +286,14 @@
   --shadow-8: var(--shadow-light-8);
 }
 
+/* ── Paper grain ──
+   Fine fibres: a tile of fractal noise too fine to show its seam, neutral
+   and faint, so a page tints it with its own colour. The Markdown page lays
+   it under its prose, and the reading menu's texture swatch shows it. */
+:root {
+  --paper-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='f' x='0' y='0'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.26 0 0 0 -0.11'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23f)'/%3E%3C/svg%3E");
+}
+
 /* ============================================================================
    2. THEME SWITCHING
    ----------------------------------------------------------------------------

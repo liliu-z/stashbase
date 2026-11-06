@@ -18,6 +18,7 @@ const DEFAULTS = {
   codeFont: null,
   lineSpacing: 'default',
   lineWidth: 'default',
+  pageTexture: 'none',
   reduceMotion: 'system',
   spellcheck: true,
   spellcheckLanguage: null,

@@ -53,6 +53,7 @@ export function applyAppearanceSurface(surface: AppearanceSurface): void {
   root.dataset.readingFont = surface.readingFont;
   root.dataset.lineSpacing = surface.lineSpacing;
   root.dataset.lineWidth = surface.lineWidth;
+  root.dataset.pageTexture = surface.pageTexture;
   root.dataset.reduceMotion = surface.reduceMotion;
   root.dataset.focusMode = surface.focusMode ? 'on' : 'off';
   applied = surface;

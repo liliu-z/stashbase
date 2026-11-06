@@ -101,6 +101,7 @@ export function EditorPanel({
           />
           <PresetRowView appearance={appearance} row={PRESET_ROWS.lineSpacing} />
           <PresetRowView appearance={appearance} row={PRESET_ROWS.lineWidth} />
+          <PresetRowView appearance={appearance} row={PRESET_ROWS.pageTexture} />
         </SettingsList>
       </SettingsGroup>
       <SettingsGroup title="Writing">

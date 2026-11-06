@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
 
 import { failureMessage } from '@/features/settings/application/failure-messages';
-import { appearancePort } from '@/test/fakes/settings';
+import { appearancePort, appearanceSurface } from '@/test/fakes/settings';
 import { withQueryClient } from '@/test/query';
 
 import { AppearanceMenu } from './appearance-menu';
@@ -12,6 +12,8 @@ afterEach(() => {
   cleanup();
   delete document.documentElement.dataset.readingFont;
   delete document.documentElement.dataset.readingTextSize;
+  delete document.documentElement.dataset.pageTexture;
+  document.documentElement.classList.remove('dark');
 });
 
 async function open() {
@@ -78,6 +80,25 @@ describe('AppearanceMenu', () => {
     );
     expect((await choice('Page color', 'Paper')).checked).toBe(true);
     expect((await choice('Mode', 'Match system')).checked).toBe(true);
+  });
+
+  it('says why a chosen grain does not show on a dark page', async () => {
+    let saved = appearanceSurface({ theme: 'dark' });
+    const port = appearancePort({
+      load: vi.fn(async () => saved),
+      update: vi.fn(async (change) => (saved = { ...saved, ...change })),
+    });
+    withQueryClient(<AppearanceMenu appearanceApi={port} />);
+
+    const user = await open();
+    expect(screen.queryByText('Grain shows on light pages.')).toBeNull();
+    await user.click(await choice('Page texture', 'Grain'));
+
+    await waitFor(() =>
+      expect(port.update).toHaveBeenCalledWith({ pageTexture: 'grain' }, expect.any(AbortSignal)),
+    );
+    expect(document.documentElement.dataset.pageTexture).toBe('grain');
+    expect(await screen.findByText('Grain shows on light pages.')).toBeDefined();
   });
 
   it('rolls the choice back and says why when the save is refused', async () => {

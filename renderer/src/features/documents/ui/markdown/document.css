@@ -42,6 +42,73 @@
   background: linear-gradient(var(--surface-2), transparent);
 }
 
+/* The page texture lies behind the prose, never over it. Dots scroll with the
+   text like a printed grid. Grain is the paper itself, so it holds still and
+   runs unbroken under the reading bar, its fade, and the page: fibres in a
+   tile too fine to show a seam, edges and two faint patches a shade of the
+   theme's own ink. Grain belongs to a light page; a dark one shows none. */
+.markdown-surface {
+  --markdown-grain: var(--paper-grain);
+  --markdown-grain-shade: light-dark(
+    color-mix(in oklab, var(--foreground) 6%, transparent),
+    transparent
+  );
+  --markdown-grain-edges: linear-gradient(
+    90deg,
+    var(--markdown-grain-shade),
+    transparent 18% 82%,
+    var(--markdown-grain-shade)
+  );
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) .markdown-surface {
+    --markdown-grain: none;
+  }
+}
+
+.dark .markdown-surface {
+  --markdown-grain: none;
+}
+
+html[data-page-texture='grain'] .markdown-surface {
+  background-image:
+    var(--markdown-grain), var(--markdown-grain-edges),
+    linear-gradient(transparent 70%, var(--markdown-grain-shade)),
+    radial-gradient(28rem 20rem at 14% 50%, var(--markdown-grain-shade), transparent),
+    radial-gradient(32rem 22rem at 84% 80%, var(--markdown-grain-shade), transparent);
+  background-size:
+    220px 220px,
+    auto,
+    auto,
+    auto,
+    auto;
+}
+
+html[data-page-texture='grain'] .markdown-surface::before,
+html[data-page-texture='grain'] .markdown-surface::after {
+  background-color: var(--surface-2);
+  background-image: var(--markdown-grain), var(--markdown-grain-edges);
+  background-size:
+    220px 220px,
+    auto;
+}
+
+/* The fade fades by mask, so the grain under it lines up with the page's. */
+html[data-page-texture='grain'] .markdown-surface::after {
+  background-position:
+    0 calc(-1 * var(--reading-bar-height)),
+    0 0;
+  mask-image: linear-gradient(black, transparent);
+}
+
+html[data-page-texture='dots'] .markdown-crepe .milkdown {
+  background-image: radial-gradient(circle, var(--markdown-dot) 0 1px, transparent 1.5px);
+  background-position: center 20px;
+  background-size: 24px 24px;
+  background-attachment: local;
+}
+
 .markdown-mode-control {
   position: absolute;
   z-index: 2;
@@ -178,6 +245,12 @@ html[data-focus-mode='on'] .markdown-crepe:focus-within .ProseMirror > :not(.is-
   --markdown-menu-rest: color-mix(in oklab, var(--foreground) 76%, var(--background));
   /* Lighter than Crepe's inline area, which code blocks keep. */
   --markdown-inline-code: color-mix(in oklab, var(--foreground) 4.5%, transparent);
+  /* The dot texture's ink: a light ink on a dark page reads stronger, so
+     the dark side takes less of it. */
+  --markdown-dot: light-dark(
+    color-mix(in oklab, var(--foreground) 15%, transparent),
+    color-mix(in oklab, var(--foreground) 11%, transparent)
+  );
   --crepe-font-title: var(--font-sans);
   --crepe-font-default: var(--font-sans);
   --crepe-font-code: var(--code-font, var(--font-mono));

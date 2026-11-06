@@ -47,6 +47,9 @@ export const appearancePreferencesSchema = z
     codeFont: fontFamilySchema.nullable(),
     lineSpacing: z.enum(['compact', 'default', 'relaxed']),
     lineWidth: z.enum(['narrow', 'default', 'wide', 'full']),
+    /** What lies behind Markdown prose: nothing, a dot grid, or paper grain,
+     *  which only a light page shows. */
+    pageTexture: z.enum(['none', 'dots', 'grain']),
     reduceMotion: z.enum(['system', 'on']),
     spellcheck: z.boolean(),
     /** Null follows the system language. Ignored on macOS, whose checker
@@ -82,6 +85,7 @@ export const DEFAULT_APPEARANCE_PREFERENCES: AppearancePreferencesWire = {
   codeFont: null,
   lineSpacing: 'default',
   lineWidth: 'default',
+  pageTexture: 'none',
   reduceMotion: 'system',
   spellcheck: true,
   spellcheckLanguage: null,

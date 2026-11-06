@@ -7,6 +7,7 @@
 import {
   DARK_THEMES,
   LIGHT_THEMES,
+  themeInk,
   themePage,
   type DarkThemeId,
   type LightThemeId,
@@ -36,7 +37,13 @@ interface Choice<Value extends string> {
 }
 
 /** Fields a segmented control can carry: a handful of string presets. */
-export type PresetField = 'theme' | 'uiScale' | 'lineSpacing' | 'lineWidth' | 'reduceMotion';
+export type PresetField =
+  | 'theme'
+  | 'uiScale'
+  | 'lineSpacing'
+  | 'lineWidth'
+  | 'pageTexture'
+  | 'reduceMotion';
 
 /** Parameterised by field so a row's choices cannot carry a value the field
  *  does not accept. */
@@ -130,6 +137,16 @@ export const PRESET_ROWS = {
     field: 'lineWidth',
     title: 'Line width',
   },
+  pageTexture: {
+    choices: [
+      { label: 'None', value: 'none' },
+      { label: 'Dots', value: 'dots' },
+      { label: 'Grain', value: 'grain' },
+    ],
+    detail: 'A dot grid or paper grain behind the text. Grain shows on light pages.',
+    field: 'pageTexture',
+    title: 'Page texture',
+  },
 } as const satisfies { [Field in PresetField]: PresetRowFor<Field> };
 
 /** The page colours the reading menu offers. Each is a light theme and the
@@ -146,6 +163,24 @@ export type PageColor = (typeof PAGE_COLORS)[number];
 /** The light page and the dark page a swatch shows, half and half. */
 export function pageColorSwatch(color: PageColor): { light: string; dark: string } {
   return { light: themePage(color.light), dark: themePage(color.dark) };
+}
+
+/** One half of a texture swatch: a page and the ink written on it. */
+export interface SwatchSide {
+  readonly ink: string;
+  readonly page: string;
+}
+
+/** The halves a texture swatch draws, the way a page colour's swatch does:
+ *  the reader's own light and dark page, each with its ink, whether the pair
+ *  was chosen in the reading menu or in Settings. */
+export function textureSwatch(
+  preferences: Pick<AppearancePreferences, 'darkTheme' | 'lightTheme'>,
+): { light: SwatchSide; dark: SwatchSide } {
+  return {
+    light: { ink: themeInk(preferences.lightTheme), page: themePage(preferences.lightTheme) },
+    dark: { ink: themeInk(preferences.darkTheme), page: themePage(preferences.darkTheme) },
+  };
 }
 
 export const READING_TEXT_SIZE_DETAIL =

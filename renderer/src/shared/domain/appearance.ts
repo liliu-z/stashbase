@@ -19,6 +19,8 @@ export interface AppearanceSurface {
   readonly codeFont: string | null;
   readonly lineSpacing: 'compact' | 'default' | 'relaxed';
   readonly lineWidth: 'narrow' | 'default' | 'wide' | 'full';
+  /** Behind Markdown prose; grain shows on a light page only. */
+  readonly pageTexture: 'none' | 'dots' | 'grain';
   readonly reduceMotion: 'system' | 'on';
   readonly spellcheck: boolean;
   /** Null follows the system language. */

@@ -50,6 +50,8 @@ interface ThemeDefinition {
 const STASHBASE_BACKGROUND = { dark: '#171717', light: '#fafafa' } as const;
 /** The StashBase document page, `--surface-2` in `globals.css`. */
 const STASHBASE_PAGE = { dark: '#1e1e1e', light: '#fcfcfc' } as const;
+/** The StashBase ink, `--foreground` in `globals.css`. */
+const STASHBASE_INK = { dark: '#f5f5f5', light: '#171717' } as const;
 
 export const LIGHT_THEMES = {
   'stashbase-light': { family: 'StashBase', label: 'StashBase Light', mode: 'light', palette: null },
@@ -500,6 +502,14 @@ export function themePage(id: LightThemeId | DarkThemeId): string {
     id in LIGHT_THEMES ? LIGHT_THEMES[id as LightThemeId] : DARK_THEMES[id as DarkThemeId];
   if (theme.palette) return mixHex(theme.palette.ground, theme.palette.raised, 0.5);
   return theme.mode === 'light' ? STASHBASE_PAGE.light : STASHBASE_PAGE.dark;
+}
+
+/** The ink a theme writes on that page, as a swatch draws it. */
+export function themeInk(id: LightThemeId | DarkThemeId): string {
+  const theme =
+    id in LIGHT_THEMES ? LIGHT_THEMES[id as LightThemeId] : DARK_THEMES[id as DarkThemeId];
+  if (theme.palette) return themePaletteTokens(theme.palette, theme.mode).foreground;
+  return theme.mode === 'light' ? STASHBASE_INK.light : STASHBASE_INK.dark;
 }
 
 /** The ground a window paints before its page does, per side. */

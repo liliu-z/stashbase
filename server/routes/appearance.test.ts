@@ -69,6 +69,7 @@ test('values outside a preference are refused rather than written', async () => 
     { lightTheme: 'catppuccin-mocha' },
     { darkTheme: 'dracula' },
     { lineWidth: 'enormous' },
+    { pageTexture: 'lines' },
     { spellcheck: 'yes' },
     { spellcheckLanguage: 'english please' },
   ];

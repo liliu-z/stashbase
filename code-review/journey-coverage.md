@@ -708,13 +708,17 @@ Host/services: `electron/main.cjs`, `server/folder.ts`.
   repaint; `electron/renderer/runtime.test.cjs` covers the first-paint argument;
   `use-appearance-surface.test.ts` covers handing each applied record to the desktop.
 - **Appearance customization (2026-09-27):** themes, fonts, reading layout,
-  reduce motion, and editor aids. `shared/protocols/http/appearance.test.ts`
+  page texture, reduce motion, and editor aids. `shared/protocols/http/appearance.test.ts`
   holds every theme to WCAG AA text contrast; `server/routes/appearance.test.ts`
   covers persistence, per-field fallback, and refusal of font names that could
   escape CSS; `electron/text-services/text-services.test.cjs` covers font listing,
   capability refusal, and the spelling menu; `appearance-panel.test.tsx`, `editor-panel.test.tsx`, and
   `writing-aids.test.ts` cover the Settings rows, font picker, word count, and
-  focus-mode marking. **Gap:** font enumeration on macOS and Windows and native
+  focus-mode marking. `appearance-menu.test.tsx` covers the page texture write
+  and the note that grain shows only on light pages. The painted textures are
+  stylesheet-only (`markdown/document.css`); an isolated built Electron pass
+  (2026-11-06) captured None, Dots and Grain on White and Paper in light and
+  dark. **Gap:** font enumeration on macOS and Windows and native
   spellcheck suggestions are unproven by a driven pass on those platforms.
 - **Sign-in recovery (2026-09-15):** `settings/hooks/account-context.tsx` owns
   one browser wait shared by sidebar, composer, and Account Settings.

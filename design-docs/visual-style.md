@@ -13,10 +13,17 @@ Keep documents and conversation readable; navigation and controls stay secondary
   font installed on the computer from Settings. The document's reading bar, a
   paper-coloured band the editor scrolls beneath without passing under, holds
   one Appearance menu set out like an e-reader's: the font, each sample set in
-  its own face; text size on a slider of seven steps; the page colour; then
-  line width and line spacing. A page colour is a light and a dark theme that
-  follow the system together, drawn as one half-and-half swatch: White,
-  Paper and Green, whose ink is tinted to their page as an e-reader's is. All
+  its own face; text size on a slider of seven steps; the page colour; the
+  page texture; then line width and line spacing. A page colour is a light and
+  a dark theme that follow the system together, drawn as one half-and-half
+  swatch: White, Paper and Green, whose ink is tinted to their page as an
+  e-reader's is. A page texture lies behind Markdown prose, never over it:
+  None, Dots (a faint grid that scrolls with the text, implying no line to
+  align to), or Grain (paper fibres with edges a shade of the theme's ink,
+  which make Paper read as parchment). Each is drawn, not named, as the same
+  half-and-half swatch over the reader's own pair. Grain belongs to a light
+  page: its swatch's dark half stays plain, a dark page shows nothing, and
+  the menu says so while it is chosen. All
   stay app-wide Appearance preferences. The reading font changes only the
   rendered document's prose and headings; the interface, Chat, source view,
   code, and tables keep their own faces, the font never changes the

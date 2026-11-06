@@ -48,11 +48,12 @@ platform capabilities stay named and disabled in navigation.
   - **Documents:** how document text looks: the document font, chosen from the two included reading fonts
     (Serif, the default, and Sans) or any font installed on the computer; the
     code font, from the bundled monospace or installed monospaced fonts; and
-    reading text size (a slider of seven steps), line spacing, and line width.
-    The document's Appearance menu edits the same font, text size, line width
-    and line spacing, and offers the page colour as a pair: choosing White,
-    Paper or Green sets the light and the dark theme together, beside the
-    mode.
+    reading text size (a slider of seven steps), line spacing, line width, and
+    page texture (none, dots, or grain).
+    The document's Appearance menu edits the same font, text size, page
+    texture, line width and line spacing, and offers the page colour as a
+    pair: choosing White, Paper or Green sets the light and the dark theme
+    together, beside the mode.
   - **Writing:** what helps while writing: spellcheck and its language (where
     the system offers a choice), focus mode, typewriter scrolling, and word
     count.

@@ -1,14 +1,14 @@
 /** The document's appearance panel, offered on the page the way an e-reader
  *  offers its type panel: the reading font, each set in its own face; the
  *  text size on a slider; the page colour, each a light and a dark theme that
- *  follow the system together; then line width and line spacing. All are the
- *  app-wide Appearance preferences, edited through the same optimistic write
- *  as their Settings rows, so the two can never disagree. The panel stays open
- *  while the reader tries choices; a refused save rolls the choice back and
- *  names the failure inside it. The trigger is a glyph alone, named by its
- *  tooltip, so the bar stays quiet over the page. */
+ *  follow the system together; the page texture; then line width and line
+ *  spacing. All are the app-wide Appearance preferences, edited through the
+ *  same optimistic write as their Settings rows, so the two can never
+ *  disagree. The panel stays open while the reader tries choices; a refused
+ *  save rolls the choice back and names the failure inside it. The trigger is
+ *  a glyph alone, named by its tooltip, so the bar stays quiet over the page. */
 import { Popover } from '@base-ui/react/popover';
-import { useId, type ReactNode } from 'react';
+import { useId, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Elevated } from '@/components/ui/elevated';
@@ -21,7 +21,10 @@ import {
   presetChange,
   READING_FONT_CHOICES,
   readingFontChange,
+  textureSwatch,
+  type AppearancePreferences,
   type PresetRow,
+  type SwatchSide,
 } from '@/features/settings/domain/appearance';
 import { useAppearance, type AppearanceViewModel } from '@/features/settings/hooks/use-appearance';
 import { PresetChoice } from '@/features/settings/ui/appearance/preset-choice';
@@ -211,6 +214,80 @@ function PresetSection({
   );
 }
 
+type PageTexture = AppearancePreferences['pageTexture'];
+
+const DARK_SCHEME = '(prefers-color-scheme: dark)';
+
+function subscribeToScheme(listener: () => void) {
+  const query = globalThis.matchMedia?.(DARK_SCHEME);
+  query?.addEventListener('change', listener);
+  return () => query?.removeEventListener('change', listener);
+}
+
+const systemIsDark = () => globalThis.matchMedia?.(DARK_SCHEME).matches ?? false;
+
+/** One half of a texture swatch, in its own page and ink, at a scale a
+ *  28px circle can show: dots seven pixels apart so both halves keep one
+ *  grid, and grain stacked until its fibres read. A dark half never carries
+ *  grain, which is how the swatch says grain belongs to a light page. */
+function textureHalf(texture: PageTexture, side: SwatchSide, light: boolean): CSSProperties {
+  if (texture === 'dots') {
+    return {
+      backgroundColor: side.page,
+      backgroundImage: `radial-gradient(circle, color-mix(in oklab, ${side.ink} 50%, transparent) 0 1px, transparent 1.4px)`,
+      backgroundSize: '7px 7px',
+    };
+  }
+  if (texture === 'grain' && light) {
+    return {
+      backgroundColor: side.page,
+      backgroundImage: `var(--paper-grain), var(--paper-grain), var(--paper-grain), radial-gradient(circle at 100% 50%, transparent 40%, color-mix(in oklab, ${side.ink} 16%, transparent))`,
+      backgroundSize: '110px 110px, 110px 110px, 110px 110px, auto',
+    };
+  }
+  return { backgroundColor: side.page };
+}
+
+/** The textures drawn rather than named, each over the reader's own light
+ *  and dark page like the page colours above them; and why a chosen grain is
+ *  not showing, since a dark page says so rather than appearing not to work. */
+function TextureChoices({ appearance }: { appearance: AppearanceViewModel }) {
+  const name = useId();
+  const systemDark = useSyncExternalStore(subscribeToScheme, systemIsDark, () => false);
+  const preferences = appearance.preferences;
+  const swatch = textureSwatch(
+    preferences ?? { darkTheme: 'stashbase-dark', lightTheme: 'stashbase-light' },
+  );
+  const darkPage = preferences?.theme === 'dark' || (preferences?.theme === 'system' && systemDark);
+  return (
+    <>
+      <div aria-label="Page texture" className="flex gap-1.5" role="radiogroup">
+        {PRESET_ROWS.pageTexture.choices.map((choice) => (
+          <SampleChoice
+            checked={preferences?.pageTexture === choice.value}
+            disabled={preferences === null}
+            key={choice.value}
+            label={choice.label}
+            name={name}
+            onChoose={() => appearance.change({ pageTexture: choice.value })}
+          >
+            <span
+              aria-hidden
+              className="flex size-7 overflow-hidden rounded-full ring-1 ring-foreground/15"
+            >
+              <span className="flex-1" style={textureHalf(choice.value, swatch.light, true)} />
+              <span className="flex-1" style={textureHalf(choice.value, swatch.dark, false)} />
+            </span>
+          </SampleChoice>
+        ))}
+      </div>
+      {darkPage && preferences?.pageTexture === 'grain' && (
+        <p className="m-0 text-caption text-muted-foreground">Grain shows on light pages.</p>
+      )}
+    </>
+  );
+}
+
 export function AppearanceMenu({ appearanceApi }: { appearanceApi: AppearancePort }) {
   const appearance = useAppearance(appearanceApi);
   const shape = useShape();
@@ -269,6 +346,9 @@ export function AppearanceMenu({ appearanceApi }: { appearanceApi: AppearancePor
                     value={preferences?.theme ?? null}
                   />
                 </div>
+              </Section>
+              <Section title="Page texture">
+                <TextureChoices appearance={appearance} />
               </Section>
               <PresetSection
                 appearance={appearance}

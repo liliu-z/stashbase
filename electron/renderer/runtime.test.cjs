@@ -25,7 +25,7 @@ test('runtime preload carries a readable remembered appearance and drops anythin
   const appearance = {
     theme: 'light', lightTheme: 'gruvbox-light', darkTheme: 'stashbase-dark', uiScale: 'large',
     readingTextSize: 3, readingFont: 'serif', writingFont: null, codeFont: null, lineSpacing: 'relaxed',
-    lineWidth: 'default', reduceMotion: 'on', spellcheck: true, spellcheckLanguage: null,
+    lineWidth: 'default', pageTexture: 'none', reduceMotion: 'on', spellcheck: true, spellcheckLanguage: null,
     focusMode: true, typewriterScrolling: false, wordCount: false,
   };
   assert.deepEqual(
