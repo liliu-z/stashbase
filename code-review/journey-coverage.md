@@ -1399,7 +1399,8 @@ and recovery behavior; the evidence below establishes its exercised paths.
 
 **Implementation:** Renderer: `renderer/src/features/documents/ui/source/registry.tsx`, `renderer/src/features/documents/application/document-runtime.ts`, `renderer/src/features/documents/ui/markdown/document.tsx`.
 The Markdown reading bar composes the Settings-owned
-`renderer/src/features/settings/ui/appearance/appearance-menu.tsx`; durable
+`renderer/src/features/settings/ui/appearance/appearance-menu.tsx`, with font,
+color and texture samples in the adjacent `appearance-samples.tsx`; durable
 font, size, page colour and line presets cross `shared/protocols/http/appearance.ts` to
 `server/app-config.ts` and are stamped on the document root by
 `renderer/src/shared/runtime/appearance-surface.ts`.
