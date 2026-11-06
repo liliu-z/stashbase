@@ -6,7 +6,7 @@
 'use client';
 
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 import { FileTypeIcon } from '@/components/ui/file-type-icon';
 import { useShape } from '@/lib/shape-context';
@@ -44,6 +44,43 @@ async function renderPdfFirstPage(file: File, targetWidth: number): Promise<stri
   canvas.height = viewport.height;
   await page.render({ canvas, viewport }).promise;
   return canvas.toDataURL('image/png');
+}
+
+// ─── Glyph face ───────────────────────────────────────────────────────────
+// A file with nothing to look at: its type glyph over its name. A project
+// source, a live upload and a replayed one all wear this face, so a file reads
+// the same before and after it is sent. `children` adds lines under the name.
+interface FileGlyphFaceProps {
+  children?: ReactNode;
+  name: string;
+  /** The path or file name the glyph is chosen from. */
+  path: string;
+  size: number;
+}
+
+function FileGlyphFace({ children, name, path, size }: FileGlyphFaceProps) {
+  return (
+    <div className="absolute inset-0 flex flex-col">
+      <div
+        aria-label={name}
+        className="flex min-h-0 flex-1 items-center justify-center text-muted-foreground"
+        role="img"
+      >
+        <FileTypeIcon aria-hidden="true" path={path} size={Math.max(16, size * 0.3)} />
+      </div>
+      <div className="flex flex-col items-center gap-px px-1.5 pb-1.5">
+        <div
+          className={cn(
+            'line-clamp-2 max-w-full text-center leading-tight font-medium break-words text-foreground',
+            size >= 72 ? 'text-ui-11' : 'text-ui-10',
+          )}
+        >
+          {name}
+        </div>
+        {children}
+      </div>
+    </div>
+  );
 }
 
 // ─── File thumbnail ───────────────────────────────────────────────────────
@@ -124,6 +161,7 @@ function FileThumbnail({ file, size, className }: FileThumbnailProps) {
         className,
       )}
       style={{ width: size, height: size }}
+      title={file.name}
     >
       {previewUrl ? (
         <img
@@ -145,19 +183,13 @@ function FileThumbnail({ file, size, className }: FileThumbnailProps) {
           />
         </div>
       ) : (
-        // The file-type glyph for files with no renderable preview: the same
-        // mark a sent upload falls back to once its File is gone, so the tile
+        // A file with no renderable preview shows its glyph and name: the
+        // face a sent upload falls back to once its File is gone, so the tile
         // looks the same before and after the turn is replayed.
-        <div
-          className="absolute inset-0 flex items-center justify-center text-muted-foreground"
-          role="img"
-          aria-label={file.name}
-        >
-          <FileTypeIcon aria-hidden="true" path={file.name} size={Math.max(16, size * 0.35)} />
-        </div>
+        <FileGlyphFace name={file.name} path={file.name} size={size} />
       )}
     </div>
   );
 }
 
-export { FileThumbnail };
+export { FileGlyphFace, FileThumbnail };

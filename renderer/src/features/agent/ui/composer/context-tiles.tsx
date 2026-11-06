@@ -12,7 +12,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useState } from 'react';
 
-import { FileThumbnail } from '@/components/ui/file-thumbnail';
+import { FileGlyphFace, FileThumbnail } from '@/components/ui/file-thumbnail';
 import { FileTypeIcon } from '@/components/ui/file-type-icon';
 import {
   contextItemKey,
@@ -103,25 +103,10 @@ function SourceTile({
   const name = contextItemName(item);
   const reprocessable = status === 'failed' && onReprocess !== undefined;
   return (
-    <TileBox className="flex flex-col" size={size} title={reason ?? item.source.path}>
-      <div
-        aria-label={name}
-        className="flex min-h-0 flex-1 items-center justify-center text-muted-foreground"
-        role="img"
-      >
-        <FileTypeIcon aria-hidden="true" path={item.source.path} size={Math.max(16, size * 0.3)} />
-      </div>
-      <div className="flex flex-col items-center gap-px px-1.5 pb-1.5">
-        <div
-          className={cn(
-            'line-clamp-2 max-w-full text-center leading-tight font-medium break-words text-foreground',
-            size >= 72 ? 'text-ui-11' : 'text-ui-10',
-          )}
-        >
-          {name}
-        </div>
+    <TileBox size={size} title={reason ?? item.source.path}>
+      <FileGlyphFace name={name} path={item.source.path} size={size}>
         {status !== 'ready' && <StatusLine status={status} />}
-      </div>
+      </FileGlyphFace>
       {reprocessable && (
         <ReprocessButton
           className={cn(
@@ -195,15 +180,13 @@ function RemoteTile({ item, size }: { item: TransientItem; size: number }) {
           onError={() => setFailedPreview(item.previewUrl)}
         />
       ) : (
-        <div
-          aria-label={item.name}
-          className="absolute inset-0 flex flex-col items-center justify-center gap-1 px-1 text-muted-foreground"
-          role="img"
-        >
-          <FileTypeIcon aria-hidden="true" path={item.path} size={Math.max(16, size * 0.25)} />
-          <span className="max-w-full truncate text-ui-10">{item.name}</span>
-          {previewFailed && <span className="text-center text-ui-10">Preview unavailable</span>}
-        </div>
+        <FileGlyphFace name={item.name} path={item.path} size={size}>
+          {previewFailed && (
+            <span className="text-center text-ui-10 text-muted-foreground">
+              Preview unavailable
+            </span>
+          )}
+        </FileGlyphFace>
       )}
     </TileBox>
   );
