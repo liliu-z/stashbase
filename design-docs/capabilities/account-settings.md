@@ -137,6 +137,9 @@ platform capabilities stay named and disabled in navigation.
   could not answer, which can come from an installed copy that does not run.
   Antigravity's check asks Google, so for a working Antigravity installation
   that Retry signs in, opening the browser when the check still cannot answer.
+  An explicit native backend configuration error instead explains the correction
+  and offers a recheck after the reader repairs it. It never opens another
+  sign-in or rewrites the reader's native settings.
   A broken executable instead offers installation repair. The first-send
   connection follows this same recovery action before continuing its held send.
   An expired or invalid sign-in reported by a status check or a running

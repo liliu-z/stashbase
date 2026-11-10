@@ -13,7 +13,7 @@ import { writeDiagnostics } from './write-diagnostics.ts';
 
 /** One fixed feature name, never a dynamic route, query, body, or file path. */
 const FEATURES = new Set(['account', 'agents', 'agent', 'project', 'upload', 'asset', 'asset-derived', 'appearance', 'attach', 'embedder', 'files',
-  'folders', 'gallery', 'index-status', 'mcp', 'projects', 'search', 'sync', 'terminal',
+  'folders', 'gallery', 'github', 'index-status', 'mcp', 'projects', 'search', 'sync', 'terminal',
   'keyword-search', 'local-components', 'turn-changes', 'updates', 'workspace-preferences', 'scheduled-tasks']);
 
 /** A refused request (4xx) is an expected outcome such as a save conflict or a

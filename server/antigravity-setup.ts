@@ -15,7 +15,7 @@ import os from 'node:os';
 import { probeAgentCommand } from './agent-probe.ts';
 import { agentCliEnv, commandDir } from './agent-cli.ts';
 import { terminateExtractorTree, waitForExtractorTree } from './extractor-process.ts';
-import { AgentAccountRefusedError } from './agent-setup-diagnostic.ts';
+import { AgentAccountRefusedError, AgentConfigurationError } from './agent-setup-diagnostic.ts';
 
 type ProbeResult = { status: number | null; stdout: string; stderr: string };
 
@@ -23,11 +23,13 @@ const SIGNED_OUT = /authentication required|not (?:signed|logged) in|sign[- ]?in
 /** Google answering a signed-in account with an eligibility rule, such as an
  * unsupported region, rather than a sign-in problem. */
 const REFUSED = /PERMISSION_DENIED|not eligible|ineligible|not (?:currently )?available in your (?:location|country|region)/i;
+const GEMINI_CONFIGURATION_FAILURE = /modelProvider is set to ["']gemini["'] in settings\.json, but the GEMINI_API_KEY environment variable is not set\b/i;
 
 export type AntigravityAuthState =
   | { state: 'signed-in' }
   | { state: 'signed-out' }
   | { state: 'refused'; reason: string }
+  | { state: 'configuration-error'; reason: string }
   | { state: 'unknown' };
 
 /** Classify one `agy --output-format json -p /usage` run. A refusal that
@@ -38,10 +40,13 @@ export function antigravityAuthState(result: ProbeResult): AntigravityAuthState 
   const output = `${result.stdout}\n${result.stderr}`;
   const envelope = lastJsonObject(result.stdout);
   const error = typeof envelope?.error === 'string' ? envelope.error : '';
+  const status = typeof envelope?.status === 'string' ? envelope.status.toUpperCase() : '';
+  if ((result.status !== 0 || status === 'ERROR') && GEMINI_CONFIGURATION_FAILURE.test(`${error}\n${output}`)) {
+    return { state: 'configuration-error', reason: 'Antigravity cannot start because its native settings.json selects the Gemini API backend without the required credentials. Restore the default backend in Antigravity\'s settings.json, then retry.' };
+  }
   if (REFUSED.test(output)) return { state: 'refused', reason: providerSentence(error || output) };
   if (SIGNED_OUT.test(output)) return { state: 'signed-out' };
   if (result.status !== 0) return { state: 'unknown' };
-  const status = typeof envelope?.status === 'string' ? envelope.status.toUpperCase() : '';
   return status && status !== 'SUCCESS' ? { state: 'unknown' } : { state: 'signed-in' };
 }
 
@@ -58,6 +63,11 @@ export async function antigravityIsAuthenticated(executable: string, signal?: Ab
   if (auth.state === 'signed-out') return false;
   if (auth.state === 'refused') {
     throw new AgentAccountRefusedError(`Antigravity is signed in, but Google refused this account: ${auth.reason}`);
+  }
+  if (auth.state === 'configuration-error') {
+    throw Object.assign(new AgentConfigurationError(auth.reason), {
+      exitCode: result.status, stdout: result.stdout, stderr: result.stderr,
+    });
   }
   const output = `${result.stdout}\n${result.stderr}`.replace(/\s+/g, ' ').trim().slice(-800);
   throw new Error(`Could not check Antigravity sign-in using ${executable} (exit ${result.status ?? 'unknown'}${output ? `: ${output}` : ''}).`);
@@ -109,7 +119,7 @@ export async function loginToAntigravity(
     if (authenticated) return;
   } catch (error) {
     signal.throwIfAborted();
-    if (error instanceof AgentAccountRefusedError) throw error;
+    if (error instanceof AgentAccountRefusedError || error instanceof AgentConfigurationError) throw error;
     lastCheckError = error;
   }
   options.onBrowserSignIn?.();
@@ -134,7 +144,7 @@ export async function loginToAntigravity(
       } catch (error) {
         signal.throwIfAborted();
         // A refused account stays refused; waiting longer cannot sign it in.
-        if (error instanceof AgentAccountRefusedError) throw error;
+        if (error instanceof AgentAccountRefusedError || error instanceof AgentConfigurationError) throw error;
         lastCheckError = error;
       }
       if (exited) {
