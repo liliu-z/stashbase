@@ -24,6 +24,7 @@ import { useAgentCatalog } from '@/features/agent/hooks/use-agent-catalog';
 import { useAgentModelRefresh } from '@/features/agent/hooks/use-agent-model-refresh';
 import { useAgentPersona } from '@/features/agent/hooks/use-agent-persona';
 import { useAgentRuntimeUpdate } from '@/features/agent/hooks/use-agent-runtime-update';
+import { useAgentSignInRecovered } from '@/features/agent/hooks/use-agent-sign-in-recovery';
 import { useAttentionFocus } from '@/features/agent/hooks/use-attention-focus';
 import { useChangedSource } from '@/features/agent/hooks/use-changed-source';
 import { useRenameConversation } from '@/features/agent/hooks/use-conversation-history';
@@ -118,6 +119,10 @@ function ChatWorkspace({
     onOpenAgentSettings,
   );
   const modelRefresh = useAgentModelRefresh(active, catalog.refresh);
+  const signedIn = useAgentSignInRecovered(
+    state.transcript,
+    catalog.agents.find((agent) => agent.id === state.agent)?.ready,
+  );
   const activeTurn = agentTurnIsActive(state.connection);
   const busy = agentSessionIsBusy(active.store.getState());
   const armedSkill = agentSkills(state.skillCatalog).find((skill) => skill.id === state.skill);
@@ -225,6 +230,7 @@ function ChatWorkspace({
               onReviewTurnChange={onReviewTurnChange}
               pending={state.steers}
               runtimeUpdate={selectedAgent.updatable ? runtimeUpdate : undefined}
+              signedIn={signedIn}
               sourceFor={sourceFor}
               transientFile={active.fileForTransient}
             />
@@ -385,6 +391,16 @@ export default function ManagedAgentWorkspace(props: AgentWorkspaceProps) {
   useEffect(() => {
     if (props.accountSignedIn !== undefined) refresh();
   }, [props.accountSignedIn, refresh]);
+  // Settings signs agents in and out, installs and updates them, and the chat
+  // stays mounted beneath it; read readiness again once it closes.
+  const settingsWereOpen = useRef(false);
+  useEffect(() => {
+    if (props.settingsOpen) settingsWereOpen.current = true;
+    else if (settingsWereOpen.current) {
+      settingsWereOpen.current = false;
+      refresh();
+    }
+  }, [props.settingsOpen, refresh]);
 
   useEffect(() => {
     props.runtime.start(catalog.readyAgents.map((agent) => agent.id));

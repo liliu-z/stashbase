@@ -252,6 +252,7 @@ async function recoverAuthentication(
   expect(within(settings).getByText('Your agents')).not.toBeNull();
   await user.keyboard('{Escape}');
   expect(screen.getByRole('textbox', { name: 'Message' }).textContent).toBe('Keep this next idea');
+  expect(within(card).getByRole('button', { name: 'Sign in' })).not.toBeNull();
   await user.click(screen.getByRole('button', { name: 'Send' }));
   const dialog = within(await screen.findByRole('dialog'));
   expect(dialog.getByRole('heading', { name: `Sign in to use ${provider.label}` })).not.toBeNull();
@@ -260,6 +261,11 @@ async function recoverAuthentication(
   expect(fixture.prompts).toEqual([request, 'Check my introduction']);
   await act(async () => fixture.signIn());
   await screen.findByText(`${provider.label} reply: Keep this next idea`, {}, { timeout: 5000 });
+  // The refused turn stays in the chat, but no longer asks for a sign-in
+  // that has already happened.
+  expect(within(card).getByText(/^You are signed in again\./u)).not.toBeNull();
+  expect(within(card).queryByRole('button', { name: 'Sign in' })).toBeNull();
+  expect(screen.queryByRole('heading', { name: 'Sign in to continue' })).toBeNull();
 }
 
 afterEach(() => {

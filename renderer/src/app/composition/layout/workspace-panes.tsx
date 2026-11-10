@@ -150,6 +150,7 @@ export function WorkspacePanes({
             // row starts the same browser sign-in the sidebar's footer row does.
             onSignIn={(signal) => (signal ? account.signInAndWait(signal) : account.signIn())}
             runtime={agent.runtime}
+            settingsOpen={settings.open}
           />
         }
         onPaneWidthChange={session.runtime.setAgentPaneWidth}

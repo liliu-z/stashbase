@@ -53,6 +53,8 @@ interface TranscriptDecisions {
   onRetry(errorBlockId: string): boolean;
   onSignIn?: (() => void) | undefined;
   onUpdateApp?: (() => void) | undefined;
+  /** The chat's agent was signed in again after refusing its credentials. */
+  signedIn?: boolean | undefined;
 }
 
 const NO_PENDING: readonly PendingFollowUp[] = [];
@@ -74,6 +76,7 @@ const TranscriptBlock = memo(function TranscriptBlock({
   onUpdateApp,
   promptAt,
   runtimeUpdate,
+  signedIn,
   transientFile,
 }: TranscriptDecisions & {
   block: AgentTranscriptBlock;
@@ -155,6 +158,7 @@ const TranscriptBlock = memo(function TranscriptBlock({
         onSignIn={onSignIn}
         onUpdateApp={onUpdateApp}
         runtimeUpdate={runtimeUpdate}
+        signedIn={signedIn}
       />
     );
   }
@@ -188,6 +192,7 @@ export const AgentTranscript = memo(function AgentTranscript({
   onReviewTurnChange,
   pending = NO_PENDING,
   runtimeUpdate,
+  signedIn,
   sourceFor,
   transientFile,
 }: TranscriptDecisions & {
@@ -304,6 +309,7 @@ export const AgentTranscript = memo(function AgentTranscript({
             onUpdateApp={onUpdateApp}
             promptAt={closing.get(group.id)}
             runtimeUpdate={runtimeUpdate}
+            signedIn={signedIn}
             transientFile={transientFile}
           />
         </div>

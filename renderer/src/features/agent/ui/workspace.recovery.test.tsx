@@ -1,4 +1,4 @@
-import { act, screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vite-plus/test';
 
@@ -136,6 +136,51 @@ describe('Agent workspace recovery', () => {
       );
     },
   );
+
+  it('stops asking for sign-in once Settings has signed the refused agent in', async () => {
+    const { port, listeners, sent } = agentSessionPort();
+    let entry = { ...CODEX_AGENT };
+    const listAgents = vi.fn(async () => ({ agents: [entry] }));
+    const { runtime, setSettingsOpen } = renderWorkspace(
+      port,
+      [CODEX_AGENT],
+      undefined,
+      undefined,
+      { listAgents },
+    );
+    await agentGateLifted();
+    const session = runtime.activeSession();
+    await act(async () => {
+      await runtime.chooseAgent('codex');
+      session.start();
+      listeners[0]?.onEvent({ kind: 'ready' });
+      await session.sendPrompt('Refused request');
+      // The host withdraws readiness before it reports the refusal.
+      entry = { ...CODEX_AGENT, ready: false, needsSignIn: true };
+      listeners[0]?.onEvent({ kind: 'failed', failure: 'auth-expired', message: 'Not logged in' });
+      listeners[0]?.onEvent({ kind: 'turn-ended', isError: true });
+    });
+    const card = (await screen.findByRole('heading', { name: 'Sign in to continue' })).closest(
+      'section',
+    );
+    if (!card) throw new Error('The refusal has no card.');
+    await waitFor(() =>
+      expect(within(card).getByRole('button', { name: 'Sign in' })).not.toBeNull(),
+    );
+    // Closing Settings without signing in reads readiness again, and the
+    // refusal it still reports keeps the card asking.
+    setSettingsOpen(true);
+    const reads = listAgents.mock.calls.length;
+    setSettingsOpen(false);
+    await waitFor(() => expect(listAgents.mock.calls.length).toBeGreaterThan(reads));
+    expect(within(card).getByRole('button', { name: 'Sign in' })).not.toBeNull();
+    setSettingsOpen(true);
+    entry = { ...CODEX_AGENT };
+    setSettingsOpen(false);
+    expect(await within(card).findByText(/^You are signed in again\./u)).not.toBeNull();
+    expect(within(card).queryByRole('button', { name: 'Sign in' })).toBeNull();
+    expect(sent.filter((command) => command.kind === 'prompt')).toHaveLength(1);
+  });
 
   it('retains an unknown outcome and paused queue when a fatal failure requires sign-in', async () => {
     const { port, listeners, sent } = agentSessionPort();

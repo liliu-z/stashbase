@@ -49,6 +49,9 @@ export interface AgentWorkspaceProps {
   onReviewTurnChange?: ((review: AgentTurnChangeReview) => void) | undefined;
   /** Restarts preparation for a bound source whose prepared text failed. */
   onReprocess?: ((source: SourceReference) => void) | undefined;
+  /** Whether Settings is open over the workspace. Agent readiness may have
+   *  changed there, so closing it reads the catalog again. */
+  settingsOpen?: boolean | undefined;
   /** The review open on a document an agent proposed a revision to, by
    *  folder-relative path. The documents feature owns that count, and the
    *  composition layer is where the two features meet. */

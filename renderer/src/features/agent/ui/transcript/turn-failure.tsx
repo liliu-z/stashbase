@@ -6,7 +6,9 @@
  *  retry would fail the same way. A hosted model whose configuration changed
  *  is handled the same way, without an update: the chat reconnects to read
  *  the models again, and nothing is sent until the reader has reviewed the
- *  model and chooses to retry.
+ *  model and chooses to retry. A refused sign-in asks for one only until the
+ *  agent is signed in again; the card stays in the transcript, so it then
+ *  says so instead of asking for a sign-in that already happened.
  *
  *  The card is paper like the others in the transcript; the failure's red is
  *  the mark beside the heading, never a fill. While a recovery runs, its
@@ -31,6 +33,7 @@ export function TurnFailure({
   onUpdateApp,
   onRetry,
   runtimeUpdate,
+  signedIn = false,
 }: {
   block: Extract<AgentTranscriptBlock, { kind: 'error' }>;
   modelRefresh?: AgentModelRefreshView | undefined;
@@ -38,9 +41,12 @@ export function TurnFailure({
   onUpdateApp?: (() => void) | undefined;
   onRetry(errorBlockId: string): boolean;
   runtimeUpdate?: AgentRuntimeUpdateView | undefined;
+  /** The agent that refused sign-in has been signed in again since. */
+  signedIn?: boolean | undefined;
 }) {
   const shape = useShape();
-  const needsSignIn = block.failure === 'auth-expired';
+  const refusedSignIn = block.failure === 'auth-expired';
+  const needsSignIn = refusedSignIn && !signedIn;
   const appOutdated = block.failure === 'app-outdated';
   const outdated = block.failure === 'runtime-outdated';
   const updated = outdated && runtimeUpdate?.completedBlockId === block.id;
@@ -69,8 +75,10 @@ export function TurnFailure({
       </div>
       <p className="mt-1 text-caption text-muted-foreground">{block.text}</p>
       <p className="mt-1 text-caption text-muted-foreground">
-        {needsSignIn
-          ? 'Sign in to this agent in Settings, then send again. Your chat and draft are kept.'
+        {refusedSignIn
+          ? signedIn
+            ? 'You are signed in again. Send again to continue. Your chat and draft are kept.'
+            : 'Sign in to this agent in Settings, then send again. Your chat and draft are kept.'
           : appOutdated
             ? 'Install the StashBase update in Settings, then send again. Your chat and draft are kept.'
             : modelChanged

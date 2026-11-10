@@ -11,8 +11,9 @@
  * Only a test file imports this. It is not a `test-support.ts`, which is a
  * barrel of values the feature otherwise keeps to itself; this mounts React.
  */
-import { cleanup } from '@testing-library/react';
+import { act, cleanup } from '@testing-library/react';
 import { afterEach, vi } from 'vite-plus/test';
+import { createStore, useStore } from 'zustand';
 
 import type {
   AgentCatalogPort,
@@ -79,29 +80,35 @@ export function renderWorkspace(
   const catalog = agentCatalogPort(agents, catalogOverrides);
   const onOpenAgentSettings = vi.fn();
   const onOpenAppSettings = vi.fn();
-  const view = withQueryClient(
-    <div>
-      <AgentChats
-        catalog={catalog}
-        onOpenAgentSettings={onOpenAgentSettings}
-        runtime={runtime}
-        scope={RESEARCH_SCOPE}
-        workspaceName="Research"
-      />
-      <ManagedAgentWorkspace
-        onOpenAppSettings={onOpenAppSettings}
-        catalog={catalog}
-        persona={agentPersonaApi()}
-        tools={tools}
-        onOpenAgentSettings={onOpenAgentSettings}
-        onOpenExternal={vi.fn()}
-        onSignIn={onSignIn}
-        onReprocess={onReprocess}
-        runtime={runtime}
-      />
-    </div>,
-    createTestQueryClient(),
-    { strict: true },
-  );
-  return { runtime, view, onOpenAgentSettings, onOpenAppSettings };
+  // Settings is a dialog over the pane in the app; here it is only its flag.
+  const settings = createStore(() => ({ open: false }));
+  function Pane() {
+    const settingsOpen = useStore(settings, (state) => state.open);
+    return (
+      <div>
+        <AgentChats
+          catalog={catalog}
+          onOpenAgentSettings={onOpenAgentSettings}
+          runtime={runtime}
+          scope={RESEARCH_SCOPE}
+          workspaceName="Research"
+        />
+        <ManagedAgentWorkspace
+          onOpenAppSettings={onOpenAppSettings}
+          catalog={catalog}
+          persona={agentPersonaApi()}
+          tools={tools}
+          onOpenAgentSettings={onOpenAgentSettings}
+          onOpenExternal={vi.fn()}
+          onSignIn={onSignIn}
+          onReprocess={onReprocess}
+          runtime={runtime}
+          settingsOpen={settingsOpen}
+        />
+      </div>
+    );
+  }
+  const view = withQueryClient(<Pane />, createTestQueryClient(), { strict: true });
+  const setSettingsOpen = (open: boolean) => act(() => settings.setState({ open }));
+  return { runtime, view, onOpenAgentSettings, onOpenAppSettings, setSettingsOpen };
 }

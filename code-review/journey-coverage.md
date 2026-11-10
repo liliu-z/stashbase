@@ -199,7 +199,11 @@ the catalog had reported ready: the failure offers sign-in settings, preserves
 the next draft, refreshes readiness, and gates the next send on sign-in. The
 refused turn is never automatically replayed. `ui/work-status.tsx` refreshes the
 catalog and `transcript/turn-failure.tsx` owns the visible sign-in recovery;
-the existing first-send gate still owns connecting before sending. This is
+the existing first-send gate still owns connecting before sending. Once a
+reading after the refusal reports the agent ready, the refused turn's card
+says it is signed in again instead of asking (`hooks/use-agent-sign-in-recovery.ts`);
+J01 checks this after the in-chat sign-in, and `workspace.recovery.test.tsx`
+after signing in through Settings, whose closing re-reads the chat catalog. This is
 controlled recovery coverage, not evidence of why a particular fresh install
 passed its initial login check or of a real provider's OAuth exchange.
 The core gate, focused transcript/catalog checks, lint, formatting and build

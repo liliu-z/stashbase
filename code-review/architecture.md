@@ -426,7 +426,12 @@ stable status without download, retry, or a new durable demand latch.
   The chat workspace refreshes its readiness
   catalog when a turn or terminal connection reports `auth-expired`; either names the sign-in
   prerequisite and opens Agents settings through app composition. It preserves
-  the raw diagnostic and draft, and never replays the failed request.
+  the raw diagnostic and draft, and never replays the failed request. The chat
+  stays mounted beneath Settings, so app composition passes whether Settings is
+  open and closing it re-reads the chat catalog. A refused turn's card stops
+  asking for sign-in only after the catalog has reported the refusal and a
+  later reading reports the agent ready; a reading from before the refusal
+  cannot clear it.
   A refusal survives concurrent and later local status checks, even when the
   CLI reports cached credentials as signed in. Only an explicit successful
   sign-in clears it; that sign-in waits for the login command itself. Sign-in failures keep the login's last output with URL query strings

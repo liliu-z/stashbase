@@ -355,6 +355,8 @@ request. A failed history load never becomes an empty conversation.
 An authentication refusal explicitly asks the reader to sign in and offers an
 entry to the agent's sign-in settings. The next send checks that prerequisite
 again. Opening sign-in keeps the chat and draft and never replays the failed turn.
+The refused turn stays in the chat; once the agent is signed in again, it says
+so instead of still asking for a sign-in.
 The same repair is available when authentication or version refusal prevents
 the session from starting. Updating a runtime may expose a sign-in prerequisite;
 show that next action, then continue after sign-in without reinstalling.
