@@ -15,8 +15,8 @@ const DEFAULT_LIMITS = {
   idleMs: 30_000,
 };
 
-function invalidArchive(): GitHubImportError {
-  return new GitHubImportError('The repository snapshot contains invalid or unsupported files.', 'INVALID_ARCHIVE');
+function invalidArchive(cause?: unknown): GitHubImportError {
+  return new GitHubImportError('The repository snapshot contains invalid or unsupported files.', 'INVALID_ARCHIVE', 400, { cause });
 }
 
 function tooLarge(): GitHubImportError {
@@ -67,10 +67,11 @@ export async function downloadGitHubSnapshot(
   let timer: ReturnType<typeof setTimeout>;
   const armTimeout = () => {
     clearTimeout(timer);
-    timer = setTimeout(() => controller.abort(new Error('Snapshot download stalled')), limits.idleMs);
+    timer = setTimeout(() => controller.abort(Object.assign(new Error('Snapshot download stalled'), { code: 'ETIMEDOUT' })), limits.idleMs);
     timer.unref();
   };
   let response: Response | undefined;
+  let stage: 'download' | 'extraction' = 'download';
   try {
     combined.throwIfAborted();
     armTimeout();
@@ -97,16 +98,22 @@ export async function downloadGitHubSnapshot(
     }
     // Rate limits and service failures are retryable download errors, not proof
     // that a public repository is private or missing.
-    if (!response.ok || !response.body) throw new Error(`Archive HTTP ${response.status}`);
+    if (!response.ok || !response.body) throw Object.assign(new Error(`Archive HTTP ${response.status}`), {
+      status: response.status, request_id: response.headers.get('x-github-request-id') ?? undefined,
+    });
     if (Number(response.headers.get('content-length')) > limits.downloadBytes) throw tooLarge();
+    stage = 'extraction';
     await extractSnapshot(response.body, destination, combined, limits, armTimeout);
   } catch (error) {
-    if (signal.aborted) throw new GitHubImportError('Import was cancelled.', 'IMPORT_CANCELLED', 499);
-    if (error instanceof GitHubImportError) throw error;
+    if (signal.aborted) throw new GitHubImportError('Import was cancelled.', 'IMPORT_CANCELLED', 499, { stage });
+    if (error instanceof GitHubImportError) { error.stage ??= stage; throw error; }
+    const cause = combined.aborted ? combined.reason : error;
     // Filesystem failures retain the import transaction's local-failure mapping.
-    const code = (error as NodeJS.ErrnoException)?.code;
-    if (code && ['ENOSPC', 'EACCES', 'EPERM', 'EROFS', 'EMFILE', 'ENFILE', 'EIO'].includes(code)) throw error;
-    throw new GitHubImportError('Failed to download the repository snapshot.', 'DOWNLOAD_FAILED', 502);
+    const code = (cause as NodeJS.ErrnoException)?.code;
+    if (code && ['ENOSPC', 'EACCES', 'EPERM', 'EROFS', 'EMFILE', 'ENFILE', 'EIO'].includes(code)) {
+      throw new GitHubImportError('Failed to save or register the local copy.', 'LOCAL_IMPORT_FAILED', 500, { cause, stage });
+    }
+    throw new GitHubImportError('Failed to download the repository snapshot.', 'DOWNLOAD_FAILED', 502, { cause, stage });
   } finally {
     clearTimeout(timer!);
     controller.abort();
@@ -152,7 +159,7 @@ async function extractSnapshot(
       callback(error);
     },
   });
-  parser.on('error', (error) => { fail(error instanceof GitHubImportError ? error : invalidArchive()); sink.destroy(error); });
+  parser.on('error', (error) => { fail(error instanceof GitHubImportError ? error : invalidArchive(error)); sink.destroy(error); });
   parser.on('ignoredEntry', () => { const error = invalidArchive(); fail(error); sink.destroy(error); });
   parser.on('entry', (entry: ReadEntry) => {
     const work = writeEntry(entry).catch(fail);
@@ -233,7 +240,7 @@ async function extractSnapshot(
     await Promise.all(pending);
     if (signal.aborted) throw signal.reason;
     if (failure instanceof GitHubImportError) throw failure;
-    if ((failure as NodeJS.ErrnoException)?.code?.startsWith('Z_')) throw invalidArchive();
+    if ((failure as NodeJS.ErrnoException)?.code?.startsWith('Z_')) throw invalidArchive(failure);
     throw failure;
   }
 }

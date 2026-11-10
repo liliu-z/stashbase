@@ -12,7 +12,7 @@ import {
 } from '../shared/github-import.ts';
 
 export { GitHubImportError } from './github-import-error.ts';
-import { GitHubImportError } from './github-import-error.ts';
+import { GitHubImportError, type GitHubImportStage } from './github-import-error.ts';
 import { downloadGitHubSnapshot } from './github-snapshot.ts';
 
 const log = logger('github-import');
@@ -135,7 +135,7 @@ export async function publishStagedRepository(
     if (root) {
       await rollbackPublication(root);
       if (await pathExists(target)) {
-        const retained = new GitHubImportError('Some files were retained after the import failed.', 'IMPORT_INCOMPLETE', 500);
+        const retained = new GitHubImportError('Some files were retained after the import failed.', 'IMPORT_INCOMPLETE', 500, { cause: err });
         retained.retainedPath = target;
         throw retained;
       }
@@ -257,12 +257,14 @@ async function runImport(
   // rather than copy every file a second time.
   const operationRoot = path.join(location, `.import-staging-${randomUUID()}`);
   const stagedRepository = path.join(operationRoot, 'repository');
+  let stage: GitHubImportStage = 'staging';
 
   try {
     await fs.promises.mkdir(operationRoot, { recursive: false, mode: 0o700 });
     await fs.promises.mkdir(stagedRepository);
     await downloadGitHubSnapshot(validatedUrl, stagedRepository, signal, deps.fetch);
 
+    stage = 'inspection';
     throwIfCancelled(signal);
     if (await pathExists(path.join(stagedRepository, '.gitmodules'))) {
       throw new GitHubImportError(
@@ -282,7 +284,11 @@ async function runImport(
     throwIfCancelled(signal);
     if (await pathExists(target)) throw destinationExists(rawFolderName);
     try {
-      await deps.publish(stagedRepository, target, signal, () => deps.register(target, signal));
+      stage = 'publication';
+      await deps.publish(stagedRepository, target, signal, () => {
+        stage = 'registration';
+        return deps.register(target, signal);
+      });
     } catch (err: unknown) {
       if (err instanceof GitHubImportError && err.retainedPath) throw err;
       if (signal.aborted || isAbortError(err)) throw cancelled();
@@ -292,11 +298,9 @@ async function runImport(
 
     return { path: target };
   } catch (err: unknown) {
-    if (err instanceof GitHubImportError) throw err;
+    if (err instanceof GitHubImportError) { err.stage ??= stage; throw err; }
     if (signal.aborted || isAbortError(err)) throw cancelled();
-    const code = (err as NodeJS.ErrnoException)?.code;
-    log.warn(`GitHub import failed during local staging${code ? ` (${code})` : ''}`);
-    throw new GitHubImportError('Failed to save or register the local copy.', 'LOCAL_IMPORT_FAILED', 500);
+    throw new GitHubImportError('Failed to save or register the local copy.', 'LOCAL_IMPORT_FAILED', 500, { cause: err, stage });
   } finally {
     try {
       await fs.promises.rm(operationRoot, { recursive: true, force: true });

@@ -191,6 +191,14 @@ refused. All extraction writes settle before cancellation cleans staging.
 Submodules and LFS declarations remain unsupported. Inspection and cancellation
 happen before committing registration.
 
+Acquisition owns one failure diagnostic per import receipt, independently of
+HTTP response delivery. It preserves the bounded original cause chain and the
+staging, download, extraction, inspection, publication or registration stage.
+Upstream HTTP status/request IDs and network error codes remain in causes;
+archive bytes and HTTP response bodies are not collected. Receipt recovery
+never reports that failure again, and the renderer receives only the existing
+public error envelope. Collection uses the ordinary telemetry privacy rules.
+
 Publication and rollback track owned filesystem identities. Preserve concurrent
 edits, replacements, and unrelated additions; never recursively delete an
 ambiguously owned target. Register a successful acquisition before returning its

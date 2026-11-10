@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { telemetry } from '../telemetry.ts';
+import { errorDiagnostic } from '../error-diagnostics.ts';
 /**
  * Project registration and removal, window folder bindings, and imports.
  *
@@ -209,7 +210,7 @@ export function mount(app: express.Express): void {
 
   // Receipts survive HTTP disconnection. Explicit cancellation, not losing a
   // response, owns cancellation for receipt-bearing clients.
-  const imports = createProjectImportOperations<{ status: number; body: unknown }>();
+  const imports = createProjectImportOperations<{ status: number; body: unknown; diagnosticReported?: boolean }>();
   async function acquire(
     input: { url: string; folderName: string; location?: string | undefined; templateId?: string | undefined },
     signal: AbortSignal,
@@ -224,8 +225,15 @@ export function mount(app: express.Express): void {
       rememberCopyLocation(path.dirname(result.path));
       return { status: 200, body: result };
     } catch (err) {
+      const status = err instanceof GitHubImportError ? err.status : 500;
+      // Acquisition owns its diagnostic even when the original response is
+      // lost. Receipt reads must not count the same failed copy again.
+      record({ event: status >= 500 ? 'application_error' : 'application_warning',
+        source: 'server', operation: 'http.github', diagnostic: errorDiagnostic(err),
+        context: { operation_id: operationId, ...(err instanceof GitHubImportError && err.stage ? { stage: err.stage } : {}) },
+      });
       if (!(err instanceof GitHubImportError)) {
-        return { status: 500, body: { code: 'LOCAL_IMPORT_FAILED', error: 'The local import failed.' } };
+        return { status: 500, diagnosticReported: true, body: { code: 'LOCAL_IMPORT_FAILED', error: 'The local import failed.' } };
       }
       let destination;
       if (err.code === 'DESTINATION_EXISTS') {
@@ -233,7 +241,7 @@ export function mount(app: express.Express): void {
         const stat = await fs.promises.stat(target).catch(() => null);
         destination = stat ? { path: target, directory: stat.isDirectory() } : undefined;
       }
-      return { status: err.status, body: {
+      return { status: err.status, diagnosticReported: true, body: {
         code: err.code, error: err.message,
         ...(destination ? { destination } : {}),
         ...(err.retainedPath ? { retainedPath: err.retainedPath } : {}),
@@ -251,7 +259,10 @@ export function mount(app: express.Express): void {
       const result = await (operationId
         ? imports.start(currentWindowId(), operationId, JSON.stringify(input), (signal) => acquire(input, signal, operationId))
         : acquire(input, controller.signal, randomUUID()));
-      if (!res.destroyed) res.status(result.status).json(result.body);
+      if (!res.destroyed) {
+        res.locals.diagnosticReported = result.diagnosticReported;
+        res.status(result.status).json(result.body);
+      }
     } catch {
       if (!res.destroyed) res.status(409).json({ error: 'That receipt belongs to another import request.' });
     } finally { res.removeListener('close', abort); }
@@ -260,6 +271,7 @@ export function mount(app: express.Express): void {
     const receipt = imports.result(currentWindowId(), req.params.operationId);
     if (!receipt) { res.status(404).json({ code: 'OUTCOME_UNKNOWN', error: 'The import outcome is unknown.' }); return; }
     const result = await receipt;
+    res.locals.diagnosticReported = result.diagnosticReported;
     res.status(result.status).json(result.body);
   });
   app.delete('/api/github/import/:operationId', (req, res) => {

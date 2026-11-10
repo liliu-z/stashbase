@@ -277,7 +277,7 @@ test('cancellation and shutdown abort pending HTTP work and clean staging', asyn
       },
     });
     const importing = importPublicGitHubRepository({ url: 'https://github.com/owner/cancel', signal: controller.signal }, deps);
-    const refused = assert.rejects(importing, { code: 'IMPORT_CANCELLED' });
+    const refused = assert.rejects(importing, { code: 'IMPORT_CANCELLED', stage: 'download' });
     await ready;
     if (shutdown) assert.equal(await cancelAllGitHubImports(), 1);
     else controller.abort();
@@ -504,7 +504,8 @@ test('Gallery completion is recorded after publication once per receipt; conflic
   t.mock.method(productionGitHubImportDeps, 'fetch', deps.fetch);
   t.mock.method(productionGitHubImportDeps, 'register', deps.register);
   const recorded: unknown[] = [];
-  t.mock.method(telemetry, 'scoped', () => (event: unknown) => {
+  t.mock.method(telemetry, 'scoped', () => (event: import('../../shared/protocols/http/telemetry.ts').TelemetryEvent) => {
+    if (event.event !== 'gallery_download_completed') return;
     assert.ok(log.registered.length > 0, 'registration must precede counting');
     recorded.push(event);
   });
@@ -531,4 +532,68 @@ test('Gallery completion is recorded after publication once per receipt; conflic
   const { templateId: _templateId, ...ordinary } = input;
   assert.equal((await post({ ...ordinary, operationId: randomUUID(), folderName: 'Ordinary' })).status, 200);
   assert.equal(recorded.length, 1);
+});
+
+test('Gallery failures retain their acquisition cause once per receipt without exposing it in responses', async t => {
+  const { telemetry } = await import('../telemetry.ts');
+  const { httpErrorReporting, installHostErrorReporting } = await import('../error-reporting.ts');
+  const { setLogErrorReporter } = await import('../log.ts');
+  const { randomUUID } = await import('node:crypto');
+  const { deps, home } = fakeDeps({});
+  const network = Object.assign(new Error('archive connection refused'), { code: 'ECONNREFUSED' });
+  const recorded: import('../../shared/protocols/http/telemetry.ts').TelemetryEvent[] = [];
+  const httpErrors: unknown[] = [];
+  t.mock.method(telemetry, 'scoped', () => (event: typeof recorded[number]) => { recorded.push(event); });
+  t.mock.method(telemetry, 'captureError', (error: unknown) => { httpErrors.push(error); });
+  t.mock.method(telemetry, 'captureWarning', (error: unknown) => { httpErrors.push(error); });
+  const monitors = new Set(process.listeners('uncaughtExceptionMonitor'));
+  installHostErrorReporting();
+  t.after(() => {
+    setLogErrorReporter(() => {});
+    for (const listener of process.listeners('uncaughtExceptionMonitor')) {
+      if (!monitors.has(listener)) process.removeListener('uncaughtExceptionMonitor', listener);
+    }
+  });
+  const app = express();
+  app.use(express.json());
+  app.use(httpErrorReporting());
+  mountProjectRoutes(app);
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise<void>(resolve => server.once('listening', resolve));
+  t.after(() => { server.closeAllConnections(); server.close(); });
+  const address = server.address();
+  assert.ok(address && typeof address === 'object');
+  const base = `http://127.0.0.1:${address.port}/api/github/import`;
+  const cases: Array<{ request: typeof fetch; register?: GitHubImportDeps['register']; status: number; code: string; stage: string; causeCode?: string; causeStatus?: number }> = [
+    { request: async () => { throw new TypeError('fetch failed', { cause: network }); }, status: 502, code: 'DOWNLOAD_FAILED', stage: 'download', causeCode: 'ECONNREFUSED' },
+    { request: async () => new Response('private response body', { status: 429, headers: { 'x-github-request-id': 'github-rate-limit' } }), status: 502, code: 'DOWNLOAD_FAILED', stage: 'download', causeStatus: 429 },
+    { request: async () => new Response('not gzip'), status: 400, code: 'INVALID_ARCHIVE', stage: 'extraction', causeCode: 'Z_DATA_ERROR' },
+    { request: deps.fetch, register: async () => { throw Object.assign(new Error('registration denied'), { code: 'EACCES' }); }, status: 500, code: 'LOCAL_IMPORT_FAILED', stage: 'registration', causeCode: 'EACCES' },
+  ];
+  for (const scenario of cases) {
+    t.mock.method(productionGitHubImportDeps, 'fetch', scenario.request);
+    t.mock.method(productionGitHubImportDeps, 'register', scenario.register ?? deps.register);
+    const operationId = randomUUID();
+    const input = { operationId, templateId: 'linkedin-ghostwriter', url: 'https://github.com/owner/repo', folderName: 'LinkedIn Ghostwriter', location: home };
+    const before = recorded.length;
+    for (const retry of [false, true, false]) {
+      const response = await fetch(retry ? `${base}/${operationId}` : base, retry ? {} : {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input),
+      });
+      assert.equal(response.status, scenario.status);
+      const body = await response.json() as Record<string, unknown>;
+      assert.equal(body.code, scenario.code);
+      assert.deepEqual(Object.keys(body).sort(), ['code', 'error']);
+      if (scenario.code === 'DOWNLOAD_FAILED') assert.equal(body.error, 'Failed to download the repository snapshot.');
+    }
+    const errors = recorded.slice(before).filter(event => event.event === 'application_error' || event.event === 'application_warning');
+    assert.equal(errors.length, 1);
+    assert.equal(errors[0]?.context?.stage, scenario.stage);
+    assert.equal(errors[0]?.context?.operation_id, operationId);
+    if (scenario.causeCode) assert.equal(errors[0]?.diagnostic.causes?.some(cause => cause.code === scenario.causeCode), true);
+    if (scenario.causeStatus) assert.equal(errors[0]?.diagnostic.causes?.some(cause => cause.http_status === scenario.causeStatus && cause.request_id === 'github-rate-limit'), true);
+    assert.equal(JSON.stringify(errors).includes('private response body'), false);
+    assert.deepEqual(fs.readdirSync(home), []);
+  }
+  assert.equal(httpErrors.length, 0, 'receipt responses must not duplicate the acquisition diagnostic');
 });

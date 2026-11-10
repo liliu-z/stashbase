@@ -6,6 +6,7 @@ import test from 'node:test';
 import { gzipSync } from 'node:zlib';
 import { Header } from 'tar';
 import { downloadGitHubSnapshot } from './github-snapshot.ts';
+import { GitHubImportError } from './github-import-error.ts';
 
 const repository = { owner: 'owner', repo: 'repo', canonicalUrl: 'https://github.com/owner/repo', defaultFolderName: 'repo' };
 interface Entry { path: string; type?: 'File' | 'Directory' | 'SymbolicLink' | 'Link' | 'CharacterDevice' | 'GNUDumpDir'; content?: string; linkpath?: string; mode?: number; size?: number }
@@ -173,7 +174,15 @@ test('stalled response bodies time out as retryable download failures', async (t
   try {
     await assert.rejects(downloadGitHubSnapshot(repository, destination, new AbortController().signal,
       async () => new Response(new ReadableStream({ cancel() { cancelled = true; } })),
-      { idleMs: 10 }), { code: 'DOWNLOAD_FAILED' });
+      { idleMs: 10 }), error => {
+        assert.ok(error instanceof GitHubImportError);
+        assert.equal(error.code, 'DOWNLOAD_FAILED');
+        assert.equal(error.stage, 'extraction');
+        assert.ok(error.cause instanceof Error);
+        assert.equal((error.cause as NodeJS.ErrnoException).code, 'ETIMEDOUT');
+        assert.equal(error.cause.message, 'Snapshot download stalled');
+        return true;
+      });
     assert.equal(cancelled, true);
   } finally { clearTimeout(keepAlive); }
 });

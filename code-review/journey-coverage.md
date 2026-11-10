@@ -4127,6 +4127,15 @@ Host/services: `server/routes/gallery.ts`, `server/github-import.ts`, `server/gi
   covers the remembered location and its folder-home fallback. The dialog was
   reviewed in its Story (light and dark); no built-app pass drove the native
   picker or a real copy into a non-default location.
+- **Acquisition diagnostics (2026-11-10):** `__tests__/github-import.test.ts`
+  exercises network refusal, GitHub HTTP 429, invalid gzip and registration
+  failure through real HTTP import/receipt handlers, the production log reporter
+  and archive extraction. Cancellation/shutdown retains its download stage.
+  Each attempt keeps one stage/cause diagnostic across repeated POST and GET
+  receipt recovery, while responses contain no internal diagnostic or upstream
+  response body. `github-snapshot.test.ts` retains the original idle-timeout
+  reason. This repairs missing evidence, not the historical Windows download
+  failure; its original cause and Windows runtime reproduction remain unknown.
 - **Snapshot runtime pass (2026-10-09):** an isolated macOS Electron app with
   the built renderer, native boundary and built Node service imported real
   `octocat/Hello-World` through GitHub Import and Gallery Copy with no executables
