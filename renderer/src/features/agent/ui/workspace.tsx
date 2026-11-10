@@ -385,23 +385,8 @@ function ChatWorkspace({
 }
 
 export default function ManagedAgentWorkspace(props: AgentWorkspaceProps) {
-  const catalog = useAgentCatalog(props.catalog);
+  const catalog = useAgentCatalog(props.catalog, props);
   const active = useStore(props.runtime.store, (state) => props.runtime.session(state.activeId));
-  const { refresh } = catalog;
-  useEffect(() => {
-    if (props.accountSignedIn !== undefined) refresh();
-  }, [props.accountSignedIn, refresh]);
-  // Settings signs agents in and out, installs and updates them, and the chat
-  // stays mounted beneath it; read readiness again once it closes.
-  const settingsWereOpen = useRef(false);
-  useEffect(() => {
-    if (props.settingsOpen) settingsWereOpen.current = true;
-    else if (settingsWereOpen.current) {
-      settingsWereOpen.current = false;
-      refresh();
-    }
-  }, [props.settingsOpen, refresh]);
-
   useEffect(() => {
     props.runtime.start(catalog.readyAgents.map((agent) => agent.id));
   }, [catalog.readyAgents, props.runtime]);

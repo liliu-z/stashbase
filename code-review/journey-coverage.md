@@ -59,7 +59,10 @@ OAuth, first reply or returning-user login was completed. Computer-use could
 not reliably target the validation window, and the browser control host was
 unavailable, so visual review remains unverified in this pass. These are
 controlled source results; packaged and cross-platform residual checks remain
-separate.
+separate. The first source CI rejected `workspace.tsx` at 412 lines while its
+other eleven renderer gates passed. Account/Settings refresh effects now live
+with their catalog query in `use-agent-catalog.ts`, keeping the workspace under
+its 400-line limit without changing recovery behavior.
 
 **Source Python setup paths (2026-11-10):** `scripts/packaging/inputs.test.mjs`
 drives the real setup/build script initialization with controlled child commands

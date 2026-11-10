@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import type { AgentCatalogPort } from '@/features/agent/application/ports';
 import { AGENT_ORDER } from '@/features/agent/domain/agent-catalog';
@@ -7,7 +7,16 @@ import { AGENT_ORDER } from '@/features/agent/domain/agent-catalog';
 const AGENT_CATALOG_QUERY_KEY = ['agent', 'catalog'] as const;
 const PREPARATION_POLL_MS = 500;
 
-export function useAgentCatalog(port: AgentCatalogPort) {
+export function useAgentCatalog(
+  port: AgentCatalogPort,
+  {
+    accountSignedIn,
+    settingsOpen,
+  }: {
+    accountSignedIn?: boolean | undefined;
+    settingsOpen?: boolean | undefined;
+  } = {},
+) {
   const query = useQuery({
     queryKey: AGENT_CATALOG_QUERY_KEY,
     queryFn: ({ signal }) => port.listAgents(signal),
@@ -35,6 +44,20 @@ export function useAgentCatalog(port: AgentCatalogPort) {
   const refresh = useCallback(() => {
     void refetch();
   }, [refetch]);
+
+  useEffect(() => {
+    if (accountSignedIn !== undefined) refresh();
+  }, [accountSignedIn, refresh]);
+  // Settings signs agents in and out, installs and updates them, and the chat
+  // stays mounted beneath it; read readiness again once it closes.
+  const settingsWereOpen = useRef(false);
+  useEffect(() => {
+    if (settingsOpen) settingsWereOpen.current = true;
+    else if (settingsWereOpen.current) {
+      settingsWereOpen.current = false;
+      refresh();
+    }
+  }, [settingsOpen, refresh]);
 
   return {
     agents,

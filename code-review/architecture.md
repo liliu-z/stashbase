@@ -428,7 +428,8 @@ stable status without download, retry, or a new durable demand latch.
   prerequisite and opens Agents settings through app composition. It preserves
   the raw diagnostic and draft, and never replays the failed request. The chat
   stays mounted beneath Settings, so app composition passes whether Settings is
-  open and closing it re-reads the chat catalog. A refused turn's card stops
+  open; `use-agent-catalog.ts` owns the re-read when it closes and when account
+  sign-in changes. A refused turn's card stops
   asking for sign-in only after the catalog has reported the refusal and a
   later reading reports the agent ready; a reading from before the refusal
   cannot clear it.
