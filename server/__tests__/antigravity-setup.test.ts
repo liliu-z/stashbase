@@ -50,6 +50,8 @@ else { console.error(${JSON.stringify(geminiConfigurationFailure)}); process.exi
   assert.equal(failure?.retryAction, 'bootstrap');
   assert.match(failure?.message ?? '', /settings\.json/);
   assert.match(failure?.message ?? '', /default backend/i);
+  assert.ok(failure?.message.includes(`Remove "modelProvider" from ${path.join(os.homedir(), '.gemini', 'antigravity-cli', 'settings.json')}`));
+  assert.doesNotMatch(failure?.message ?? '', /GEMINI_API_KEY/);
   coordinator.login('antigravity');
   const login = await coordinator.wait('antigravity');
   assert.equal(login.failure?.code, 'authentication-check-failed');

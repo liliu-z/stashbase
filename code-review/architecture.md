@@ -929,7 +929,10 @@ stable status without download, retry, or a new durable demand latch.
   on window focus.
   `use-agent-catalog.ts` also follows host-reported preparation until it settles,
   so the first listing cannot strand a mounted composer before startup checks
-  finish. Only running preparation is polled; ready, missing, signed-out and
+  finish. The host listing (`routes/terminal.ts`) completes a runtime's model
+  catalog memory before it answers only for a ready runtime: a signed-out
+  Antigravity's `-p /model` waits about a minute on a sign-in of its own, and
+  every listing that follows a sign-in in progress would wait with it. Only running preparation is polled; ready, missing, signed-out and
   failed runtimes stop it. A read failure retains the last catalog and stops
   automatic reads until explicit Retry; unmount cancels outstanding reads.
   Readiness refreshes never launch a session, send a draft or change its agent.

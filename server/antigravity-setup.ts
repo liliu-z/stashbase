@@ -12,6 +12,7 @@
  */
 import { spawn, type ChildProcess } from 'node:child_process';
 import os from 'node:os';
+import path from 'node:path';
 import { probeAgentCommand } from './agent-probe.ts';
 import { agentCliEnv, commandDir } from './agent-cli.ts';
 import { terminateExtractorTree, waitForExtractorTree } from './extractor-process.ts';
@@ -23,7 +24,7 @@ const SIGNED_OUT = /authentication required|not (?:signed|logged) in|sign[- ]?in
 /** Google answering a signed-in account with an eligibility rule, such as an
  * unsupported region, rather than a sign-in problem. */
 const REFUSED = /PERMISSION_DENIED|not eligible|ineligible|not (?:currently )?available in your (?:location|country|region)/i;
-const GEMINI_CONFIGURATION_FAILURE = /modelProvider is set to ["']gemini["'] in settings\.json, but the GEMINI_API_KEY environment variable is not set\b/i;
+const MISSING_PROVIDER_KEY = /\bmodelProvider\b[^\n]*\benvironment variable is not set\b/i;
 
 export type AntigravityAuthState =
   | { state: 'signed-in' }
@@ -41,8 +42,9 @@ export function antigravityAuthState(result: ProbeResult): AntigravityAuthState 
   const envelope = lastJsonObject(result.stdout);
   const error = typeof envelope?.error === 'string' ? envelope.error : '';
   const status = typeof envelope?.status === 'string' ? envelope.status.toUpperCase() : '';
-  if ((result.status !== 0 || status === 'ERROR') && GEMINI_CONFIGURATION_FAILURE.test(`${error}\n${output}`)) {
-    return { state: 'configuration-error', reason: 'Antigravity cannot start because its native settings.json selects the Gemini API backend without the required credentials. Restore the default backend in Antigravity\'s settings.json, then retry.' };
+  if ((result.status !== 0 || status === 'ERROR') && MISSING_PROVIDER_KEY.test(`${error}\n${output}`)) {
+    const settings = path.join(os.homedir(), '.gemini', 'antigravity-cli', 'settings.json');
+    return { state: 'configuration-error', reason: `Antigravity is set to use an API key instead of a Google sign-in. Remove "modelProvider" from ${settings}, then retry to sign in with Google using the default backend.` };
   }
   if (REFUSED.test(output)) return { state: 'refused', reason: providerSentence(error || output) };
   if (SIGNED_OUT.test(output)) return { state: 'signed-out' };

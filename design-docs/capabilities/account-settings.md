@@ -139,7 +139,9 @@ platform capabilities stay named and disabled in navigation.
   that Retry signs in, opening the browser when the check still cannot answer.
   An explicit native backend configuration error instead explains the correction
   and offers a recheck after the reader repairs it. It never opens another
-  sign-in or rewrites the reader's native settings.
+  sign-in or rewrites the reader's native settings. For a missing API backend
+  key, it asks the reader to remove `modelProvider` from Antigravity's settings
+  file, named by path, to restore Google sign-in.
   A broken executable instead offers installation repair. The first-send
   connection follows this same recovery action before continuing its held send.
   An expired or invalid sign-in reported by a status check or a running

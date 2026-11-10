@@ -49,6 +49,18 @@ The map is navigation, not proof that every caller has been reviewed.
 
 ## J01: Onboarding
 
+**Patch release validation (2026-11-10):** The merged sign-in recovery and
+ready-only model-catalog changes passed `pnpm check`, 93 focused renderer
+checks, 20 host catalog checks, renderer lint/format, documentation validation,
+a fresh build and built Electron smoke on macOS. The persistent Antigravity
+onboarding profile started its built host; its catalog reported all three
+native CLIs absent and Default awaiting account setup. No real installation,
+OAuth, first reply or returning-user login was completed. Computer-use could
+not reliably target the validation window, and the browser control host was
+unavailable, so visual review remains unverified in this pass. These are
+controlled source results; packaged and cross-platform residual checks remain
+separate.
+
 **Source Python setup paths (2026-11-10):** `scripts/packaging/inputs.test.mjs`
 drives the real setup/build script initialization with controlled child commands
 under paths containing spaces, apostrophes, Unicode, `%` and `#`. A real pip
@@ -3597,6 +3609,26 @@ setup had reported it as a failed sign-in check, and now reports Account not
 accepted with that sentence (`antigravity-setup.test.ts`,
 `failure-messages.test.ts`, `agent-runtime-status.test.ts`). Later the same
 account passed `/usage` and answered a headless turn.
+A Windows user (2026-11-10) whose `~/.gemini/antigravity-cli/settings.json` set
+`"modelProvider": "gemini"` without `GEMINI_API_KEY` saw Connect fail as
+"closed before sign-in finished": `agy` exits before any sign-in, so the
+console window StashBase opened closed at once. `agy` 1.5.1 on macOS reproduced
+the exit and its sentence through `--settings`, and confirmed that file
+location with a scratch HOME; with any key present, `/usage` returned
+`SUCCESS`. Setup now asks the reader to remove `modelProvider` from that file
+and rechecks on Retry, without opening a sign-in (`antigravity-setup.test.ts`,
+with a fake `agy` through the real probe). The Windows dialog was not rerun.
+The same week a Windows user's Connect dialog stayed on "Connecting
+Antigravity…" for over four minutes, while Antigravity was signed in after a
+StashBase restart. The dialog showed no host step, so its follow-up listings
+were not answering. Each listing completed the model catalog of any installed
+runtime, and a signed-out `agy -p /model` (1.5.1, macOS) waits about a minute
+on its own sign-in. A scratch-HOME server with a fake signed-out `agy` held the
+first listing 15.8 s (the fake's wait); listings now prime only ready runtimes
+and answered in 0.1 s (`agent-contract.test.ts`). Print-mode `agy` also starts
+StashBase's MCP server as a child. Why the Windows listing waited past one
+probe timeout is unproven: the server log is replaced at launch, and the
+user's `agy` logs were not collected.
 Headless stream-json runs on that `agy` confirmed the `init`, `step_update`
 (text deltas) and `result` shapes. They also showed that `init` names no model,
 so the catalog reads the current one from `-p /model`, and that a failed tool

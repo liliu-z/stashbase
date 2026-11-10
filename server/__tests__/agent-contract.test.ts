@@ -13,6 +13,7 @@ import {
   runtimeDescriptorFor,
 } from '../agent-contract.ts';
 import { smokeNativeAgentCli } from '../agent-native-smoke.ts';
+import { primesModelCatalog } from '../routes/terminal.ts';
 
 const REQUIRED_SHARED_CAPABILITIES = [
   'connection', 'prompts', 'interrupt', 'transcript', 'approvals', 'history',
@@ -93,6 +94,17 @@ test('capability discovery reports installed and unavailable native runtimes wit
     assert.equal(unavailable.installHint, expectedInstallHints[adapter.id]);
   }
 
+});
+
+// A signed-out Antigravity's `-p /model` waits about a minute for a sign-in of
+// its own, which held every listing while the reader was signing in.
+test('the listing reads a model catalog only for a runtime that is ready', () => {
+  const antigravity = BUILT_IN_AGENT_ADAPTERS.find((adapter) => adapter.id === 'antigravity');
+  assert.ok(antigravity);
+  const installed = runtimeDescriptorFor(antigravity, '/native/agy');
+  assert.equal(primesModelCatalog(installed), false, 'installed but not signed in');
+  assert.equal(primesModelCatalog({ ...installed, bootstrap: { phase: 'ready', progress: 1, message: 'Ready.' } }), true);
+  assert.equal(primesModelCatalog({ ...runtimeDescriptorFor(antigravity, null), bootstrap: { phase: 'ready', progress: 1, message: 'Ready.' } }), false);
 });
 
 test('capability discovery publishes the registered adapter catalog', async () => {

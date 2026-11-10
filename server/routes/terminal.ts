@@ -4,7 +4,7 @@
  * the CLIs themselves run via structured agent bridges, not a PTY.
  */
 import express from 'express';
-import { discoverAgentRuntimes } from '../agent-contract.ts';
+import { discoverAgentRuntimes, type AgentRuntimeDescriptor } from '../agent-contract.ts';
 import { ensureAgentModelCatalog } from '../agent-model-catalog.ts';
 import { sendError } from '../http.ts';
 import {
@@ -40,11 +40,20 @@ async function agentCatalogResponse() {
  * when what is remembered names no default, so the first Chat on a fresh
  * install can name its model. The memory decides whether a read is due, and
  * a read that fails is not retried until its pause has passed, so a runtime
- * that cannot answer never slows the listing twice in a row. */
+ * that cannot answer never slows the listing twice in a row.
+ *
+ * Installed is not enough. A runtime not yet signed in cannot list its models,
+ * and Antigravity's `-p /model` then waits about a minute on a sign-in of its
+ * own, holding the very listings that follow a sign-in in progress. */
+export function primesModelCatalog(runtime: AgentRuntimeDescriptor): boolean {
+  return runtime.capabilities.models && runtime.installed && runtime.state === 'available'
+    && runtime.bootstrap.phase === 'ready';
+}
+
 async function primeAgentModelCatalogs(): Promise<void> {
   await Promise.all(
     (await discoverAgentRuntimes())
-      .filter((runtime) => runtime.capabilities.models && runtime.installed && runtime.state === 'available')
+      .filter(primesModelCatalog)
       .map((runtime) => ensureAgentModelCatalog(runtime.id)),
   );
 }
