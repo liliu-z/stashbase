@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -20,7 +21,23 @@ const specPath = path.join(root, 'dist', 'pyinstaller');
 const buildReqs = path.join(root, 'python', 'build-requirements.txt');
 const setupPython = path.join(root, 'scripts', 'setup-python.mjs');
 execFileSync(process.execPath, [path.join(root, 'scripts', 'lock-python.mjs'), '--check'], { cwd: root });
-process.env.PIP_CONSTRAINT = path.join(root, 'python', 'constraints.txt');
+function getPipConstraintPath(constraintPath) {
+  if (process.platform === 'win32' && constraintPath.includes(' ')) {
+    try {
+      const short = execFileSync(
+        'powershell.exe',
+        ['-NoProfile', '-Command', `(New-Object -ComObject Scripting.FileSystemObject).GetFile('${constraintPath}').ShortPath`],
+        { encoding: 'utf8' }
+      ).trim();
+      if (short && !short.includes(' ')) return short;
+    } catch {}
+    const tempPath = path.join(os.tmpdir(), 'stashbase-constraints.txt');
+    fs.copyFileSync(constraintPath, tempPath);
+    return tempPath;
+  }
+  return constraintPath;
+}
+process.env.PIP_CONSTRAINT = getPipConstraintPath(path.join(root, 'python', 'constraints.txt'));
 const args = process.argv.slice(2);
 const buildExtractor = args.includes('--with-extract') || process.env.STASHBASE_BUILD_EXTRACT === '1';
 // Keep the console-enabled bootloader so Node can capture stderr progress and

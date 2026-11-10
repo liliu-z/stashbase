@@ -16,7 +16,8 @@
  * embedding daemon crash later with "No module named 'mfs'".
  */
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -27,7 +28,23 @@ const REQS = path.join(ROOT, 'python', 'requirements.txt');
 const EXTRACT_REQS = path.join(ROOT, 'python', 'requirements-extract.txt');
 // Constrain runtime and isolated build dependencies to the reviewed resolution.
 execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'lock-python.mjs'), '--check'], { cwd: ROOT });
-process.env.PIP_CONSTRAINT = path.join(ROOT, 'python', 'constraints.txt');
+function getPipConstraintPath(constraintPath) {
+  if (process.platform === 'win32' && constraintPath.includes(' ')) {
+    try {
+      const short = execFileSync(
+        'powershell.exe',
+        ['-NoProfile', '-Command', `(New-Object -ComObject Scripting.FileSystemObject).GetFile('${constraintPath}').ShortPath`],
+        { encoding: 'utf8' }
+      ).trim();
+      if (short && !short.includes(' ')) return short;
+    } catch {}
+    const tempPath = path.join(os.tmpdir(), 'stashbase-constraints.txt');
+    copyFileSync(constraintPath, tempPath);
+    return tempPath;
+  }
+  return constraintPath;
+}
+process.env.PIP_CONSTRAINT = getPipConstraintPath(path.join(ROOT, 'python', 'constraints.txt'));
 const WITH_EXTRACT = process.argv.includes('--with-extract');
 const VENV_PYTHON = process.platform === 'win32'
   ? path.join(VENV, 'Scripts', 'python.exe')
