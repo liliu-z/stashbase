@@ -7,6 +7,10 @@ export class AgentAccountRefusedError extends Error {}
  * probe. A later cached signed-in result cannot replace a new browser login. */
 export class AgentAuthenticationRequiredError extends Error {}
 
+/** Native configuration prevents the runtime from checking sign-in. A
+ * browser login cannot repair it; recheck after the reader fixes the config. */
+export class AgentConfigurationError extends Error {}
+
 /** Preserve bounded, plain-text setup diagnostics, including Node fetch causes. */
 export function agentSetupDiagnostic(error: unknown): string {
   const seen = new Set<unknown>();

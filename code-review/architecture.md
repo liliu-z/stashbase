@@ -385,6 +385,12 @@ stable status without download, retry, or a new durable demand latch.
   a prior failed startup/authentication check. Working copies skip installation.
   Antigravity's check asks Google, so an unanswered check retries through
   sign-in when its executable runs; a broken launcher offers bootstrap repair.
+  A recognized native backend configuration failure is a typed
+  `AgentConfigurationError`: setup keeps `authentication-check-failed` with a
+  bootstrap recheck, and login propagates it before opening a terminal or
+  browser, or immediately if it appears during polling. The correction names
+  the native settings; StashBase does not rewrite them or request an environment
+  credential. Bounded probe output remains available in diagnostics.
   The chat catalog maps the host's `retryAction: login` to its
   sign-in prerequisite, so first-send and Settings follow the same recovery.
   Stop ends only a running sign-in; a stop that finds another
@@ -476,7 +482,8 @@ stable status without download, retry, or a new durable demand latch.
   Antigravity readiness runs `agy --output-format json -p /usage`, which needs
   the cached sign-in but starts no turn. Its sign-in entry runs that same check
   before starting a terminal: a signed-in account returns immediately and a
-  refused account keeps its error without opening login. A check that cannot
+  refused account or explicit backend configuration failure keeps its error
+  without opening login. A check that cannot
   answer starts the terminal, because an answer it does not recognize may be a
   signed-out account, and the readiness failure it leaves names sign-in as its
   retry action. Cancellation

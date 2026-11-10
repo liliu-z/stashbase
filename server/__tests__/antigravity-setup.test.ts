@@ -6,14 +6,68 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { antigravityAuthState, loginToAntigravity } from '../antigravity-setup.ts';
+import { antigravityAuthState, antigravityIsAuthenticated, loginToAntigravity } from '../antigravity-setup.ts';
 import { AgentAccountRefusedError } from '../agent-setup-diagnostic.ts';
-import { AgentBootstrapCoordinator } from '../agent-runtime-installer.ts';
+import { AgentBootstrapCoordinator, verifyAgentExecutable } from '../agent-runtime-installer.ts';
 import { antigravityCurrentModel, antigravityModelsFromListing, withCurrentModel } from '../antigravity-model-catalog.ts';
 import { antigravityErrorFromStderr, isReadOnlyCommand, parseAntigravityLine } from '../antigravity-protocol.ts';
 import { antigravityHookLauncher, ensureAgentMcp } from '../agent-mcp.ts';
 
+const geminiConfigurationFailure = 'modelProvider is set to "gemini" in settings.json, but the GEMINI_API_KEY environment variable is not set. Set GEMINI_API_KEY to your Gemini API key, or remove "modelProvider" from settings.json to use the default backend.';
+
+test('an explicit Antigravity backend configuration failure rechecks without opening sign-in', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-agy configuration '));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const repaired = path.join(root, 'repaired');
+  const script = path.join(root, 'probe.cjs');
+  fs.writeFileSync(script, `const fs = require('node:fs');
+if (process.argv.includes('--version')) console.log('1.4.0');
+else if (fs.existsSync(${JSON.stringify(repaired)})) console.log('{"status":"SUCCESS"}');
+else { console.error(${JSON.stringify(geminiConfigurationFailure)}); process.exit(1); }
+`);
+  const executable = path.join(root, process.platform === 'win32' ? 'agy.cmd' : 'agy');
+  fs.writeFileSync(executable, process.platform === 'win32'
+    ? `@"${process.execPath}" "${script}" %*\r\n`
+    : `#!/bin/sh\nexec '${process.execPath}' '${script}' "$@"\n`, { mode: 0o755 });
+  let terminals = 0;
+  let browsers = 0;
+  let configured = 0;
+  const coordinator = new AgentBootstrapCoordinator({
+    resolveExecutable: () => executable,
+    resolveNativeExecutable: () => executable,
+    installRuntime: async () => { throw new Error('Configuration recovery must not reinstall a working CLI.'); },
+    verifyExecutable: (_id, selected, signal) => verifyAgentExecutable(selected, 'Antigravity', process.env, 1000, signal),
+    isAuthenticated: (_id, selected, signal) => antigravityIsAuthenticated(selected, signal),
+    login: (_id, selected, signal) => loginToAntigravity(selected, signal, {
+      spawnSignIn: () => { terminals++; throw new Error('Configuration repair cannot start sign-in.'); },
+    }, { onBrowserSignIn: () => { browsers++; } }),
+    configureMcp: () => { configured++; },
+    consumeFailure: () => false,
+  });
+  coordinator.connectIfInstalled('antigravity');
+  const failure = (await coordinator.wait('antigravity')).failure;
+  assert.equal(failure?.code, 'authentication-check-failed');
+  assert.equal(failure?.retryAction, 'bootstrap');
+  assert.match(failure?.message ?? '', /settings\.json/);
+  assert.match(failure?.message ?? '', /default backend/i);
+  coordinator.login('antigravity');
+  const login = await coordinator.wait('antigravity');
+  assert.equal(login.failure?.code, 'authentication-check-failed');
+  assert.equal(login.failure?.retryAction, 'bootstrap');
+  assert.equal(terminals, 0);
+  assert.equal(browsers, 0);
+  assert.equal(configured, 0);
+  fs.writeFileSync(repaired, '');
+  coordinator.begin('antigravity');
+  assert.equal((await coordinator.wait('antigravity')).phase, 'ready');
+  assert.equal(configured, 1);
+});
+
 test('the sign-in check tells signed out, refused, and unknown apart', () => {
+  for (const result of [
+    { status: 1, stdout: '', stderr: geminiConfigurationFailure },
+    { status: 0, stdout: JSON.stringify({ status: 'ERROR', error: geminiConfigurationFailure }), stderr: '' },
+  ]) assert.equal(antigravityAuthState(result).state, 'configuration-error');
   assert.deepEqual(antigravityAuthState({ status: 0, stdout: '{"status":"SUCCESS","command":{"name":"usage"}}', stderr: '' }), { state: 'signed-in' });
   assert.deepEqual(antigravityAuthState({ status: 1, stdout: '', stderr: 'error: authentication required' }), { state: 'signed-out' });
   assert.deepEqual(antigravityAuthState({ status: 0, stdout: '{"status":"ERROR","error":"Not signed in"}', stderr: '' }), { state: 'signed-out' });

@@ -173,6 +173,19 @@ processes. They join focused host setup/source-preservation tests and the pinned
 OpenCode fake-gateway smoke in `pnpm test:core`; `pnpm check` adds types.
 The old vocabulary-array count test was removed; it established no user outcome.
 
+**Antigravity configuration recovery (2026-11-10):** The existing
+`__tests__/antigravity-setup.test.ts` now runs a controlled CLI under a path with
+spaces through the real probe, coordinator and login entry. The production
+Gemini-backend/missing-credential diagnostic stays a failed check with bootstrap
+recheck; explicit login starts neither a terminal nor browser. Repairing the
+fixture configuration reaches Ready without reinstalling. Unknown checks retain
+their sign-in recovery. A macOS built-host pass on Node 26.13.0 repeats the
+failure, explicit login refusal and repair-to-Ready through the real HTTP routes,
+with isolated native configuration and telemetry disabled. Desktop inspection
+could not complete because the computer-use app target was unavailable. These
+fixtures do not establish fresh Google OAuth, real-provider first replies, or
+Windows runtime behavior; those remain unverified for this change.
+
 The native scenarios also cover a turn whose authentication is refused after
 the catalog had reported ready: the failure offers sign-in settings, preserves
 the next draft, refreshes readiness, and gates the next send on sign-in. The

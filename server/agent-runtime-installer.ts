@@ -19,7 +19,7 @@ import {
 } from './agent-runtime-paths.ts';
 import { probeAgentCommand } from './agent-probe.ts';
 import { agentCliLaunch } from './agent-cli-launch.ts';
-import { AgentAccountRefusedError, AgentAuthenticationRequiredError, agentSetupDiagnostic } from './agent-setup-diagnostic.ts';
+import { AgentAccountRefusedError, AgentAuthenticationRequiredError, AgentConfigurationError, agentSetupDiagnostic } from './agent-setup-diagnostic.ts';
 import { classifyAgentTurnFailure } from './agent-turn-failure.ts';
 import { ensureAgentMcp } from './agent-mcp.ts';
 import {
@@ -270,6 +270,10 @@ export class AgentBootstrapCoordinator {
             new Error(`${agentLabel(id)} ${signIn ? 'sign-in' : 'setup'} was stopped.`));
           return;
         }
+        if (!signal.aborted && error instanceof AgentConfigurationError) {
+          this.fail(id, action, stage, 'authentication-check-failed', error, undefined, 'bootstrap');
+          return;
+        }
         const code = !signal.aborted && error instanceof AgentAccountRefusedError ? 'account-refused' : 'operation-failed';
         this.fail(id, action, stage, code, signal.aborted ? signal.reason : error, stage === 'installation' ? 'install-command' : undefined);
       }
@@ -331,6 +335,10 @@ export class AgentBootstrapCoordinator {
       }
       if (error instanceof AgentAccountRefusedError) {
         this.fail(id, action, 'authentication', 'account-refused', error);
+        return false;
+      }
+      if (error instanceof AgentConfigurationError) {
+        this.fail(id, action, 'authentication', 'authentication-check-failed', error, undefined, 'bootstrap');
         return false;
       }
       // Antigravity's check asks Google. Offer login for an unanswered check
