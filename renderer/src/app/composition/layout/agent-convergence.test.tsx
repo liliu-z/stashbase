@@ -146,9 +146,11 @@ vi.mock('@milkdown/crepe/builder', () => ({
 type AgentConnectionListener = Parameters<AgentSessionPort['connect']>[1];
 
 const FOLDER = '/project/notes';
+/** A lazily mounted surface is allowed this long to arrive under full-suite load. */
+const LAZY = { timeout: 10_000 };
 // Each case mounts the complete workspace and awaits several lazy surfaces.
-// Allow more than the composer's five-second wait under full-suite coverage load.
-const COMPOSITION_TEST_MS = 15_000;
+// Allow more than the composer's wait under full-suite coverage load.
+const COMPOSITION_TEST_MS = 30_000;
 
 interface Harness {
   dependencies: AppDependencies;
@@ -246,7 +248,7 @@ function harness(): Harness {
 }
 
 async function messageEditor(): Promise<EditorView> {
-  const field = await screen.findByRole('textbox', { name: 'Message' }, { timeout: 5_000 });
+  const field = await screen.findByRole('textbox', { name: 'Message' }, LAZY);
   const view = EditorView.findFromDOM(field.closest('.cm-editor') as HTMLElement);
   if (!view) throw new Error('No CodeMirror view behind the message field.');
   return view;
@@ -271,9 +273,9 @@ async function converge(test: Harness): Promise<AgentConnectionListener> {
   );
 
   const user = userEvent.setup();
-  await user.click(await screen.findByRole('treeitem', { name: 'Welcome.md' }));
+  await user.click(await screen.findByRole('treeitem', { name: 'Welcome.md' }, LAZY));
   // A tree click browses, so the tab it opens is the preview.
-  await screen.findByRole('tab', { name: 'Welcome.md, preview' });
+  await screen.findByRole('tab', { name: 'Welcome.md, preview' }, LAZY);
 
   const composer = await messageEditor();
   act(() => {
@@ -284,7 +286,7 @@ async function converge(test: Harness): Promise<AgentConnectionListener> {
   });
   await user.click(screen.getByRole('button', { name: 'Send' }));
 
-  await waitFor(() => expect(test.listeners).toHaveLength(1));
+  await waitFor(() => expect(test.listeners).toHaveLength(1), LAZY);
   const listener = test.listeners[0];
   if (!listener) throw new Error('The Agent session never connected.');
   act(() => listener.onEvent({ kind: 'ready' }));
@@ -321,7 +323,7 @@ describe('J07 converge chat into a document', () => {
       test.setFiles(['Welcome.md', 'Canvas.md']);
       settleWrite(listener, 'write-1', 'Canvas.md', '# Canvas v1');
 
-      expect(await screen.findByRole('treeitem', { name: 'Canvas.md' })).not.toBeNull();
+      expect(await screen.findByRole('treeitem', { name: 'Canvas.md' }, LAZY)).not.toBeNull();
       expect(
         screen.getByRole('tab', { name: 'Welcome.md, preview' }).getAttribute('aria-selected'),
       ).toBe('true');
@@ -352,8 +354,8 @@ describe('J07 converge chat into a document', () => {
 
       await userEvent.click(
         entry === 'file result'
-          ? await screen.findByRole('button', { name: 'Open Canvas.md' })
-          : await screen.findByRole('link', { name: 'Canvas' }),
+          ? await screen.findByRole('button', { name: 'Open Canvas.md' }, LAZY)
+          : await screen.findByRole('link', { name: 'Canvas' }, LAZY),
       );
       expect(screen.getByRole('tab', { name: 'Documents' }).getAttribute('aria-selected')).toBe(
         'true',
@@ -363,14 +365,20 @@ describe('J07 converge chat into a document', () => {
 
       // Opening from the transcript is browsing too: the Canvas takes the
       // preview's place rather than a tab of its own.
-      expect(await screen.findByRole('tab', { name: 'Canvas.md, preview' })).not.toBeNull();
+      expect(await screen.findByRole('tab', { name: 'Canvas.md, preview' }, LAZY)).not.toBeNull();
       expect(screen.queryByRole('tab', { name: /^Welcome\.md/ })).toBeNull();
-      await waitFor(() => expect(markdownEditorFor('Canvas.md').markdown).toBe('# Canvas v1'));
+      await waitFor(
+        () => expect(markdownEditorFor('Canvas.md').markdown).toBe('# Canvas v1'),
+        LAZY,
+      );
 
       test.setSource('Canvas.md', '# Canvas v2', 'c2');
       settleWrite(listener, 'write-2', 'Canvas.md', '# Canvas v2');
 
-      await waitFor(() => expect(markdownEditorFor('Canvas.md').markdown).toBe('# Canvas v2'));
+      await waitFor(
+        () => expect(markdownEditorFor('Canvas.md').markdown).toBe('# Canvas v2'),
+        LAZY,
+      );
     },
     COMPOSITION_TEST_MS,
   );
@@ -392,20 +400,21 @@ describe('J07 converge chat into a document', () => {
         }),
       );
 
-      const cited = await screen.findByRole('link', { name: 'the claim' });
+      const cited = await screen.findByRole('link', { name: 'the claim' }, LAZY);
       expect(cited.getAttribute('title')).toContain('tide rises');
       await userEvent.click(cited);
 
       expect(screen.getByRole('tab', { name: 'Documents' }).getAttribute('aria-selected')).toBe(
         'true',
       );
-      expect(await screen.findByRole('tab', { name: 'Canvas.md, preview' })).not.toBeNull();
-      await waitFor(() =>
-        expect(screen.queryByText('The file is open. Locating the passage…')).toBeNull(),
+      expect(await screen.findByRole('tab', { name: 'Canvas.md, preview' }, LAZY)).not.toBeNull();
+      await waitFor(
+        () => expect(screen.queryByText('The file is open. Locating the passage…')).toBeNull(),
+        LAZY,
       );
       expect(screen.queryByText(/passage could not be/u)).toBeNull();
       await userEvent.keyboard('{Control>}f{/Control}');
-      const find = await screen.findByRole('search', { name: 'Find in document' });
+      const find = await screen.findByRole('search', { name: 'Find in document' }, LAZY);
       expect(within(find).getByRole('textbox', { name: 'Find in document' })).toHaveProperty(
         'value',
         'tide rises',
@@ -423,22 +432,25 @@ describe('J07 converge chat into a document', () => {
 
       test.setFiles(['Welcome.md', 'Canvas.md']);
       settleWrite(listener, 'write-1', 'Canvas.md', '# Canvas v1');
-      await userEvent.setup().click(await screen.findByRole('button', { name: 'Open Canvas.md' }));
-      await screen.findByRole('tab', { name: 'Canvas.md, preview' });
-      await waitFor(() => expect(markdownEditorFor('Canvas.md').markdown).toBe('# Canvas v1'));
+      await userEvent
+        .setup()
+        .click(await screen.findByRole('button', { name: 'Open Canvas.md' }, LAZY));
+      await screen.findByRole('tab', { name: 'Canvas.md, preview' }, LAZY);
+      await waitFor(
+        () => expect(markdownEditorFor('Canvas.md').markdown).toBe('# Canvas v1'),
+        LAZY,
+      );
 
       const canvas = markdownEditorFor('Canvas.md');
       test.setSaveConflict(true);
       test.setSource('Canvas.md', '# Canvas from the Agent', 'c3');
       act(() => canvas.change?.(null, '# Canvas, reviewed', '# Canvas v1'));
 
-      expect(await screen.findByRole('tab', { name: 'Canvas.md, unsaved changes' })).not.toBeNull();
       expect(
-        await screen.findByRole(
-          'heading',
-          { name: 'Canvas.md changed on disk' },
-          { timeout: 3_000 },
-        ),
+        await screen.findByRole('tab', { name: 'Canvas.md, unsaved changes' }, LAZY),
+      ).not.toBeNull();
+      expect(
+        await screen.findByRole('heading', { name: 'Canvas.md changed on disk' }, LAZY),
       ).not.toBeNull();
       expect(screen.getByRole('button', { name: 'Use disk version' })).not.toBeNull();
       expect(screen.getByRole('button', { name: 'Merge' })).not.toBeNull();
