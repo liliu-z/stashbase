@@ -49,6 +49,14 @@ The map is navigation, not proof that every caller has been reviewed.
 
 ## J01: Onboarding
 
+**Source Python setup paths (2026-11-10):** `scripts/packaging/inputs.test.mjs`
+drives the real setup/build script initialization with controlled child commands
+under paths containing spaces, apostrophes, Unicode, `%` and `#`. A real pip
+no-index dry run reads each checkout's encoded constraint URL without installation.
+The test covers unavailable 8.3 names and a spaced temporary directory without
+PowerShell or a shared constraint copy. It does not establish a full Python
+dependency installation or frozen sidecar build under those special paths.
+
 **Account and startup recovery (2026-11-03):** credits and billing now refresh
 host-owned account state after a typed authentication refusal. Confirmed expiry
 restores Sign in and invalidates Agent readiness; network errors keep the

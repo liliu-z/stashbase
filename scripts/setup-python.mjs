@@ -16,10 +16,9 @@
  * embedding daemon crash later with "No module named 'mfs'".
  */
 import { execFileSync, spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
-import os from 'node:os';
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -28,23 +27,9 @@ const REQS = path.join(ROOT, 'python', 'requirements.txt');
 const EXTRACT_REQS = path.join(ROOT, 'python', 'requirements-extract.txt');
 // Constrain runtime and isolated build dependencies to the reviewed resolution.
 execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'lock-python.mjs'), '--check'], { cwd: ROOT });
-function getPipConstraintPath(constraintPath) {
-  if (process.platform === 'win32' && constraintPath.includes(' ')) {
-    try {
-      const short = execFileSync(
-        'powershell.exe',
-        ['-NoProfile', '-Command', `(New-Object -ComObject Scripting.FileSystemObject).GetFile('${constraintPath}').ShortPath`],
-        { encoding: 'utf8' }
-      ).trim();
-      if (short && !short.includes(' ')) return short;
-    } catch {}
-    const tempPath = path.join(os.tmpdir(), 'stashbase-constraints.txt');
-    copyFileSync(constraintPath, tempPath);
-    return tempPath;
-  }
-  return constraintPath;
-}
-process.env.PIP_CONSTRAINT = getPipConstraintPath(path.join(ROOT, 'python', 'constraints.txt'));
+// pip splits this environment option on whitespace; a file URL keeps the
+// checkout's own constraint readable without short names or temporary copies.
+process.env.PIP_CONSTRAINT = pathToFileURL(path.join(ROOT, 'python', 'constraints.txt')).href;
 const WITH_EXTRACT = process.argv.includes('--with-extract');
 const VENV_PYTHON = process.platform === 'win32'
   ? path.join(VENV, 'Scripts', 'python.exe')
