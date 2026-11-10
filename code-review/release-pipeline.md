@@ -310,6 +310,11 @@ requirements edits without a refreshed resolution. Review dependency updates
 in the generated file; the resolver retains existing pins where compatible.
 The build reconciles its environment before freezing instead of accepting any
 already-installed PyInstaller version. Source setup uses the same constraints.
+`pnpm test:package-inputs` runs both scripts' initialization with controlled
+subprocesses from checkout paths containing spaces, apostrophes, Unicode, `%`
+and `#`, then verifies the constraint with a real pip no-index dry run. It also
+checks distinct checkouts retain their own constraints without a shared temporary
+file or PowerShell invocation; it does not freeze or package a sidecar.
 After regenerating constraints, validate a clean resolution with Python 3.13's
 `pip install --dry-run --ignore-installed -c python/constraints.txt -r python/requirements-extract.txt -r python/build-requirements.txt`.
 Universal uv resolution and an existing environment can miss index-level Python

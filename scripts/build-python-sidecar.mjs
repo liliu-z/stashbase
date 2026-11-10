@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
@@ -20,7 +20,9 @@ const specPath = path.join(root, 'dist', 'pyinstaller');
 const buildReqs = path.join(root, 'python', 'build-requirements.txt');
 const setupPython = path.join(root, 'scripts', 'setup-python.mjs');
 execFileSync(process.execPath, [path.join(root, 'scripts', 'lock-python.mjs'), '--check'], { cwd: root });
-process.env.PIP_CONSTRAINT = path.join(root, 'python', 'constraints.txt');
+// Keep the constraint in its checkout; pip accepts a file URL without
+// splitting spaces or depending on Windows short names.
+process.env.PIP_CONSTRAINT = pathToFileURL(path.join(root, 'python', 'constraints.txt')).href;
 const args = process.argv.slice(2);
 const buildExtractor = args.includes('--with-extract') || process.env.STASHBASE_BUILD_EXTRACT === '1';
 // Keep the console-enabled bootloader so Node can capture stderr progress and

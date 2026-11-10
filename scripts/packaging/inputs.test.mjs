@@ -5,7 +5,7 @@ import test from 'node:test';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { extractorInputs, extractorVersion } from './extractor-release.mjs';
 
@@ -118,6 +118,79 @@ test('Windows extractor build wires PyInstaller hide-console without switching o
   );
   assert.match(source, /'stashbase-extract',\s*\.\.\.extractorConsoleArgs,/);
   assert.doesNotMatch(source, /'--(?:no)?console'/);
+});
+
+test('Python setup and build keep each checkout constraint readable by pip under special paths', (t) => {
+  const temporary = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-pip-inputs-')));
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  const sharedTemp = path.join(temporary, "First Last's Temp");
+  fs.mkdirSync(sharedTemp);
+  const sharedConstraint = path.join(sharedTemp, 'stashbase-constraints.txt');
+  fs.writeFileSync(sharedConstraint, 'unrelated temporary file\n');
+  const bootstrap = path.join(temporary, 'probe.mjs');
+  fs.writeFileSync(bootstrap, `
+import childProcess from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import { syncBuiltinESMExports } from 'node:module';
+Object.defineProperty(process, 'platform', { value: process.env.FIXTURE_PLATFORM });
+os.tmpdir = () => process.env.FIXTURE_TEMP;
+const commands = [];
+childProcess.spawnSync = () => ({ status: 0, stdout: '3 13' });
+childProcess.execFileSync = (command, args) => {
+  commands.push(command);
+  if (command === 'powershell.exe') throw new Error('No 8.3 short names in this fixture');
+  if (args[0] === '-m' && args[1] === 'venv') fs.mkdirSync(args[2], { recursive: true });
+  else if (args[0] === '-m' && args[1] === 'pip' && args[2] === 'install') {
+    console.log('PIP_INPUT ' + JSON.stringify({ constraint: process.env.PIP_CONSTRAINT, commands }));
+    process.exit(0);
+  }
+  else if (command !== process.execPath) throw new Error('Unexpected process: ' + command);
+  return Buffer.alloc(0);
+};
+syncBuiltinESMExports();
+`);
+  const candidates = [
+    path.join(root, 'python', '.venv.nosync', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python'),
+    'python3.13', 'python3', 'python',
+  ];
+  const python = candidates.find(command => spawnSync(command, ['-c', 'import pip'], { encoding: 'utf8' }).status === 0);
+  assert.ok(python, 'Python with pip is required to verify the constraint consumer');
+  for (const platform of new Set(['win32', process.platform])) {
+    for (const script of ['setup-python.mjs', 'build-python-sidecar.mjs']) {
+      const constraints = [];
+      for (const [name, pin] of [["First Last's checkout #1 % 中文", '1.0'], ['Second checkout', '2.0']]) {
+        const checkout = path.join(temporary, platform, script, name);
+        fs.mkdirSync(path.join(checkout, 'scripts'), { recursive: true });
+        fs.mkdirSync(path.join(checkout, 'python'));
+        const sourceConstraint = path.join(checkout, 'python', 'constraints.txt');
+        fs.writeFileSync(sourceConstraint, `stashbase-path-fixture==${pin}\n`);
+        fs.copyFileSync(path.join(root, 'scripts', script), path.join(checkout, 'scripts', script));
+        const result = spawnSync(process.execPath, ['--import', pathToFileURL(bootstrap).href, path.join(checkout, 'scripts', script)], {
+          cwd: checkout, encoding: 'utf8',
+          env: { ...process.env, FIXTURE_PLATFORM: platform, FIXTURE_TEMP: sharedTemp },
+        });
+        assert.equal(result.status, 0, result.stderr);
+        const captured = result.stdout.split(/\r?\n/).find(line => line.startsWith('PIP_INPUT '));
+        assert.ok(captured, result.stdout);
+        const input = JSON.parse(captured.slice('PIP_INPUT '.length));
+        assert.equal(input.constraint, pathToFileURL(sourceConstraint).href);
+        assert.doesNotMatch(input.constraint, /\s/);
+        assert.equal(input.commands.includes('powershell.exe'), false, 'paths must never become PowerShell code');
+        constraints.push(input.constraint);
+        // Use the real pip parser and local-file reader, without contacting an
+        // index or changing an environment. pip is already installed.
+        const pip = spawnSync(python, ['-m', 'pip', 'install', '--dry-run', '--no-index', '--no-deps', 'pip'], {
+          encoding: 'utf8',
+          env: { ...process.env, PIP_CONFIG_FILE: os.devNull, PIP_CONSTRAINT: input.constraint, PIP_DISABLE_PIP_VERSION_CHECK: '1' },
+        });
+        assert.equal(pip.status, 0, pip.stderr || pip.stdout);
+      }
+      assert.notEqual(constraints[0], constraints[1], 'different checkouts must never share a mutable constraint copy');
+      assert.equal(fs.readFileSync(fileURLToPath(constraints[0]), 'utf8'), 'stashbase-path-fixture==1.0\n');
+      assert.equal(fs.readFileSync(sharedConstraint, 'utf8'), 'unrelated temporary file\n');
+    }
+  }
 });
 
 test('the packaged daemon pins the public MFS project and excludes retired ONNX wiring', () => {

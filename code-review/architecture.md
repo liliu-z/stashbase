@@ -248,7 +248,10 @@ a second projection ledger or query MFS implementation tables.
 
 MFS dependency updates follow published upstream releases. Pin the versioned
 release archive in Python requirements and constraints; setup verifies both its
-source URL and installed package version.
+source URL and installed package version. Python setup and sidecar builds pass
+the checked-in constraint as an encoded local file URL in `PIP_CONSTRAINT`, so
+pip receives one path even when checkout names contain whitespace. They never
+evaluate that path as shell code or share a mutable temporary constraint copy.
 
 - Completion is format-specific and current-source-bound: PDF needs its terminal
   marker; DOCX needs sanitized marked output with text. Empty completed PDF/image
