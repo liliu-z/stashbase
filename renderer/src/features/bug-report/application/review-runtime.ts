@@ -20,6 +20,7 @@ import {
   type ReviewSession,
 } from '@/features/bug-report/domain/review-session';
 import { isFeatureError } from '@/shared/domain/feature-error';
+import { createSerialQueue } from '@/shared/runtime/serial-queue';
 
 import type { BugReportReviewPort } from './ports';
 
@@ -66,16 +67,7 @@ export function createBugReportReviewRuntime(
   const dispatch = (event: ReviewEvent) =>
     store.setState((state) => reduceReviewSession(state, event), true);
   const current = () => store.getState();
-  let tail: Promise<void> = Promise.resolve();
-
-  function enqueue(operation: () => Promise<void>): Promise<void> {
-    const result = tail.then(operation, operation);
-    tail = result.then(
-      () => undefined,
-      () => undefined,
-    );
-    return result;
-  }
+  const enqueue = createSerialQueue();
 
   /** Sends a dirty description to main. Answers whether the field is
    *  confirmed, so a prepare can stop before approving unconfirmed text. */

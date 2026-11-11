@@ -17,6 +17,7 @@ import {
 import { isExternalSource } from '@/shared/domain/external-source';
 import type { SourceReference } from '@/shared/domain/source-reference';
 import { createScopeGuard } from '@/shared/runtime/scope-guard';
+import { createSerialQueue } from '@/shared/runtime/serial-queue';
 
 import { createDocumentRuntime, type DocumentRuntime } from './document-runtime';
 import {
@@ -75,7 +76,6 @@ export function createDocumentTabsRuntime({
   };
   let preparing: ReturnType<typeof createQueries> | null = null;
   let retryOpen: (() => Promise<DocumentRuntime | null>) | null = null;
-  let transitionTail: Promise<void> = Promise.resolve();
 
   const guard = createScopeGuard<DocumentTabsScope>({
     disposed: () => disposed,
@@ -84,14 +84,7 @@ export function createDocumentTabsRuntime({
     scope: () => scope,
   });
 
-  function enqueueTransition<Result>(operation: () => Promise<Result>): Promise<Result> {
-    const result = transitionTail.then(operation, operation);
-    transitionTail = result.then(
-      () => undefined,
-      () => undefined,
-    );
-    return result;
-  }
+  const enqueueTransition = createSerialQueue();
 
   const saveDocuments = (items: Iterable<DocumentRuntime>) =>
     saveOpenDocuments({ store, navigation }, api, items);

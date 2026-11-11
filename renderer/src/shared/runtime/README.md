@@ -4,8 +4,8 @@
 only `app/` composition and feature hooks — request signal lifetimes, lazily
 mounted surfaces, the boundary a surface renders behind so one that throws is
 contained rather than taking its window down, command-surface registration,
-runtime scoping and retention, scroll anchoring, text-entry focus tracking, and
-the provider stack the application mounts.
+runtime scoping and retention, serial operation queues, scroll anchoring,
+text-entry focus tracking, and the provider stack the application mounts.
 
 The boundary draws the recovery and owns none of its words. A caught render
 error's message is written for a developer, and a leaf here cannot reach a
