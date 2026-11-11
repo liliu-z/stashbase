@@ -85,28 +85,20 @@ interface LinkMatch {
  *  URL portion. Nested brackets in the text part are tolerated one
  *  level deep — good enough for hand-written docs. */
 function extractMdLinks(content: string): LinkMatch[] {
-  const re = /(!?\[(?:[^\[\]]|\[[^\[\]]*\])*\])\(([^)\s]+?)((?:\s+"[^"]*")?)\)/gd;
-  const out: LinkMatch[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(content)) !== null) {
-    const idx = (m as unknown as { indices?: Array<[number, number] | undefined> }).indices;
-    if (!idx?.[2]) continue;
-    const [s, e] = idx[2];
-    out.push({ start: s, end: e, href: m[2] });
-  }
-  return out;
+  return hrefMatches(content, /(!?\[(?:[^\[\]]|\[[^\[\]]*\])*\])\(([^)\s]+?)((?:\s+"[^"]*")?)\)/gd);
 }
 
 /** Match every `<a ... href="..." ...>`. Quotes can be `"` or `'`. */
 function extractHtmlLinks(content: string): LinkMatch[] {
-  const re = /<a\b[^>]*?\bhref\s*=\s*(["'])([^"']*)\1/gid;
+  return hrefMatches(content, /<a\b[^>]*?\bhref\s*=\s*(["'])([^"']*)\1/gid);
+}
+
+/** Every match's second capture group is the href; `d` gives its offsets. */
+function hrefMatches(content: string, re: RegExp): LinkMatch[] {
   const out: LinkMatch[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(content)) !== null) {
-    const idx = (m as unknown as { indices?: Array<[number, number] | undefined> }).indices;
-    if (!idx?.[2]) continue;
-    const [s, e] = idx[2];
-    out.push({ start: s, end: e, href: m[2] });
+  for (const m of content.matchAll(re)) {
+    const span = m.indices?.[2];
+    if (span) out.push({ start: span[0], end: span[1], href: m[2] });
   }
   return out;
 }
