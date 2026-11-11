@@ -36,6 +36,7 @@
         "src/bug-report.tsx",
         "src/**/*.test.{ts,tsx}",
         "src/**/*.stories.tsx",
+        "src/**/*.profile.tsx",
         ".storybook/**/*.{ts,tsx}"
       ],
       "project": ["src/**/*.{ts,tsx,css}", ".storybook/**/*.{ts,tsx}"],

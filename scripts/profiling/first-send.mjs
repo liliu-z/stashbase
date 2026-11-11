@@ -14,8 +14,11 @@ try {
     for (const startupMs of [0, 1000]) {
       await app.window.evaluate(`(async () => {
         window.__firstSend?.dispose();
-        const { mount } = await import('/src/test/profiling/first-send.tsx');
-        window.__firstSend = mount(${startupMs});
+        const { mount } = await import('/src/features/agent/ui/first-send.profile.tsx');
+        const container = document.createElement('div');
+        container.style.cssText = 'position:fixed;inset:0;z-index:9999;background:var(--background)';
+        document.body.append(container);
+        window.__firstSend = mount(container, ${startupMs});
       })()`);
       await app.window.waitFor(`document.querySelector('[role=textbox][aria-label=Message]') && !document.body.textContent.includes('Checking agents…')`, { what: "composer" });
       await app.window.evaluate(`document.querySelector('[role=textbox][aria-label=Message]').focus()`);
