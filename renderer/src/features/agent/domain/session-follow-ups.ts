@@ -6,7 +6,7 @@ import {
   type AgentSessionAction,
   type AgentSessionState,
 } from './session-state';
-import { appendBlock } from './session-transcript';
+import { appendBlock, settlePendingTools } from './session-transcript';
 
 type FollowUpAction = Extract<
   AgentSessionAction,
@@ -71,4 +71,21 @@ export function transitionFollowUp(
       };
     }
   }
+}
+
+/** Retirement cancels queued and waiting messages and says how many. */
+export function retireQueue(
+  state: AgentSessionState,
+): Pick<AgentSessionState, 'queuedPrompts' | 'steers' | 'transcript'> {
+  const cancelled = settlePendingTools(state.transcript, 'cancelled');
+  const count = state.queuedPrompts.length + state.steers.length;
+  const transcript =
+    count === 0
+      ? cancelled
+      : appendBlock(cancelled, {
+          id: `${state.id}-retired-queue`,
+          kind: 'notice',
+          text: `${count} queued ${count === 1 ? 'message was' : 'messages were'} cancelled when this folder was removed.`,
+        });
+  return { queuedPrompts: [], steers: [], transcript };
 }

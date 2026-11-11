@@ -59,7 +59,7 @@ export {
   type AgentSkillCatalog,
 } from './session-state';
 
-import { boundedQueue, returnSteers, transitionFollowUp } from './session-follow-ups';
+import { boundedQueue, retireQueue, returnSteers, transitionFollowUp } from './session-follow-ups';
 import type { AgentTranscriptBlock } from './session-transcript';
 
 export {
@@ -375,9 +375,7 @@ export function transitionAgentSession(
         delivery: 'stopped',
         queuePaused: true,
         contextIssue: null,
-        queuedPrompts: [],
-        steers: [],
-        transcript: retiredTranscript(state),
+        ...retireQueue(state),
       };
     case 'dispose':
       return { ...state, connection: { kind: 'disposed' }, preparingPrompt: null };
@@ -394,16 +392,4 @@ function sameTranscript(
   transcript: AgentTranscriptBlock[],
 ): AgentSessionState {
   return transcript === state.transcript ? state : { ...state, transcript };
-}
-
-/** Retirement explains which queued and waiting messages were cancelled. */
-function retiredTranscript(state: AgentSessionState) {
-  const cancelled = settlePendingTools(state.transcript, 'cancelled');
-  const count = state.queuedPrompts.length + state.steers.length;
-  if (count === 0) return cancelled;
-  return appendBlock(cancelled, {
-    id: `${state.id}-retired-queue`,
-    kind: 'notice',
-    text: `${count} queued ${count === 1 ? 'message was' : 'messages were'} cancelled when this folder was removed.`,
-  });
 }
