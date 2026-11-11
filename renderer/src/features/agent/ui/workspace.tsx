@@ -17,6 +17,7 @@ import {
   agentTurnIsActive,
   agentSessionIsBusy,
   agentCanChangeAgent,
+  agentComposerAccepts,
 } from '@/features/agent/domain/session';
 import { EMPTY_CHAT_PROMPT } from '@/features/agent/domain/starters';
 import { useAgentAccess } from '@/features/agent/hooks/use-agent-access';
@@ -337,13 +338,7 @@ function ChatWorkspace({
                 !runtimeUpdate.busy &&
                 !runtimeUpdate.signIn &&
                 !preferencesUnavailable &&
-                state.delivery !== 'unknown' &&
-                state.delivery !== 'stopping' &&
-                state.delivery !== 'preparing' &&
-                (activeTurn ||
-                  state.connection.kind === 'draft' ||
-                  state.connection.kind === 'live') &&
-                state.queuedPrompts.length < 20
+                agentComposerAccepts(state)
               }
               session={active}
               skills={readyAgent?.abilities.skills ?? false}
@@ -366,21 +361,9 @@ function ChatWorkspace({
         onStopWaiting={access.stopWaiting}
       />
       <AgentReadinessNotice
-        message={
-          preferences.failure ??
-          (catalog.error
-            ? 'Agent runtime status is unavailable.'
-            : catalog.loading
-              ? 'Checking agents…'
-              : null)
-        }
-        onRetry={
-          preferences.failure
-            ? () => void runtime.loadPreferences()
-            : catalog.error
-              ? catalog.refresh
-              : undefined
-        }
+        catalog={catalog}
+        preferencesFailure={preferences.failure ?? null}
+        onReloadPreferences={() => void runtime.loadPreferences()}
       />
       {empty && <div aria-hidden className="min-h-0 grow-[1.3] basis-0" />}
     </div>

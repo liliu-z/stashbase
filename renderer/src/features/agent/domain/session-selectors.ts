@@ -2,14 +2,15 @@
 import { basePathName } from '@/shared/utils/file-path';
 
 import type { AgentSkill } from './runtime-catalog';
-import type {
-  AgentActiveTurn,
-  AgentConnection,
-  AgentScope,
-  AgentSessionAction,
-  AgentSessionState,
-  AgentSessionPhase,
-  AgentSkillCatalog,
+import {
+  MAX_QUEUED_PROMPTS,
+  type AgentActiveTurn,
+  type AgentConnection,
+  type AgentScope,
+  type AgentSessionAction,
+  type AgentSessionState,
+  type AgentSessionPhase,
+  type AgentSkillCatalog,
 } from './session-state';
 
 // Connection
@@ -36,6 +37,21 @@ export function agentTurnIsActive(connection: AgentConnection): boolean {
  *  transport yet and opens one on the first send. */
 export function agentCanSend(connection: AgentConnection): boolean {
   return connection.kind === 'draft' || (connection.kind === 'live' && connection.turn === null);
+}
+
+/** Whether the composer may take another message: the connection can carry
+ *  it now or queue it behind the running turn, no earlier send is still
+ *  settling, and the queue has room. */
+export function agentComposerAccepts(
+  state: Pick<AgentSessionState, 'connection' | 'delivery' | 'queuedPrompts'>,
+): boolean {
+  return (
+    (state.connection.kind === 'draft' || state.connection.kind === 'live') &&
+    state.delivery !== 'unknown' &&
+    state.delivery !== 'stopping' &&
+    state.delivery !== 'preparing' &&
+    state.queuedPrompts.length < MAX_QUEUED_PROMPTS
+  );
 }
 
 /** The coarse label tabs and status rows read. A retried connection is still

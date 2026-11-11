@@ -1,8 +1,16 @@
 import { describe, expect, it } from 'vite-plus/test';
 
+import { agentComposerAccepts } from './session';
 import { createAgentSessionState, MAX_QUEUED_PROMPTS } from './session-state';
 
 const scope = { kind: 'folder', path: '/project/Research' } as const;
+const queued = (count: number) =>
+  Array.from({ length: count }, (_, index) => ({
+    context: [],
+    id: `q${index}`,
+    skill: null,
+    text: 'next',
+  }));
 
 describe('createAgentSessionState', () => {
   it('opens a conversation as an unconnected draft with nothing bound to it', () => {
@@ -53,7 +61,20 @@ describe('createAgentSessionState', () => {
     ).toThrow(/must not be empty/u);
   });
 
-  it('caps the queue at a screen of messages', () => {
+  it('accepts messages until the queue holds a screen of them or a send is settling', () => {
+    const draft = createAgentSessionState({ agent: 'codex', id: 'chat-1', scope });
+    const running = {
+      ...draft,
+      connection: { kind: 'live' as const, turn: { promptBlockId: 'p' } },
+    };
+
+    expect(agentComposerAccepts(draft)).toBe(true);
+    expect(agentComposerAccepts({ ...running, queuedPrompts: queued(19) })).toBe(true);
     expect(MAX_QUEUED_PROMPTS).toBe(20);
+    expect(agentComposerAccepts({ ...running, queuedPrompts: queued(20) })).toBe(false);
+    for (const delivery of ['preparing', 'stopping', 'unknown'] as const) {
+      expect(agentComposerAccepts({ ...draft, delivery })).toBe(false);
+    }
+    expect(agentComposerAccepts({ ...draft, connection: { kind: 'retired' } })).toBe(false);
   });
 });

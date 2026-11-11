@@ -95,15 +95,30 @@ export function AgentWorkStatus({
   );
 }
 
-/** Catalog and preference failures retain the operation that can reload them. */
+/** Catalog and preference failures retain the operation that can reload them.
+ *  A preference failure comes first: it blocks sending even with a catalog. */
 export function AgentReadinessNotice({
-  message,
-  onRetry,
+  catalog,
+  preferencesFailure,
+  onReloadPreferences,
 }: {
-  message: string | null;
-  onRetry?: (() => void) | undefined;
+  catalog: { error: boolean; loading: boolean; refresh(): void };
+  preferencesFailure: string | null;
+  onReloadPreferences(): void;
 }) {
+  const message =
+    preferencesFailure ??
+    (catalog.error
+      ? 'Agent runtime status is unavailable.'
+      : catalog.loading
+        ? 'Checking agents…'
+        : null);
   if (!message) return null;
+  const onRetry = preferencesFailure
+    ? onReloadPreferences
+    : catalog.error
+      ? catalog.refresh
+      : undefined;
   return (
     <div className="mx-auto flex w-full max-w-[46rem] items-center gap-2 px-4 pb-3 text-caption text-muted-foreground">
       <span>{message}</span>

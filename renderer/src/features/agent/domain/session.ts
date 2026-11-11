@@ -12,6 +12,7 @@ export {
   agentReconnectAttempt,
   agentTurnIsActive,
   agentCanSend,
+  agentComposerAccepts,
   agentSessionPhase,
   agentSkills,
   agentSessionIsUnstarted,
