@@ -182,7 +182,7 @@ syncBuiltinESMExports();
         // index or changing an environment. pip is already installed.
         const pip = spawnSync(python, ['-m', 'pip', 'install', '--dry-run', '--no-index', '--no-deps', 'pip'], {
           encoding: 'utf8',
-          env: { ...process.env, PIP_CONFIG_FILE: os.devNull, PIP_CONSTRAINT: input.constraint, PIP_DISABLE_PIP_VERSION_CHECK: '1' },
+          env: { ...process.env, PIP_CONFIG_FILE: os.devNull, PIP_CONSTRAINT: input.constraint, PIP_DISABLE_PIP_VERSION_CHECK: '1', PIP_BREAK_SYSTEM_PACKAGES: '1' },
         });
         assert.equal(pip.status, 0, pip.stderr || pip.stdout);
       }
