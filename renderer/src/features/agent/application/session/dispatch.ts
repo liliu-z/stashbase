@@ -203,7 +203,16 @@ export function createPromptDispatcher({
         ? undefined
         : { text: opening.draft, context: opening.context, skill: opening.skill };
       sending = true;
-      transition({ kind: 'delivery', value: 'preparing' });
+      transition({
+        kind: 'delivery',
+        value: 'preparing',
+        prompt: {
+          id: crypto.randomUUID(),
+          text: skill ? `/${skill.label} ${prompt}`.trimEnd() : prompt,
+          context,
+          skill: skillId,
+        },
+      });
       try {
         const lines = await resolveLines(context);
         if (disposed() || captured !== generation) return { ok: false, reason: 'disconnected' };

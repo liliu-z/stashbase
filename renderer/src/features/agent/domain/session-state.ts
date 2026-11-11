@@ -85,6 +85,9 @@ export interface AgentSessionState {
   title: string;
   titleEdited: boolean;
   delivery: 'idle' | 'preparing' | 'stopping' | 'stopped' | 'completed' | 'failed' | 'unknown';
+  /** Visible while context or the first connection is being prepared. The
+   *  draft stays intact until the transport accepts this snapshot. */
+  preparingPrompt: AgentQueuedPrompt | null;
   queuePaused: boolean;
   accessMode: AgentAccessMode;
   /** The mode each other Agent was left in, so switching Agents never carries
@@ -137,6 +140,7 @@ export function createAgentSessionState(options: {
     title: options.title?.trim() || UNTITLED_CHAT_TITLE,
     titleEdited: false,
     delivery: 'idle',
+    preparingPrompt: null,
     queuePaused: false,
     accessMode: 'auto',
     accessModes: {},
@@ -257,7 +261,7 @@ type AgentSessionLocalAction =
   | { kind: 'select-agent'; agent: AgentId }
   | { kind: 'reset-draft-connection' }
   | { kind: 'rename'; title: string }
-  | { kind: 'delivery'; value: AgentSessionState['delivery'] }
+  | { kind: 'delivery'; value: AgentSessionState['delivery']; prompt?: AgentQueuedPrompt }
   | { kind: 'pause-queue'; paused: boolean }
   | { kind: 'set-context'; context: AgentContextItem[] }
   | { kind: 'set-context-issue'; message: string | null }

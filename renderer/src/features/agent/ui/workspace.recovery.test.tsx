@@ -26,6 +26,7 @@ describe('Agent workspace recovery', () => {
         await runtime.chooseAgent('codex');
         await runtime.activeSession().sendPrompt('Keep my first message');
       });
+      expect(within(screen.getByRole('log')).getByText('Keep my first message')).not.toBeNull();
       const reads = listAgents.mock.calls.length;
       act(() => {
         if (ending === 'error-then-exit')
@@ -42,6 +43,7 @@ describe('Agent workspace recovery', () => {
         listeners[0]?.onClose();
       });
       await userEvent.click(await screen.findByRole('button', { name: 'Sign in' }));
+      expect(within(screen.getByRole('log')).queryByText('Keep my first message')).toBeNull();
       expect(onOpenAgentSettings).toHaveBeenCalledOnce();
       await waitFor(() => expect(listAgents.mock.calls.length).toBeGreaterThan(reads));
       expect(runtime.activeSession().store.getState().draft).toBe('Keep my first message');

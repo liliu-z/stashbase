@@ -79,6 +79,9 @@ ordinary text. This applies to replies and Markdown file writes.
 
 - Capture text, context, and choices on Send. Clear only the accepted snapshot.
   Refused delivery retains it; uncertain delivery forbids automatic resend.
+  Show that snapshot as a pending user message while resolving context or
+  starting the session. It becomes a sent message only after transport acceptance;
+  preparation failure or cancellation removes the pending bubble and keeps the draft.
 - One turn runs per conversation. Follow-ups queue explicitly and advance on
   their own; the queue never needs starting. Stop ends only the running turn,
   and once it is confirmed the next queued message goes. Failure, connection

@@ -618,6 +618,12 @@ stable status without download, retry, or a new durable demand latch.
   owner. Only confirmed readiness may continue that same submission once; navigation,
   edits, cancellation, and disposal reject late completions. Setup HTTP 202 is an
   acknowledgement to poll, not permission to initialize or send early.
+  After access is granted, the session reducer owns a `preparingPrompt` display
+  snapshot before context resolution or transport startup. The transcript renders
+  it through its pending-message presentation; it is neither native history nor a
+  delivered turn. Transport acceptance replaces it with one committed transcript
+  block. Refusal, cancellation, retirement and disposal clear it, preserving the
+  existing draft-until-acceptance rule and any newer draft edits.
 - Unstarted means no session/transcript/turn; blank also means no pending user work.
   Blank chats may follow the window and be reused; user work pins scope. Runtime
   adoption preserves drafts, source bindings, and transient upload bytes. Catalog

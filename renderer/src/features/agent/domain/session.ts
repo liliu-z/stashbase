@@ -94,6 +94,7 @@ export function transitionAgentSession(
     case 'schedule-reconnect':
       return {
         ...state,
+        preparingPrompt: null,
         ...returnSteers(state),
         queuePaused: true,
         delivery: agentTurnIsActive(state.connection)
@@ -114,11 +115,15 @@ export function transitionAgentSession(
         ? state
         : { ...state, title: action.title.trim() || state.title };
     case 'delivery':
-      return { ...state, delivery: action.value };
+      return {
+        ...state,
+        delivery: action.value,
+        preparingPrompt: action.value === 'preparing' ? (action.prompt ?? null) : null,
+      };
     case 'pause-queue':
       return { ...state, queuePaused: action.paused };
     case 'reset-draft-connection':
-      return { ...state, connection: { kind: 'draft' }, delivery: 'idle' };
+      return { ...state, connection: { kind: 'draft' }, delivery: 'idle', preparingPrompt: null };
     case 'select-agent':
       return {
         ...state,
@@ -189,6 +194,7 @@ export function transitionAgentSession(
     case 'submit-prompt':
       return {
         ...state,
+        preparingPrompt: null,
         connection: withTurn(state.connection, { promptBlockId: action.id }),
         delivery: 'idle',
         title: !state.titleEdited && action.titleHint ? action.titleHint : state.title,
@@ -269,6 +275,7 @@ export function transitionAgentSession(
         ...returnSteers(state),
         connection: withTurn(state.connection, null),
         delivery,
+        preparingPrompt: null,
         // Stop ends only the running turn. A turn that ends, completed or
         // stopped, releases a queue an earlier failure held; a failed one holds it.
         queuePaused: delivery === 'failed',
@@ -294,6 +301,7 @@ export function transitionAgentSession(
     case 'turn-fail':
       return {
         ...state,
+        preparingPrompt: null,
         ...returnSteers(state),
         delivery: 'failed',
         queuePaused: true,
@@ -327,6 +335,7 @@ export function transitionAgentSession(
         ...state,
         ...returnSteers(state),
         queuePaused: true,
+        preparingPrompt: null,
         delivery:
           agentTurnIsActive(state.connection) || state.delivery === 'unknown'
             ? 'unknown'
@@ -340,6 +349,7 @@ export function transitionAgentSession(
     case 'begin-restore':
       return {
         ...state,
+        preparingPrompt: null,
         // New-chat preferences must not override the resumed native conversation.
         model: null,
         activeModel: null,
@@ -360,6 +370,7 @@ export function transitionAgentSession(
     case 'retire':
       return {
         ...state,
+        preparingPrompt: null,
         connection: { kind: 'retired' },
         delivery: 'stopped',
         queuePaused: true,
@@ -369,7 +380,7 @@ export function transitionAgentSession(
         transcript: retiredTranscript(state),
       };
     case 'dispose':
-      return { ...state, connection: { kind: 'disposed' } };
+      return { ...state, connection: { kind: 'disposed' }, preparingPrompt: null };
     default: {
       const unreachable: never = action;
       return unreachable;

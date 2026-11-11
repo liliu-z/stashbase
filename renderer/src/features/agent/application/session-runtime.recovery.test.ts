@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
 
 import { agentContextPort, agentSessionPort } from '@/test/fakes/agent';
 
+import { AgentContextError } from './ports';
 import { createAgentSessionRuntime, type AgentSessionRuntime } from './session-runtime';
 import { heldScheduler } from './session-runtime.harness';
 import { createAgentWorkspaceRuntime } from './workspace-runtime';
@@ -263,18 +264,69 @@ describe('conversation recovery and pending work', () => {
     });
     session.setDraft('First');
     const sending = session.sendPrompt();
+    expect(session.store.getState().preparingPrompt).toMatchObject({
+      text: 'First',
+      context: session.store.getState().context,
+    });
     session.setDraft('Newer idea');
     release?.();
     expect(await sending).toEqual({ ok: true });
+    expect(session.store.getState().preparingPrompt).toBeNull();
     expect(session.store.getState().draft).toBe('Newer idea');
     fake.listeners[0]?.onEvent({ kind: 'turn-ended', isError: false });
     const cancelled = session.sendPrompt();
     expect(session.interrupt()).toBe(true);
     release?.();
     expect((await cancelled).ok).toBe(false);
+    expect(session.store.getState().preparingPrompt).toBeNull();
     expect(fake.sent.filter((command) => command.kind === 'prompt')).toHaveLength(1);
     expect(session.store.getState().draft).toBe('Newer idea');
   });
+
+  it.each(['failed', 'turn-ended'] as const)(
+    'removes a pending message when live %s interrupts context preparation',
+    async (ending) => {
+      const fake = agentSessionPort();
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const session = createAgentSessionRuntime({
+        agent: 'codex',
+        id: 'chat',
+        port: fake.port,
+        scope: { kind: 'folder', path: '/project' },
+        context: agentContextPort({
+          resolve: async () => {
+            await gate;
+            throw new AgentContextError('not-found', 'The context file was removed.');
+          },
+        }),
+      });
+      sessions.push(session);
+      fake.listeners[0]?.onEvent({ kind: 'ready' });
+      session.addContext({
+        kind: 'source',
+        source: { folderPath: '/project', path: 'note.md' },
+        format: 'md',
+        boundVersion: null,
+      });
+      session.setDraft('Read this note');
+      const sending = session.sendPrompt();
+      expect(session.store.getState().preparingPrompt?.text).toBe('Read this note');
+      fake.listeners[0]?.onEvent(
+        ending === 'failed'
+          ? { kind: 'failed', message: 'The selected model is unavailable.' }
+          : { kind: 'turn-ended', isError: true },
+      );
+      release();
+      expect(await sending).toEqual({ ok: false, reason: 'stale' });
+      expect(session.store.getState().delivery).toBe('failed');
+      expect(session.store.getState().draft).toBe('Read this note');
+      expect(fake.sent.filter((command) => command.kind === 'prompt')).toHaveLength(0);
+      expect(session.store.getState().preparingPrompt).toBeNull();
+    },
+  );
 
   it('protects existing drafts during reuse and preserves them when selecting another Agent', () => {
     const { session } = live();

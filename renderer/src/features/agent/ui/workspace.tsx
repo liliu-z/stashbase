@@ -81,6 +81,7 @@ function ChatWorkspace({
       activeModel: session.activeModel,
       connection: session.connection,
       delivery: session.delivery,
+      preparingPrompt: session.preparingPrompt,
       queuePaused: session.queuePaused,
       effort: session.effort,
       persona: session.persona,
@@ -126,7 +127,7 @@ function ChatWorkspace({
   const activeTurn = agentTurnIsActive(state.connection);
   const busy = agentSessionIsBusy(active.store.getState());
   const armedSkill = agentSkills(state.skillCatalog).find((skill) => skill.id === state.skill);
-  const empty = state.transcript.length === 0;
+  const empty = state.transcript.length === 0 && !state.preparingPrompt;
   const persona = useAgentPersona(
     personaApi,
     state.persona,
@@ -228,7 +229,9 @@ function ChatWorkspace({
               onSignIn={onOpenAgentSettings}
               onUpdateApp={onOpenAppSettings}
               onReviewTurnChange={onReviewTurnChange}
-              pending={state.steers}
+              pending={
+                state.preparingPrompt ? [state.preparingPrompt, ...state.steers] : state.steers
+              }
               runtimeUpdate={selectedAgent.updatable ? runtimeUpdate : undefined}
               signedIn={signedIn}
               sourceFor={sourceFor}

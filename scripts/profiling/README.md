@@ -8,6 +8,18 @@ before and after a change, then compare the two labels.
 
 Results and CPU profiles go to `profiling.nosync/<scenario>/`, which Git ignores.
 
+## First-send feedback
+
+`pnpm profile:first-send --label before --runs 2` measures Send-to-own-message
+paint in the mounted development Chat workspace. The isolated fixture uses a
+ready catalog and controlled session ports with immediate and one-second startup;
+it never starts a native Agent or calls a model. Each run records `ownMessageMs`
+and `wireMs` under `cases.0` and `cases.1000`, verifies a single wire send, and
+saves one screenshot of the delayed-startup case per label. The delayed case
+should show a pending bubble before the wire send; actual provider startup,
+production-build timings and first reply latency are outside this scenario.
+Compare with `pnpm profile:compare first-send --labels before,after`.
+
 ## Workflow
 
 1. Run the scenario on the current code:

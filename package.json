@@ -74,6 +74,7 @@
     "test:agent": "node --import tsx --import ./server/__tests__/isolated-home.ts --test server/__tests__/agent.test.ts server/__tests__/agent-contract.test.ts server/turn-changes.test.ts server/__tests__/agent-history-routes.test.ts server/__tests__/agent-projects.test.ts server/__tests__/agent-runtime-installer.test.ts server/__tests__/agent-runtime-recovery.test.ts server/__tests__/agent-turn-failure.test.ts server/__tests__/codex-agent.test.ts server/__tests__/antigravity-agent.test.ts server/__tests__/antigravity-setup.test.ts server/__tests__/agent-model-catalog.test.ts server/__tests__/claude-model-catalog.test.ts server/__tests__/agent-cli.test.ts server/__tests__/opencode-agent.test.ts server/__tests__/opencode-warm-slot.test.ts server/__tests__/default-agent-permissions.test.ts server/__tests__/default-agent-tools.test.ts server/__tests__/hosted-agent-broker.test.ts server/__tests__/hosted-agent-diagnostics.test.ts server/__tests__/hosted-agent-models.test.ts server/codex-history.test.ts",
     "profile:pdf-memory": "node scripts/profiling/pdf-memory.mjs",
     "profile:editing": "node scripts/profiling/editing.mjs",
+    "profile:first-send": "node scripts/profiling/first-send.mjs",
     "profile:budgets": "node scripts/profiling/budgets.mjs",
     "profile:project-availability": "node --import tsx --import ./server/__tests__/isolated-home.ts scripts/profiling/project-availability.mjs",
     "profile:compare": "node scripts/profiling/compare.mjs",

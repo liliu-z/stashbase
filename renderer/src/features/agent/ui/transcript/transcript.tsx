@@ -36,7 +36,7 @@ export { closingReplies } from './transcript-order';
 import { useTranscriptPage } from './use-transcript-page';
 import { UserMessage } from './user-message';
 
-/** A follow-up waiting for the running turn to read it. */
+/** A request being prepared or waiting for the running turn to read it. */
 export interface PendingFollowUp {
   id: string;
   text: string;
@@ -201,8 +201,8 @@ export const AgentTranscript = memo(function AgentTranscript({
   canFoldProcess?: (() => boolean) | undefined;
   disclosureScope?: object | undefined;
   onProcessToggle?: (() => void) | undefined;
-  /** Follow-ups sent into the running turn that its runtime has not read
-   *  yet. They wait, dimmed, below the turn and join it where it reads them. */
+  /** Preparing requests and follow-ups the runtime has not read yet. They
+   *  wait, dimmed, until accepted into the transcript. */
   pending?: readonly PendingFollowUp[] | undefined;
   focusBlockId?: string | undefined;
   /** Reads the hosted models again, offered on a turn refused because the

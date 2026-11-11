@@ -2,7 +2,7 @@
  *  the empty canvas keeps quiet, where provider, model and thinking are
  *  chosen, and the first composer turn through its permission decision. The
  *  header that names the Chat is a suite of its own. */
-import { act, screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vite-plus/test';
 
@@ -212,9 +212,14 @@ describe('Agent workspace', () => {
     typeInto(composer, 'Inspect the workspace');
     await userEvent.click(screen.getByRole('button', { name: 'Send' }));
     expect(draftOf(runtime)).toBe('Inspect the workspace');
+    // A cold native session has not reported ready yet. Its startup must
+    // not hold back the reader's own message or put anything on the wire.
+    expect(within(screen.getByRole('log')).getByText('Inspect the workspace')).not.toBeNull();
+    expect(sent).toEqual([]);
 
     act(() => listeners[0]?.onEvent({ kind: 'ready' }));
-    expect((await screen.findAllByText('Inspect the workspace'))[0]).not.toBeNull();
+    expect(within(screen.getByRole('log')).getAllByText('Inspect the workspace')).toHaveLength(1);
+    expect(runtime.activeSession().store.getState().preparingPrompt).toBeNull();
     expect(sent).toEqual([
       {
         kind: 'prompt',

@@ -1928,6 +1928,16 @@ Host/services: `server/retrieval/index.ts`, `server/indexer.mfs.ts`, `python/sta
 
 ## J06: Agent
 
+**First-send feedback (2026-11-11):** the session dispatcher publishes a pending
+user-message snapshot before context resolution and cold-session startup. The
+workspace no longer waits for native `ready` to show the reader's own message.
+The existing composer/permission flow checks the bubble before readiness, no
+early wire send, and one bubble/send after acceptance. Recovery checks cover
+startup refusal, context preparation, cancellation and newer draft preservation.
+`profile:first-send` measures the mounted workspace in isolated Electron with
+controlled immediate and one-second startup ports; it does not measure live
+provider startup, model response latency or packaged Windows performance.
+
 **Missing-runtime history recovery (2026-11-03):** the renderer preserves
 `412 AGENT_NOT_INSTALLED` as an installation prerequisite. Both the Chats sidebar
 and history popover offer Agents settings and Check again, retain cached chats
