@@ -42,6 +42,7 @@ import { MentionRowsListbox, useMentionRows } from './context-rows';
 import { DraftSourceTiles, isVisualSource } from './context-tiles';
 import { useComposerFocusRequest } from './focus';
 import { MentionEditor, type MentionEditorHandle, type MentionEditorProps } from './mention-editor';
+import { useComposerUploads } from './use-composer-uploads';
 import { useCurrentSource } from './use-current-source';
 
 /** Native picker hint for an Agent that accepts transient local files. The
@@ -191,35 +192,7 @@ export function AgentContextComposer({
   );
   const tileValidations = validations.filter((validation) => isDraftTile(validation, mentioned));
 
-  // Hand each uploaded File back to the shared composer's preview tiles.
-  const uploads = useMemo(
-    () =>
-      context.flatMap((item) =>
-        item.kind === 'transient' ? (session.fileForTransient(item.path) ?? []) : [],
-      ),
-    [context, session],
-  );
-  const knownUpload = (file: File): AgentContextItem | undefined => {
-    for (const item of [...context, ...queuedPrompts.flatMap((prompt) => prompt.context)]) {
-      if (item.kind === 'transient' && session.fileForTransient(item.path) === file) return item;
-    }
-    return undefined;
-  };
-  const syncUploads = (next: File[]) => {
-    for (const item of context) {
-      if (item.kind !== 'transient') continue;
-      const file = session.fileForTransient(item.path);
-      if (file && !next.includes(file)) session.removeContext(contextItemKey(item));
-    }
-    const fresh: File[] = [];
-    for (const file of next) {
-      if (uploads.includes(file)) continue;
-      const known = knownUpload(file);
-      if (known) session.addContext(known);
-      else fresh.push(file);
-    }
-    if (fresh.length > 0) void session.attachFiles(fresh);
-  };
+  const { syncUploads, uploads } = useComposerUploads(session, context, queuedPrompts);
 
   const armedSkill = useMemo(
     () => agentSkills(skillCatalog).find((entry) => entry.id === skill) ?? null,
