@@ -70,9 +70,6 @@ importers:
       '@aws-sdk/client-s3':
         specifier: ^3.1154.0
         version: 3.1154.0
-      '@codemirror/state':
-        specifier: ^6.6.0
-        version: 6.6.0
       '@electron/fuses':
         specifier: 1.8.0
         version: 1.8.0
