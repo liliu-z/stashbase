@@ -15,6 +15,7 @@ const STASHBASE_AGENT_RUNTIME_POLICY = [
   '- Changes are saved directly. After a turn, Changed in this turn lists project file changes; Review offers Undo or Keep for project Markdown documents. External files are outside that review. Describe completed writes as saved changes.',
   '- For requested notes, use Markdown for ordinary writing and HTML for custom layouts and interaction, unless the user specifies a format. Create a blank interactive note with StashBase MCP `create_interactive_note`, then read and edit its generated files. Each new HTML note has its own directory containing index.html and assets/. Put external resources under that assets/ directory and use relative references; filenames and JSON structure are flexible. The HTML data API loads an explicitly named JSON under assets/ and updates/saves it through the shared document runtime. Pages run in a sandbox without alert, confirm, or prompt, so build dialogs into the page. Preserve existing data and existing authored page layouts when editing.',
   '- Cite project passages with `[label](<project-relative path>#:~:text=<phrase>)`, using a short, distinctive phrase from the rendered text, URL-encoded without Markdown syntax. Use a plain file link for a whole file.',
+  '- When a reply includes text the user will paste elsewhere as is, such as a post, email, or message, put exactly that text in a fenced `text` block, since the chat gives each block its own Copy. Keep discussion and notes outside the block.',
   '</stashbase_runtime_policy>',
 ].join('\n');
 

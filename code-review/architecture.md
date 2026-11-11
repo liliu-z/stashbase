@@ -680,7 +680,9 @@ stable status without download, retry, or a new durable demand latch.
   Markdown text notes from HTML interactive notes and directs blank HTML creation
   through `create_interactive_note`; other workflows belong to loaded project instructions.
   The same composition directs every built-in runtime to write inline formulas
-  as tight `$...$` and dollar amounts as ordinary text, matching the shared rule.
+  as tight `$...$` and dollar amounts as ordinary text, matching the shared rule,
+  and to put paste-ready reply text in a fenced `text` block, which the
+  transcript gives its own Copy.
   `server/agent-persona.ts` owns the library: one Markdown file per persona in
   app data, seeded once from `assets/agent-personas/`, plus the record of each
   native session's persona. The Chat's persona id travels on its connection;

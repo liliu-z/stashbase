@@ -3960,7 +3960,11 @@ Host/services: `server/project-file-mutations.ts`, `server/text-file-transaction
   wrap, and the Copy floats beside the first line so text never runs under it.
   `markdown.test.tsx` covers the copied text. A Storybook pass in Electron's
   Chromium showed a wrapped drafted post in both themes, unchanged in layout
-  between idle and hover. Not proven: a packaged build.
+  between idle and hover. `server/agent-runtime-instructions.ts` asks every
+  runtime to put paste-ready text, such as a post or email, in such a block
+  (2026-11-11). Not proven: a packaged build, and that each real runtime
+  follows that instruction. A Claude session before it quoted a drafted post
+  with `> ` instead, and fenced it only once the user asked.
 - **AI Eval:** requested writing quality belongs to J10. Existing deterministic
   orchestration evidence is not document-specific diff evidence.
 - **Release Check:** real-runtime requested draft/revision followed by editor save.
