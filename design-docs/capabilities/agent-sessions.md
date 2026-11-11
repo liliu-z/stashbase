@@ -52,7 +52,9 @@ and consumes no agent credits. Each chat still receives its own runtime and
 permissions, with current model and tool choices checked before use.
 Those instructions also say how to write math: `$...$` inline, with no space
 just inside the dollar signs, `$$` blocks for display, and dollar amounts as
-ordinary text. This applies to replies and Markdown file writes.
+ordinary text. This applies to replies and Markdown file writes. Text the user
+will paste elsewhere as is, such as a drafted post or email, goes in a fenced
+block in the reply, so Chat's block Copy takes exactly that text.
 
 ## Submission and Execution
 
