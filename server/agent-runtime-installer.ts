@@ -20,7 +20,7 @@ import {
 import { probeAgentCommand } from './agent-probe.ts';
 import { agentCliLaunch } from './agent-cli-launch.ts';
 import { AgentAccountRefusedError, AgentAuthenticationRequiredError, AgentConfigurationError, agentSetupDiagnostic } from './agent-setup-diagnostic.ts';
-import { classifyAgentTurnFailure } from './agent-turn-failure.ts';
+import { classifyAgentTurnFailure, type AgentTurnFailure } from './agent-turn-failure.ts';
 import { ensureAgentMcp } from './agent-mcp.ts';
 import {
   agentCliEnv,
@@ -132,6 +132,12 @@ export class AgentBootstrapCoordinator {
     // check must honor this refusal. An explicit login owns its recovery.
     if (this.runs.has(id)) return;
     this.fail(id, 'login', 'authentication', 'authentication-required', new Error(message));
+  }
+
+  /** A live session's error or exit classified as a sign-in refusal
+   * invalidates readiness the same way. Every native adapter reports here. */
+  noteSessionFailure(id: NativeAgentId, event: { message?: string; failure?: AgentTurnFailure }): void {
+    if (event.failure?.kind === 'auth-expired' && event.message) this.requireSignIn(id, event.message);
   }
 
   /** Startup and explicit recheck can repair installed runtimes, never download. */

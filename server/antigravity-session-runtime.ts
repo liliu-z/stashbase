@@ -674,7 +674,7 @@ export class AntigravitySession implements AttributedAgentSession {
       });
     }
     const event = agentTurnErrorEvent(message);
-    if (event.failure?.kind === 'auth-expired') agentBootstrapCoordinator.requireSignIn('antigravity', message);
+    agentBootstrapCoordinator.noteSessionFailure('antigravity', event);
     this.send(event, cause);
   }
 
@@ -699,7 +699,7 @@ export class AntigravitySession implements AttributedAgentSession {
   private finish(message?: string, cause?: unknown): void {
     if (this.closed) return;
     const event = agentSessionExitEvent(message);
-    if (message && event.failure?.kind === 'auth-expired') agentBootstrapCoordinator.requireSignIn('antigravity', message);
+    agentBootstrapCoordinator.noteSessionFailure('antigravity', event);
     this.send(event, cause);
     this.dispose();
   }

@@ -1010,7 +1010,7 @@ export class AgentSession implements AttributedAgentSession {
    * renderer can offer the matching recovery without parsing the message. */
   private sendTurnError(message: string, cause?: unknown): void {
     const event = agentTurnErrorEvent(message);
-    if (event.failure?.kind === 'auth-expired') agentBootstrapCoordinator.requireSignIn('claude', message);
+    agentBootstrapCoordinator.noteSessionFailure('claude', event);
     this.send(event, cause);
   }
 
@@ -1035,7 +1035,7 @@ export class AgentSession implements AttributedAgentSession {
   private finish(message?: string, cause?: unknown): void {
     if (this.closed) return;
     const event = agentSessionExitEvent(message);
-    if (message && event.failure?.kind === 'auth-expired') agentBootstrapCoordinator.requireSignIn('claude', message);
+    agentBootstrapCoordinator.noteSessionFailure('claude', event);
     this.send(event, cause);
     this.dispose();
   }
