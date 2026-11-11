@@ -31,7 +31,7 @@ function cjsFiles(directory) {
   });
 }
 
-test('the supported renderer build is the only packaged renderer input', () => {
+test('the supported renderer build is the only packaged renderer input', async () => {
   const rendererPkg = JSON.parse(
     fs.readFileSync(path.join(root, 'renderer', 'package.json'), 'utf8'),
   );
@@ -66,7 +66,11 @@ test('the supported renderer build is the only packaged renderer input', () => {
     path.join(root, 'scripts', 'electron', 'boundary.mjs'),
     'utf8',
   );
-  assert.match(electronBuild, /['"]renderer\/preload['"]:\s*['"]electron\/renderer\/preload\.ts['"]/);
+  const { electronBoundaryEntries } = await import(
+    pathToFileURL(path.join(root, 'scripts', 'electron', 'entries.mjs')).href
+  );
+  assert.match(electronBuild, /entryPoints:\s*electronBoundaryEntries/);
+  assert.equal(electronBoundaryEntries['renderer/preload'], 'electron/renderer/preload.ts');
   assert.match(pkg.scripts?.build ?? '', /build:electron-boundary/);
 });
 

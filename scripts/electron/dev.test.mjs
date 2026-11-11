@@ -22,7 +22,7 @@ function developmentFixture(context) {
   };
 
   mkdirSync(path.join(root, "scripts/electron"), { recursive: true });
-  for (const script of ["dev.mjs", "boundary.mjs"]) {
+  for (const script of ["dev.mjs", "boundary.mjs", "entries.mjs"]) {
     copyFileSync(path.join(repositoryRoot, "scripts/electron", script), path.join(root, "scripts/electron", script));
   }
   for (const directory of ["electron", "server", "shared"]) {

@@ -3,48 +3,14 @@ import { fileURLToPath } from 'node:url';
 
 import { build } from 'esbuild';
 
+import { electronBoundaryEntries } from './entries.mjs';
+
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 await build({
   absWorkingDir: repositoryRoot,
   bundle: true,
-  entryPoints: {
-    'account/auth-network': 'electron/account/auth-network.ts',
-    'diagnostics/native': 'server/native-diagnostics.ts',
-    'bug-report/review-ipc': 'electron/bug-report/review-ipc.ts',
-    'bug-report/review-preload': 'electron/bug-report/review-preload.ts',
-    'bug-report/review-window-preload': 'electron/bug-report/review-window-preload.ts',
-    'external-files/handler': 'electron/external-files/handler.ts',
-    'external-files/preload': 'electron/external-files/preload.ts',
-    'external-navigation/handler': 'electron/external-navigation/handler.ts',
-    'external-navigation/preload': 'electron/external-navigation/preload.ts',
-    'project/dialog': 'electron/project/dialog.ts',
-    'project/filesystem-path': 'server/filesystem-path.ts',
-    'project/lifecycle': 'electron/project/lifecycle.ts',
-    'project/preload': 'electron/project/preload.ts',
-    'renderer/document-marks': 'electron/renderer/document-marks.ts',
-    'renderer/preload': 'electron/renderer/preload.ts',
-    'renderer/runtime': 'electron/renderer/runtime.ts',
-    'notifications/center': 'electron/notifications/center.ts',
-    'notifications/indicators': 'electron/notifications/indicators.ts',
-    'notifications/system-settings': 'electron/notifications/system-settings.ts',
-    'notifications/native': 'electron/notifications/native.ts',
-    'notifications/ipc': 'electron/notifications/ipc.ts',
-    'notifications/preload': 'electron/notifications/preload.ts',
-    'scheduled-tasks/ipc': 'electron/scheduled-tasks/ipc.ts',
-    'scheduled-tasks/preload': 'electron/scheduled-tasks/preload.ts',
-    'scheduled-tasks/scheduler': 'electron/scheduled-tasks/scheduler.ts',
-    'updates/ipc': 'electron/updates/ipc.ts',
-    'updates/preload': 'electron/updates/preload.ts',
-    'workspace/preload': 'electron/workspace/preload.ts',
-    'workspace/session': 'electron/workspace/session.ts',
-    'window/lifecycle': 'electron/window/lifecycle.ts',
-    'window/appearance': 'electron/window/appearance.ts',
-    'text-services/context-menu': 'electron/text-services/context-menu.ts',
-    'text-services/ipc': 'electron/text-services/ipc.ts',
-    'text-services/system-fonts': 'electron/text-services/system-fonts.ts',
-    'window/preload': 'electron/window/preload.ts',
-  },
+  entryPoints: electronBoundaryEntries,
   external: ['electron'],
   format: 'cjs',
   logLevel: 'info',

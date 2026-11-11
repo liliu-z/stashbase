@@ -291,7 +291,8 @@ Paths are relative to the repository root.
 - `mcp/project-server.ts`
 - `mcp/project-operations-http.ts`
 - `electron/main.cjs`
-- `knip.json`
+- `knip.config.js`
+- `scripts/electron/entries.mjs`
 - `renderer/src/features/agent/application/failure-messages.ts`
 - `renderer/src/features/agent/domain/agent-catalog.ts`
 
