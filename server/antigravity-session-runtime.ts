@@ -27,6 +27,7 @@ import {
 import { agentSessionExitEvent, agentTurnErrorEvent } from './agent-turn-failure.ts';
 import { agentBootstrapCoordinator } from './agent-runtime-installer.ts';
 import {
+  nativeSessionTitle,
   resolveSessionBinding,
   type AgentAccessMode,
   type AgentConnectionOptions,
@@ -414,7 +415,7 @@ export class AntigravitySession implements AttributedAgentSession {
     if (this.conversationId === id) return;
     this.conversationId = id;
     this.send({ t: 'session-id', id });
-    const title = titleFromPrompt(this.turn?.titleHint || this.turn?.prompt || '');
+    const title = nativeSessionTitle(this.turn?.titleHint || this.turn?.prompt || '');
     if (!this.resumed && title) this.send({ t: 'session-title', title });
   }
 
@@ -570,7 +571,7 @@ export class AntigravitySession implements AttributedAgentSession {
     const id = this.conversationId;
     const folder = this.cwd;
     if (!id || !folder) return;
-    const title = this.resumed ? undefined : titleFromPrompt(turn.titleHint || turn.prompt) || undefined;
+    const title = this.resumed ? undefined : nativeSessionTitle(turn.titleHint || turn.prompt) || undefined;
     void this.history.appendTurn(id, folder, turn.blocks, title).catch((error) => {
       log.warn(`could not record Antigravity turn for ${id}:`, error);
     });
@@ -736,13 +737,6 @@ function toolId(turn: TurnState, stepIndex: number): string {
 
 function sameLaunch(a: AntigravityLaunch, b: AntigravityLaunch): boolean {
   return a.mode === b.mode && a.model === b.model && a.effort === b.effort;
-}
-
-function titleFromPrompt(prompt: string): string {
-  const firstLine = prompt.split(/\r?\n/).map((line) => line.trim()).find(Boolean) ?? '';
-  if (!firstLine) return '';
-  const compact = firstLine.replace(/\s+/g, ' ');
-  return compact.length > 60 ? `${compact.slice(0, 60).trimEnd()}…` : compact;
 }
 
 function isModelSelectionError(message: string): boolean {

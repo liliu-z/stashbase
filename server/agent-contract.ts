@@ -44,6 +44,14 @@ export function isAgentAccessMode(value: unknown): value is AgentAccessMode {
   return typeof value === 'string' && (AGENT_ACCESS_MODES as readonly string[]).includes(value);
 }
 
+/** The name a native adapter gives a new conversation: the prompt's first
+ * non-blank line, whitespace collapsed, at most 60 characters. */
+export function nativeSessionTitle(prompt: string): string {
+  const firstLine = prompt.split(/\r?\n/).map((line) => line.trim()).find(Boolean) ?? '';
+  const compact = firstLine.replace(/\s+/g, ' ');
+  return compact.length > 60 ? `${compact.slice(0, 60).trimEnd()}…` : compact;
+}
+
 /** Effort identifiers are runtime-owned opaque strings. Keep the URL boundary
  * bounded and free of control characters without narrowing future runtimes to
  * a StashBase-maintained enum. */

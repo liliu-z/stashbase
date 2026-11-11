@@ -21,6 +21,7 @@ import { agentSessionExitEvent, agentTurnErrorEvent } from './agent-turn-failure
 import { agentBootstrapCoordinator } from './agent-runtime-installer.ts';
 import {
   isAgentAccessMode,
+  nativeSessionTitle,
   resolveSessionBinding,
   type AgentAccessMode,
   type AgentConnectionOptions,
@@ -623,7 +624,7 @@ export class CodexSession implements AttributedAgentSession {
     this.resumeThreadId = null;
     if (shouldSendSessionId) this.send({ t: 'session-id', id });
     if (isNewThread) {
-      const title = titleFromPrompt(titleHint);
+      const title = nativeSessionTitle(titleHint);
       if (title) {
         this.send({ t: 'session-title', title });
         await this.request('thread/name/set', { threadId: id, name: title })
@@ -1158,16 +1159,6 @@ function codexThreadModel(thread: JsonObject | undefined, response?: JsonObject)
 
 function codexEffortOption(effort: string | undefined): { effort?: string } {
   return effort ? { effort } : {};
-}
-
-function titleFromPrompt(prompt: string): string {
-  const firstLine = prompt
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .find(Boolean) ?? '';
-  if (!firstLine) return '';
-  const compact = firstLine.replace(/\s+/g, ' ');
-  return compact.length > 60 ? `${compact.slice(0, 60).trimEnd()}…` : compact;
 }
 
 const sessions = liveSessionSet<CodexSession>();
