@@ -1159,6 +1159,13 @@ async function createWindow({ background = false, reopensProject = false } = {})
       win.close();
       return;
     }
+    if (windowAction === 'zoom-in') {
+      // Same step as Electron's zoomIn role. Preventing the default also
+      // stops the menu accelerator, so a shifted `+` zooms once, not twice.
+      event.preventDefault();
+      win.webContents.setZoomLevel(win.webContents.getZoomLevel() + 0.5);
+      return;
+    }
     if (windowAction === 'block-reload') event.preventDefault();
   });
 

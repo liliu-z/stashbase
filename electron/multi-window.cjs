@@ -145,6 +145,11 @@ function windowLifecycleShortcutAction(input, platform = process.platform) {
     && input.alt !== true
     && input.meta !== true;
   if ((primary && input.alt !== true && key === 'r') || windowsReloadKey) return 'block-reload';
+  // The stock zoomIn role listens for `CommandOrControl+Plus`, the shifted
+  // character. Pressing the primary key with the unshifted `=`/`+` key sends
+  // `=`, so zoom out worked while zoom in silently did nothing. Own both
+  // characters (and the numpad `+`) here; held keys keep zooming like `-`.
+  if (primary && input.alt !== true && (key === '=' || key === '+')) return 'zoom-in';
   if (input.isAutoRepeat === true) return null;
   if (shiftedPrimary && key === 'n') return 'new-window';
   if (shiftedPrimary && key === 'w') return 'close-window';

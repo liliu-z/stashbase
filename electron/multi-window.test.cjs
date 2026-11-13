@@ -344,6 +344,27 @@ test('window lifecycle input follows the platform menu mapping without stealing 
   );
 });
 
+test('zoom in accepts the unshifted = key as well as +, matching zoom out', () => {
+  const ctrlEqual = { type: 'keyDown', key: '=', control: true, meta: false, shift: false, alt: false };
+  for (const platform of ['win32', 'linux']) {
+    // Ctrl+= is what a laptop keyboard sends; Ctrl+Shift+= and numpad + send `+`.
+    assert.equal(windowLifecycleShortcutAction(ctrlEqual, platform), 'zoom-in');
+    assert.equal(windowLifecycleShortcutAction({ ...ctrlEqual, key: '+', shift: true }, platform), 'zoom-in');
+    assert.equal(windowLifecycleShortcutAction({ ...ctrlEqual, key: '+' }, platform), 'zoom-in');
+    // Holding the chord keeps zooming, like the native zoom-out accelerator.
+    assert.equal(windowLifecycleShortcutAction({ ...ctrlEqual, isAutoRepeat: true }, platform), 'zoom-in');
+    // A plain `=` is typing, and Alt or Meta chords are not this shortcut.
+    assert.equal(windowLifecycleShortcutAction({ ...ctrlEqual, control: false }, platform), null);
+    assert.equal(windowLifecycleShortcutAction({ ...ctrlEqual, alt: true }, platform), null);
+    assert.equal(windowLifecycleShortcutAction({ ...ctrlEqual, type: 'keyUp' }, platform), null);
+  }
+  assert.equal(
+    windowLifecycleShortcutAction({ ...ctrlEqual, control: false, meta: true }, 'darwin'),
+    'zoom-in',
+  );
+  assert.equal(windowLifecycleShortcutAction(ctrlEqual, 'darwin'), null);
+});
+
 test('last-window behavior follows each desktop platform convention', () => {
   assert.equal(shouldQuitAfterLastWindow('darwin'), false);
   assert.equal(shouldQuitAfterLastWindow('win32'), true);
