@@ -72,6 +72,16 @@ The test covers unavailable 8.3 names and a spaced temporary directory without
 PowerShell or a shared constraint copy. It does not establish a full Python
 dependency installation or frozen sidecar build under those special paths.
 
+**Source server launch paths (2026-11-13):** a Windows source launch runs the
+`tsx.cmd` shim through `cmd.exe`, where Node joins the command and arguments
+unquoted; a checkout such as `C:\MY Coding\stashbase` failed before health with
+`'C:\MY' is not recognized`. `createServerSpawn` in `electron/main-probe.cjs`
+quotes each part for that shell and leaves direct launches unchanged.
+`main-probe.test.cjs` asserts both shapes and, on Windows, runs a real `.cmd`
+shim from a spaced temporary directory. A manual Windows 11 source launch from
+the spaced checkout reached the window. Packaged launches use Electron's
+embedded runtime without a shell and were not affected.
+
 **Account and startup recovery (2026-11-03):** credits and billing now refresh
 host-owned account state after a typed authentication refusal. Confirmed expiry
 restores Sign in and invalidates Agent readiness; network errors keep the
