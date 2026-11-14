@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { DIRECTORY_LINK } from './filesystem-links.ts';
 
 // Isolate application data before
 // importing the modules under test (each test file runs in its own process).
@@ -193,7 +194,7 @@ test('create_project rejects a location that escapes an owned root through a sym
   const link = path.join(HOME, 'linked-outside');
   fs.mkdirSync(outside, { recursive: true });
   try {
-    fs.symlinkSync(outside, link, process.platform === 'win32' ? 'junction' : 'dir');
+    fs.symlinkSync(outside, link, DIRECTORY_LINK);
   } catch (error) {
     t.skip(`symlinks are unavailable in this environment: ${String(error)}`);
     return;

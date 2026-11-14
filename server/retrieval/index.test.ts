@@ -206,6 +206,7 @@ test('both retrieval modes reject deleted, cancelled, failed, and stale prepared
       const { markCancelled, markFailed, clearRecord } = await import('./server/conversion-status.ts');
       const { closeStateDb } = await import('./server/state-db.ts');
       const { filesystemPath } = await import('./server/filesystem-path.ts');
+      const { fileSymlink } = await import('./server/__tests__/filesystem-links.ts');
       const root = path.join(os.homedir(), 'project');
       fs.mkdirSync(root);
       const direct = path.join(root, 'note.md');
@@ -277,8 +278,7 @@ test('both retrieval modes reject deleted, cancelled, failed, and stale prepared
         const outside = path.join(os.homedir(), 'outside.md');
         fs.writeFileSync(outside, 'needle');
         source = path.join(root, 'link.md');
-        fs.symlinkSync(outside, source);
-        await expectCount(0, 'symlink outside project');
+        if (fileSymlink(outside, source, { diagnostic: console.log })) await expectCount(0, 'symlink outside project');
       } finally { closeStateDb(); }
     })().catch((error) => { console.error(error); process.exitCode = 1; });`], {
       cwd: path.resolve(import.meta.dirname, '../..'), encoding: 'utf8', timeout: 30_000,

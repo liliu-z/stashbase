@@ -12,6 +12,7 @@ import { mountFileOperationReceipts } from './routes/file-operations.ts';
 import { mount as mountProjectFiles } from './routes/project-files.ts';
 import { mount as mountMcp } from './routes/mcp-http.ts';
 import { registerAttributedAgentSession, unregisterAttributedAgentSession } from './agent-session-registry.ts';
+import { DIRECTORY_LINK } from './__tests__/filesystem-links.ts';
 
 test('creates independent notes under concurrent requests and preserves named collisions and project boundaries', async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-interactive-'));
@@ -28,7 +29,7 @@ test('creates independent notes under concurrent requests and preserves named co
     await assert.rejects(createInteractiveNote({ parentPath: '', name: notes[0]!.path }), /already uses/);
     assert.equal(fs.readFileSync(path.join(root, notes[0]!.path, 'assets/note.json'), 'utf8'), 'user content');
     await assert.rejects(createInteractiveNote({ parentPath: '../outside' }));
-    fs.symlinkSync(outside, path.join(root, 'escape'), 'dir');
+    fs.symlinkSync(outside, path.join(root, 'escape'), DIRECTORY_LINK);
     await assert.rejects(createInteractiveNote({ parentPath: 'escape' }));
     assert.deepEqual(fs.readdirSync(outside), []);
   });

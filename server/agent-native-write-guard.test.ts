@@ -8,8 +8,7 @@ import type { HookCallbackMatcher, HookInput, Query } from '@anthropic-ai/claude
 import type { WebSocket } from 'ws';
 import { AgentSession } from './agent.ts';
 import { nativeWriteTargetsProject, projectNativeWriteGuard } from './agent-native-write-guard.ts';
-
-const DIRECTORY_LINK = process.platform === 'win32' ? 'junction' : 'dir';
+import { DIRECTORY_LINK } from './__tests__/filesystem-links.ts';
 
 function fixture(t: TestContext): { project: string; outside: string } {
   // Deliberately unresolved: macOS temp paths reach /private/var through /var.

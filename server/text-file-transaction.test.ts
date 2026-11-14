@@ -9,6 +9,7 @@ import { saveFileContent } from './file-save.ts';
 import { indexer } from './state.ts';
 import { readTextSnapshotAsync, textVersion } from './text-file-transaction.ts';
 import { applyRenamePlanAsync, planRenameLinksAsync } from './links.ts';
+import { DIRECTORY_LINK } from './__tests__/filesystem-links.ts';
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-text-transactions-'));
 after(() => fs.rmSync(scratch, { recursive: true, force: true }));
@@ -103,7 +104,7 @@ test('two folder aliases serialize writes to the same source directory entry', a
   t.mock.method(indexer, 'upsertFile', async () => ({ outcome: 'unchanged' }));
   const root = folder();
   const alias = path.join(scratch, 'alias');
-  try { fs.symlinkSync(root, alias, process.platform === 'win32' ? 'junction' : 'dir'); }
+  try { fs.symlinkSync(root, alias, DIRECTORY_LINK); }
   catch { t.skip('directory symlinks unavailable'); return; }
   fs.writeFileSync(path.join(root, 'note.md'), 'original');
   const results = await Promise.allSettled([root, alias].map((scope, index) =>
@@ -192,7 +193,7 @@ test('an absent-version save creates a sibling but never replaces a concurrently
     assert.equal(fs.readFileSync(path.join(root, 'form.json'), 'utf8'), '{"value":1}');
     fs.writeFileSync(path.join(root, 'raced.json'), '{"agent":true}');
     await assert.rejects(saveFileContent('raced.json', '{}', { baseVersion: 'absent' }), { code: 'FILE_CHANGED' });
-    fs.symlinkSync(path.join(root, '..'), path.join(root, 'outside'));
+    fs.symlinkSync(path.join(root, '..'), path.join(root, 'outside'), DIRECTORY_LINK);
     await assert.rejects(saveFileContent('outside/forbidden.json', '{}', { baseVersion: 'absent' }));
   });
 });

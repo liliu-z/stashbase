@@ -12,6 +12,7 @@ import { registerProjectFolderAsync } from './folder.ts';
 import { normalizeProjectFilePath } from './project-file-access.ts';
 import { currentProjectDiagnosticScope, withAgentProjectScope } from './project-request-scope.ts';
 import { traceWriteOperation } from './write-diagnostic-context.ts';
+import { DIRECTORY_LINK } from './__tests__/filesystem-links.ts';
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-path-evidence-'));
 const samples: WriteOperationDiagnostic[] = [];
@@ -120,7 +121,7 @@ test('realpath failure and symlink refusal record the original observed result w
   const other = path.join(scratch, 'p4');
   fs.mkdirSync(root); fs.mkdirSync(other);
   const alias = path.join(root, 'p5');
-  fs.symlinkSync(other, alias, process.platform === 'win32' ? 'junction' : 'dir');
+  fs.symlinkSync(other, alias, DIRECTORY_LINK);
   const target = path.join(alias, 'entry.ts');
   const paths = createFilesystemPath();
   const escaped = await capture(target, () => paths.resolveUnderAsync(root, 'p5/entry.ts', { access: 'creatable' }));

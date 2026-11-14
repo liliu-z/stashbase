@@ -11,6 +11,7 @@ import test from 'node:test';
 import { registerProjectFolderAsync } from '../folder.ts';
 import { prepareAgentAttachments } from '../agent-attachments.ts';
 import { attachRoot, cleanupStaleAttachments, mount, transientAttachmentPreviewPath } from './attach.ts';
+import { fileSymlink } from '../__tests__/filesystem-links.ts';
 
 test('transient attachment upload preserves ordered UTF-8 filenames across file types', async (t) => {
   const project = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-upload-project-'));
@@ -58,7 +59,7 @@ test('transient attachment upload preserves ordered UTF-8 filenames across file 
 
 });
 
-test('attachment previews reject a transient-tree symlink to an outside file', () => {
+test('attachment previews reject a transient-tree symlink to an outside file', (t) => {
   fs.mkdirSync(attachRoot(), { recursive: true, mode: 0o700 });
   const batch = fs.mkdtempSync(path.join(attachRoot(), 'preview-test-'));
   const outside = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-outside-')), 'secret.png');
@@ -67,7 +68,10 @@ test('attachment previews reject a transient-tree symlink to an outside file', (
   try {
     fs.writeFileSync(uploaded, 'not an image');
     fs.writeFileSync(outside, 'not an image');
-    fs.symlinkSync(outside, linked);
+    if (!fileSymlink(outside, linked, t)) {
+      t.skip('this test is only about a file symlink');
+      return;
+    }
 
     assert.equal(transientAttachmentPreviewPath(uploaded), fs.realpathSync(uploaded));
     assert.equal(transientAttachmentPreviewPath(linked), null);
@@ -127,8 +131,9 @@ test('Default prepares only unchanged uploads in its project, with bounded suppo
   fs.writeFileSync(text, 'changed after attaching');
   await assert.rejects(prepareAgentAttachments([text], project, signal), /changed/);
   fs.rmSync(image);
-  fs.symlinkSync(path.join(project, 'secret'), image);
-  await assert.rejects(prepareAgentAttachments([image], project, signal), /unavailable/);
+  if (fileSymlink(path.join(project, 'secret'), image, t)) {
+    await assert.rejects(prepareAgentAttachments([image], project, signal), /unavailable/);
+  }
   const binary = await upload('archive.zip', new Uint8Array([0, 255, 128]));
   await assert.rejects(prepareAgentAttachments([binary], project, signal), /supports UTF-8/);
   const longText = await upload('long.txt', 'x'.repeat(200_001));

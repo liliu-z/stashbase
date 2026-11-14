@@ -29,6 +29,7 @@ import {
 } from '../folder.ts';
 import { withWindowContext } from '../http.ts';
 import { mount } from './external-files.ts';
+import { DIRECTORY_LINK } from '../__tests__/filesystem-links.ts';
 
 const REGISTRATION_TOKEN = 'main-process-only';
 
@@ -170,7 +171,7 @@ test('a grant refuses a path component later swapped for a symlink', async () =>
     assert.equal(result.kind, 'external');
     if (result.kind !== 'external') return;
     fs.renameSync(folder, `${folder}-moved`);
-    fs.symlinkSync(elsewhere, folder, 'dir');
+    fs.symlinkSync(elsewhere, folder, DIRECTORY_LINK);
     assert.equal((await fetch(`${base}/api/external-files/${result.token}/text`, inWindow('window-a'))).status, 404);
   });
 });
