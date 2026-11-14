@@ -36,6 +36,17 @@ for (const root of SCAN_ROOTS) {
 }
 
 // A glob reaching Node's runner is quoted so the shell forwards it intact.
+// Only double quotes do that everywhere: pnpm runs scripts through cmd.exe on
+// Windows, which passes single quotes through literally, so the runner matches
+// no file and reports a passing run of zero tests.
+const singleQuotedGlobs = Object.entries(pkg.scripts ?? {}).flatMap(([name, command]) =>
+  [...command.matchAll(/'([^']*[*?{][^']*)'/g)].map((match) => `${name}: '${match[1]}'`));
+if (singleQuotedGlobs.length > 0) {
+  console.error('Single-quoted test globs match nothing on Windows; use escaped double quotes:');
+  for (const entry of singleQuotedGlobs) console.error(`  ${entry}`);
+  process.exit(1);
+}
+
 function expandBraces(token) {
   const match = token.match(/^(?<before>[^{}]*)\{(?<choices>[^{}]+)\}(?<after>.*)$/);
   if (!match?.groups) return [token];
