@@ -20,6 +20,7 @@ const path = require('node:path');
 const {
   readServerLogTail,
   createServerArguments,
+  createServerSpawn,
   createServerChildEnvironment,
   probeServerHealth,
   readDevelopmentExternalFileToken,
@@ -694,10 +695,6 @@ function localBin(name) {
   return path.join(PROJECT_ROOT, 'node_modules', '.bin', process.platform === 'win32' ? `${name}.cmd` : name);
 }
 
-function needsCmdShell(command) {
-  return process.platform === 'win32' && /\.(cmd|bat)$/i.test(command);
-}
-
 /** Construct the owned server child; readiness and port arbitration live in main-probe. */
 function spawnServer(instanceId) {
   hostInstanceId = instanceId;
@@ -778,7 +775,8 @@ function spawnServer(instanceId) {
       logFd = null;
     }
   }
-  serverProc = spawn(serverBin, serverArgs, {
+  const serverSpawn = createServerSpawn({ command: serverBin, args: serverArgs });
+  serverProc = spawn(serverSpawn.command, serverSpawn.args, {
     cwd: serverCwd,
     // Port flows via the CLI arg above, not the env — keeps the server
     // entry's argv parser the single source of truth for port config.
@@ -804,7 +802,7 @@ function spawnServer(instanceId) {
     // StashBase from starting. Bug-report collection only reads the
     // Electron-managed file, never an arbitrary renderer-provided path.
     stdio: logFd === null ? ['ignore', 'inherit', 'inherit'] : ['ignore', logFd, logFd],
-    shell: needsCmdShell(serverBin),
+    shell: serverSpawn.shell,
   });
   if (logFd !== null) {
     try { fs.closeSync(logFd); } catch { /* child owns its duplicate */ }

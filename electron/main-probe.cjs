@@ -248,6 +248,19 @@ function createServerArguments({ entry, portArgs, packaged, vite }) {
   return vite ? ['watch', entry, ...portArgs] : [entry, ...portArgs];
 }
 
+/** Windows source launches run the `.cmd` shim from node_modules/.bin, which
+ * only cmd.exe can execute. With `shell: true` Node joins the command and its
+ * arguments with spaces and no quoting, so a checkout such as
+ * `C:\My Projects\stashbase` would be split at the space. Quote every part;
+ * Node wraps the whole line for `cmd.exe /s /c`, which keeps these quotes. */
+function createServerSpawn({ command, args, platform = process.platform }) {
+  if (platform !== 'win32' || !/\.(cmd|bat)$/i.test(command)) {
+    return { command, args, shell: false };
+  }
+  const quote = (value) => `"${String(value).replace(/"/g, '""')}"`;
+  return { command: quote(command), args: args.map(quote), shell: true };
+}
+
 /** Source launches compile the TypeScript server on demand, so their first
  * process can legitimately take longer on a cold or contended machine than
  * the pre-bundled packaged entry. Keep packaged startup failure fast while
@@ -293,6 +306,7 @@ module.exports = {
   requestJson,
   readServerLogTail,
   createServerArguments,
+  createServerSpawn,
   createServerChildEnvironment,
   isCompatibleServerHealth,
   serverStartupTimeoutMs,

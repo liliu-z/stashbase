@@ -9,6 +9,7 @@ const test = require('node:test');
 const {
   probeServerHealth,
   createServerArguments,
+  createServerSpawn,
   isCompatibleServerHealth,
   startServer,
   createServerChildEnvironment,
@@ -266,6 +267,46 @@ test('Electron-owned server uses a single process unless Vite explicitly needs w
   assert.deepEqual(direct, ['/repo/server/index.ts', '--port=4200']);
   assert.deepEqual(vite, ['watch', '/repo/server/index.ts', '--port=4200']);
   assert.deepEqual(packaged, ['/app/dist/server/index.mjs']);
+});
+
+test('Windows source launch keeps a spaced checkout path intact through cmd.exe', async () => {
+  const windows = createServerSpawn({
+    command: 'C:\\My Projects\\stashbase\\node_modules\\.bin\\tsx.cmd',
+    args: ['C:\\My Projects\\stashbase\\server\\index.ts', '--port=4200'],
+    platform: 'win32',
+  });
+  assert.deepEqual(windows, {
+    command: '"C:\\My Projects\\stashbase\\node_modules\\.bin\\tsx.cmd"',
+    args: ['"C:\\My Projects\\stashbase\\server\\index.ts"', '"--port=4200"'],
+    shell: true,
+  });
+
+  const posix = createServerSpawn({
+    command: '/My Projects/stashbase/node_modules/.bin/tsx',
+    args: ['/My Projects/stashbase/server/index.ts'],
+    platform: 'darwin',
+  });
+  assert.deepEqual(posix, {
+    command: '/My Projects/stashbase/node_modules/.bin/tsx',
+    args: ['/My Projects/stashbase/server/index.ts'],
+    shell: false,
+  });
+
+  if (process.platform !== 'win32') return;
+  // Exercise the real cmd.exe path: a spaced directory with a .cmd shim must
+  // receive its spaced argument as one value.
+  const { spawnSync } = require('node:child_process');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase spawn '));
+  try {
+    const shim = path.join(root, 'echo args.cmd');
+    fs.writeFileSync(shim, '@echo off\r\necho [%~1]\r\n');
+    const real = createServerSpawn({ command: shim, args: [path.join(root, 'server index.ts')] });
+    const result = spawnSync(real.command, real.args, { shell: real.shell, encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout.trim(), `[${path.join(root, 'server index.ts')}]`);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('source server startup covers cold TypeScript loading without weakening packaged failure bounds', () => {
