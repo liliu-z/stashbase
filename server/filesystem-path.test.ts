@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { createFilesystemPath, filesystemPath } from './filesystem-path.ts';
+import { DIRECTORY_LINK } from './__tests__/filesystem-links.ts';
 
 test('POSIX paths preserve case and root joins', () => {
   const paths = createFilesystemPath({ platform: 'posix', cwd: '/workspace' });
@@ -192,7 +193,7 @@ test('resolveUnder blocks existing and creatable symlink or junction escapes', (
   fs.mkdirSync(outside);
   fs.writeFileSync(path.join(root, 'inside.md'), 'inside');
   fs.writeFileSync(path.join(outside, 'outside.md'), 'outside');
-  fs.symlinkSync(outside, path.join(root, 'link'), process.platform === 'win32' ? 'junction' : 'dir');
+  fs.symlinkSync(outside, path.join(root, 'link'), DIRECTORY_LINK);
   if (process.platform !== 'win32') {
     fs.symlinkSync(path.join(outside, 'outside.md'), path.join(root, 'linked-file.md'));
   }
@@ -230,7 +231,7 @@ test('resolveUnderAsync matches resolveUnder for symlink or junction escapes', a
   fs.mkdirSync(outside);
   fs.writeFileSync(path.join(root, 'inside.md'), 'inside');
   fs.writeFileSync(path.join(outside, 'outside.md'), 'outside');
-  fs.symlinkSync(outside, path.join(root, 'link'), process.platform === 'win32' ? 'junction' : 'dir');
+  fs.symlinkSync(outside, path.join(root, 'link'), DIRECTORY_LINK);
   if (process.platform !== 'win32') {
     fs.symlinkSync(path.join(outside, 'outside.md'), path.join(root, 'linked-file.md'));
   }

@@ -30,6 +30,7 @@ import { parseToolCatalog } from '../agent-tool-catalog.ts';
 import { readAppConfigStrict, writeAppConfigStrict } from '../app-config.ts';
 import { crewCallHistory, forgetCrewCalls } from '../agent-crew-history.ts';
 import type { AgentAccessMode } from '../../shared/agent-runtime.ts';
+import { DIRECTORY_LINK } from './filesystem-links.ts';
 
 function modeHarness(access: AgentAccessMode, folder = '/workspace', nativeStart = true, abortFailure = false, diagnostic?: () => unknown,
   review?: (signal?: AbortSignal) => Promise<string>, abort?: () => Promise<void>) {
@@ -441,7 +442,7 @@ for (const access of ['default', 'acceptEdits', 'plan', 'auto'] as const) {
     const folder = path.join(root, 'project');
     const outside = path.join(root, 'outside');
     fs.mkdirSync(folder); fs.mkdirSync(outside);
-    fs.symlinkSync(outside, path.join(folder, 'escape'), process.platform === 'win32' ? 'junction' : 'dir');
+    fs.symlinkSync(outside, path.join(folder, 'escape'), DIRECTORY_LINK);
     const harness = modeHarness(access, folder);
     t.after(() => { harness.session.dispose(); fs.rmSync(root, { recursive: true, force: true }); });
     await settle();
