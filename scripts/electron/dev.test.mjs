@@ -7,6 +7,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { developmentServerCommand } from "../dev-server.mjs";
 import { developmentElectronEnvironment } from "./dev.mjs";
 
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
@@ -104,4 +105,36 @@ test("the development Electron host enables Vite without inheriting embedded Nod
   assert.equal(environment.STASHBASE_DEV_VITE, "1");
   assert.equal(environment.EXISTING, "kept");
   assert.equal(environment.ELECTRON_RUN_AS_NODE, undefined);
+});
+
+test("package scripts set environment variables in Node, not with a POSIX prefix", () => {
+  // pnpm runs scripts through cmd.exe on Windows, where `NAME=value command`
+  // is "not recognized as an internal or external command".
+  const { scripts } = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8"));
+  const prefixed = Object.entries(scripts)
+    .filter(([, command]) => /(^|&&|\|\||;)\s*[A-Za-z_][A-Za-z0-9_]*=\S*\s/u.test(command))
+    .map(([name]) => name);
+  assert.deepEqual(prefixed, []);
+  assert.equal(scripts["dev:server"], "node scripts/dev-server.mjs");
+});
+
+test("the development server runs tsx watch directly with the Vite flag", (context) => {
+  const { command, args, env, stdio } = developmentServerCommand({ EXISTING: "kept" });
+  assert.equal(command, process.execPath);
+  assert.deepEqual(args.slice(1), ["watch", "server/index.ts"]);
+  assert.equal(env.STASHBASE_DEV_VITE, "1");
+  assert.equal(env.EXISTING, "kept");
+  // An inherited, never-written stdin pipe (as under `concurrently`) blocked
+  // the watched server's startup on Windows.
+  assert.equal(stdio[0], "ignore");
+
+  // The resolved tsx CLI runs TypeScript and sees the flag without a shell,
+  // including from a checkout path that contains spaces.
+  const root = mkdtempSync(path.join(os.tmpdir(), "stashbase dev server "));
+  context.after(() => rmSync(root, { recursive: true, force: true }));
+  const probe = path.join(root, "probe.ts");
+  writeFileSync(probe, "const flag: string | undefined = process.env.STASHBASE_DEV_VITE;\nconsole.log(`flag=${flag}`);\n");
+  const result = spawnSync(command, [args[0], probe], { env, encoding: "utf8", timeout: 20_000 });
+  assert.equal(result.status, 0, `${result.stdout}${result.stderr}`);
+  assert.match(result.stdout, /flag=1/u);
 });
