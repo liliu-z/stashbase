@@ -31,8 +31,8 @@ function applicationWindowWebPreferences({
 }
 
 /**
- * The one permission an application window is granted, and only to its own
- * origin: putting a value the reader asked a panel to copy onto the clipboard.
+ * Clipboard writes are granted only to the application origin. Microphone
+ * access has its separate capability-armed, main-frame-only check below.
  *
  * This is the write, and only the write. Chromium sanitizes the payload, and
  * the app never reads the clipboard through this API — a paste arrives as an
@@ -48,6 +48,25 @@ function applicationWindowWebPreferences({
  * not be reached.
  */
 const CLIPBOARD_PERMISSION = 'clipboard-sanitized-write';
+const microphoneWindows = new WeakMap();
+
+/** Only the capability-checked preload may arm this short permission window.
+ * BrowserWindow destruction and explicit capture cleanup revoke it. */
+function authorizeApplicationMicrophone(win, active) {
+  const authority = microphoneWindows.get(win.webContents);
+  if (!authority || win.webContents.isDestroyed?.()) return false;
+  authority.until = active ? Date.now() + 60_000 : 0;
+  return true;
+}
+
+function isApplicationMicrophoneRequest(webContents, permission, details, check) {
+  const authority = webContents && microphoneWindows.get(webContents);
+  if (permission !== 'media' || !authority || authority.until <= Date.now()
+    || details?.isMainFrame !== true
+    || !isAllowedApplicationUrl(details.requestingUrl, authority.origin)) return false;
+  return check ? details.mediaType === 'audio'
+    : Array.isArray(details.mediaTypes) && details.mediaTypes.length === 1 && details.mediaTypes[0] === 'audio';
+}
 
 /** The requesting document decides this, not the window: `requestingUrl` is
  *  the frame that asked, so a frame at any other origin is refused even
@@ -59,6 +78,9 @@ function isApplicationClipboardRequest(permission, details, expectedOrigin) {
 }
 
 function secureApplicationWindow(win, expectedOrigin) {
+  const contents = win.webContents;
+  microphoneWindows.set(contents, { origin: expectedOrigin, until: 0 });
+  contents.once('destroyed', () => microphoneWindows.delete(contents));
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   const denyUnexpectedNavigation = (event, url) => {
     if (!isAllowedApplicationUrl(url, expectedOrigin)) event.preventDefault();
@@ -66,17 +88,20 @@ function secureApplicationWindow(win, expectedOrigin) {
   win.webContents.on('will-navigate', denyUnexpectedNavigation);
   win.webContents.on('will-redirect', denyUnexpectedNavigation);
   win.webContents.on('will-attach-webview', (event) => event.preventDefault());
-  // Nothing is granted ambiently. A capability a page can hold without asking
-  // is one it can use without the reader having done anything.
-  win.webContents.session.setPermissionCheckHandler(() => false);
+  // Clipboard writes remain request-only. Audio checks require the same
+  // short-lived capture grant as requests; no camera or subframe inherits it.
+  win.webContents.session.setPermissionCheckHandler((webContents, permission, _origin, details) =>
+    isApplicationMicrophoneRequest(webContents, permission, details, true));
   win.webContents.session.setPermissionRequestHandler(
-    (_webContents, permission, callback, details) => {
-      callback(isApplicationClipboardRequest(permission, details, expectedOrigin));
+    (webContents, permission, callback, details) => {
+      callback(isApplicationClipboardRequest(permission, details, expectedOrigin)
+        || isApplicationMicrophoneRequest(webContents, permission, details, false));
     },
   );
 }
 
 module.exports = {
+  authorizeApplicationMicrophone,
   applicationWindowWebPreferences,
   isAllowedApplicationUrl,
   secureApplicationWindow,

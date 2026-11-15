@@ -8,6 +8,7 @@ const {
   applicationWindowWebPreferences,
   isAllowedApplicationUrl,
   secureApplicationWindow,
+  authorizeApplicationMicrophone,
 } = require('./window-security.cjs');
 
 test('application windows use the restrictive replacement preferences by default', () => {
@@ -114,4 +115,39 @@ test('application windows grant the clipboard only to their own origin', () => {
 
   // And nothing is granted ambiently, the clipboard included.
   assert.equal(permissionCheck(), false);
+});
+
+test('microphone access requires an armed live application main frame and never grants video', () => {
+  const contents = new EventEmitter();
+  let request;
+  let check;
+  contents.setWindowOpenHandler = () => {};
+  contents.session = {
+    setPermissionCheckHandler(handler) { check = handler; },
+    setPermissionRequestHandler(handler) { request = handler; },
+  };
+  const win = { webContents: contents };
+  secureApplicationWindow(win, 'app://renderer');
+  const details = { isMainFrame: true, requestingUrl: 'app://renderer/index.html', mediaTypes: ['audio'] };
+  const decide = (source, value) => {
+    let allowed;
+    request(source, 'media', (answer) => { allowed = answer; }, value);
+    return allowed;
+  };
+  assert.equal(decide(contents, details), false);
+  assert.equal(authorizeApplicationMicrophone(win, true), true);
+  assert.equal(decide(contents, details), true);
+  assert.equal(check(contents, 'media', 'app://renderer', { ...details, mediaType: 'audio' }), true);
+  assert.equal(check(contents, 'media', 'app://renderer', { ...details, mediaType: 'video' }), false);
+  assert.equal(decide(contents, { ...details, mediaTypes: ['audio', 'video'] }), false);
+  assert.equal(decide(contents, { ...details, mediaTypes: ['video'] }), false);
+  assert.equal(decide(contents, { ...details, isMainFrame: false }), false);
+  assert.equal(decide(contents, { ...details, requestingUrl: 'https://example.com/' }), false);
+  assert.equal(decide(new EventEmitter(), details), false);
+  authorizeApplicationMicrophone(win, false);
+  assert.equal(decide(contents, details), false);
+  authorizeApplicationMicrophone(win, true);
+  Object.defineProperty(win, 'webContents', { get() { throw new Error('Window has been destroyed'); } });
+  assert.doesNotThrow(() => contents.emit('destroyed'));
+  assert.equal(decide(contents, details), false);
 });

@@ -34,6 +34,7 @@ export const electronBoundaryEntries = {
   'window/appearance': 'electron/window/appearance.ts',
   'text-services/context-menu': 'electron/text-services/context-menu.ts',
   'text-services/ipc': 'electron/text-services/ipc.ts',
+  'speech/ipc': 'electron/speech/ipc.ts',
   'text-services/system-fonts': 'electron/text-services/system-fonts.ts',
   'window/preload': 'electron/window/preload.ts',
 };

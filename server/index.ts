@@ -89,6 +89,8 @@ import {
 import { createClientErrorHandler } from './client-error.ts';
 import { stopOpenCodeRuntime } from './opencode-runtime.ts';
 import { cancelAllGitHubImports } from './github-import.ts';
+import { mount as mountSpeechRoutes } from './routes/speech.ts';
+import { closeSpeech, speechService, startSpeechPreparation } from './speech/index.ts';
 import { parsePortArg } from '../shared/port-arg.ts';
 
 const log = logger('server');
@@ -281,7 +283,7 @@ if (!DEV_VITE) {
 
 // Folder/project routes include Welcome-screen operations that must work
 // before a window has an open folder, so mount them before the gate.
-mountWindowContextRoutes(app);
+mountWindowContextRoutes(app, (window) => speechService.releaseWindow(window));
 mountProjectRoutes(app);
 // External files are read by grant token, never by a project path, so the
 // project gate below (whose `/asset` prefix they share) does not apply.
@@ -309,6 +311,7 @@ app.use([
 
 // ----- mount routes -------------------------------------------------------
 mountAppearanceRoutes(app);
+mountSpeechRoutes(app);
 mountTelemetryRoutes(app);
 mountWorkspacePreferenceRoutes(app);
 mountUpdateRoutes(app);
@@ -364,6 +367,7 @@ const server = app.listen(PORT, '127.0.0.1', () => {
   try { ensureMcpLauncher(); }
   catch (err: unknown) { log.warn(`MCP launcher refresh failed:`, err); }
   log.info(`listening on http://127.0.0.1:${PORT}`);
+  void startSpeechPreparation().catch(() => log.warn('Voice typing preparation is unavailable. Check Settings.'));
   void resumeExtractorDownload().catch((error) => log.warn(`component recovery failed:`, error));
   void mcpHttpService.start().catch((err: unknown) => {
     log.warn(`MCP HTTP startup failed:`, err);
@@ -600,6 +604,7 @@ async function shutdown(reason: string): Promise<void> {
   const exitTimer = setTimeout(() => process.exit(0), 6500);
   try {
     await runShutdownCleanup({
+      closeSpeech,
       closeMcp: () => mcpHttpService.close(),
       cancelAgentInstalls: cancelAgentRuntimeInstalls,
       closeBundledAgent: async () => { await Promise.all([stopOpenCodeRuntime(), closeAgentProcesses()]); },

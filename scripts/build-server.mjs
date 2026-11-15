@@ -11,8 +11,12 @@ fs.rmSync(outDir, { recursive: true, force: true });
 fs.mkdirSync(outDir, { recursive: true });
 
 await esbuild.build({
-  entryPoints: [path.join(root, 'server', 'index.ts')],
-  outfile: path.join(outDir, 'index.mjs'),
+  entryPoints: {
+    index: path.join(root, 'server', 'index.ts'),
+    'speech-worker': path.join(root, 'server', 'speech', 'worker.ts'),
+  },
+  outdir: outDir,
+  outExtension: { '.js': '.mjs' },
   bundle: true,
   platform: 'node',
   format: 'esm',
@@ -20,6 +24,8 @@ await esbuild.build({
   external: [
     // Native module rebuilt by electron-builder and loaded from packaged node_modules.
     'better-sqlite3',
+    // The speech child resolves its verified prebuilt libraries beside this package.
+    'transcribe-cpp',
     // Ships its own `cli.js` that it locates relative to its own package
     // dir at runtime — bundling it into one file breaks that resolution,
     // so load it from packaged node_modules like the native modules above.

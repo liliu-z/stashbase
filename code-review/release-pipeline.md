@@ -189,6 +189,17 @@ toolchain rather than the linter any gate runs.
   PDF runtime resource and performs DOCX conversion. PyArrow/OpenCV and the independent
   Python environments are preserved.
 - Packaging validates Python daemon and extractor inputs before assembling the app.
+- Local voice typing ships the pinned `transcribe-cpp` binding, target native
+  package, and Koffi outside asar, plus the built speech worker and model license
+  notices. Model weights are excluded: first launch prepares them silently in
+  the user's data directory, also after updates. macOS requires the microphone
+  usage description and audio-input entitlement. Windows packaging stages the
+  x64 Visual C++ 14.40+ runtime DLLs app-locally from the build host's Visual Studio
+  redistributable directory, so users need no separate runtime installer; missing
+  or incompatible inputs fail packaging. Verify capture, native library loading,
+  automatic preparation, offline reuse and idle unload in each final signed
+  artifact, including a clean Windows VM without a preinstalled redistributable.
+  Source model smoke is not evidence of these packaged behaviors.
 - Every unbundled local dependency loaded by the Electron main process must be
   included in the electron-builder input. The package-input test scans relative
   CommonJS dependencies that cross out of `electron/` so a source-only smoke

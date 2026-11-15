@@ -88,6 +88,8 @@ export function isEmbedderProvider(value: unknown): value is EmbedderProvider {
 }
 
 export interface AppConfigFile {
+  /** Explicitly pausing voice preparation survives application restarts. */
+  voiceTypingDownloadPaused?: boolean;
   /** The last explicit Agent choice, inherited by projects without their own. */
   lastSelectedAgent?: 'stashbase' | 'codex' | 'claude' | 'antigravity';
   /** Per-Agent defaults for projects without an explicit model or effort choice. */
