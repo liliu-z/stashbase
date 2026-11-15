@@ -1974,8 +1974,8 @@ General settings row. Its private launcher drives
 test hook. This uses controlled audio, not a physical microphone.
 `test:speech:native` has also completed real English inference under Electron's
 embedded Node 22.22.1 on Linux
-x64 CPU. The built `dist/server/speech-worker.mjs` also completed the sample
-through its actual IPC entrypoint under that embedded runtime. The default built
+x64 CPU. The compiled worker from `server/speech/worker.ts` also completed the
+sample through its actual IPC entrypoint under that embedded runtime. The default built
 Electron smoke passes, including cleanup after native window destruction.
 The Windows runtime-input test stages a controlled x64 CRT fixture;
 static inspection found both published macOS library sets and Koffi bindings
