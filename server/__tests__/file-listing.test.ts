@@ -58,6 +58,15 @@ test('file-listing reports the truthful workbench tree without traversing exclud
     fs.mkdirSync(folderDotOnly);
     fs.writeFileSync(path.join(folderDotOnly, '.DS_Store'), '');
     if (process.platform !== 'win32') fs.writeFileSync(path.join(tempDir, 'Icon\r'), '');
+    // Explorer folder settings, thumbnail caches, an Office lock beside its
+    // document, and drive-root system folders.
+    for (const junk of ['Desktop.ini', 'Thumbs.db', 'mixed/~$report.docx']) {
+      fs.writeFileSync(path.join(tempDir, junk), '');
+    }
+    for (const systemDir of ['$RECYCLE.BIN', 'System Volume Information']) {
+      fs.mkdirSync(path.join(tempDir, systemDir));
+      fs.writeFileSync(path.join(tempDir, systemDir, 'deleted draft.md'), '# Deleted');
+    }
 
     // A row comes from metadata alone. Opening a cloud-only source downloads
     // it, so the listing must never open any file in the project.
@@ -125,6 +134,13 @@ test('file-listing reports the truthful workbench tree without traversing exclud
     assert.ok(!fileNames.includes('.DS_Store'), 'junk dot-files stay hidden');
     if (process.platform !== 'win32')
       assert.ok(!fileNames.includes('Icon\r'), 'macOS custom folder icon files stay hidden');
+    for (const junk of ['Desktop.ini', 'Thumbs.db', 'mixed/~$report.docx']) {
+      assert.ok(!fileNames.includes(junk), `${junk} stays hidden`);
+    }
+    for (const systemDir of ['$RECYCLE.BIN', 'System Volume Information']) {
+      assert.ok(!folderPaths.includes(systemDir), `${systemDir} stays hidden`);
+      assert.ok(!fileNames.includes(`${systemDir}/deleted draft.md`), `${systemDir} is never traversed`);
+    }
     assert.ok(!fileNames.includes('.private.md'), 'the established hidden dot-note namespace stays hidden');
     assert.ok(!fileNames.includes('.note.pdf.md'), 'hidden derived notes never surface');
     assert.ok(!fileNames.includes('node_modules/index.js'), 'excluded directory contents are never traversed');
