@@ -117,6 +117,7 @@ jobs:
         run: pnpm test:opencode:native
 
       - name: Cache the pinned speech model
+        if: ${{ !cancelled() && steps.python.outcome == 'success' }}
         uses: actions/cache@v6
         with:
           path: profiling.nosync/speech-model

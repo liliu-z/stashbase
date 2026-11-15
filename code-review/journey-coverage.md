@@ -1987,8 +1987,8 @@ Windows x64 and Linux desktops; Metal execution/fallback on real hardware;
 clean-machine Windows DLL loading; signed/package resource resolution; real
 network preparation through proxies and interrupted app updates; broad speech
 quality and continuous hour-long native capture. The four-platform source CI
-now includes the pinned real-model smoke, but this unpushed local change has not
-run that matrix.
+includes the pinned real-model smoke; the PR's current matrix results establish
+source-platform execution separately from device and packaged-app acceptance.
 
 **First-send feedback (2026-11-11):** the session dispatcher publishes a pending
 user-message snapshot before context resolution and cold-session startup. The
