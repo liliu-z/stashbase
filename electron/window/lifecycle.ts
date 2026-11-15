@@ -2,12 +2,14 @@ import type { BrowserWindow, IpcMain, IpcMainInvokeEvent } from 'electron';
 
 import {
   WINDOW_CONTEXT_RELEASE_READY_CHANNEL,
+  WINDOW_CONTEXT_RELEASE_PENDING_CHANNEL,
   WINDOW_FULLSCREEN_CHANNEL,
   WINDOW_INPUT_ACTIVITY_CHANNEL,
   WINDOW_LIFECYCLE_CAPABILITY,
   WINDOW_PREPARE_CONTEXT_RELEASE_CHANNEL,
   type WindowContextReleaseReason,
   windowContextReleaseReadySchema,
+  windowContextReleaseRequestSchema,
   windowFullScreenSchema,
   windowContextReleaseResponseSchema,
 } from '../../shared/protocols/electron/window-lifecycle.ts';
@@ -59,6 +61,13 @@ export function registerWindowLifecycle(
     if (!loaded.has(window)) return Promise.resolve(true);
     return acks.request(window.webContents, reason);
   };
+
+  dependencies.ipcMain.handle(WINDOW_CONTEXT_RELEASE_PENDING_CHANNEL, (event: IpcMainInvokeEvent, payload) => {
+    const window = authorizeSender(event, dependencies, WINDOW_LIFECYCLE_CAPABILITY);
+    const parsed = windowContextReleaseRequestSchema.safeParse(payload);
+    if (window && parsed.success) acks.defer(event.sender.id, parsed.data.requestId, parsed.data.reason);
+    return windowContextReleaseResponseSchema.parse({ ok: true });
+  });
 
   dependencies.ipcMain.handle(
     WINDOW_CONTEXT_RELEASE_READY_CHANNEL,

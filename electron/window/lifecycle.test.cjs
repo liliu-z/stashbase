@@ -98,6 +98,25 @@ test('native activity reports only foreground input presence without raw fields'
   ]);
 });
 
+test('a live interactive barrier extends only its current request and still expires when heartbeats stop', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const setup = harness();
+  let settled = false;
+  const pending = setup.lifecycle.requestContextRelease(setup.window, 'window-close').then(value => { settled = true; return value; });
+  const payload = setup.sent[0][1];
+  t.mock.timers.tick(900);
+  setup.handlers.get('window:context-release-pending')(setup.event, payload);
+  t.mock.timers.tick(900);
+  await Promise.resolve();
+  assert.equal(settled, false, 'a visible confirmation can outlive the normal close deadline');
+  setup.handlers.get('window:context-release-pending')({ ...setup.event, senderFrame: { url: 'app://renderer/' } }, payload);
+  t.mock.timers.tick(101);
+  assert.equal(await pending, false, 'a subframe cannot extend the deadline and lost heartbeats refuse close');
+  setup.handlers.get('window:context-release-pending')(setup.event, payload);
+  setup.handlers.get('window:context-release-ready')(setup.event, { ...payload, ready: true });
+  assert.equal(setup.closeCalls(), 0, 'late consent cannot resurrect a timed-out request');
+});
+
 test('native fullscreen is mirrored to the renderer on load and on every change', () => {
   const setup = harness({ load: false });
   assert.deepEqual(setup.fullscreenSent, []);
