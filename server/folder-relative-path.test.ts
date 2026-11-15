@@ -37,3 +37,29 @@ test('writable folder-relative paths share one protected-segment policy', () => 
   );
   assert.throws(() => normalizeFolderRelativePath("John's Notes.md"), /invalid characters/);
 });
+
+test('writable paths on Windows refuse names Windows cannot store, with the reason', () => {
+  const win32 = { writable: true, allowQuotes: true, platform: 'win32' } as const;
+  for (const [name, reason] of [
+    ['What is this?.md', /cannot contain/],
+    ['Drafts/My "final" draft.md', /cannot contain/],
+    ['note.md:hidden.md', /cannot contain/],
+    ['Chapter one./draft.md', /cannot end with a dot or a space/],
+    ['draft.md ', /cannot end with a dot or a space/],
+    ['CON.md', /CON is reserved for a device/],
+    ['Notes/lpt1', /LPT1 is reserved for a device/],
+  ] as const) {
+    assert.throws(() => normalizeFolderRelativePath(name, win32), reason, name);
+  }
+  // Similar-looking names Windows accepts.
+  for (const name of ['What is this.md', "John's Notes.md", 'console.md', 'COM10.md', 'Notes/.env']) {
+    assert.equal(normalizeFolderRelativePath(name, win32), name);
+  }
+  // macOS and Linux store these names, so only Windows refuses them.
+  assert.equal(
+    normalizeFolderRelativePath('What is this?.md', { writable: true, platform: 'darwin' }),
+    'What is this?.md',
+  );
+  // Reading an existing path is not a write and is not checked.
+  assert.equal(normalizeFolderRelativePath('CON.md', { platform: 'win32' }), 'CON.md');
+});
