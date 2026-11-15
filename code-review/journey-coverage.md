@@ -1952,7 +1952,8 @@ application Rust or custom native build.
 Model/recording owner checks cover resumed ranges, persistent Stop, checksum
 failure, offline model reuse, duplicate audio acknowledgements, foreign-window
 refusal, cancellation before a delayed start, bounded processing of an hour of
-simulated PCM, retained-segment CPU replay, idle-unload races and cleanup.
+simulated PCM, retained-segment CPU replay, shared cleanup under overlapping
+Windows directory removal, idle-unload races and cleanup.
 Session/composer checks cover draft locking including Undo, last-frame delivery,
 Retry, one undoable append without sending, multiple clips, navigation to the
 original target, hidden-pane/project
@@ -1981,6 +1982,11 @@ The Windows runtime-input test stages a controlled x64 CRT fixture;
 static inspection found both published macOS library sets and Koffi bindings
 target macOS 11 or later. Linux CPU libraries require at most GLIBC 2.27 and
 GLIBCXX 3.4.22. These are not Windows/macOS execution or signing evidence.
+
+The native-model fixture also completed twice on all four targets in
+[source CI at c75e2f09](https://github.com/liliu-z/stashbase/actions/runs/43738640421):
+CPU on Linux x64, Windows x64 and Intel macOS; Metal on Apple Silicon macOS.
+This is model/runtime evidence, not physical-microphone or signed-app acceptance.
 
 Still unproven: actual microphone permissions/devices on macOS arm64/x64,
 Windows x64 and Linux desktops; Metal execution/fallback on real hardware;

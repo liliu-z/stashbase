@@ -96,8 +96,21 @@ test('concurrent result acknowledgements cannot unload the model during a later 
   await service.push('one', first.id, 0, frame);
   await service.finish('one', first.id, 1);
   await until(() => service.status('one', first.id).phase === 'ready');
+  const remove = fs.rm;
+  let cleanups = 0;
+  t.mock.method(fs, 'rm', async (...args: Parameters<typeof fs.rm>) => {
+    const [file] = args;
+    if (file === path.join(root, first.id)) {
+      // Windows can reject overlapping directory removals. Model that error
+      // here as well so Linux cannot hide a duplicate-cleanup race.
+      if (++cleanups > 1) throw Object.assign(new Error('Concurrent removal'), { code: 'EPERM' });
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    }
+    return remove(...args);
+  });
   t.mock.timers.enable({ apis: ['setTimeout'] });
   await Promise.all([service.cancel('one', first.id), service.cancel('one', first.id)]);
+  assert.equal(cleanups, 1);
   const next = await service.start('one', '/project', 'chat');
   t.mock.timers.tick(60_000);
   await Promise.resolve();

@@ -30,6 +30,7 @@ interface Recording {
   receipts: Map<number, string>;
   mutation: Promise<void>;
   pumping: Promise<void> | null;
+  retirement: Promise<void> | null;
 }
 
 export function createSpeechService(options: {
@@ -138,14 +139,30 @@ export function createSpeechService(options: {
     })();
   }
 
-  async function cancel(job: Recording) {
+  function cancel(job: Recording, keepWarm = false): Promise<void> {
+    if (job.retirement) return job.retirement;
+    const warm = keepWarm && job.phase === 'ready' && !job.pumping;
     job.phase = 'cancelled';
-    // A pending inference and spool writer must retire before any replacement.
-    await engine.close();
-    await job.pumping;
-    await job.mutation.catch(() => {});
-    await fs.rm(directory(job), { recursive: true, force: true });
-    if (recording === job) recording = undefined;
+    // Every acknowledgement/cancel shares this retirement. In particular,
+    // Windows must never receive overlapping removals of the same directory.
+    const completion = (async () => {
+      if (!warm) await engine.close();
+      await job.pumping;
+      await job.mutation.catch(() => {});
+      await fs.rm(directory(job), { recursive: true, force: true });
+      if (recording === job) {
+        recording = undefined;
+        if (warm && !closed) {
+          clearTimeout(idle);
+          idle = setTimeout(() => { if (!recording) retiring = engine.close(); }, 60_000);
+          idle.unref();
+        }
+      }
+    })();
+    job.retirement = completion;
+    // A transient filesystem failure can be retried by the next cleanup call.
+    void completion.catch(() => { if (job.retirement === completion) job.retirement = null; });
+    return completion;
   }
 
   return {
@@ -163,7 +180,7 @@ export function createSpeechService(options: {
         id, window, folder, conversation, phase: 'recording', nextSequence: 0,
         cursor: 0, segmentStart: 0, segmentSamples: 0, pendingBytes: 0, nativeStarted: false,
         stopRequested: false, cpu, error: null, forcedError: null,
-        text: [], receipts: new Map(), mutation: Promise.resolve(), pumping: null,
+        text: [], receipts: new Map(), mutation: Promise.resolve(), pumping: null, retirement: null,
       };
       recording = job;
       job.mutation = fs.mkdir(directory(job), { mode: 0o700 });
@@ -259,18 +276,8 @@ export function createSpeechService(options: {
       if (cancelled.size > 512) cancelled.delete(cancelled.keys().next().value!);
       // Successful delivery keeps the model warm; there is no active native
       // session after finalization. Cancellation of work kills its process.
-      if (job.phase === 'ready' && !job.pumping) {
-        await fs.rm(directory(job), { recursive: true, force: true });
-        if (recording === job) {
-          recording = undefined;
-          clearTimeout(idle);
-          idle = setTimeout(() => { if (!recording) retiring = engine.close(); }, 60_000);
-          idle.unref();
-        }
-      } else {
-        retiring = cancel(job);
-        await retiring;
-      }
+      retiring = cancel(job, true);
+      await retiring;
     },
     async releaseWindow(window: string) {
       if (recording?.window === window) { retiring = cancel(recording); await retiring; }
