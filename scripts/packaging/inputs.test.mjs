@@ -14,17 +14,22 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 const packagedFiles = pkg.build?.files ?? [];
 
-test('Windows speech packages app-local x64 runtime libraries and refuses an incompatible CRT', (t) => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'speech-crt-'));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  const redistDirectory = path.join(root, 'redist');
-  fs.mkdirSync(redistDirectory);
+function speechCrtFixture(directory) {
+  fs.mkdirSync(directory, { recursive: true });
   const pe = Buffer.alloc(128);
   pe.write('MZ', 0, 'ascii');
   pe.writeUInt32LE(64, 60);
   pe.write('PE\0\0', 64, 'ascii');
   pe.writeUInt16LE(0x8664, 68);
-  for (const file of ['msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll']) fs.writeFileSync(path.join(redistDirectory, file), pe);
+  for (const file of ['msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll']) fs.writeFileSync(path.join(directory, file), pe);
+  return pe;
+}
+
+test('Windows speech packages app-local x64 runtime libraries and refuses an incompatible CRT', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'speech-crt-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const redistDirectory = path.join(root, 'redist');
+  const pe = speechCrtFixture(redistDirectory);
   const destination = stageWindowsSpeechRuntime({ root, redistDirectory, checkVersion() {} });
   assert.deepEqual(fs.readFileSync(path.join(destination, 'msvcp140.dll')), pe);
   pe.writeUInt16LE(0xaa64, 68);
@@ -300,9 +305,9 @@ test('the packaging CLI validates component version and bytes before invoking th
       }
       return '';
     }; syncBuiltinESMExports();`;
-  const run = (platform = '--linux') => spawnSync(process.execPath, ['--import', `data:text/javascript,${encodeURIComponent(preload)}`,
+  const run = (platform = '--linux', environment = process.env) => spawnSync(process.execPath, ['--import', `data:text/javascript,${encodeURIComponent(preload)}`,
     path.join(tmp, 'scripts', 'package-desktop.mjs'), platform, '--skip-sidecar-build'], {
-    encoding: 'utf8', env: process.env,
+    encoding: 'utf8', env: environment,
   });
   fs.writeFileSync(manifestPath, JSON.stringify(manifest));
   // Passing the component checks reaches the next real guard, without packaging an installer.
@@ -320,12 +325,20 @@ test('the packaging CLI validates component version and bytes before invoking th
     asset: `stashbase-extract-${componentVersion}-win32-x64.tar.gz` };
   fs.writeFileSync(manifestPath, JSON.stringify(windowsManifest));
   fs.writeFileSync(path.join(tmp, 'release.nosync', windowsManifest.asset), bytes);
-  const result = run('--win');
+  // Tool execution is stubbed by the preload, including vswhere/PowerShell.
+  // Supply app-local CRT inputs explicitly rather than depending on the host's
+  // Visual Studio installation to reach the builder-argument assertion.
+  const redist = path.join(tmp, 'speech-redist');
+  speechCrtFixture(path.join(redist, 'x64', 'Microsoft.VC143.CRT'));
+  const result = run('--win', { ...process.env, VCToolsRedistDir: redist });
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /builder arguments accepted/);
   if (process.platform === 'win32') {
     const staged = path.join(tmp, 'build', 'native.nosync', 'rg.exe');
     assert.ok(fs.existsSync(staged), 'Windows packaging stages the pinned ripgrep binary');
     assert.equal(fs.readFileSync(staged).subarray(0, 2).toString(), 'MZ');
+    const crt = path.join(tmp, 'build', 'native.nosync', 'speech-crt');
+    assert.deepEqual(fs.readdirSync(crt).sort(), ['msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll']);
+    assert.equal(fs.readFileSync(path.join(crt, 'msvcp140.dll')).readUInt16LE(68), 0x8664);
   }
 });
