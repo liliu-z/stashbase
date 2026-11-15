@@ -1,5 +1,4 @@
 /** Binds the visible request, source context, uploads, and queue to its session. */
-import { Paperclip } from 'lucide-react';
 import {
   useId,
   useMemo,
@@ -11,15 +10,15 @@ import {
 } from 'react';
 import { useStore } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
+import { createStore } from 'zustand/vanilla';
 
-import { Button } from '@/components/ui/button';
 import {
   InputMessage,
   type InputMessageEditorContext,
   type QueuedMessage,
 } from '@/components/ui/input-message';
-import { Tooltip } from '@/components/ui/tooltip';
 import type { AgentSessionRuntime } from '@/features/agent/application/session-runtime';
+import { IDLE_VOICE_STATE } from '@/features/agent/application/voice-typing';
 import {
   contextItemKey,
   removeMentionText,
@@ -38,12 +37,16 @@ import type { SourceReference } from '@/shared/domain/source-reference';
 import { FailureLine } from '@/shared/ui/failure-notice';
 import { dragCarriesSource, readSourceDrag } from '@/shared/utils/source-drag';
 
+import { attachmentSlot } from './attachment-button';
 import { MentionRowsListbox, useMentionRows } from './context-rows';
 import { DraftSourceTiles, isVisualSource } from './context-tiles';
 import { useComposerFocusRequest } from './focus';
 import { MentionEditor, type MentionEditorHandle, type MentionEditorProps } from './mention-editor';
 import { useComposerUploads } from './use-composer-uploads';
 import { useCurrentSource } from './use-current-source';
+import { VoiceTypingControls, VoiceTypingMic } from './voice-typing-controls';
+
+const noVoice = createStore(() => IDLE_VOICE_STATE);
 
 /** Native picker hint for an Agent that accepts transient local files. The
  * selected runtime decides what it can interpret after the file is attached;
@@ -83,26 +86,6 @@ function onDragOverCapture(event: DragEvent<HTMLDivElement>) {
   event.dataTransfer.dropEffect = 'copy';
 }
 
-function attachSlot(attachments: boolean, leftSlot: ReactNode) {
-  return ({ openFilePicker }: { openFilePicker: () => void }) => (
-    <>
-      {attachments && (
-        <Tooltip content="Attach files" side="top">
-          <Button
-            aria-label="Attach files"
-            onClick={() => openFilePicker()}
-            size="icon-compact"
-            variant="ghost"
-          >
-            <Paperclip />
-          </Button>
-        </Tooltip>
-      )}
-      {leftSlot}
-    </>
-  );
-}
-
 function mentionEditorSlot(
   props: Omit<MentionEditorProps, 'ctx'> & { ref: Ref<MentionEditorHandle> },
 ) {
@@ -133,6 +116,9 @@ export function AgentContextComposer({
   status,
 }: AgentContextComposerProps) {
   const shape = useShape();
+  const voice = session.voice;
+  const voiceState = useStore(voice?.store ?? noVoice);
+  const locked = voiceState.phase !== 'idle';
   const { context, contextIssue, draft, queuedPrompts, scope, skill, skillCatalog } = useStore(
     session.store,
     useShallow((state) => ({
@@ -258,6 +244,11 @@ export function AgentContextComposer({
   };
 
   const onDropCapture = (event: DragEvent<HTMLDivElement>) => {
+    if (locked) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     if (!dragCarriesSource(event.dataTransfer)) return;
     event.preventDefault();
     event.stopPropagation();
@@ -266,6 +257,7 @@ export function AgentContextComposer({
   };
 
   const onPasteCapture = (event: ClipboardEvent<HTMLDivElement>) => {
+    if (locked) return;
     if (!attachments) return;
     const files = Array.from(event.clipboardData?.files ?? []);
     if (files.length === 0) return;
@@ -280,8 +272,20 @@ export function AgentContextComposer({
       onDragOverCapture={onDragOverCapture}
       onDropCapture={onDropCapture}
       onPasteCapture={onPasteCapture}
+      onKeyDownCapture={(event) => {
+        if (locked && event.key === 'Escape') {
+          event.preventDefault();
+          event.stopPropagation();
+          void voice?.cancel();
+        }
+      }}
     >
-      <MentionRowsListbox id={listboxId} panel={panel} />
+      {!locked && <MentionRowsListbox id={listboxId} panel={panel} />}
+      {voiceState.error && (
+        <FailureLine className="m-0 px-3 pt-2" tone="capability">
+          {voiceState.error}
+        </FailureLine>
+      )}
       {!attachments && uploads.length > 0 && (
         <FailureLine className="m-0 px-3 pt-2" tone="input">
           This agent cannot use these uploads. Remove them or choose another agent.
@@ -293,6 +297,9 @@ export function AgentContextComposer({
         </FailureLine>
       )}
       <InputMessage
+        readOnly={locked}
+        showQueue={!locked}
+        actionSlot={locked && voice ? <VoiceTypingControls voice={voice} /> : undefined}
         accept={ATTACH_ACCEPT}
         // A row dragged from the tree or a tab is taken by `onDropCapture`
         // above; the box lights for it as it does for a desktop file.
@@ -305,6 +312,7 @@ export function AgentContextComposer({
         onEditQueued={session.editQueued}
         editor={mentionEditorSlot({
           chipPaths,
+          appendSnapshot: voiceState.insertion,
           listbox: panel.binding,
           onMentionAdded,
           onMentionRemoved,
@@ -315,7 +323,7 @@ export function AgentContextComposer({
           skillsEnabled: skills,
           statuses,
         })}
-        leftSlot={attachSlot(attachments, leftSlot)}
+        leftSlot={attachmentSlot(attachments, leftSlot)}
         maxRows={maxRows}
         minRows={minRows}
         onQueueChange={(next) => {
@@ -343,7 +351,7 @@ export function AgentContextComposer({
         placeholder={placeholder}
         placeholderIsPrompt={placeholderIsPrompt}
         previewSlot={
-          tileValidations.length > 0 ? (
+          !locked && tileValidations.length > 0 ? (
             <div aria-label="Attached context" className="contents" role="list">
               <DraftSourceTiles
                 onOpenSource={onOpenSource}
@@ -356,7 +364,12 @@ export function AgentContextComposer({
           ) : undefined
         }
         queue={queue}
-        rightSlot={rightSlot}
+        rightSlot={
+          <>
+            {rightSlot}
+            {voice && <VoiceTypingMic voice={voice} />}
+          </>
+        }
         sendable={
           sendable &&
           (attachments || uploads.length === 0) &&

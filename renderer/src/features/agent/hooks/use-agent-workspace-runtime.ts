@@ -7,6 +7,7 @@ import type {
 } from '@/features/agent/application/ports';
 import type { AgentFilesChanged } from '@/features/agent/application/session-runtime';
 import type { AgentUsageEvent } from '@/features/agent/application/session/usage';
+import type { VoiceTypingPorts } from '@/features/agent/application/speech-port';
 import {
   createAgentWorkspaceRuntime,
   type AgentWorkspaceRuntime,
@@ -14,6 +15,7 @@ import {
 import { useRetainedRuntime } from '@/shared/runtime/use-retained-runtime';
 
 export interface AgentWorkspaceRuntimeOptions {
+  voice?: VoiceTypingPorts;
   recordUsage?: ((event: AgentUsageEvent) => void) | undefined;
   context: AgentContextPort;
   createId(): string;
@@ -36,6 +38,7 @@ export function useAgentWorkspaceRuntime({
   session,
   preferences,
   subscribeFolderRemoved,
+  voice,
 }: AgentWorkspaceRuntimeOptions): AgentWorkspaceRuntime {
   const filesChangedHandler = useRef(onFilesChanged);
   filesChangedHandler.current = onFilesChanged;
@@ -50,6 +53,7 @@ export function useAgentWorkspaceRuntime({
         port: session,
         preferences,
         recordUsage,
+        ...(voice ? { voice } : {}),
       }),
     (agent) => agent.dispose(),
   );

@@ -15,6 +15,7 @@ import type {
   AgentSessionRuntime,
 } from '@/features/agent/application/session-runtime';
 import type { AgentUsageEvent } from '@/features/agent/application/session/usage';
+import type { VoiceTypingPorts } from '@/features/agent/application/speech-port';
 import type { AgentScopeEnvironment } from '@/features/agent/domain/context';
 import type { AgentHistoryEntry } from '@/features/agent/domain/conversation-history';
 import type { AgentId, AgentScope } from '@/features/agent/domain/session';
@@ -57,6 +58,7 @@ export interface AgentWorkspaceRuntime {
   restore(entry: AgentHistoryEntry): Promise<boolean>;
   retireFolder(folderPath: string): void;
   session(id: string): AgentSessionRuntime | null;
+  voiceSessions(): readonly AgentSessionRuntime[];
   start(availableAgents?: readonly AgentId[]): void;
   startActive(): void;
   setScopeEnvironment(environment: AgentScopeEnvironment | null): void;
@@ -64,6 +66,7 @@ export interface AgentWorkspaceRuntime {
 }
 
 export interface AgentWorkspaceRuntimeOptions {
+  voice?: VoiceTypingPorts;
   recordUsage?: ((event: AgentUsageEvent) => void) | undefined;
   autostart?: boolean | undefined;
   context?: AgentContextPort | undefined;

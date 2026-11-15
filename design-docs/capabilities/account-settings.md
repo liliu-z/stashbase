@@ -154,7 +154,18 @@ platform capabilities stay named and disabled in navigation.
   installed version cannot run leads its row with that model instead of its
   readiness; the requirement shown is the runtime's own, never one StashBase
   worked out.
-- **General:** software updates and usage statistics/privacy preferences.
+- **General:** software updates, usage statistics/privacy preferences, and Voice
+  typing. English dictation prepares automatically in the background on first
+  launch, including the first launch after an existing installation updates.
+  There is no setup prompt, notification, or download row in the composer.
+  This compact Settings row alone shows preparation progress and Stop, Resume,
+  or Retry. Stop persists across restarts; interrupted downloads resume and a
+  verified model is reused across app updates. Until ready, the composer's
+  disabled microphone points here in its tooltip. Preparation needs about
+  731 MB plus free working space; the application installer excludes model
+  weights. Once prepared, dictation works offline. A microphone action never
+  sends audio to a service. See [Voice typing](agent-sessions.md#voice-typing)
+  for recording and draft behavior.
 - **Advanced:** search by meaning and external apps (MCP). Search links directly
   to its configuration without discarding the current query. MCP reveals HTTP
   credentials only for that connection method; Docker details follow explicit

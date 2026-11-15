@@ -8,6 +8,7 @@ import type {
   SystemTextPort,
 } from '@/features/settings/application/ports';
 import type { TelemetryPort } from '@/features/settings/application/telemetry-port';
+import type { VoiceModelPort } from '@/features/settings/application/voice-model-port';
 import type { NotificationPreferencesPort } from '@/shared/domain/notifications';
 import type { SoftwareUpdateRow } from '@/shared/domain/software-update';
 
@@ -29,6 +30,7 @@ export type SettingsSectionId = (typeof SETTINGS_SECTION_IDS)[number];
 export type SettingsTarget = SettingsSectionId | 'search' | 'mcp';
 
 export interface SettingsProps {
+  voiceModelApi?: VoiceModelPort | undefined;
   /** Optional app-composed development surfaces; absent in production. */
   revisionPreview?: ReactNode;
   telemetryApi?: TelemetryPort;

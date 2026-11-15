@@ -34,6 +34,7 @@ export default function ManagedSettings({
   softwareUpdate = null,
   systemTextApi,
   telemetryApi,
+  voiceModelApi,
 }: SettingsProps) {
   const sections: SettingsSectionDef[] = [
     {
@@ -93,6 +94,7 @@ export default function ManagedSettings({
       label: 'General',
       render: () => (
         <GeneralPanel
+          voiceModelApi={voiceModelApi}
           telemetryApi={telemetryApi}
           onOpenExternal={onOpenExternal}
           softwareUpdate={softwareUpdate}

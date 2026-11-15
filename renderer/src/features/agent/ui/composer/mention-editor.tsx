@@ -30,6 +30,7 @@ import type { ContextStatus, MentionQuery } from '@/features/agent/domain/contex
 import { fontWeights } from '@/lib/font-weight';
 
 import {
+  appendDictation,
   chipInPlace,
   chipRuns,
   deleteMentionSelection,
@@ -62,6 +63,7 @@ export interface MentionEditorHandle {
 }
 
 export interface MentionEditorProps {
+  appendSnapshot?: { before: string; after: string } | null | undefined;
   ctx: InputMessageEditorContext;
   /** Paths whose `@path` runs in an externally supplied value become chips. */
   chipPaths: readonly string[];
@@ -80,10 +82,15 @@ export interface MentionEditorProps {
   onSkillRemoved(): void;
 }
 
+function editingState(disabled: boolean) {
+  return [EditorView.editable.of(!disabled), EditorState.readOnly.of(disabled)];
+}
+
 export const MentionEditor = forwardRef<MentionEditorHandle, MentionEditorProps>(
   function MentionEditor(
     {
       chipPaths,
+      appendSnapshot,
       ctx,
       listbox,
       onMentionAdded,
@@ -107,7 +114,10 @@ export const MentionEditor = forwardRef<MentionEditorHandle, MentionEditorProps>
     const skillRef = useRef(skill);
     const skillsEnabledRef = useRef(skillsEnabled);
     const chipPathsRef = useRef(chipPaths);
+    const appendRef = useRef(appendSnapshot);
+    appendRef.current = appendSnapshot;
     const dismissedRef = useRef(false);
+    const suppressOwner = useRef(false);
     const editable = useRef(new Compartment());
     const placeholderCompartment = useRef(new Compartment());
     const attributes = useRef(new Compartment());
@@ -126,7 +136,7 @@ export const MentionEditor = forwardRef<MentionEditorHandle, MentionEditorProps>
       focus: () => viewRef.current?.focus(),
       insertMention: (path) => {
         const view = viewRef.current;
-        if (!view) return;
+        if (!view || ctxRef.current.disabled) return;
         const query = mentionQuery(view.state);
         const head = view.state.selection.main.head;
         const from = query ? query.from : head;
@@ -143,7 +153,7 @@ export const MentionEditor = forwardRef<MentionEditorHandle, MentionEditorProps>
       },
       insertSkill: (label) => {
         const view = viewRef.current;
-        if (!view) return;
+        if (!view || ctxRef.current.disabled) return;
         const query = mentionQuery(view.state, true);
         if (query?.kind === 'skill') {
           view.dispatch({
@@ -161,7 +171,7 @@ export const MentionEditor = forwardRef<MentionEditorHandle, MentionEditorProps>
       if (!host) return;
       const runListboxKey = (key: string) => {
         const box = listboxRef.current;
-        if (!box.open) return false;
+        if (!box.open || ctxRef.current.disabled) return false;
         if (key === 'ArrowDown') {
           box.onNavigate(1);
           return true;
@@ -217,7 +227,7 @@ export const MentionEditor = forwardRef<MentionEditorHandle, MentionEditorProps>
               drop: (event) => Array.from(event.dataTransfer?.types ?? []).includes('Files'),
             }),
             placeholderCompartment.current.of(placeholder(ctxRef.current.placeholder)),
-            editable.current.of(EditorView.editable.of(!ctxRef.current.disabled)),
+            editable.current.of(editingState(ctxRef.current.disabled)),
             attributes.current.of(EditorView.contentAttributes.of({})),
             theme.current.of([]),
             keymap.of([
@@ -234,7 +244,7 @@ export const MentionEditor = forwardRef<MentionEditorHandle, MentionEditorProps>
               ...historyKeymap,
             ]),
             EditorView.updateListener.of((update) => {
-              if (update.docChanged) {
+              if (update.docChanged && !suppressOwner.current) {
                 dismissedRef.current = false;
                 ctxRef.current.onValueChange(serialize(update.state));
                 const before = mentionPaths(update.startState);
@@ -259,7 +269,13 @@ export const MentionEditor = forwardRef<MentionEditorHandle, MentionEditorProps>
       });
       viewRef.current = view;
       if (ctxRef.current.value) {
-        replaceDocument(view, ctxRef.current.value, chipPathsRef.current, skillRef.current);
+        const append = appendRef.current;
+        if (append && ctxRef.current.value === append.after) {
+          suppressOwner.current = true;
+          replaceDocument(view, append.before, chipPathsRef.current, skillRef.current, false);
+          suppressOwner.current = false;
+          appendDictation(view, append);
+        } else replaceDocument(view, ctxRef.current.value, chipPathsRef.current, skillRef.current);
       } else if (skillRef.current) {
         projectSkill(view, skillRef.current);
       }
@@ -274,7 +290,7 @@ export const MentionEditor = forwardRef<MentionEditorHandle, MentionEditorProps>
 
     useEffect(() => {
       viewRef.current?.dispatch({
-        effects: editable.current.reconfigure(EditorView.editable.of(!ctx.disabled)),
+        effects: editable.current.reconfigure(editingState(ctx.disabled)),
       });
     }, [ctx.disabled]);
 
@@ -359,12 +375,15 @@ export const MentionEditor = forwardRef<MentionEditorHandle, MentionEditorProps>
     useEffect(() => {
       const view = viewRef.current;
       if (!view) return;
-      if (serialize(view.state) !== ctx.value) replaceDocument(view, ctx.value, chipPaths, skill);
+      const live = serialize(view.state);
+      if (appendSnapshot && live === appendSnapshot.before && ctx.value === appendSnapshot.after) {
+        appendDictation(view, appendSnapshot);
+      } else if (live !== ctx.value) replaceDocument(view, ctx.value, chipPaths, skill);
       else chipInPlace(view, chipPaths);
       // The skill is projected after the value so a re-synced document keeps
       // the armed token, whichever of the two changed.
       projectSkill(view, skill);
-    }, [chipPaths, ctx.value, skill]);
+    }, [appendSnapshot, chipPaths, ctx.value, skill]);
 
     return (
       <div

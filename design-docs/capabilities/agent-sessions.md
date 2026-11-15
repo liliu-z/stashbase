@@ -56,6 +56,39 @@ ordinary text. This applies to replies and Markdown file writes. Text the user
 will paste elsewhere as is, such as a drafted post or email, goes in a fenced
 block in the reply, so Chat's block Copy takes exactly that text.
 
+## Voice Typing
+
+Chat and the Documents agent pane share English voice typing, independently of
+the chosen agent or its account. A microphone beside Send starts local capture
+and loads the speech model on demand. System microphone permission is requested
+only after this action. Model preparation belongs to
+[General settings](account-settings.md#settings-organization).
+
+While recording, the existing draft stays visible and cannot be edited or sent.
+A level waveform and elapsed timer provide feedback, with Stop as the only
+composer action. Stop releases the microphone immediately; local transcription
+then finishes and appends the complete text as one undoable edit. Nothing is
+sent automatically. Send and the microphone return afterwards. Another clip
+appends to the same draft. Dictation during an agent reply preserves the ordinary
+Send now / Queue behavior; stopping that reply remains a separate action.
+
+There is no duration limit. Slow inference and bounded storage can stop capture
+with an explicit incomplete-recording explanation. Silence leaves the draft
+unchanged. Permission refusal, device loss, suspended audio, native failure, and
+cancellation preserve the typed draft. Failed transcription offers Retry,
+Keep completed text when available, and Discard recording. Escape from the
+composer cancels capture/processing. Audio stays on this computer and temporary
+recordings are removed after use or cancellation.
+
+Only one recording can run across application windows. Changing conversations,
+projects, or hiding the agent pane stops capture and finishes into the original
+conversation. Closing a chat with voice work requires resolving it first. Native
+window close asks before discarding an active recording or unsent dictated
+text. Update installation waits until voice work is sent or cleared; it never
+discards that work. Chat drafts currently have no disk journal. Keeping the window
+open permits review, copying, or sending; this does not promise crash recovery
+for unsent text.
+
 ## Submission and Execution
 
 - File reads and searches default to the conversation’s project. An explicit

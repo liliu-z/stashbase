@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import type { TelemetryPort } from '@/features/settings/application/telemetry-port';
+import type { VoiceModelPort } from '@/features/settings/application/voice-model-port';
 import {
   SettingsGroup,
   SettingsList,
@@ -11,17 +12,25 @@ import type { SoftwareUpdateRow } from '@/shared/domain/software-update';
 import { FailureNotice } from '@/shared/ui/failure-notice';
 
 import { TelemetryGroup } from './telemetry-group';
+import { VoiceTypingGroup } from './voice-typing-group';
 
 export interface GeneralPanelProps {
+  voiceModelApi?: VoiceModelPort | undefined;
   telemetryApi?: TelemetryPort | undefined;
   onOpenExternal?: ((href: string) => void) | undefined;
   /** Null where the build has no updater, and then the group is not shown. */
   softwareUpdate: SoftwareUpdateRow | null;
 }
 
-export function GeneralPanel({ softwareUpdate, telemetryApi, onOpenExternal }: GeneralPanelProps) {
+export function GeneralPanel({
+  softwareUpdate,
+  telemetryApi,
+  onOpenExternal,
+  voiceModelApi,
+}: GeneralPanelProps) {
   return (
     <SettingsPane title="General">
+      {voiceModelApi && <VoiceTypingGroup port={voiceModelApi} />}
       {softwareUpdate && (
         <SettingsGroup
           hint={

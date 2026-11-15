@@ -59,6 +59,7 @@ export function createAgentWorkspaceRuntime({
   recordUsage,
   port,
   scheduler,
+  voice,
 }: AgentWorkspaceRuntimeOptions): AgentWorkspaceRuntime {
   const sessions = new Map<string, MountedAgentSession>();
   const controller = new AbortController();
@@ -73,6 +74,10 @@ export function createAgentWorkspaceRuntime({
 
   const initialId = createId();
   const store = createStore<AgentWorkspaceState>(() => createAgentWorkspaceState(initialId));
+  const stopVoiceOnNavigation = store.subscribe((state, previous) => {
+    if (state.activeId !== previous.activeId)
+      void sessions.get(previous.activeId)?.runtime.voice?.stop();
+  });
 
   const operationSignal = (signal: AbortSignal) => AbortSignal.any([controller.signal, signal]);
 
@@ -123,6 +128,7 @@ export function createAgentWorkspaceRuntime({
       scheduler,
       scope,
       title,
+      ...(voice ? { voice } : {}),
     });
     projectAgents.seed(session);
     const mounted: MountedAgentSession = {
@@ -188,6 +194,14 @@ export function createAgentWorkspaceRuntime({
     },
     close(id) {
       if (disposed || !sessions.has(id)) return;
+      const dictation = sessions.get(id)?.runtime.voice;
+      if (dictation?.hasRecording() || dictation?.hasUnsentDraft()) {
+        void dictation.stop();
+        dictation.store.setState({
+          error: 'Your voice draft was kept. Send or clear it before closing this chat.',
+        });
+        return;
+      }
       if (sessions.size === 1) {
         pinnedAgents.delete(id);
         mountSession(
@@ -215,6 +229,7 @@ export function createAgentWorkspaceRuntime({
     dispose() {
       if (disposed) return;
       disposed = true;
+      stopVoiceOnNavigation();
       controller.abort();
       for (const mounted of sessions.values()) {
         mounted.unsubscribe();
@@ -308,6 +323,10 @@ export function createAgentWorkspaceRuntime({
     session(id) {
       return sessions.get(id)?.runtime ?? null;
     },
+    voiceSessions: () =>
+      [...sessions.values()]
+        .map((mounted) => mounted.runtime)
+        .filter((session) => Boolean(session.voice)),
     start(availableAgents) {
       if (disposed) return;
       if (availableAgents) readyAgentIds = new Set(availableAgents);
@@ -327,6 +346,7 @@ export function createAgentWorkspaceRuntime({
     },
     setWindowFolder(nextFolderPath) {
       if (disposed || nextFolderPath === folderPath) return;
+      void sessions.get(store.getState().activeId)?.runtime.voice?.stop();
       folderPath = nextFolderPath;
       if (!folderPath) return;
       if (!sessions.size) {

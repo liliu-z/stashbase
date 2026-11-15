@@ -12,6 +12,7 @@ import {
   useAgentPersonaLibrary,
   useAgentWorkspaceRuntime,
   useScheduledRunReceiver,
+  VoiceReleaseBarrier,
 } from '@/features/agent/public';
 import {
   RevisionPreview,
@@ -143,6 +144,7 @@ function WorkspaceWindow() {
     session: dependencies.agent.session,
     ...(dependencies.agent.preferences ? { preferences: dependencies.agent.preferences } : {}),
     subscribeFolderRemoved: workspaceDeps.adapters.lifecycle.onFolderRemoved,
+    ...(dependencies.agent.voice ? { voice: dependencies.agent.voice } : {}),
   });
 
   // Requested turn reviews open in Documents; one that does not open floats a notice.
@@ -275,6 +277,11 @@ function WorkspaceWindow() {
       openExternal={dependencies.documents.openExternal}
       port={dependencies.settings.accountApi}
     >
+      <VoiceReleaseBarrier
+        runtime={runtime}
+        subscribe={docs.adapters.windowLifecycle.onPrepareContextRelease}
+        visible={Boolean(folderPath) && (chrome.navigator.mode === 'chats' || chatPaneOpen)}
+      />
       <WorkspaceLayout
         dialogs={
           <>

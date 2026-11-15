@@ -51,6 +51,25 @@ For a source-filled project, you can ask your agent to organize references
 into linked wiki pages. Search always targets one project,
 and wiki maintenance runs only when requested.
 
+## Dictate a Message
+
+Click the microphone beside Send in Chat or the Documents agent pane to dictate
+in English. Allow system microphone access when requested. Your typed draft stays
+visible while a waveform and timer show recording; click Stop to finish. The
+completed text is added to your draft once processing ends. Review or undo it,
+record another clip, or send it yourself. Dictation never sends a message.
+
+Voice typing prepares silently on first launch, including after updating an
+existing installation. Until it is ready the microphone is disabled. Open
+**Settings → General → Voice typing** to see progress, Stop, Resume, or Retry.
+The model download is about 731 MB; once prepared, recognition works offline
+and audio stays on your computer. Stop in Settings remains paused after restart.
+
+Leaving a conversation or hiding its pane stops recording and keeps the result
+in the original conversation. A failed recording can be retried or discarded;
+completed words can be kept when available. Closing with voice work asks before
+discarding it, because unsent chat drafts are not saved across application exits.
+
 ## Read and Work Alongside Chat
 
 Selecting a source opens it alongside the same conversation. The Files sidebar,
