@@ -127,6 +127,9 @@ export async function launchApp({
   renderer = "dev",
   ownHost = false,
   fresh = true,
+  electronArguments = [],
+  electronEntry = '.',
+  prepareProfile,
 }) {
   for (const port of [hostPort, debugPort]) {
     if (!(await portIsFree(port))) {
@@ -141,6 +144,7 @@ export async function launchApp({
     fs.mkdirSync(path.join(profileRoot, directory), { recursive: true });
   }
   fs.mkdirSync(logDirectory, { recursive: true });
+  await prepareProfile?.(profileRoot);
 
   const environment = isolatedEnvironment(profileRoot);
   if (renderer === "dev") environment.STASHBASE_DEV_VITE = "1";
@@ -184,7 +188,8 @@ export async function launchApp({
     const electron = startProcess(
       electronPath,
       [
-        ".",
+        ...electronArguments,
+        electronEntry,
         `--port=${hostPort}`,
         `--remote-debugging-port=${debugPort}`,
         `--user-data-dir=${path.join(profileRoot, "config", "stashbase")}`,

@@ -249,6 +249,57 @@ project. These are controlled coupling/deadline measurements, not real disk
 benchmarks or proof of the reported Windows timeout's cause. The schedule
 regressions separately cover stored switches and synchronous path comparisons.
 
+## Scenario: local speech
+
+`pnpm test:speech:native --model /absolute/path/to/parakeet-unified-en-0.6b-Q8_0.gguf`
+verifies the pinned checksum and transcribes the public-domain JFK sample twice
+through `transcribe-cpp` in Electron's embedded Node. `--download` explicitly
+prepares the approximately 731 MB model in `profiling.nosync/speech-model` instead.
+Neither command uses agent credentials or the developer's microphone. Source CI
+runs the real-model smoke on both macOS architectures and Windows/Linux x64;
+this does not establish packaged DLL loading, signing, or OS microphone access.
+
+`pnpm profile:speech --model <path> --soak-minutes 60` repeats short native sessions
+for at least an hour of equivalent sample audio and reports memory periodically.
+It checks session disposal and model reuse, not one continuous hour of microphone
+capture or recognition quality across arbitrary speakers. Do not run multiple
+model processes alongside memory-heavy builds on a small machine. Memory and
+timings from concurrent runs are not comparable performance ranges.
+
+After building the renderer, `env -u ELECTRON_RUN_AS_NODE pnpm profile:speech-ui
+--model <path>` exercises the production composer, native permission boundary,
+Chromium fixture device, real host spool and worker, and final draft insertion.
+The model is seeded into an isolated profile, then verified by the ordinary
+model owner. It preserves a typed prefix and asserts that no message was sent.
+Screenshots and private logs stay under `profiling.nosync/speech-ui`. The private
+test launcher uses a parent-only signal to invoke the actual native close path and
+verifies Keep working after a confirmation held longer than five seconds. The
+launcher is not packaged. Software-update version metadata is not part of this
+capture check. Add `--seconds 70` to check continuous capture beyond the initial
+microphone permission window and across native segment boundaries.
+On a Linux test environment without usable namespaces, `--no-sandbox` applies only to this
+isolated verification launch. The scenario currently uses the POSIX profiling
+harness; Windows uses the embedded-Node smoke plus native packaged acceptance.
+
+Local Linux x64/WSL evidence includes a successful real-model smoke and complete
+fixture-microphone UI flow. The production worker uses bounded offline batches
+because live text is not displayed. `--streaming` runs the upstream streaming
+defaults for a comparison, without changing application behavior. Two runs of
+the same 11-second CPU fixture under Electron 39.8.8 produced these ranges
+(inference excludes model loading):
+
+| Mode | Inference | Peak process RSS |
+|---|---|---|
+| Streaming reference | 8.63–9.53 s | 1291 MiB |
+| Offline batches | 1.90–2.65 s | 1296 MiB |
+
+These observations are not latency or minimum-memory guarantees. The hour of
+simulated PCM in the service test uses a controlled engine and separately
+establishes bounded spool cleanup; it does not prove native inference speed.
+The seventy-second fixture-device UI recording completed with the original
+draft intact and no send. Its observed Stop-to-draft time fell from 51.5 seconds
+with streaming segments to 11.5 seconds with offline batches; each is one run.
+
 ## Adding a scenario
 
 Write `<scenario>.mjs` beside `editing.mjs`:

@@ -116,6 +116,17 @@ jobs:
         if: ${{ !cancelled() && steps.python.outcome == 'success' }}
         run: pnpm test:opencode:native
 
+      - name: Cache the pinned speech model
+        uses: actions/cache@v6
+        with:
+          path: profiling.nosync/speech-model
+          key: speech-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('server/speech/model-manifest.ts') }}
+
+      - name: Verify local speech in embedded Node
+        timeout-minutes: 15
+        if: ${{ !cancelled() && steps.python.outcome == 'success' }}
+        run: pnpm test:speech:native --download
+
       - name: Typecheck server + mcp + Electron
         if: ${{ !cancelled() && steps.python.outcome == 'success' }}
         run: pnpm typecheck:host

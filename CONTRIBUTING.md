@@ -82,6 +82,11 @@ pnpm test:renderer src/app/composition/layout/math-workflow.test.tsx
 
 # Story interactions and structural accessibility
 pnpm test:renderer:a11y
+
+# Real local speech model in Electron's embedded Node (no provider account)
+pnpm test:speech:native --model /path/to/parakeet-unified-en-0.6b-Q8_0.gguf
+# Or explicitly fetch the pinned 731 MB fixture model into profiling.nosync
+pnpm test:speech:native --download
 ```
 
 `test:renderer` excludes the catalog accessibility sweep and does not build,
@@ -90,6 +95,13 @@ renderer audit for CI and architecture/toolchain changes, including coverage,
 accessibility, static checks, and both builds. Ordinary local UI work uses the
 core gate, formatting/lint, and affected tests.
 Build and lint commands do only their named work.
+Speech owner checks live in `server/speech/*.test.ts`; renderer recovery uses
+the conversation/composer and General settings checks. The native command uses
+the public audio fixture and verifies the pinned model checksum, completed text,
+and process memory. It does not use the developer's microphone, agent login,
+or installed speech models. See [speech profiling](scripts/profiling/README.md#scenario-local-speech)
+for long-session and running-UI checks. Clean packaged OS microphone permissions
+remain release acceptance.
 Use `test:renderer:a11y` for Story accessibility: its dedicated Vite configuration
 loads real styles for computed visibility checks.
 

@@ -1938,6 +1938,58 @@ Host/services: `server/retrieval/index.ts`, `server/indexer.mfs.ts`, `python/sta
 
 ## J06: Agent
 
+**Local voice typing (2026-11-15):** the shared composer in Chat and Documents
+uses `application/voice-typing.ts`, `platform/audio/speech-capture.ts` and its
+worklet. `server/routes/speech.ts` admits a folder-explicit recording;
+`server/speech/{model,service,worker-client,worker}.ts` own silent model
+preparation, window identity, private bounded audio spooling, isolated native
+inference, cancellation and idle unload. Settings General owns preparation
+progress and Stop/Resume/Retry; neither startup nor the composer shows a setup
+prompt or progress row. `electron/speech` and `window-security.cjs` gate audio-only
+main-frame capture. Native libraries are packaged dependencies; there is no
+application Rust or custom native build.
+
+Model/recording owner checks cover resumed ranges, persistent Stop, checksum
+failure, offline model reuse, duplicate audio acknowledgements, foreign-window
+refusal, cancellation before a delayed start, bounded processing of an hour of
+simulated PCM, retained-segment CPU replay, idle-unload races and cleanup.
+Session/composer checks cover draft locking including Undo, last-frame delivery,
+Retry, one undoable append without sending, multiple clips, navigation to the
+original target, hidden-pane/project
+retirement, silence and denied permission. General settings checks cover the
+compact progress/Stop/Resume flow. The voice release barrier protects active
+recordings and unsent dictation; existing chat drafts have no disk journal.
+Interactive close checks exercise a current-request heartbeat, refusal of stale
+or subframe heartbeats, expiration after heartbeat loss, and explicit discard.
+
+`profile:speech-ui` has completed the production renderer → Chromium fixture
+microphone → host spool → actual Parakeet worker → original typed draft path on
+Linux x64/WSL, including a continuous seventy-second recording across batch
+boundaries, with waveform/Stop and completed-draft screenshots inspected. The
+bounded offline worker finished that run about 11.5 seconds after Stop; this is
+fixture evidence, not a latency guarantee. This also holds the actual native
+close confirmation beyond five seconds, keeps the draft, and opens the compact
+General settings row. Its private launcher drives
+`BrowserWindow.close()` through a parent-only signal; it adds no application
+test hook. This uses controlled audio, not a physical microphone.
+`test:speech:native` has also completed real English inference under Electron's
+embedded Node 22.22.1 on Linux
+x64 CPU. The built `dist/server/speech-worker.mjs` also completed the sample
+through its actual IPC entrypoint under that embedded runtime. The default built
+Electron smoke passes, including cleanup after native window destruction.
+The Windows runtime-input test stages a controlled x64 CRT fixture;
+static inspection found both published macOS library sets and Koffi bindings
+target macOS 11 or later. Linux CPU libraries require at most GLIBC 2.27 and
+GLIBCXX 3.4.22. These are not Windows/macOS execution or signing evidence.
+
+Still unproven: actual microphone permissions/devices on macOS arm64/x64,
+Windows x64 and Linux desktops; Metal execution/fallback on real hardware;
+clean-machine Windows DLL loading; signed/package resource resolution; real
+network preparation through proxies and interrupted app updates; broad speech
+quality and continuous hour-long native capture. The four-platform source CI
+now includes the pinned real-model smoke, but this unpushed local change has not
+run that matrix.
+
 **First-send feedback (2026-11-11):** the session dispatcher publishes a pending
 user-message snapshot before context resolution and cold-session startup. The
 workspace no longer waits for native `ready` to show the reader's own message.
