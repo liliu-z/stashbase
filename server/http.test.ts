@@ -1,7 +1,27 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { runWithWindowId } from './folder.ts';
-import { requireFolder, validateEmbedderKey } from './http.ts';
+import { fileManagerRevealCommand, requireFolder, validateEmbedderKey } from './http.ts';
+
+test('Explorer receives the selected path quoted inside its /select switch', () => {
+  // Spaces, commas and forward slashes each made Explorer open another folder.
+  for (const [input, selected] of [
+    ['C:\\Users\\Smith, John\\My Notes\\draft one.md', 'C:\\Users\\Smith, John\\My Notes\\draft one.md'],
+    ['C:/Projects/plain/note.md', 'C:\\Projects\\plain\\note.md'],
+  ]) {
+    assert.deepEqual(fileManagerRevealCommand(input, 'win32'), {
+      command: 'explorer.exe',
+      args: [`/select,"${selected}"`],
+      windowsVerbatimArguments: true,
+    });
+  }
+  assert.deepEqual(fileManagerRevealCommand('/Users/me/My Notes/a.md', 'darwin'), {
+    command: 'open', args: ['-R', '/Users/me/My Notes/a.md'],
+  });
+  assert.deepEqual(fileManagerRevealCommand('/home/me/My Notes/a.md', 'linux'), {
+    command: 'xdg-open', args: ['/home/me/My Notes'],
+  });
+});
 test('folder-explicit preparation routes work without an open window folder', async () => {
   for (const path of ['/prepare', '/reprocess', '/cancel-preparation']) {
     let nextCalled = false;
