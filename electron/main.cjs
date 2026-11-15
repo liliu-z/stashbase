@@ -746,8 +746,9 @@ function spawnServer(instanceId) {
   // electron asar shim) and bails with ENOTDIR. Use the real
   // Resources/ directory there; in dev keep PROJECT_ROOT (the repo).
   const serverCwd = app.isPackaged ? RESOURCES_ROOT : PROJECT_ROOT;
-  // Tee server output to a per-launch log file in ~/Library/Logs/StashBase/
-  // so a packaged Dock launch is debuggable, AND to the parent stdio so
+  // Tee server output to a per-launch log file in Electron's logs directory
+  // (getServerLogPath) so a packaged launch from the Dock or Start menu is
+  // debuggable, AND to the parent stdio so
   // `pnpm electron` from a terminal still shows live logs. The file is
   // truncated each launch — old crashes would only confuse the user.
   const currentServerLogPath = getServerLogPath();

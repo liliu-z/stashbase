@@ -199,7 +199,8 @@ failures, check application-data permissions and disk space. Preserve a damaged
 state database for diagnosis instead of deleting it as an automatic repair.
 
 - Renderer logs: **View -> Toggle Developer Tools**
-- Packaged-app server logs: `~/Library/Logs/StashBase/`
+- Packaged-app server logs (`server.log`): `~/Library/Logs/StashBase/` on macOS,
+  `%APPDATA%\StashBase\logs\` on Windows, `~/.config/StashBase/logs/` on Linux
 - Useful env vars: `STASHBASE_LOG=debug`, `STASHBASE_PYTHON=/path/to/python`, `STASHBASE_BUILD_EXTRACT=1`
 
 With `STASHBASE_LOG=debug`, Default Agent logs model-catalog and native connection
