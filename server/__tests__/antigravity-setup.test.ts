@@ -281,7 +281,7 @@ test('stream-json events read in their nested and flat forms, and failures carry
     tool: { name: 'view_file', parameters: { AbsolutePath: '/a' }, output: 'text', error: '' },
   });
   assert.deepEqual(parseAntigravityLine('{"event":"result","result":{"status":"error","error":{"message":"bad model"},"denied_actions":[{"action":"command","display_name":"Run rm"}]}}'), {
-    kind: 'result', conversationId: '', status: 'ERROR', response: '', error: 'bad model', deniedActions: ['Run rm'],
+    kind: 'result', conversationId: '', status: 'ERROR', response: '', error: 'bad model', finishedReason: '', deniedActions: ['Run rm'],
   });
   assert.equal(parseAntigravityLine('jetski: no output produced'), null);
   // Recorded from agy 1.4.0: a refused tool ends in ERROR, not DONE.
@@ -289,7 +289,7 @@ test('stream-json events read in their nested and flat forms, and failures carry
     conversation_id: 'c', step_index: 2, state: 'ERROR', step_type: 'tool', tool_name: 'call_mcp_tool',
     tool_info: { name: 'call_mcp_tool', parameters: { Arguments: {}, ServerName: 'stashbase', ToolName: 'list_projects' }, error: { type: 'TOOL_ERROR', message: 'permission check failed' } },
   } }));
-  assert.equal(failed?.kind === 'step' && failed.state, 'done');
+  assert.equal(failed?.kind === 'step' && failed.state, 'error');
   assert.equal(failed?.kind === 'step' && failed.tool?.error, 'permission check failed');
   assert.equal(antigravityErrorFromStderr('noise\nAGY_ERROR: {"short_error":"429 rate limited","retryable":true}\n'), '429 rate limited');
   assert.equal(antigravityErrorFromStderr('error: unknown model "x"'), 'unknown model "x"');

@@ -49,6 +49,16 @@ The map is navigation, not proof that every caller has been reviewed.
 
 ## J01: Onboarding
 
+**Antigravity completion validation (2026-11-16):** `pnpm check`, 38 focused
+Antigravity checks, a fresh build and built Electron smoke passed. An isolated
+desktop chat with a controlled `agy` completed two successive replies despite
+repeated terminal interruption errors, showed ordinary notices without Retry,
+and remained sendable; the resulting window was inspected visually. The separate
+persistent real-provider profile launched through `verify:onboarding` but its
+catalog reported Antigravity uninstalled. Installation, sign-in and a real reply
+through the changed adapter remain unverified; the controlled CLI establishes
+the application flow, not provider behavior.
+
 **Patch release validation (2026-11-10):** The merged sign-in recovery and
 ready-only model-catalog changes passed `pnpm check`, 93 focused renderer
 checks, 20 host catalog checks, renderer lint/format, documentation validation,
@@ -3666,9 +3676,22 @@ its decisions and `isReadOnlyCommand`, but no driven pass has run it.
 Attachments now reach Antigravity as the prompt's `Attached files:` paths, as for
 Claude and Codex: given an image path, a real headless `agy` read and described
 the image itself, and replay restores the cards (`antigravity-agent.test.ts`).
-Not proven: no StashBase chat has run on a real `agy`, so the hook's payload and
-its running in a StashBase-launched stream-json process, stdio MCP startup there,
-and pseudo-terminal sign-in remain unexercised. Windows sign-in, the Windows
+On 2026-11-16, a macOS report on `agy` 1.5.9 showed an interruption card after
+completed replies. Read-only inspection found one earlier interruption record
+followed by more than a hundred newer steps, consistent with the upstream
+[repeated terminal error report](https://github.com/google-antigravity/antigravity-cli/issues/969).
+The adapter now requires a nonempty `DONE` main-conversation response in the
+current turn before downgrading that exact error to a notice. Completed trailing
+checkpoints are allowed; unfinished steps/tools, a later error, other error
+messages, timeout/cancellation reasons and process loss remain failures.
+`antigravity-agent.test.ts` exercises recovered and subsequent repeated errors,
+empty-DONE text deltas, history preservation, no automatic replay, process reuse,
+state reset, child replies and the genuine-failure boundaries. These are
+controlled stream events; the reported live conversation has not been replayed
+through the changed adapter.
+Not proven by a driven real-provider pass: the hook's payload and its running
+in a StashBase-launched stream-json process, stdio MCP startup there,
+and pseudo-terminal sign-in. Windows sign-in, the Windows
 hook launcher, and a signed-in provider turn remain release checks.
 
 **Document context (2026-09-25):** a passage is a context kind in

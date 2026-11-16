@@ -555,6 +555,12 @@ stable status without download, retry, or a new durable demand latch.
   remembered list and replaces it when the read lands, and chats opened within
   a minute share one read. A `SUCCESS` result with no text, response, or tool fails the turn;
   `AGY_ERROR` and `error:` stderr lines supply a failed turn's message.
+  The adapter tracks current-turn main-conversation step states separately from
+  displayed text. Only the known repeated stream-interruption `ERROR` may become
+  a notice when the last substantive step is a nonempty `DONE` agent response,
+  all steps/tools and approvals have settled, and any later steps are completed
+  checkpoints. Explicit timeout/cancellation, other errors, child replies and
+  process exits cannot establish this recovery. No request is replayed.
 - Claude requests native session-state events and ends a turn at `idle`, using
   its latest result for success/failure. Intermediate results while background
   agents run do not release the turn or its queue. Native runtimes that emit no

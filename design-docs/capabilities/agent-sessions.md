@@ -422,6 +422,13 @@ An unknown outcome keeps the runtime or connection's reported failure visible
 beside the review action; it must not replace a known cause with a generic
 network explanation. Reconnecting alone does not establish what finished.
 
+Antigravity can repeat an earlier stream-interruption error after a reply has
+finished. When the current turn explicitly confirms its final main-conversation
+reply is complete and no work remains in progress, retain a notice and complete
+the turn without offering Retry. Text alone, a subagent's reply, or a previous
+turn's completion is insufficient. Other errors, timeouts, cancellation and
+process loss keep their existing failure or Stop behavior; no prompt is replayed.
+
 When Codex reports missing metadata for a model and then refuses that same
 model, the failed turn offers **Update Codex** through this recovery flow.
 Neither a metadata warning alone nor an account/model refusal alone establishes
