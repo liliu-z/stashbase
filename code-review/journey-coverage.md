@@ -3964,6 +3964,20 @@ Host/services: `server/project-file-mutations.ts`, `server/text-file-transaction
   and `agent-convergence.test.tsx` (a cited link selects Documents and Find lands
   on the phrase) cover it. Not proven: that a real runtime cites as instructed,
   and a phrase spanning a line break in the rendered text is not found.
+- **Antigravity file citations (2026-11-16):** A reported reply exposed
+  `[::cite_file{path="..." lines="1-25"}::]` as prose: the host forwards native
+  text and the transcript previously recognized only Markdown links.
+  `ui/transcript/markdown-citations.ts` now parses these tokens before Markdown
+  consumes path punctuation, so streamed and restored replies use the existing
+  source resolver and document opener. The filename and optional line range
+  remain visible; opening does not claim line navigation. Code examples remain
+  literal, and refused paths and URL schemes do not acquire another opener.
+  `markdown.test.tsx` covers those outcomes; `AntigravityCitations` in the
+  transcript Story shows the reported two-file shape. The focused Markdown,
+  citation and convergence suites pass 47 checks; types, formatting and lint
+  pass. Visual inspection could not complete because browser access and native
+  screen capture were unavailable. A new real-provider turn and packaged-app
+  verification remain unproven.
 - **Block copy (2026-10-30):** `renderer/src/features/agent/ui/transcript/markdown.tsx`
   gives each fenced block in a reply its own Copy, revealed on hover or focus,
   which copies the block's text without the fence's closing line break. Blocks

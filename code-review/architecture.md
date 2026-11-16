@@ -1500,6 +1500,11 @@ registered host boundaries; renderer shared types are a different layer.
   listing arrives, only if restoration and user navigation have left no document.
   App composition switches to Documents when a user opens a Chat file result or
   local file link, restoring the last Documents sidebar panel.
+  Transcript Markdown recognizes Antigravity's `cite_file` syntax before
+  CommonMark interprets path punctuation. `ui/transcript/markdown-citations.ts`
+  emits ordinary links through the same source resolver and open callback;
+  code stays literal, stored replies stay unchanged, and history uses the same
+  renderer. Supplied line ranges are labels, not navigation targets.
 - Refresh keeps usable content. Clean editors may adopt newer source; dirty ones
   retain drafts for conflict. Optimistic metadata rollback uses the last confirmed
   value and ignores superseded failures. Network failure is not scope retirement.

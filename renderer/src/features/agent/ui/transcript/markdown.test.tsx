@@ -271,4 +271,52 @@ $$`;
     await userEvent.click(screen.getByRole('link', { name: 'broken' }));
     expect(onOpenSource).toHaveBeenLastCalledWith(source, null);
   });
+
+  it('renders streamed and restored Antigravity citations through the existing file opener', async () => {
+    const path = '/project/output/student_webinar/slides #1 (draft) 100%.html';
+    const source = {
+      folderPath: '/project',
+      path: 'output/student_webinar/slides #1 (draft) 100%.html',
+    };
+    const reference = `[::cite_file{path="${path}" lines="1-25"}::]`;
+    const onOpenSource = vi.fn();
+    const sourceFor = vi.fn((value: string) => (value === path ? source : null));
+    const props = { sourceFor, onOpenSource };
+    const { container, rerender } = render(
+      <AgentMarkdown {...props} markdown={reference.slice(0, -4)} />,
+    );
+    expect(screen.queryByRole('link')).toBeNull();
+    rerender(<AgentMarkdown {...props} markdown={`Created: ${reference}\n\n${reference}`} />);
+    const links = screen.getAllByRole('link', { name: 'slides #1 (draft) 100%.html:1-25' });
+    expect(links).toHaveLength(2);
+    expect(container.textContent).not.toContain('cite_file');
+    expect(links[0]?.getAttribute('title')).toBe(`${path}:1-25`);
+    for (const link of links) await userEvent.click(link);
+    expect(onOpenSource).toHaveBeenCalledTimes(2);
+    expect(onOpenSource).toHaveBeenLastCalledWith(source, null);
+  });
+
+  it('keeps citation examples literal and refuses unresolved paths and URL schemes', () => {
+    const reference = '[::cite_file{path="notes/draft.md" lines="3"}::]';
+    const onOpenExternal = vi.fn();
+    const sourceFor = vi.fn(() => null);
+    render(
+      <AgentMarkdown
+        markdown={[
+          `\`${reference}\``,
+          `\`\`\`text\n${reference}\n\`\`\``,
+          '[::cite_file{path="../secret.md"}::]',
+          '[::cite_file{path="https://example.com/tracking"}::]',
+          '[::cite_file{path="javascript:alert(1)"}::]',
+        ].join('\n\n')}
+        sourceFor={sourceFor}
+        onOpenSource={vi.fn()}
+        onOpenExternal={onOpenExternal}
+      />,
+    );
+    expect(screen.getAllByText(reference)).toHaveLength(2);
+    expect(screen.queryByRole('link')).toBeNull();
+    expect(sourceFor).toHaveBeenCalledExactlyOnceWith('../secret.md');
+    expect(onOpenExternal).not.toHaveBeenCalled();
+  });
 });

@@ -337,7 +337,10 @@ block in the reply, so Chat's block Copy takes exactly that text.
 - A reply may cite a passage in a project file with a link carrying a short
   quoted phrase. Opening it shows the file in Documents and locates that
   phrase; when the file no longer holds it, the file stays open and says so.
-  A link without a phrase opens its file at the top. Citing is standing
+  A link without a phrase opens its file at the top. Antigravity's native
+  file citations render as file links, retaining any supplied line range in
+  the label; they open the file without claiming to locate those lines.
+  Code examples keep citation syntax literal. Citing is standing
   guidance to the agent, not a guarantee that every reply cites.
 - A clarifying question is answered in place on its own pending request. Answers
   return keyed by question text; Skip or Stop leaves it unanswered rather than

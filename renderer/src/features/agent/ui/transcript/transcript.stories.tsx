@@ -67,3 +67,26 @@ export const Running: Story = { args: { activeTurn: true } };
 export const Compact: Story = {
   parameters: { fluidCanvas: { width: '22rem', minHeight: '25rem' } },
 };
+
+export const AntigravityCitations: Story = {
+  args: {
+    blocks: [
+      { id: 'prompt', kind: 'user', text: 'Where are the slides and the source notes?' },
+      {
+        id: 'answer',
+        kind: 'assistant',
+        turnOutcome: 'completed',
+        text: [
+          'The slides and source notes are ready:',
+          '[::cite_file{path="/project/output/student-webinar-slides/index.html" lines="1-25"}::]',
+          '[::cite_file{path="/project/projects/student-webinar.md" lines="1-106"}::]',
+        ].join('\n\n'),
+      },
+    ],
+    sourceFor: (path) =>
+      path.startsWith('/project/')
+        ? { folderPath: '/project', path: path.slice('/project/'.length) }
+        : null,
+    onOpenSource: () => {},
+  },
+};
