@@ -258,8 +258,10 @@ prepares the approximately 731 MB model in `profiling.nosync/speech-model` inste
 Neither command uses agent credentials or the developer's microphone. Source CI
 runs the real-model smoke and a 77-second production-service continuity check
 (two rollovers plus the final tail) on both macOS architectures and Windows/Linux
-x64, fitting the whole-job budget on slow Intel CPU runners;
-this does not establish packaged DLL loading, signing, or OS microphone access.
+x64, fitting the whole-job budget on slow Intel CPU runners. The upload window
+pauses at 60 queued frames, forcing native progress before Stop even for the
+shorter fixture; the five-minute final-tail deadline is unchanged.
+This does not establish packaged DLL loading, signing, or OS microphone access.
 
 `pnpm profile:speech --model <path> --soak-minutes 60` repeats short native sessions
 for at least an hour of equivalent sample audio and reports memory periodically.
@@ -300,9 +302,9 @@ the same 11-second CPU fixture under Electron 39.8.8 produced these ranges
 These observations are not latency or minimum-memory guarantees. The hour of
 simulated PCM in the service test uses a controlled engine and separately
 establishes bounded spool cleanup; it does not prove native inference speed.
-The earlier seventy-second fixture-device UI recording completed with the original
-draft intact and no send. Its observed Stop-to-draft time fell from 51.5 seconds
-with streaming segments to 11.5 seconds with offline batches; each is one run.
+A seventy-second fixture-device UI recording on macOS arm64 completed with the
+original draft intact and no send, about 1.17 seconds after Stop. This is one
+controlled-device run, not physical-microphone or cross-platform acceptance.
 
 `pnpm profile:speech:continuous --model <path> --minutes 60` sends at least an
 hour of the public-domain fixture through one production service and embedded-Node
@@ -316,7 +318,8 @@ capture. The default two-minute run is a shorter boundary check. On macOS arm64
 (2026-11-17), the 3,608-second fixture completed in 209.9 seconds; its full word
 sequence matched 328 repetitions, sampled worker RSS stayed within 256.3–287.9
 MiB after loading (last sample 277.6 MiB), and the spool peaked at 96 frames.
-Process RSS does not measure GPU allocations.
+That hour-long result used the previous 80-frame upload window; the current
+harness pauses at 60 frames. Process RSS does not measure GPU allocations.
 
 ## Adding a scenario
 

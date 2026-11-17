@@ -60,7 +60,9 @@ async function continuous() {
     let sequence = 0;
     for (let offset = 0; offset < bytes; offset += 32000) {
       if (sequence % 20 === 0) {
-        while (await sample() >= 80) await delay(100);
+        // Engage backpressure before the 77-second CI fixture is fully queued,
+        // so Stop measures the final tail rather than an entire CPU backlog.
+        while (await sample() >= 60) await delay(100);
       }
       const frame = Buffer.alloc(Math.min(32000, bytes - offset));
       for (let i = 0; i < frame.length;) {
@@ -93,7 +95,7 @@ async function continuous() {
     assert.equal(secondOccurrences, repetitions, 'the second clause must survive every rollover');
     assert.equal(occurrences, repetitions, 'a phrase crossing native boundaries must not be lost or repeated');
     assert.ok(normalized.trim().endsWith('your country'), 'Stop must flush the last spoken words');
-    assert.ok(peakSpoolFrames <= 100, 'native processing must make progress within the bounded upload window');
+    assert.ok(peakSpoolFrames <= 80, 'native processing must make progress within the bounded upload window');
     assert.deepEqual(await fs.readdir(directory), [], 'processed native audio must be removed');
     console.log(JSON.stringify({ scenario: 'speech-continuous', backendPreference: cpu ? 'cpu' : 'metal-with-cpu-fallback', audioSeconds: bytes / 32000, wallSeconds: (performance.now() - started) / 1000, stopToDraftMs: performance.now() - stopped, repetitions, occurrences, secondOccurrences, peakWorkerRssMiB, firstWorkerRssMiB: memorySamples[0], lastWorkerRssMiB: memorySamples.at(-1), peakSpoolFrames, sampleFrames: sequence, tailPreserved: true }));
     await service.cancel('native-verification', job.id);
