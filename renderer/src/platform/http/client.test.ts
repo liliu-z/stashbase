@@ -127,6 +127,7 @@ describe('HTTP client', () => {
 });
 
 it('reports transport failures without capturing the request and ignores requested cancellation', async () => {
+  const privateValue = 'private-request-content-fixture';
   const error = new TypeError('Failed to fetch');
   const report = vi.fn();
   const ids: string[] = [];
@@ -139,7 +140,10 @@ it('reports transport failures without capturing the request and ignores request
     report,
   );
   await expect(
-    client.request({ path: '/api/files/private.md?folder=private', body: { content: 'private' } }),
+    client.request({
+      path: `/api/files/${privateValue}.md?folder=${privateValue}`,
+      body: { content: privateValue },
+    }),
   ).rejects.toBe(error);
   expect(ids[0]).toMatch(/^[0-9a-f-]{36}$/);
   expect(report).toHaveBeenCalledExactlyOnceWith(
@@ -156,10 +160,12 @@ it('reports transport failures without capturing the request and ignores request
     },
   );
   const signal = AbortSignal.abort();
-  await expect(client.request({ path: '/api/files/private.md', signal })).rejects.toBe(error);
+  await expect(client.request({ path: `/api/files/${privateValue}.md`, signal })).rejects.toBe(
+    error,
+  );
   expect(report).toHaveBeenCalledTimes(1);
   expect(ids[1]).not.toBe(ids[0]);
-  expect(JSON.stringify(report.mock.calls)).not.toContain('private');
+  expect(JSON.stringify(report.mock.calls)).not.toContain(privateValue);
 });
 
 it('retains correlation when a response body times out without replaying the request', async () => {
