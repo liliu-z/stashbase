@@ -5,7 +5,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { SpeechJob } from '../../shared/protocols/http/speech.ts';
 import { createSpeechEngine, type SpeechEngine } from './worker-client.ts';
-import { SPEECH_SEGMENT_MAX_SAMPLES } from './model-manifest.ts';
+import { SPEECH_SEGMENT_MAX_SAMPLES, SPEECH_LEFT_CONTEXT_SAMPLES, SPEECH_RIGHT_CONTEXT_SAMPLES } from './model-manifest.ts';
 
 const MAX_PENDING_BYTES = 512 * 1024 * 1024;
 const DISK_RESERVE_BYTES = 256 * 1024 * 1024;
@@ -20,6 +20,7 @@ interface Recording {
   cursor: number;
   segmentStart: number;
   segmentSamples: number;
+  segmentSkipSamples: number;
   pendingBytes: number;
   nativeStarted: boolean;
   cpu: boolean;
@@ -67,17 +68,29 @@ export function createSpeechService(options: {
     }
   })();
 
-  async function commitSegment(job: Recording) {
-    const text = job.nativeStarted ? await engine.finish() : '';
-    if (!current(job)) return;
+  async function commitSegment(job: Recording, final: boolean) {
     const from = job.segmentStart;
-    // Commit native output before cleaning its spool. Cleanup failure must
-    // never replay an already appended segment or duplicate its words.
+    const end = job.cursor;
+    let retainedStart = end;
+    let retainedSamples = 0;
+    if (!final) {
+      // Retain left acoustic context plus the uncommitted right tail. Replay
+      // these exact spool frames after rollover or a worker/CPU retry.
+      while (retainedStart > from && retainedSamples < SPEECH_LEFT_CONTEXT_SAMPLES + SPEECH_RIGHT_CONTEXT_SAMPLES) {
+        retainedStart--;
+        retainedSamples += (await fs.stat(audioFile(job, retainedStart))).size / 2;
+      }
+    }
+    const ownedEnd = final ? undefined : job.segmentSamples - SPEECH_RIGHT_CONTEXT_SAMPLES;
+    const text = job.nativeStarted ? await engine.finish({ startSample: job.segmentSkipSamples, ...(ownedEnd === undefined ? {} : { endSample: ownedEnd }) }) : '';
+    if (!current(job)) return;
     if (text.trim()) job.text.push(text.trim());
     job.nativeStarted = false;
     job.segmentSamples = 0;
-    job.segmentStart = job.cursor;
-    for (let sequence = from; sequence < job.cursor; sequence++) {
+    job.segmentStart = retainedStart;
+    job.segmentSkipSamples = final ? 0 : retainedSamples - SPEECH_RIGHT_CONTEXT_SAMPLES;
+    job.cursor = retainedStart;
+    for (let sequence = from; sequence < retainedStart; sequence++) {
       const file = audioFile(job, sequence);
       job.pendingBytes -= (await fs.stat(file)).size;
       await fs.rm(file);
@@ -103,15 +116,15 @@ export function createSpeechService(options: {
           job.segmentSamples += bytes.length / 2;
           job.cursor++;
           // Prefer a pause after thirty seconds. A forty-second ceiling keeps
-          // native offline batches bounded even with uninterrupted speech.
+          // native retained audio bounded even with uninterrupted speech.
           let energy = 0;
           const from = Math.max(0, bytes.length - 12800);
           for (let i = from; i < bytes.length; i += 2) energy += (bytes.readInt16LE(i) / 32768) ** 2;
           const quiet = energy / Math.max(1, (bytes.length - from) / 2) < 0.000064;
-          if (job.segmentSamples >= SPEECH_SEGMENT_MAX_SAMPLES || (job.segmentSamples >= 480000 && quiet)) await commitSegment(job);
+          if (job.segmentSamples >= SPEECH_SEGMENT_MAX_SAMPLES || (job.segmentSamples >= 480000 && quiet)) await commitSegment(job, job.stopRequested && job.cursor === job.nextSequence);
         }
         if (current(job) && job.stopRequested && job.cursor === job.nextSequence) {
-          await commitSegment(job);
+          await commitSegment(job, true);
           if (current(job)) {
             job.phase = job.forcedError ? 'failed' : 'ready';
             job.error = job.forcedError;
@@ -178,7 +191,7 @@ export function createSpeechService(options: {
       clearTimeout(idle);
       const job: Recording = {
         id, window, folder, conversation, phase: 'recording', nextSequence: 0,
-        cursor: 0, segmentStart: 0, segmentSamples: 0, pendingBytes: 0, nativeStarted: false,
+        cursor: 0, segmentStart: 0, segmentSamples: 0, segmentSkipSamples: 0, pendingBytes: 0, nativeStarted: false,
         stopRequested: false, cpu, error: null, forcedError: null,
         text: [], receipts: new Map(), mutation: Promise.resolve(), pumping: null, retirement: null,
       };

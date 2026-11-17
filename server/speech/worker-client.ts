@@ -2,14 +2,15 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 type Call = { kind: 'load'; path: string; cpu: boolean }
-  | { kind: 'begin' | 'finish' | 'reset' }
+  | { kind: 'begin' | 'reset' }
+  | { kind: 'finish'; startSample?: number; endSample?: number }
   | { kind: 'feed'; pcm: Uint8Array };
 
 export interface SpeechEngine {
   load(modelPath: string, cpu: boolean): Promise<void>;
   begin(): Promise<void>;
   feed(pcm: Uint8Array): Promise<void>;
-  finish(): Promise<string>;
+  finish(range?: { startSample?: number; endSample?: number }): Promise<string>;
   close(): Promise<void>;
 }
 
@@ -101,8 +102,8 @@ export function createSpeechEngine(): SpeechEngine {
     async load(path, cpu) { await call({ kind: 'load', path, cpu }); },
     async begin() { await call({ kind: 'begin' }); },
     async feed(pcm) { await call({ kind: 'feed', pcm }); },
-    async finish() {
-      const result = await call({ kind: 'finish' });
+    async finish(range = {}) {
+      const result = await call({ kind: 'finish', ...range });
       if (!result || typeof result !== 'object' || !('text' in result)
         || typeof result.text !== 'string' || result.text.length > 262144)
         throw new Error('Local speech recognition returned an invalid result.');

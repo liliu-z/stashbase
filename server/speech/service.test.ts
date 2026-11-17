@@ -18,11 +18,13 @@ async function until(predicate: () => boolean | Promise<boolean>, timeoutMs = 30
 function fakeEngine(overrides: Partial<SpeechEngine> = {}) {
   let samples = 0;
   let segments = 0;
+  let segmentSamples = 0;
+  let ownedSamples = 0;
   const backend: SpeechEngine = {
-    async load() {}, async begin() {}, async feed(pcm) { samples += pcm.length / 2; },
-    async finish() { return `Segment ${++segments}.`; }, async close() {}, ...overrides,
+    async load() {}, async begin() { segmentSamples = 0; }, async feed(pcm) { samples += pcm.length / 2; segmentSamples += pcm.length / 2; },
+    async finish(range = {}) { ownedSamples += (range.endSample ?? segmentSamples) - (range.startSample ?? 0); return `Segment ${++segments}.`; }, async close() {}, ...overrides,
   };
-  return { backend, samples: () => samples, segments: () => segments };
+  return { backend, samples: () => samples, ownedSamples: () => ownedSamples, segments: () => segments };
 }
 
 test('audio acknowledgements are idempotent, conflicting/out-of-order frames and foreign windows are rejected', async (t) => {
@@ -60,9 +62,9 @@ test('long recordings commit bounded segments and release processed audio before
   await until(async () => (await fs.readdir(path.join(root, job.id))).length <= 40, 30_000);
   await service.finish('one', job.id, 3600);
   await until(() => service.status('one', job.id).phase === 'ready', 30_000);
-  assert.equal(engine.samples(), 3600 * 16000);
-  assert.equal(engine.segments(), 90);
-  assert.equal(service.status('one', job.id).text.split('.').filter((part) => part.trim()).length, 90);
+  assert.equal(engine.ownedSamples(), 3600 * 16000, 'overlap is decoded again but each sample has one transcript owner');
+  assert.ok(engine.samples() > engine.ownedSamples(), 'rollover reuses retained acoustic context');
+  assert.equal(service.status('one', job.id).text.split('.').filter((part) => part.trim()).length, engine.segments());
 });
 
 test('accelerator failure replays only the retained segment on CPU', async (t) => {
@@ -130,4 +132,30 @@ test('late start cannot resurrect a cancelled recording', async (t) => {
   await service.push('one', next.id, 0, frame);
   await service.cancel('one', next.id);
   assert.deepEqual(await fs.readdir(root), []);
+});
+
+
+test('CPU recovery after a committed overlap retains its ownership boundary without duplicating text', async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'speech-overlap-retry-'));
+  let finishes = 0;
+  const ranges: Array<{ startSample?: number; endSample?: number }> = [];
+  const backends: boolean[] = [];
+  const engine = fakeEngine({
+    async load(_path, cpu) { backends.push(cpu); },
+    async finish(range = {}) {
+      ranges.push(range);
+      if (++finishes === 2) throw new Error('Metal finalization failed');
+      return finishes === 1 ? 'First.' : 'Second.';
+    },
+  });
+  const service = createSpeechService({ root, modelPath: () => '/verified.gguf', engine: engine.backend, cpu: false });
+  t.after(async () => { await service.close(); await fs.rm(root, { recursive: true, force: true }); });
+  const job = await service.start('one', '/project', 'chat');
+  for (let sequence = 0; sequence < 50; sequence++) await service.push('one', job.id, sequence, frame);
+  await service.finish('one', job.id, 50);
+  await until(() => service.status('one', job.id).phase === 'ready');
+  assert.equal(service.status('one', job.id).text, 'First. Second.');
+  assert.ok(backends.includes(true));
+  assert.deepEqual(ranges, [{ startSample: 0, endSample: 38 * 16000 }, { startSample: 6 * 16000 }, { startSample: 6 * 16000 }]);
+  assert.deepEqual(await fs.readdir(path.join(root, job.id)), []);
 });

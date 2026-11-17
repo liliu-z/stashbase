@@ -1952,10 +1952,27 @@ Host/services: `server/retrieval/index.ts`, `server/indexer.mfs.ts`, `python/sta
 
 ## J06: Agent
 
+**Buffered-stream integration (2026-11-17):** the native worker now uses the
+Parakeet buffered-streaming API, with finite input retention and finalized
+right context at rollover. `stream.test.ts` covers native limits smaller than
+one capture frame, unlimited advertised limits, exact sample accounting,
+final-tail delivery, repeated finish, failed finalization, whole-word ownership
+and intentional repetitions. Service checks cover CPU replay after a committed
+overlap without duplicating earlier text.
+
+On macOS arm64 (2026-11-17), one production service/embedded-Node worker job
+processed 3,608 seconds of controlled audio with accelerated, bounded delivery.
+All 328 repetitions matched the complete expected word sequence, including
+rollover boundaries and the final tail. Sampled worker RSS peaked at 287.9 MiB
+(first loaded sample 256.3 MiB, last 277.6 MiB), with at most 96 pending spool
+frames; completed spool files were removed. Stop completed in about 2.83 seconds
+in that run. These are fixture measurements, not physical microphone or minimum
+hardware guarantees; GPU memory is not established by process RSS.
+
 **Local voice typing (2026-11-15):** the shared composer in Chat and Documents
 uses `application/voice-typing.ts`, `platform/audio/speech-capture.ts` and its
 worklet. `server/routes/speech.ts` admits a folder-explicit recording;
-`server/speech/{model,service,worker-client,worker}.ts` own silent model
+`server/speech/{model,service,stream,worker-client,worker}.ts` own silent model
 preparation, window identity, private bounded audio spooling, isolated native
 inference, cancellation and idle unload. Settings General owns preparation
 progress and Stop/Resume/Retry; neither startup nor the composer shows a setup
@@ -2003,10 +2020,10 @@ CPU on Linux x64, Windows x64 and Intel macOS; Metal on Apple Silicon macOS.
 This is model/runtime evidence, not physical-microphone or signed-app acceptance.
 
 Still unproven: actual microphone permissions/devices on macOS arm64/x64,
-Windows x64 and Linux desktops; Metal execution/fallback on real hardware;
+Windows x64 and Linux desktops; forced Metal failure/fallback on real hardware;
 clean-machine Windows DLL loading; signed/package resource resolution; real
 network preparation through proxies and interrupted app updates; broad speech
-quality and continuous hour-long native capture. The four-platform source CI
+quality and continuous hour-long physical microphone capture in real time. The four-platform source CI
 includes the pinned real-model smoke; the PR's current matrix results establish
 source-platform execution separately from device and packaged-app acceptance.
 

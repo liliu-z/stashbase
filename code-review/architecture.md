@@ -380,9 +380,14 @@ Native inference runs in a disposable child through the official TypeScript
 `transcribe-cpp` binding. No application Rust or custom C++ build is introduced.
 Only verified host-owned model paths reach it. macOS arm64 attempts Metal then
 replays the uncommitted segment on CPU after failure; Intel macOS, Windows x64,
-and Linux x64 use CPU. Full-attention offline inference runs in batches of at
-most forty seconds, preferring a pause after thirty seconds. Committed batches
-release processed spool files; memory queues and pending disk bytes have explicit
+and Linux x64 use CPU. `server/speech/stream.ts` runs native Parakeet buffered
+streams, finalizing retained right context before reset. Parakeet retains its
+input PCM, so each stream is capped at forty seconds or the smaller positive
+native session limit; a capture frame is split before crossing that limit.
+The host prefers a pause after thirty seconds. Bounded left acoustic context
+and an uncommitted right tail survive rollover in the private spool. Token
+timestamps assign complete words to one segment; string matching never removes
+intentional repetitions. Completed ownership releases its processed spool files; memory queues and pending disk bytes have explicit
 limits rather than a recording duration cap. Text is exposed only on final
 completion or explicit partial recovery. Worker exit/timeout becomes a
 recoverable failure, never a successful empty transcript. Successful

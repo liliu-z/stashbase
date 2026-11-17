@@ -9,7 +9,13 @@ export const SPEECH_MODEL = {
 } as const;
 
 export const SPEECH_TRANSCRIBE_OPTIONS = { language: 'en', timestamps: 'none' } as const;
+export const SPEECH_STREAM_OPTIONS = {
+  ...SPEECH_TRANSCRIBE_OPTIONS, timestamps: 'token', commitPolicy: 'stable_prefix',
+  family: { kind: 'parakeet_buffered', leftMs: 5600, chunkMs: 1040, rightMs: 1040 },
+} as const;
 export const SPEECH_SEGMENT_MAX_SAMPLES = 40 * 16000;
+export const SPEECH_LEFT_CONTEXT_SAMPLES = 6 * 16000;
+export const SPEECH_RIGHT_CONTEXT_SAMPLES = 2 * 16000;
 
 export function speechPlatformSupported(platform = process.platform, arch = process.arch): boolean {
   return (platform === 'darwin' && (arch === 'arm64' || arch === 'x64'))

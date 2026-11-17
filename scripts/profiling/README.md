@@ -253,10 +253,11 @@ regressions separately cover stored switches and synchronous path comparisons.
 
 `pnpm test:speech:native --model /absolute/path/to/parakeet-unified-en-0.6b-Q8_0.gguf`
 verifies the pinned checksum and transcribes the public-domain JFK sample twice
-through `transcribe-cpp` in Electron's embedded Node. `--download` explicitly
+through native Parakeet buffered streaming in `transcribe-cpp` inside Electron's embedded Node. `--download` explicitly
 prepares the approximately 731 MB model in `profiling.nosync/speech-model` instead.
 Neither command uses agent credentials or the developer's microphone. Source CI
-runs the real-model smoke on both macOS architectures and Windows/Linux x64;
+runs the real-model smoke and a two-minute production-service continuity check
+on both macOS architectures and Windows/Linux x64;
 this does not establish packaged DLL loading, signing, or OS microphone access.
 
 `pnpm profile:speech --model <path> --soak-minutes 60` repeats short native sessions
@@ -282,9 +283,9 @@ isolated verification launch. The scenario currently uses the POSIX profiling
 harness; Windows uses the embedded-Node smoke plus native packaged acceptance.
 
 Local Linux x64/WSL evidence includes a successful real-model smoke and complete
-fixture-microphone UI flow. The production worker uses bounded offline batches
-because live text is not displayed. `--streaming` runs the upstream streaming
-defaults for a comparison, without changing application behavior. Two runs of
+fixture-microphone UI flow. The production worker now uses bounded native buffered streams. `--offline`
+runs the older full-attention path for comparison only. Before this integration,
+two runs of
 the same 11-second CPU fixture under Electron 39.8.8 produced these ranges
 (inference excludes model loading):
 
@@ -296,9 +297,23 @@ the same 11-second CPU fixture under Electron 39.8.8 produced these ranges
 These observations are not latency or minimum-memory guarantees. The hour of
 simulated PCM in the service test uses a controlled engine and separately
 establishes bounded spool cleanup; it does not prove native inference speed.
-The seventy-second fixture-device UI recording completed with the original
+The earlier seventy-second fixture-device UI recording completed with the original
 draft intact and no send. Its observed Stop-to-draft time fell from 51.5 seconds
 with streaming segments to 11.5 seconds with offline batches; each is one run.
+
+`pnpm profile:speech:continuous --model <path> --minutes 60` sends at least an
+hour of the public-domain fixture through one production service and embedded-Node
+worker job, with bounded accelerated delivery rather than real-time microphone
+capture. It crosses production stream boundaries, checks the exact count of an
+expected phrase and the final spoken words, and verifies consumed spool cleanup.
+The command reports actual wall time, Stop completion time, peak queued frames,
+and sampled native-worker RSS on POSIX. `--cpu` explicitly exercises CPU. It does
+not prove physical microphones, arbitrary speech quality, or an hour of real-time
+capture. The default two-minute run is a shorter boundary check. On macOS arm64
+(2026-11-17), the 3,608-second fixture completed in 209.9 seconds; its full word
+sequence matched 328 repetitions, sampled worker RSS stayed within 256.3–287.9
+MiB after loading (last sample 277.6 MiB), and the spool peaked at 96 frames.
+Process RSS does not measure GPU allocations.
 
 ## Adding a scenario
 
