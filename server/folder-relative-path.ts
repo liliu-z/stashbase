@@ -12,6 +12,22 @@ export interface FolderRelativePathOptions {
   writable?: boolean;
   /** Allow real user filenames containing quotes; callers opt in per route. */
   allowQuotes?: boolean;
+  /** Platform whose file-name rules a writable path must satisfy. */
+  platform?: NodeJS.Platform;
+}
+
+/** Why Windows cannot store one path segment under this name, or null. The
+ *  OS otherwise reports these as ENOENT/EINVAL, after a staged write may already
+ *  have created a stray file (`a.md:b` writes an alternate data stream of `a.md`). */
+export function windowsFileNameProblem(segment: string): string | null {
+  // eslint-disable-next-line no-control-regex
+  if (/[<>:"/\\|?*\x00-\x1f]/.test(segment)) {
+    return `"${segment}" is not a valid Windows file name; names cannot contain < > : " / \\ | ? * or control characters`;
+  }
+  if (/[. ]$/.test(segment)) return `"${segment}" is not a valid Windows file name; names cannot end with a dot or a space`;
+  const device = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.exec(segment);
+  if (device) return `"${segment}" is not a valid Windows file name; ${device[1].toUpperCase()} is reserved for a device`;
+  return null;
 }
 
 export function normalizeFolderRelativePath(
@@ -45,6 +61,10 @@ export function normalizeFolderRelativePath(
     }
     if (isIndexExcludedDirName(segment)) {
       throw new Error(`${label} cannot include excluded directory "${segment}"`);
+    }
+    if ((options.platform ?? process.platform) === 'win32') {
+      const problem = windowsFileNameProblem(segment);
+      if (problem) throw new Error(`${label} ${problem}; choose another name`);
     }
   }
   return normalized;

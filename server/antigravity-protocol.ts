@@ -66,7 +66,7 @@ export interface AntigravityStep {
   kind: 'step';
   conversationId: string;
   index: number;
-  state: 'active' | 'done';
+  state: 'active' | 'done' | 'error' | 'unknown';
   type: string;
   textDelta: string;
   tool: { name: string; parameters: JsonObject; output: string; error: string } | null;
@@ -78,6 +78,7 @@ export interface AntigravityResult {
   status: string;
   response: string;
   error: string;
+  finishedReason: string;
   deniedActions: string[];
 }
 
@@ -102,13 +103,13 @@ export function parseAntigravityLine(line: string): AntigravityEvent | null {
     const type = (stringValue(step.step_type) || stringValue(step.stepType)).toLowerCase();
     const toolName = stringValue(info.name) || stringValue(step.tool_name) || stringValue(step.toolName);
     const isTool = type === 'tool' || (!!toolName && type !== 'agent_response');
-    // `ACTIVE` is the only running state: a tool also ends in `ERROR`.
+    // A tool also ends in ERROR, but only DONE confirms a completed reply.
     const state = (stringValue(step.state) || 'ACTIVE').toUpperCase();
     return {
       kind: 'step',
       conversationId: conversationIdOf(step),
       index: numberValue(step.step_index ?? step.stepIndex),
-      state: state === 'ACTIVE' ? 'active' : 'done',
+      state: state === 'ACTIVE' ? 'active' : state === 'DONE' ? 'done' : state === 'ERROR' ? 'error' : 'unknown',
       type,
       textDelta: stringValue(step.text_delta ?? step.textDelta),
       tool: isTool
@@ -130,6 +131,7 @@ export function parseAntigravityLine(line: string): AntigravityEvent | null {
       status: (stringValue(result.status) || 'SUCCESS').toUpperCase(),
       response: textOf(result.response),
       error: errorText(result.error),
+      finishedReason: stringValue(result.finished_reason ?? result.finishedReason).toLowerCase(),
       deniedActions: denied
         .map((item) => stringValue(objectValue(item).display_name) || stringValue(objectValue(item).action) || stringValue(item))
         .filter(Boolean),

@@ -22,6 +22,7 @@ import { clearCurrentFolder, runWithWindowId, openProjectFolder } from '../folde
 import { attachAgentDiagnostics } from '../error-reporting.ts';
 import { ownAgentProcess } from '../agent-process.ts';
 import { errorDiagnostic, telemetryEventSchema, type TelemetryEvent } from '../../shared/protocols/http/telemetry.ts';
+import { DIRECTORY_LINK } from './filesystem-links.ts';
 
 class FakeCodexProcess extends EventEmitter {
   stdin = new PassThrough();
@@ -997,7 +998,7 @@ test('Codex Edit auto-accepts only physical file-change grants inside the open f
   const outside = path.join(root, 'other');
   fs.mkdirSync(folder);
   fs.mkdirSync(outside);
-  fs.symlinkSync(outside, path.join(folder, 'linked-outside'));
+  fs.symlinkSync(outside, path.join(folder, 'linked-outside'), DIRECTORY_LINK);
   try {
     assert.equal(isWorkspaceFileChange({ grantRoot: path.join(folder, 'src') }, folder), true);
     assert.equal(isWorkspaceFileChange({ grantRoot: folder }, folder), true);

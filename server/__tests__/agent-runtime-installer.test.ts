@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -1374,7 +1375,14 @@ chmod +x "${installed}"
     }
     assert.equal(verified, true);
     assert.equal(fs.existsSync(path.join(root, 'stale-private-bin')), false);
-    if (process.platform === 'win32') assert.equal(selectedShell?.kind, 'powershell-7');
+    if (process.platform === 'win32') {
+      // PowerShell 7 must be chosen whenever it is installed; without it, the
+      // same installer has to succeed under the built-in Windows PowerShell.
+      const powerShell7Installed = spawnSync('pwsh.exe', ['-NoProfile', '-NonInteractive', '-Command', 'exit 0'], { windowsHide: true }).status === 0
+        || [process.env.ProgramW6432, process.env.ProgramFiles]
+          .some((dir) => dir && fs.existsSync(path.join(dir, 'PowerShell', '7', 'pwsh.exe')));
+      assert.equal(selectedShell?.kind, powerShell7Installed ? 'powershell-7' : 'windows-powershell');
+    }
   } finally {
     mock.restoreAll();
     if (previousRoot === undefined) delete process.env.STASHBASE_LOCAL_DATA_ROOT;

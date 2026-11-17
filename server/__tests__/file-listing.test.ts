@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { runWithFolderRoot } from '../folder.ts';
-import { listFilesAndFoldersAsync } from '../file-listing.ts';
+import { listFilesAndFoldersAsync, walkMarkdownSourcesAsync } from '../file-listing.ts';
 import { shouldIndexFilePath } from '../indexable.ts';
 
 test('file-listing reports the truthful workbench tree without traversing excluded infrastructure', async (t) => {
@@ -58,6 +58,17 @@ test('file-listing reports the truthful workbench tree without traversing exclud
     fs.mkdirSync(folderDotOnly);
     fs.writeFileSync(path.join(folderDotOnly, '.DS_Store'), '');
     if (process.platform !== 'win32') fs.writeFileSync(path.join(tempDir, 'Icon\r'), '');
+    const ordinaryPrefixedFiles = ['~$budget.md', '~$draft.txt', '~$data.json', '~$page.html'];
+    for (const name of ordinaryPrefixedFiles) fs.writeFileSync(path.join(tempDir, name), 'ordinary source');
+    // Explorer folder settings, thumbnail caches, an Office lock beside its
+    // document, and drive-root system folders.
+    for (const junk of ['Desktop.ini', 'Thumbs.db', 'mixed/~$report.docx', 'mixed/~$budget.XLSX', 'mixed/~$slides.pptm']) {
+      fs.writeFileSync(path.join(tempDir, junk), '');
+    }
+    for (const systemDir of ['$RECYCLE.BIN', 'System Volume Information']) {
+      fs.mkdirSync(path.join(tempDir, systemDir));
+      fs.writeFileSync(path.join(tempDir, systemDir, 'deleted draft.md'), '# Deleted');
+    }
 
     // A row comes from metadata alone. Opening a cloud-only source downloads
     // it, so the listing must never open any file in the project.
@@ -125,6 +136,22 @@ test('file-listing reports the truthful workbench tree without traversing exclud
     assert.ok(!fileNames.includes('.DS_Store'), 'junk dot-files stay hidden');
     if (process.platform !== 'win32')
       assert.ok(!fileNames.includes('Icon\r'), 'macOS custom folder icon files stay hidden');
+    for (const junk of ['Desktop.ini', 'Thumbs.db', 'mixed/~$report.docx', 'mixed/~$budget.XLSX', 'mixed/~$slides.pptm']) {
+      assert.ok(!fileNames.includes(junk), `${junk} stays hidden`);
+    }
+    for (const systemDir of ['$RECYCLE.BIN', 'System Volume Information']) {
+      assert.ok(!folderPaths.includes(systemDir), `${systemDir} stays hidden`);
+      assert.ok(!fileNames.includes(`${systemDir}/deleted draft.md`), `${systemDir} is never traversed`);
+    }
+    for (const name of ordinaryPrefixedFiles) assert.ok(fileNames.includes(name), `${name} is an ordinary source`);
+    await runWithFolderRoot(tempDir, async () => {
+      const shown = await listFilesAndFoldersAsync({ showHidden: true });
+      for (const name of ordinaryPrefixedFiles) assert.ok(shown.files.some((file) => file.name === name));
+      assert.ok(!shown.files.some((file) => file.name === 'mixed/~$report.docx'));
+      const markdown: string[] = [];
+      await walkMarkdownSourcesAsync(tempDir, async (name) => { markdown.push(name); });
+      assert.ok(markdown.includes('~$budget.md'), 'ordinary drafts remain eligible for turn-change tracking');
+    });
     assert.ok(!fileNames.includes('.private.md'), 'the established hidden dot-note namespace stays hidden');
     assert.ok(!fileNames.includes('.note.pdf.md'), 'hidden derived notes never surface');
     assert.ok(!fileNames.includes('node_modules/index.js'), 'excluded directory contents are never traversed');

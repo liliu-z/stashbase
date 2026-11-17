@@ -307,6 +307,7 @@ test('a turn that ends without an answer, or with its process, fails visibly and
 
   h.ws.client({ t: 'prompt', text: 'Try again' });
   await until(() => proc.lines.length === 2, 'second prompt');
+  proc.emitEvent({ event: 'step_update', step_update: { conversation_id: 'conv-1', step_index: 1, state: 'DONE', step_type: 'agent_response', text_delta: 'A reply before the crash.' } });
   proc.stderr.write('AGY_ERROR: {"short_error":"Model quota exhausted for today","retryable":false}\n');
   await new Promise((resolve) => setTimeout(resolve, 10));
   proc.exit(3);
@@ -320,6 +321,81 @@ test('a turn that ends without an answer, or with its process, fails visibly and
   h.ws.client({ t: 'prompt', text: 'Once more' });
   await until(() => h.processes.length === 2, 'respawn after crash');
   assert.deepEqual(h.processes[1]!.args.slice(-2), ['--conversation', 'conv-1']);
+});
+
+const streamInterruption = 'The stream was interrupted. Please continue the task you were working on.';
+
+test('a completed Antigravity reply survives a recovered or historical stream interruption without replay', async (t) => {
+  const h = harness(t);
+  h.session.begin();
+  await until(() => h.ws.events('ready').length === 1, 'ready');
+  const proc = await startTurn(h, 'First reply');
+  const step = (step_index: number, step_type: string, state: string, text_delta = '') =>
+    proc.emitEvent({ event: 'step_update', step_update: { conversation_id: 'conv-1', step_index, step_type, state, text_delta } });
+
+  // The native runtime retries an interruption inside this turn, then finishes.
+  step(1, 'error_message', 'DONE', streamInterruption);
+  step(2, 'agent_response', 'ACTIVE', 'First reply.');
+  step(2, 'agent_response', 'DONE'); // DONE need not repeat the streamed text.
+  step(3, 'checkpoint', 'DONE');
+  proc.emitEvent({ event: 'result', result: { conversation_id: 'conv-1', status: 'ERROR', finished_reason: 'error', error: streamInterruption, response: 'First reply.' } });
+  assert.deepEqual(h.ws.events('turn-end'), [{ t: 'turn-end', isError: false }]);
+
+  h.ws.client({ t: 'prompt', text: 'Second reply' });
+  await until(() => proc.lines.length === 2, 'next prompt');
+  // A later turn has no new error step but inherits the same terminal error.
+  step(4, 'user_input', 'DONE');
+  step(5, 'agent_response', 'DONE', 'Second reply.');
+  proc.emitEvent({ event: 'result', result: { conversation_id: 'conv-1', status: 'ERROR', error: streamInterruption.replace('. ', '.\n'), response: 'Second reply.' } });
+  assert.deepEqual(h.ws.events('turn-end'), [{ t: 'turn-end', isError: false }, { t: 'turn-end', isError: false }]);
+  assert.equal(h.ws.events('error').length, 0);
+  assert.equal(h.ws.events('notice').length, 2, 'the contradictory native result remains visible without a retry card');
+  assert.deepEqual(h.ws.events('text').map((event) => event.delta), ['First reply.', 'Second reply.']);
+  assert.equal(proc.lines.length, 2, 'only the reader submits another prompt');
+  assert.equal(h.processes.length, 1, 'the conversation remains usable on its process');
+  await until(() => h.history.title('conv-1') !== null, 'history');
+  const blocks = await h.history.actions().messages('conv-1', h.folder) as Array<Record<string, unknown>>;
+  assert.deepEqual(blocks.filter((block) => block.kind === 'assistant').map((block) => block.text), ['First reply.', 'Second reply.']);
+
+  h.ws.client({ t: 'prompt', text: 'Third reply' });
+  await until(() => proc.lines.length === 3, 'third prompt');
+  proc.emitEvent({ event: 'result', result: { status: 'ERROR', error: streamInterruption } });
+  assert.equal(h.ws.events('turn-end').at(-1)!.isError, true, 'previous turns cannot prove this turn completed');
+});
+
+test('Antigravity interruption recovery requires a completed main reply and no unfinished work', async (t) => {
+  const reply = { conversation_id: 'conv-1', step_index: 2, step_type: 'agent_response', state: 'DONE', text_delta: 'Answer.' };
+  const tool = { conversation_id: 'conv-1', step_index: 3, step_type: 'tool', state: 'ACTIVE', tool_info: { name: 'view_file' } };
+  const cases = [
+    { name: 'still streaming', steps: [{ ...reply, state: 'ACTIVE' }] },
+    { name: 'response failed', steps: [{ ...reply, state: 'ERROR' }] },
+    { name: 'unknown response state', steps: [{ ...reply, state: 'STOPPED' }] },
+    { name: 'empty response step', steps: [{ ...reply, text_delta: ' ' }] },
+    { name: 'only a child replied', steps: [{ ...reply, conversation_id: 'child' }] },
+    { name: 'later work unfinished', steps: [reply, tool] },
+    { name: 'earlier work unfinished', steps: [{ ...tool, step_index: 1 }, reply] },
+    { name: 'later tool even if done', steps: [reply, { ...tool, state: 'DONE' }] },
+    { name: 'later interruption', steps: [reply, { ...reply, step_index: 3, step_type: 'error_message', text_delta: streamInterruption }] },
+    { name: 'unfinished checkpoint', steps: [reply, { ...reply, step_index: 3, step_type: 'checkpoint', state: 'ACTIVE' }] },
+    { name: 'another error', steps: [reply], result: { error: 'Quota exhausted' } },
+    { name: 'another step error', steps: [{ ...reply, step_index: 1, step_type: 'error_message', text_delta: 'Quota exhausted' }, reply] },
+    { name: 'timeout', steps: [reply], result: { finished_reason: 'print_timeout' } },
+    { name: 'cancellation reason', steps: [reply], result: { finished_reason: 'interrupted' } },
+    { name: 'interrupted status', steps: [reply], result: { status: 'INTERRUPTED' } },
+    { name: 'different result conversation', steps: [reply], result: { conversation_id: 'child' } },
+  ];
+  for (const scenario of cases) await t.test(scenario.name, async (t) => {
+    const h = harness(t);
+    h.session.begin();
+    await until(() => h.ws.events('ready').length === 1, 'ready');
+    const proc = await startTurn(h, 'Task');
+    for (const step of scenario.steps) proc.emitEvent({ event: 'step_update', step_update: step });
+    proc.emitEvent({ event: 'result', result: { conversation_id: 'conv-1', status: 'ERROR', error: streamInterruption, response: 'Answer.', ...scenario.result } });
+    assert.equal(h.ws.events('turn-end')[0]!.isError, true);
+    assert.equal(h.ws.events('error').length, 1);
+    assert.equal(h.ws.events('notice').length, 0);
+    assert.equal(proc.lines.length, 1, 'a genuine failure never replays the request');
+  });
 });
 
 test('the hook route refuses a chat it does not know and leaves other runtimes\' runs to their own rules', async (t) => {

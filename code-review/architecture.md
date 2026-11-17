@@ -555,6 +555,12 @@ stable status without download, retry, or a new durable demand latch.
   remembered list and replaces it when the read lands, and chats opened within
   a minute share one read. A `SUCCESS` result with no text, response, or tool fails the turn;
   `AGY_ERROR` and `error:` stderr lines supply a failed turn's message.
+  The adapter tracks current-turn main-conversation step states separately from
+  displayed text. Only the known repeated stream-interruption `ERROR` may become
+  a notice when the last substantive step is a nonempty `DONE` agent response,
+  all steps/tools and approvals have settled, and any later steps are completed
+  checkpoints. Explicit timeout/cancellation, other errors, child replies and
+  process exits cannot establish this recovery. No request is replayed.
 - Claude requests native session-state events and ends a turn at `idle`, using
   its latest result for success/failure. Intermediate results while background
   agents run do not release the turn or its queue. Native runtimes that emit no
@@ -1500,6 +1506,11 @@ registered host boundaries; renderer shared types are a different layer.
   listing arrives, only if restoration and user navigation have left no document.
   App composition switches to Documents when a user opens a Chat file result or
   local file link, restoring the last Documents sidebar panel.
+  Transcript Markdown recognizes Antigravity's `cite_file` syntax before
+  CommonMark interprets path punctuation. `ui/transcript/markdown-citations.ts`
+  emits ordinary links through the same source resolver and open callback;
+  code stays literal, stored replies stay unchanged, and history uses the same
+  renderer. Supplied line ranges are labels, not navigation targets.
 - Refresh keeps usable content. Clean editors may adopt newer source; dirty ones
   retain drafts for conflict. Optimistic metadata rollback uses the last confirmed
   value and ignores superseded failures. Network failure is not scope retirement.

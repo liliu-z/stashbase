@@ -115,7 +115,8 @@ function workspaceDirectoryEntries(entries: fs.Dirent[], opts: FolderListingOpti
       if (isProtectedHiddenDirName(entry.name)) return false;
       if (!opts.showHidden && !VISIBLE_PROJECT_CONFIG_DIRS.has(entry.name)) return false;
     }
-    if (entry.isFile() && HIDDEN_DOT_FILES.has(entry.name)) return false;
+    if (entry.isFile() && isOsJunkFile(entry.name)) return false;
+    if (entry.isDirectory() && isOsSystemDir(entry.name)) return false;
     // The task list is the reader's view of this file; it joins the tree
     // only with the other hidden files.
     if (entry.isFile() && entry.name === SCHEDULE_FILE_NAME && !opts.showHidden) return false;
@@ -333,14 +334,31 @@ export async function walkMarkdownSourcesAsync(
   });
 }
 
-/** Junk OS files hidden from the workspace, matching Finder. `Icon\r` stores a
- *  macOS custom folder icon (Google Drive sets one on every synced folder).
- *  Workspace directory visibility belongs to `workspaceDirectoryEntries`;
- *  retrieval walks skip dot-directories. */
-const HIDDEN_DOT_FILES = new Set<string>([
+/** Junk OS files hidden from the workspace, matching Finder and Explorer.
+ *  `Icon\r` stores a macOS custom folder icon (Google Drive sets one on every
+ *  synced folder). `desktop.ini` and `Thumbs.db` hold Explorer folder settings
+ *  and thumbnail caches, and `~$` files are Office's lock for an open document.
+ *  Windows names compare case-insensitively. Workspace directory visibility
+ *  belongs to `workspaceDirectoryEntries`; retrieval walks skip dot-directories. */
+const HIDDEN_OS_FILES = new Set<string>([
   '.DS_Store',
   'Icon\r',
 ]);
+const HIDDEN_WINDOWS_FILES = new Set<string>(['desktop.ini', 'thumbs.db', 'ehthumbs.db']);
+// The prefix alone is a valid ordinary filename, including Markdown drafts.
+const OFFICE_LOCK_FILE = /^~\$.*\.(?:doc[xm]?|dot[xm]?|xls[xmb]?|xlt[xm]?|ppt[xm]?|pps[xm]?|pot[xm]?)$/i;
+
+function isOsJunkFile(name: string): boolean {
+  return HIDDEN_OS_FILES.has(name) || HIDDEN_WINDOWS_FILES.has(name.toLowerCase()) || OFFICE_LOCK_FILE.test(name);
+}
+
+/** A Windows drive root holds the recycle bin and restore data; neither is
+ *  project content, and the recycle bin would surface deleted documents. */
+const WINDOWS_SYSTEM_DIRS = new Set<string>(['$recycle.bin', 'system volume information']);
+
+function isOsSystemDir(name: string): boolean {
+  return WINDOWS_SYSTEM_DIRS.has(name.toLowerCase());
+}
 
 async function walkAsync(
   dir: string,
@@ -363,7 +381,8 @@ async function walkAsync(
   for (const entry of entries) {
     if (isCloudPlaceholderName(entry.name)) continue;
     if (entry.isDirectory() && isHiddenDirName(entry.name)) continue;
-    if (entry.isFile() && HIDDEN_DOT_FILES.has(entry.name)) continue;
+    if (entry.isFile() && isOsJunkFile(entry.name)) continue;
+    if (entry.isDirectory() && isOsSystemDir(entry.name)) continue;
     if (entry.isDirectory() && isIndexExcludedDirName(entry.name)) continue;
     if (entry.isFile() && entry.name.startsWith('.')) {
       if (isDerivedScratchName(entry.name)) continue;

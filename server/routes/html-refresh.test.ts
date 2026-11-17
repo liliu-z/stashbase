@@ -7,6 +7,7 @@ import test from 'node:test';
 import express from 'express';
 import { clearCurrentFolder, openProjectFolder, removeRecentAsync } from '../folder.ts';
 import { mount } from './files.ts';
+import { fileSymlink } from '../__tests__/filesystem-links.ts';
 
 async function harness(t: { after(fn: () => unknown): void }) {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-html-refresh-'));
@@ -85,7 +86,8 @@ test('HTML dependency checks honor base URLs, entities, and project containment'
   const { root, scratch, version } = await harness(t);
   const outside = path.join(scratch, 'outside.js');
   fs.writeFileSync(outside, 'outside one');
-  fs.symlinkSync(outside, path.join(root, 'escape.js'));
+  // Without the link, escape.js is simply missing and the other checks still hold.
+  fileSymlink(outside, path.join(root, 'escape.js'), t);
   fs.writeFileSync(path.join(root, 'data&more.js'), 'one');
   fs.writeFileSync(path.join(root, 'seo_geo/board.html'), `
     <base href="../">

@@ -337,7 +337,10 @@ block in the reply, so Chat's block Copy takes exactly that text.
 - A reply may cite a passage in a project file with a link carrying a short
   quoted phrase. Opening it shows the file in Documents and locates that
   phrase; when the file no longer holds it, the file stays open and says so.
-  A link without a phrase opens its file at the top. Citing is standing
+  A link without a phrase opens its file at the top. Antigravity's native
+  file citations render as file links, retaining any supplied line range in
+  the label; they open the file without claiming to locate those lines.
+  Code examples keep citation syntax literal. Citing is standing
   guidance to the agent, not a guarantee that every reply cites.
 - A clarifying question is answered in place on its own pending request. Answers
   return keyed by question text; Skip or Stop leaves it unanswered rather than
@@ -418,6 +421,13 @@ not automatically repeat the whole user request or its completed file operations
 An unknown outcome keeps the runtime or connection's reported failure visible
 beside the review action; it must not replace a known cause with a generic
 network explanation. Reconnecting alone does not establish what finished.
+
+Antigravity can repeat an earlier stream-interruption error after a reply has
+finished. When the current turn explicitly confirms its final main-conversation
+reply is complete and no work remains in progress, retain a notice and complete
+the turn without offering Retry. Text alone, a subagent's reply, or a previous
+turn's completion is insufficient. Other errors, timeouts, cancellation and
+process loss keep their existing failure or Stop behavior; no prompt is replayed.
 
 When Codex reports missing metadata for a model and then refuses that same
 model, the failed turn offers **Update Codex** through this recovery flow.
