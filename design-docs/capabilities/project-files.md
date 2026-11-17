@@ -83,6 +83,9 @@ larger pages sooner.
   even when hidden-file visibility is off. Other eligible dot-directories follow
   that preference. VCS databases, product state, and derived data stay hidden;
   visible dependency/cache directories remain unexpanded placeholders.
+  OS metadata and Office lock files stay hidden. The `~$` prefix identifies a
+  lock only with an Office file extension; ordinary text sources with that prefix
+  remain visible and retain their normal capabilities.
   Hidden-file visibility changes browsing only. It neither widens tool/search
   access nor discards open edits.
 - Project import creates source files; same-name imports keep both copies using
