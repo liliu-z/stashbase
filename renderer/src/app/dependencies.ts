@@ -17,6 +17,8 @@ import {
   createAgentToolsAdapter,
   createAgentContextAdapter,
   createAgentSessionAdapter,
+  createSpeechAdapter,
+  type VoiceTypingPorts,
   createScheduledRunsAdapter,
   createScheduledTasksAdapter,
   type AgentCatalogPort,
@@ -52,6 +54,8 @@ import {
   createEmbedderAdapter,
   createMcpAccessAdapter,
   createLocalComponentAdapter,
+  createVoiceModelAdapter,
+  type VoiceModelPort,
   type LocalComponentPort,
   type AccountPort,
   type AgentRuntimePort,
@@ -68,6 +72,7 @@ import {
   type WorkspaceAdapters,
   type ProjectFolderPickerPort,
 } from '@/features/workspace/public';
+import { createSpeechCapture } from '@/platform/audio/speech-capture';
 import { readBridge } from '@/platform/electron/bridge';
 import { createExternalNavigation } from '@/platform/electron/external-navigation';
 import { fileManagerLabel } from '@/platform/electron/file-manager';
@@ -98,6 +103,7 @@ export interface AppDependencies {
   recordUsage: ReturnType<typeof createUsageRecorder>;
   onInputActivity?: WindowLifecycleBridge['onInputActivity'];
   agent: {
+    voice?: VoiceTypingPorts;
     /** Which runtimes a conversation can open on. Settings reads the same
      *  endpoint through its own port for its own question. */
     catalog: AgentCatalogPort;
@@ -131,6 +137,7 @@ export interface AppDependencies {
     semanticSearchApi: SemanticSearchPort;
   };
   settings: {
+    voiceModelApi?: VoiceModelPort;
     accountApi: AccountPort;
     agentRuntimeApi: AgentRuntimePort;
     appearanceApi: AppearancePort;
@@ -172,6 +179,14 @@ export function createDependencies(): AppDependencies {
     recordUsage: createUsageRecorder(http),
     onInputActivity: bridge.windowLifecycle.onInputActivity,
     agent: {
+      ...(bridge.speech
+        ? {
+            voice: {
+              speech: createSpeechAdapter(http),
+              capture: createSpeechCapture(bridge.speech),
+            },
+          }
+        : {}),
       catalog: createAgentCatalogAdapter(http),
       preferences: createAgentPreferencesAdapter(http),
       persona: createAgentPersonaAdapter(http),
@@ -209,6 +224,7 @@ export function createDependencies(): AppDependencies {
       semanticSearchApi: createSemanticSearchAdapter(http),
     },
     settings: {
+      voiceModelApi: createVoiceModelAdapter(http),
       accountApi: createAccountAdapter(http, bridge.runtime.serverOrigin),
       agentRuntimeApi: createAgentRuntimeAdapter(http),
       appearanceApi: createAppearanceAdapter(http),

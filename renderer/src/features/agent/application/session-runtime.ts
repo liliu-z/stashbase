@@ -33,6 +33,7 @@ import type {
   AgentSessionRuntimeOptions,
 } from '@/features/agent/application/session/runtime-contract';
 import { createAgentUsage } from '@/features/agent/application/session/usage';
+import { createVoiceTyping } from '@/features/agent/application/voice-typing';
 import { addContextItem, removeContextItem } from '@/features/agent/domain/context';
 import {
   agentScopesEqual,
@@ -62,6 +63,7 @@ export function createAgentSessionRuntime({
   scheduler = createDefaultScheduler(),
   scope,
   title,
+  voice: voicePorts,
 }: AgentSessionRuntimeOptions): AgentSessionRuntime {
   const usage = createAgentUsage(() => state().agent, recordUsage);
   const controller = new AbortController();
@@ -76,6 +78,23 @@ export function createAgentSessionRuntime({
   let restoreEntry: Parameters<AgentSessionRuntime['restore']>[0] | null = null;
 
   const state = () => store.getState();
+  const voice =
+    voicePorts && scope.kind === 'folder'
+      ? createVoiceTyping({
+          ports: voicePorts,
+          conversation: id,
+          folder: scope.path,
+          signal: controller.signal,
+          getDraft: () => state().draft,
+          append: (draft) => {
+            if (!disposed) store.setState({ draft, contextIssue: null });
+          },
+          lock: (draftLocked) => {
+            if (!disposed) store.setState({ draftLocked });
+          },
+        })
+      : undefined;
+  const stopVoiceDraftObserver = voice ? store.subscribe(() => voice.draftChanged()) : undefined;
   const { accept, capture, retireOperations } = createScopeGuard({
     disposed: () => disposed,
     sameScope: agentScopesEqual,
@@ -209,6 +228,7 @@ export function createAgentSessionRuntime({
   });
 
   const runtime: AgentSessionRuntime = {
+    ...(voice ? { voice } : {}),
     id,
     signal: controller.signal,
     store,
@@ -218,8 +238,8 @@ export function createAgentSessionRuntime({
     interrupt: controls.interrupt,
     continueQueue: controls.continueQueue,
     confirmOutcome: controls.confirmOutcome,
-    changeAgent: controls.changeAgent,
-    editQueued: controls.editQueued,
+    changeAgent: (nextAgent) => !state().draftLocked && controls.changeAgent(nextAgent),
+    editQueued: (queuedId) => !state().draftLocked && controls.editQueued(queuedId),
     replyPermission: controls.replyPermission,
     rename(nextTitle) {
       if (!disposed) transition({ title: nextTitle, kind: 'rename' });
@@ -243,22 +263,24 @@ export function createAgentSessionRuntime({
       transport,
       transition,
     }),
-    editPrompt: controls.editPrompt,
+    editPrompt: (promptId) => !state().draftLocked && controls.editPrompt(promptId),
     addContext(item) {
-      if (disposed) return;
+      if (disposed || state().draftLocked) return;
       transition({ context: addContextItem(state().context, item), kind: 'set-context' });
     },
     removeContext(key) {
-      if (disposed) return;
+      if (disposed || state().draftLocked) return;
       transition({ context: removeContextItem(state().context, key), kind: 'set-context' });
     },
     requestComposerFocus: controls.requestComposerFocus,
     fileForTransient: (path) => transientFiles.get(path),
-    attachFiles: dispatcher.attach,
+    attachFiles: (files) => (state().draftLocked ? Promise.resolve() : dispatcher.attach(files)),
     steer(text) {
+      if (state().draftLocked) return;
       void dispatcher.steer(text);
     },
     async sendPrompt(text = state().draft, options = {}) {
+      if (state().draftLocked) return { ok: false, reason: 'busy' };
       if (disposed || agentTurnIsActive(state().connection)) return dispatcher.send(text, options);
       if (!text.trim() && !state().context.length && !state().skill)
         return dispatcher.send(text, options);
@@ -292,7 +314,7 @@ export function createAgentSessionRuntime({
       store.setState({ models: [...models] });
     },
     setDraft(draft) {
-      if (!disposed) transition({ draft, kind: 'set-draft' });
+      if (!disposed && !state().draftLocked) transition({ draft, kind: 'set-draft' });
     },
     setQueue: controls.setQueue,
     async restore(entry, connectWhenReady = true) {
@@ -328,6 +350,7 @@ export function createAgentSessionRuntime({
       if (disposed) return;
       const current = state();
       if (current.scope.kind !== 'folder' || current.scope.path !== folderPath) return;
+      void voice?.stop();
       retireOperations();
       controls.dispose();
       dispatcher.cancel();
@@ -342,6 +365,7 @@ export function createAgentSessionRuntime({
     },
     dispose() {
       if (disposed) return;
+      stopVoiceDraftObserver?.();
       disposed = true;
       retireOperations();
       transport.invalidate();

@@ -1,0 +1,8 @@
+Licensed by NVIDIA Corporation under the NVIDIA Open Model License
+
+Modifications: handy-computer converted
+https://huggingface.co/nvidia/parakeet-unified-en-0.6b at commit d4ac992 to
+GGUF for transcribe.cpp (https://github.com/handy-computer/transcribe.cpp).
+Conversion repackages the weights, renaming and re-laying-out tensors; the
+quantized files (Q8_0, Q6_K, Q5_K_M, Q4_K_M) also store them at reduced
+numeric precision. The weights were not retrained or fine-tuned.

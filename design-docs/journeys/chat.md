@@ -10,7 +10,8 @@ Chat, Documents assistance, and runtimes.
 1. Start a chat in the project or return through history. The sidebar keeps drafts
    reachable and makes conversation identity and working state clear. Search names
    its scope; conversation navigation follows actual visits.
-2. Compose an idea, optionally attach context and choose supported agent options.
+2. Type or [dictate an idea](../capabilities/agent-sessions.md#voice-typing),
+   optionally attach context and choose supported agent options.
    The action clearly sends, queues, or stops work. A persona sets how the agent
    talks and writes in this Chat from the next message on and remains distinct
    from the current request. The reader can switch personas between messages,

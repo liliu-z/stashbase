@@ -21,6 +21,7 @@ interface DesktopWorkspaceSessionBridge {
 interface DesktopProjectBridge extends ProjectBridge, ProjectLifecycleBridge {}
 
 interface DesktopBridge {
+  speech?: { authorize(active: boolean): Promise<boolean> };
   /** Optional: opening a dropped file in place needs its location on disk,
    *  which only the desktop shell can read. */
   externalFiles?: ExternalFilesBridge;
@@ -41,6 +42,7 @@ interface DesktopBridge {
 declare global {
   interface Window {
     stashbase?: {
+      speech?: { authorize(active: boolean): Promise<boolean> };
       notifications?: NotificationsBridge;
       bugReportReview?: unknown;
       externalFiles?: unknown;
@@ -105,6 +107,7 @@ export function readBridge(globalWindow: Window = window): DesktopBridge {
   const scheduledTasks = globalWindow.stashbase?.scheduledTasks;
   const externalFiles = globalWindow.stashbase?.externalFiles;
   return {
+    ...(globalWindow.stashbase?.speech ? { speech: globalWindow.stashbase.speech } : {}),
     ...(isExternalFilesBridge(externalFiles) ? { externalFiles } : {}),
     ...(globalWindow.stashbase?.notifications
       ? { notifications: globalWindow.stashbase.notifications }

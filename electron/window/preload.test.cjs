@@ -73,6 +73,24 @@ test('native input subscription admits presence only and stops on disposal', () 
   assert.deepEqual(ipc.invocations, []);
 });
 
+test('interactive close keeps the request alive only while its decision is pending', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval'] });
+  const ipc = ipcFixture();
+  const preload = createWindowLifecyclePreload(ipc);
+  let decide;
+  preload.onPrepareContextRelease(() => new Promise(resolve => { decide = resolve; }), { interactive: true });
+  ipc.emit('window:prepare-context-release', { reason: 'window-close', requestId: 'interactive' });
+  t.mock.timers.tick(6000);
+  assert.ok(ipc.invocations.length >= 7);
+  assert.ok(ipc.invocations.every(([channel, payload]) => channel === 'window:context-release-pending' && payload.requestId === 'interactive'));
+  decide(false);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(ipc.invocations.at(-1), ['window:context-release-ready', { ready: false, reason: 'window-close', requestId: 'interactive' }]);
+  const count = ipc.invocations.length;
+  t.mock.timers.tick(6000);
+  assert.equal(ipc.invocations.length, count);
+});
+
 test('window preload carries an update install release across the boundary', async () => {
   const ipc = ipcFixture();
   const preload = createWindowLifecyclePreload(ipc);

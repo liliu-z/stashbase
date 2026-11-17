@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
+import { stageWindowsSpeechRuntime } from './packaging/speech-runtime.mjs';
 import { fileURLToPath } from 'node:url';
 import { assertMacosArchitecture, assertMacosReleaseCredentials } from './macos-release-contract.mjs';
 import { resolveWindowsSigningConfiguration } from './windows-release-contract.mjs';
@@ -297,4 +298,5 @@ if (!hostMatchesTarget()) {
 clearQuarantine();
 prepareIntelOpenCode();
 prepareWindowsRipgrep();
+if (platform === 'win' && hostMatchesTarget()) stageWindowsSpeechRuntime({ root });
 runElectronBuilder();

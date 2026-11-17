@@ -80,6 +80,7 @@ export function WorkspaceDialogs({
         revisionPreview={revisionPreview}
         section={settings.section}
         softwareUpdate={dependencies.updates ? softwareUpdate : null}
+        voiceModelApi={dependencies.settings.voiceModelApi}
       />
     </>
   );

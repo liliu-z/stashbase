@@ -249,6 +249,78 @@ project. These are controlled coupling/deadline measurements, not real disk
 benchmarks or proof of the reported Windows timeout's cause. The schedule
 regressions separately cover stored switches and synchronous path comparisons.
 
+## Scenario: local speech
+
+`pnpm test:speech:native --model /absolute/path/to/parakeet-unified-en-0.6b-Q8_0.gguf`
+verifies the pinned checksum and transcribes the public-domain JFK sample twice
+through native Parakeet buffered streaming in `transcribe-cpp` inside Electron's embedded Node. `--download` explicitly
+prepares the approximately 731 MB model in `profiling.nosync/speech-model` instead.
+Neither command uses agent credentials or the developer's microphone. Source CI
+runs the real-model smoke and a 77-second production-service continuity check
+(two rollovers plus the final tail) on both macOS architectures and Windows/Linux
+x64, fitting the whole-job budget on slow Intel CPU runners. The upload window
+pauses at 60 queued frames, forcing native progress before Stop even for the
+shorter fixture; the five-minute final-tail deadline is unchanged.
+This does not establish packaged DLL loading, signing, or OS microphone access.
+
+`pnpm profile:speech --model <path> --soak-minutes 60` repeats short native sessions
+for at least an hour of equivalent sample audio and reports memory periodically.
+It checks session disposal and model reuse, not one continuous hour of microphone
+capture or recognition quality across arbitrary speakers. Do not run multiple
+model processes alongside memory-heavy builds on a small machine. Memory and
+timings from concurrent runs are not comparable performance ranges.
+
+After building the renderer, `env -u ELECTRON_RUN_AS_NODE pnpm profile:speech-ui
+--model <path>` exercises the production composer, native permission boundary,
+Chromium fixture device, real host spool and worker, and final draft insertion.
+The model is seeded into an isolated profile, then verified by the ordinary
+model owner. It preserves a typed prefix and asserts that no message was sent.
+Screenshots and private logs stay under `profiling.nosync/speech-ui`. The private
+test launcher uses a parent-only signal to invoke the actual native close path and
+verifies Keep working after a confirmation held longer than five seconds. The
+launcher is not packaged. Software-update version metadata is not part of this
+capture check. Add `--seconds 70` to check continuous capture beyond the initial
+microphone permission window and across native segment boundaries.
+If Chromium cannot read the fake audio file under its sandbox, or a Linux
+test environment lacks usable namespaces, `--no-sandbox` applies only to this
+isolated verification launch. This does not establish production-sandbox microphone
+access. The scenario currently uses the POSIX profiling
+harness; Windows uses the embedded-Node smoke plus native packaged acceptance.
+
+Local Linux x64/WSL evidence includes a successful real-model smoke and complete
+fixture-microphone UI flow. The production worker now uses bounded native buffered streams. `--offline`
+runs the older full-attention path for comparison only. Before this integration,
+two runs of
+the same 11-second CPU fixture under Electron 39.8.8 produced these ranges
+(inference excludes model loading):
+
+| Mode | Inference | Peak process RSS |
+|---|---|---|
+| Streaming reference | 8.63–9.53 s | 1291 MiB |
+| Offline batches | 1.90–2.65 s | 1296 MiB |
+
+These observations are not latency or minimum-memory guarantees. The hour of
+simulated PCM in the service test uses a controlled engine and separately
+establishes bounded spool cleanup; it does not prove native inference speed.
+A seventy-second fixture-device UI recording on macOS arm64 completed with the
+original draft intact and no send, about 1.17 seconds after Stop. This is one
+controlled-device run, not physical-microphone or cross-platform acceptance.
+
+`pnpm profile:speech:continuous --model <path> --minutes 60` sends at least an
+hour of the public-domain fixture through one production service and embedded-Node
+worker job, with bounded accelerated delivery rather than real-time microphone
+capture. It crosses production stream boundaries, checks the exact count of an
+expected phrase and the final spoken words, and verifies consumed spool cleanup.
+The command reports actual wall time, Stop completion time, peak queued frames,
+and sampled native-worker RSS on POSIX. `--cpu` explicitly exercises CPU. It does
+not prove physical microphones, arbitrary speech quality, or an hour of real-time
+capture. The default two-minute run is a shorter boundary check. On macOS arm64
+(2026-11-17), the 3,608-second fixture completed in 209.9 seconds; its full word
+sequence matched 328 repetitions, sampled worker RSS stayed within 256.3–287.9
+MiB after loading (last sample 277.6 MiB), and the spool peaked at 96 frames.
+That hour-long result used the previous 80-frame upload window; the current
+harness pauses at 60 frames. Process RSS does not measure GPU allocations.
+
 ## Adding a scenario
 
 Write `<scenario>.mjs` beside `editing.mjs`:

@@ -1,6 +1,9 @@
 export { createAgentCatalogAdapter } from './infrastructure/catalog-api';
 export { createAgentContextAdapter } from './infrastructure/context-api';
 export { createAgentSessionAdapter } from './infrastructure/session-api';
+export { createSpeechAdapter } from './infrastructure/speech-api';
+export type { VoiceTypingPorts } from './application/speech-port';
+export { VoiceReleaseBarrier } from './ui/voice-release-barrier';
 export { AgentChats, AgentWorkspace } from './ui/workspace-lazy';
 export { ChatNavButtons } from './ui/chat-nav-buttons';
 export { ChatTitle } from './ui/chat-title';

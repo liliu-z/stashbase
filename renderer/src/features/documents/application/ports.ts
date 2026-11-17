@@ -20,6 +20,7 @@ import {
   type FeatureFailureKind,
 } from '@/shared/domain/feature-error';
 import type { SourceReference } from '@/shared/domain/source-reference';
+import type { WindowReleaseReason } from '@/shared/domain/window-release';
 
 /** A CSV/TSV table, read a page of rows at a time. */
 export interface DelimitedTablePort {
@@ -111,7 +112,10 @@ export interface DocumentQueryScope {
 }
 
 export interface DocumentWindowLifecyclePort {
-  onPrepareContextRelease(handler: () => boolean | Promise<boolean>): () => void;
+  onPrepareContextRelease(
+    handler: (reason: WindowReleaseReason) => boolean | Promise<boolean>,
+    options?: { interactive: boolean },
+  ): () => void;
 }
 
 /** Trusted native input presence; sandboxed documents cannot emit this signal. */

@@ -21,6 +21,8 @@ export { SidebarAccountRow } from './ui/account/sidebar-account-row';
 export { DeveloperTools, Settings } from './ui/settings';
 export type { SettingsSectionId, SettingsTarget } from './ui/settings-types';
 export { createLocalComponentAdapter } from './infrastructure/local-component-api';
+export { createVoiceModelAdapter } from './infrastructure/voice-model-api';
+export type { VoiceModelPort } from './application/voice-model-port';
 
 export type { TelemetryPort } from './application/telemetry-port';
 export { createTelemetryAdapter } from './infrastructure/telemetry-api';

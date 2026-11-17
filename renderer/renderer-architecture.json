@@ -57,6 +57,7 @@
     "shared/protocols/electron/project.ts",
     "shared/protocols/electron/runtime.ts",
     "shared/protocols/electron/scheduled-tasks.ts",
+    "shared/protocols/electron/speech.ts",
     "shared/protocols/electron/text-services.ts",
     "shared/protocols/electron/notifications.ts",
     "shared/protocols/electron/updates.ts",
@@ -84,6 +85,7 @@
     "shared/protocols/http/local-components.ts",
     "shared/protocols/http/preparation.ts",
     "shared/protocols/http/search.ts",
+    "shared/protocols/http/speech.ts",
     "shared/protocols/http/semantic-search.ts",
     "shared/protocols/http/workspace-preferences.ts",
     "shared/protocols/websocket/agent-session.ts"

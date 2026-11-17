@@ -59,6 +59,16 @@ export function createAckCoordinator({
       webContents.send(channel, message(subject, requestId));
       return promise;
     },
+    /** An interactive barrier keeps its current request live, while a lost
+     * renderer still expires within the ordinary acknowledgement deadline. */
+    defer(webContentsId: number, requestId: string, subject: string): boolean {
+      const pending = pendingByWebContents.get(webContentsId);
+      if (!pending || pending.requestId !== requestId || pending.subject !== subject) return false;
+      clearTimeout(pending.timer);
+      pending.timer = setTimeout(() => settle(webContentsId, false), timeoutMs);
+      pending.timer.unref?.();
+      return true;
+    },
     acknowledge(webContentsId: number, requestId: string, subject: string, ready: boolean): boolean {
       const pending = pendingByWebContents.get(webContentsId);
       if (!pending || pending.requestId !== requestId || pending.subject !== subject) return false;

@@ -15,7 +15,8 @@ concurrency:
 jobs:
   source-build:
     name: Source build (${{ matrix.os }})
-    timeout-minutes: 30
+    # The source audit and real-model CPU verification share this job's budget.
+    timeout-minutes: 45
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -115,6 +116,18 @@ jobs:
         timeout-minutes: 5
         if: ${{ !cancelled() && steps.python.outcome == 'success' }}
         run: pnpm test:opencode:native
+
+      - name: Cache the pinned speech model
+        if: ${{ !cancelled() && steps.python.outcome == 'success' }}
+        uses: actions/cache@v6
+        with:
+          path: profiling.nosync/speech-model
+          key: speech-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('server/speech/model-manifest.ts') }}
+
+      - name: Verify local speech in embedded Node
+        timeout-minutes: 15
+        if: ${{ !cancelled() && steps.python.outcome == 'success' }}
+        run: pnpm test:speech:native --download
 
       - name: Typecheck server + mcp + Electron
         if: ${{ !cancelled() && steps.python.outcome == 'success' }}

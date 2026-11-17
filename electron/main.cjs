@@ -47,6 +47,7 @@ const {
   applicationWindowWebPreferences,
   isAllowedApplicationUrl,
   secureApplicationWindow,
+  authorizeApplicationMicrophone,
 } = require('./window-security.cjs');
 const { installRequestAuthorization } = require('./renderer/requests.cjs');
 const {
@@ -169,6 +170,7 @@ let externalNavigationCapability = null;
 let externalFilesCapability = null;
 let updatesCapability = null;
 let textServicesCapability = null;
+let speechCaptureCapability = null;
 let notificationsCapability = null;
 let scheduledTasksCapability = null;
 let replacementWindowLifecycle = null;
@@ -340,6 +342,15 @@ function installReplacementBoundary() {
   externalFilesCapability = externalFiles.EXTERNAL_FILES_CAPABILITY;
   updatesCapability = updates.UPDATES_CAPABILITY;
   textServicesCapability = textServices.TEXT_SERVICES_CAPABILITY;
+  const speechCapture = require(path.join(PROJECT_ROOT, 'dist', 'electron', 'speech', 'ipc.cjs'));
+  speechCaptureCapability = speechCapture.SPEECH_CAPTURE_CAPABILITY;
+  speechCapture.registerSpeechCapture({
+    BrowserWindow, ipcMain,
+    expectedOrigins: new Set([RENDERER_ORIGIN]),
+    isLiveWindow: (win) => isLiveMainWindow(win),
+    hasCapability: (win, capability) => replacementWindowCapabilities.get(win)?.has(capability) === true,
+    authorize: authorizeApplicationMicrophone,
+  });
   scheduledTasksCapability = scheduledTasks.SCHEDULED_TASKS_CAPABILITY;
   bugReportReview.registerBugReportReviewIpc({
     ipcMain,
@@ -1086,6 +1097,7 @@ async function createWindow({ background = false, reopensProject = false } = {})
     externalFilesCapability &&
     updatesCapability &&
     textServicesCapability &&
+    speechCaptureCapability &&
     notificationsCapability &&
     scheduledTasksCapability
   ) {
@@ -1100,6 +1112,7 @@ async function createWindow({ background = false, reopensProject = false } = {})
         externalFilesCapability,
         updatesCapability,
         textServicesCapability,
+        speechCaptureCapability,
         notificationsCapability,
         scheduledTasksCapability,
       ]),

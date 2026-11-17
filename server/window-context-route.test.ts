@@ -66,7 +66,8 @@ test('window cleanup route retires its header identity and cannot be undone by a
       res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
     }
   });
-  windowContextRoutes.mount(app);
+  const released: string[] = [];
+  windowContextRoutes.mount(app, async (windowId) => { released.push(windowId); });
   server = app.listen(0, '127.0.0.1');
   await new Promise<void>((resolve, reject) => {
     server?.once('listening', resolve);
@@ -92,6 +93,7 @@ test('window cleanup route retires its header identity and cannot be undone by a
   assert.equal((await open('window-1', first)).status, 200);
   assert.equal((await open('window-2', second)).status, 200);
   assert.equal((await close('window-1')).status, 200);
+  assert.deepEqual(released, ['window-1']);
 
   const lateOpen = await open('window-1', first);
   assert.equal(lateOpen.status, 410);

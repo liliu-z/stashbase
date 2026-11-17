@@ -5,6 +5,7 @@ import { appearancePreferencesSchema } from '../http/appearance';
 export const WINDOW_LIFECYCLE_CAPABILITY = 'window.lifecycle';
 export const WINDOW_PREPARE_CONTEXT_RELEASE_CHANNEL = 'window:prepare-context-release';
 export const WINDOW_CONTEXT_RELEASE_READY_CHANNEL = 'window:context-release-ready';
+export const WINDOW_CONTEXT_RELEASE_PENDING_CHANNEL = 'window:context-release-pending';
 export const WINDOW_FULLSCREEN_CHANNEL = 'window:fullscreen';
 export const WINDOW_APPEARANCE_CHANNEL = 'window:appearance';
 export const WINDOW_INPUT_ACTIVITY_CHANNEL = 'window:input-activity';

@@ -343,6 +343,7 @@ app
         'externalFiles',
         'externalNavigation',
         'notifications',
+        'speech',
         'runtime',
         'project',
         'scheduledTasks',

@@ -1,3 +1,4 @@
+import { undo } from '@codemirror/commands';
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
@@ -7,10 +8,13 @@ import {
   createAgentSessionRuntime,
   type AgentSessionRuntime,
 } from '@/features/agent/application/session-runtime';
+import type { VoiceTypingPorts } from '@/features/agent/application/speech-port';
 import { passageContextItem, type AgentScopeEnvironment } from '@/features/agent/domain/context';
 import type { SourceReference } from '@/shared/domain/source-reference';
-import { pressKey, typeInto } from '@/test/dom';
+import { editorOf, pressKey, typeInto } from '@/test/dom';
 import { agentContextPort, agentSessionPort, type FakeAgentSession } from '@/test/fakes/agent';
+import { speechFixture } from '@/test/fakes/speech';
+import { createTestQueryClient, queryWrapper } from '@/test/query';
 
 import { AgentContextComposer } from './context-composer';
 
@@ -45,6 +49,7 @@ function renderComposer(
     status?: 'idle' | 'streaming';
     steering?: boolean;
     holdSend?: boolean;
+    voice?: VoiceTypingPorts;
   } = {},
 ) {
   const port: FakeAgentSession = agentSessionPort();
@@ -55,6 +60,7 @@ function renderComposer(
     id: 'chat-1',
     port: port.port,
     scope: SCOPE,
+    ...(overrides.voice ? { voice: overrides.voice } : {}),
   });
   runtimes.push(session);
   const spies = {
@@ -83,7 +89,9 @@ function renderComposer(
       {...spies}
     />
   );
-  const view = render(composer(overrides.activeSource ?? null));
+  const view = render(composer(overrides.activeSource ?? null), {
+    wrapper: queryWrapper(createTestQueryClient()),
+  });
   const showDocument = (activeSource: SourceReference | null) =>
     view.rerender(composer(activeSource));
   const field = screen.getByRole('textbox', { name: 'Message' });
@@ -103,6 +111,38 @@ function announceSkills(
 }
 
 describe('Agent context composer', () => {
+  it('records with one Stop action, hides preparation UI, appends once, and undoes just the dictated addition', async () => {
+    const fixture = speechFixture();
+    const { field, session, onSend } = renderComposer({ voice: fixture.ports });
+    typeInto(field, 'Typed idea.');
+    const mic = await screen.findByRole('button', { name: 'Dictate in English' });
+    await waitFor(() => expect(mic.hasAttribute('disabled')).toBe(false));
+    expect(screen.queryByRole('progressbar')).toBeNull();
+    await userEvent.click(mic);
+    await screen.findByRole('button', { name: 'Stop recording' });
+    expect(screen.queryByRole('button', { name: 'Send' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Attach files' })).toBeNull();
+    act(() => fixture.emit());
+    act(() => {
+      expect(undo(editorOf(field))).toBe(false);
+    });
+    expect(field.textContent).toContain('Typed idea.');
+    pressKey(field, 'Enter');
+    expect(onSend).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Stop recording' }));
+    await waitFor(() =>
+      expect(session.store.getState().draft).toBe('Typed idea. A dictated idea.'),
+    );
+    await screen.findByRole('button', { name: 'Dictate in English' });
+    expect(session.voice?.hasUnsentDraft()).toBe(true);
+    expect(onSend).not.toHaveBeenCalled();
+    act(() => {
+      undo(editorOf(field));
+    });
+    await waitFor(() => expect(session.store.getState().draft).toBe('Typed idea.'));
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+    expect(onSend).toHaveBeenCalledTimes(1);
+  });
   it('suggests scope files for an @ query and binds the picked one to the draft', async () => {
     const { field, session } = renderComposer();
 

@@ -87,9 +87,10 @@ apply, and the caller-owned directory is preserved.
 
 ## Source CI
 
-Source jobs are bounded to 30 minutes, renderer behavior to 10 minutes, and the
-native OpenCode smoke to five minutes. Release packaging jobs are bounded to
-60 minutes. Workflow concurrency serializes publication without cancelling signing
+The [source workflow](../.github/workflows/ci.yml) owns job and stage deadlines.
+Its whole-job budget covers the renderer/host audit and real-model CPU speech
+verification; stage deadlines bound individual hangs. Release packaging has
+separate job limits. Workflow concurrency serializes publication without cancelling signing
 or asset uploads; source runs on the same ref are also serialized.
 
 - The macOS, Windows, and Linux matrix retains renderer behavior tests,
@@ -97,13 +98,10 @@ or asset uploads; source runs on the same ref are also serialized.
   Electron lifecycle smoke. Linux runs the complete renderer gate; Windows and
   macOS run renderer behavior without repeating coverage or the Story sweep.
   Both Apple Silicon and Intel macOS runners run the source checks. Non-Linux
-  renderer behavior runs use two workers: repeated Intel runs with default
-  concurrency timed out in different otherwise-passing UI tests. Whole-test
-  timeout is 15 seconds on native runners so lazy imports and multiple awaited
-  assertions fit around their individual timeouts; the shell test itself has
-  a five-second content assertion. The complete suite and all per-assertion
-  wait limits remain unchanged. Two workers alone did not eliminate hosted
-  Intel whole-test timeouts.
+  renderer behavior runs use two workers to limit hosted Intel contention.
+  Whole-test deadlines and cold Workspace/Settings readiness waits are explicit
+  in configuration and their owning tests; content and first-reply assertions
+  remain required.
 - `pnpm check:web` is the release-blocking renderer gate, run once on Linux:
   boundaries, size, conventions, unused exports, duplication, formatting, lint,
   coverage, structural Story accessibility, typecheck, production build, and
@@ -189,6 +187,17 @@ toolchain rather than the linter any gate runs.
   PDF runtime resource and performs DOCX conversion. PyArrow/OpenCV and the independent
   Python environments are preserved.
 - Packaging validates Python daemon and extractor inputs before assembling the app.
+- Local voice typing ships the pinned `transcribe-cpp` binding, target native
+  package, and Koffi outside asar, plus the built speech worker and model license
+  notices. Model weights are excluded: first launch prepares them silently in
+  the user's data directory, also after updates. macOS requires the microphone
+  usage description and audio-input entitlement. Windows packaging stages the
+  x64 Visual C++ 14.40+ runtime DLLs app-locally from the build host's Visual Studio
+  redistributable directory, so users need no separate runtime installer; missing
+  or incompatible inputs fail packaging. Verify capture, native library loading,
+  automatic preparation, offline reuse and idle unload in each final signed
+  artifact, including a clean Windows VM without a preinstalled redistributable.
+  Source model smoke is not evidence of these packaged behaviors.
 - Every unbundled local dependency loaded by the Electron main process must be
   included in the electron-builder input. The package-input test scans relative
   CommonJS dependencies that cross out of `electron/` so a source-only smoke

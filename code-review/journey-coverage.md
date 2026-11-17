@@ -1960,6 +1960,91 @@ Host/services: `server/retrieval/index.ts`, `server/indexer.mfs.ts`, `python/sta
 
 ## J06: Agent
 
+**Buffered-stream integration (2026-11-17):** the native worker now uses the
+Parakeet buffered-streaming API, with finite input retention and finalized
+right context at rollover. `stream.test.ts` covers native limits smaller than
+one capture frame, unlimited advertised limits, exact sample accounting,
+final-tail delivery, repeated finish, failed finalization, whole-word ownership
+and intentional repetitions. Service checks cover CPU replay after a committed
+overlap without duplicating earlier text, cancellation while retry retires a
+worker, concurrent retries sharing one retirement, and preserving an audio
+publication already in flight when the engine fails.
+
+On macOS arm64 (2026-11-17), one production service/embedded-Node worker job
+processed 3,608 seconds of controlled audio with accelerated, bounded delivery.
+All 328 repetitions matched the complete expected word sequence, including
+rollover boundaries and the final tail. Sampled worker RSS peaked at 287.9 MiB
+(first loaded sample 256.3 MiB, last 277.6 MiB), with at most 96 pending spool
+frames; completed spool files were removed. Stop completed in about 2.83 seconds
+in that run. These are fixture measurements, not physical microphone or minimum
+hardware guarantees; GPU memory is not established by process RSS.
+
+A fresh macOS arm64 built-app fixture then recorded for seventy seconds,
+retained a typed prefix, appended the completed local transcript without sending,
+and returned from a native close decision held beyond five seconds. Settings
+reported the verified model ready. Stop-to-draft was about 1.17 seconds in this
+one run; recording/completion screenshots were inspected. Chromium blocked the
+fake audio file under its sandbox, so this isolated fixture used `--no-sandbox`;
+it is not physical-microphone or production-sandbox acceptance.
+
+**Local voice typing (2026-11-15):** the shared composer in Chat and Documents
+uses `application/voice-typing.ts`, `platform/audio/speech-capture.ts` and its
+worklet. `server/routes/speech.ts` admits a folder-explicit recording;
+`server/speech/{model,service,stream,worker-client,worker}.ts` own silent model
+preparation, window identity, private bounded audio spooling, isolated native
+inference, cancellation and idle unload. Settings General owns preparation
+progress and Stop/Resume/Retry; neither startup nor the composer shows a setup
+prompt or progress row. `electron/speech` and `window-security.cjs` gate audio-only
+main-frame capture. Native libraries are packaged dependencies; there is no
+application Rust or custom native build.
+
+Model/recording owner checks cover resumed ranges, persistent Stop, checksum
+failure, offline model reuse, duplicate audio acknowledgements, foreign-window
+refusal, cancellation before a delayed start, bounded processing of an hour of
+simulated PCM, retained-segment CPU replay, shared cleanup under overlapping
+Windows directory removal, idle-unload races and cleanup.
+Session/composer checks cover draft locking including Undo, last-frame delivery,
+Retry, one undoable append without sending, multiple clips, navigation to the
+original target, hidden-pane/project
+retirement, silence and denied permission. General settings checks cover the
+compact progress/Stop/Resume flow. The voice release barrier protects active
+recordings and unsent dictation; existing chat drafts have no disk journal.
+Interactive close checks exercise a current-request heartbeat, refusal of stale
+or subframe heartbeats, expiration after heartbeat loss, and explicit discard.
+
+`profile:speech-ui` has completed the production renderer → Chromium fixture
+microphone → host spool → actual Parakeet worker → original typed draft path on
+Linux x64/WSL, including a continuous seventy-second recording across batch
+boundaries, with waveform/Stop and completed-draft screenshots inspected. The
+bounded offline worker finished that run about 11.5 seconds after Stop; this is
+fixture evidence, not a latency guarantee. This also holds the actual native
+close confirmation beyond five seconds, keeps the draft, and opens the compact
+General settings row. Its private launcher drives
+`BrowserWindow.close()` through a parent-only signal; it adds no application
+test hook. This uses controlled audio, not a physical microphone.
+`test:speech:native` has also completed real English inference under Electron's
+embedded Node 22.22.1 on Linux
+x64 CPU. The compiled worker from `server/speech/worker.ts` also completed the
+sample through its actual IPC entrypoint under that embedded runtime. The default built
+Electron smoke passes, including cleanup after native window destruction.
+The Windows runtime-input test stages a controlled x64 CRT fixture;
+static inspection found both published macOS library sets and Koffi bindings
+target macOS 11 or later. Linux CPU libraries require at most GLIBC 2.27 and
+GLIBCXX 3.4.22. These are not Windows/macOS execution or signing evidence.
+
+The native-model fixture also completed twice on all four targets in
+[source CI at c75e2f09](https://github.com/liliu-z/stashbase/actions/runs/43738640421):
+CPU on Linux x64, Windows x64 and Intel macOS; Metal on Apple Silicon macOS.
+This is model/runtime evidence, not physical-microphone or signed-app acceptance.
+
+Still unproven: actual microphone permissions/devices on macOS arm64/x64,
+Windows x64 and Linux desktops; forced Metal failure/fallback on real hardware;
+clean-machine Windows DLL loading; signed/package resource resolution; real
+network preparation through proxies and interrupted app updates; broad speech
+quality and continuous hour-long physical microphone capture in real time. The four-platform source CI
+includes the pinned real-model smoke; the PR's current matrix results establish
+source-platform execution separately from device and packaged-app acceptance.
+
 **First-send feedback (2026-11-11):** the session dispatcher publishes a pending
 user-message snapshot before context resolution and cold-session startup. The
 workspace no longer waits for native `ready` to show the reader's own message.

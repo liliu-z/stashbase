@@ -1,8 +1,11 @@
 import { cleanup, render, screen } from '@testing-library/react';
+import { waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
 
 import type { SoftwareUpdateRow } from '@/shared/domain/software-update';
+import type { VoiceModelState } from '@/shared/domain/voice-typing';
+import { createTestQueryClient, queryWrapper } from '@/test/query';
 
 import { GeneralPanel } from './general-panel';
 
@@ -28,6 +31,34 @@ function updateRow(overrides: Partial<SoftwareUpdateRow> = {}): SoftwareUpdateRo
 }
 
 describe('GeneralPanel', () => {
+  it('owns voice download progress and Stop/Resume controls without introducing a setup prompt', async () => {
+    let state: VoiceModelState = {
+      phase: 'downloading',
+      downloadedBytes: 320000000,
+      totalBytes: 731357568,
+      error: null,
+    };
+    const port = {
+      load: vi.fn(async () => state),
+      command: vi.fn(async (action: 'stop' | 'resume' | 'retry') => {
+        state = { ...state, phase: action === 'stop' ? 'paused' : 'downloading' };
+        return state;
+      }),
+    };
+    const client = createTestQueryClient();
+    render(<GeneralPanel softwareUpdate={null} voiceModelApi={port} />, {
+      wrapper: queryWrapper(client),
+    });
+    await screen.findByRole('progressbar', { name: 'Voice model download' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Stop' }));
+    await screen.findByRole('button', { name: 'Resume' });
+    expect(screen.queryByRole('progressbar')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Resume' }));
+    await waitFor(() => expect(screen.queryByRole('progressbar')).not.toBeNull());
+    expect(port.command.mock.calls.map(([action]) => action)).toEqual(['stop', 'resume']);
+    client.clear();
+  });
   it('says nothing about updates in a build with no updater', async () => {
     renderPanel();
     expect(screen.queryByText('Software updates')).toBeNull();

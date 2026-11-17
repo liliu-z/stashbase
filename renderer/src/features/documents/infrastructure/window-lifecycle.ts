@@ -5,6 +5,10 @@ export function createDocumentWindowLifecycleAdapter(
   bridge: WindowLifecycleBridge,
 ): DocumentWindowLifecyclePort {
   return {
-    onPrepareContextRelease: (handler) => bridge.onPrepareContextRelease(() => handler()),
+    onPrepareContextRelease: (handler, options) =>
+      bridge.onPrepareContextRelease(
+        (reason) => handler(reason === 'update-install' ? 'update' : 'close'),
+        options,
+      ),
   };
 }

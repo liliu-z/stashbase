@@ -8,6 +8,7 @@ export interface WindowLifecycleBridge {
   onInputActivity?(handler: (kind: WindowInputActivity) => void): () => void;
   onPrepareContextRelease(
     handler: (reason: WindowContextReleaseReason) => boolean | Promise<boolean>,
+    options?: { interactive: boolean },
   ): () => void;
   setAppearance(appearance: WindowAppearance): Promise<void>;
 }

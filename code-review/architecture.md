@@ -11,14 +11,15 @@ implementation details, exact limits, and protocol variants belong to code/tests
 Electron windows → shared Node server → Python daemon → one MFS store
                          ├─ native Agent sessions
                          ├─ MCP project operations
-                         └─ account/model broker
+                         ├─ account/model broker
+                         └─ isolated local speech worker
 ```
 
 | Owner | Authority |
 |---|---|
 | User filesystem | Source files, Wiki Pages, and native instruction files |
 | Electron main | Window/capability identity, server-child lifetime, native save barriers, updates |
-| Node server | Registered projects, authorized file operations, preparation, Settings, MCP operations, agent adapters |
+| Node server | Registered projects, authorized file operations, preparation, Settings, MCP operations, agent adapters, voice model and recording ownership |
 | Python/MFS | Completed text projections, revisions, chunking, embeddings, status, and retrieval through public APIs |
 | Native agent runtime | Sessions, conversation history, native capabilities and tool execution |
 | Renderer | Window-local presentation, live buffers, scoped commands, and caches; no durable data authority |
@@ -356,6 +357,59 @@ Native component compatibility belongs to `server/native-component-support.ts`.
 An unsupported component rejects only its own operation; it must not block server
 readiness, project entry, or durable file saves. Unsupported extraction returns a
 stable status without download, retry, or a new durable demand latch.
+
+## Local Voice Typing
+
+The Node speech service owns one recording across windows, bound to the initiating
+window, project, and conversation. Start requires an explicit registered current
+project. Subsequent audio/status/finish/cancel calls require the original window
+identity and job id, so navigation cannot redirect a result into another draft.
+Sequence acknowledgements follow private spool publication; identical retries
+are idempotent and conflicting/missing sequences fail. A cancelled request cannot
+resurrect through a late start. Window retirement and shutdown release this owner.
+Concurrent acknowledgements and cancellation share one retirement, so spool
+removal and idle unloading have a single owner on every platform. In-flight
+retries share retirement, await any in-flight audio publication, and recheck
+their owner after each await; cancellation
+or window retirement cannot revive a worker through a stale retry.
+
+The model owner silently prepares one pinned GGUF revision at launch, outside
+projects and application bundles. It retains partial downloads, validates byte
+ranges, size and SHA-256, and publishes atomically. Settings is the sole command
+surface; reads never start downloads. Explicit Stop persists. Controlled test
+profiles skip automatic network preparation.
+
+Native inference runs in a disposable child through the official TypeScript
+`transcribe-cpp` binding. No application Rust or custom C++ build is introduced.
+Only verified host-owned model paths reach it. macOS arm64 attempts Metal then
+replays the uncommitted segment on CPU after failure; Intel macOS, Windows x64,
+and Linux x64 use CPU. `server/speech/stream.ts` runs native Parakeet buffered
+streams, finalizing retained right context before reset. Parakeet retains its
+input PCM, so each stream is capped at forty seconds or the smaller positive
+native session limit; a capture frame is split before crossing that limit.
+The host prefers a pause after thirty seconds. Bounded left acoustic context
+and an uncommitted right tail survive rollover in the private spool. Token
+timestamps assign complete words to one segment; string matching never removes
+intentional repetitions. Completed ownership releases its processed spool files; memory queues and pending disk bytes have explicit
+limits rather than a recording duration cap. Text is exposed only on final
+completion or explicit partial recovery. Worker exit/timeout becomes a
+recoverable failure, never a successful empty transcript. Successful
+acknowledgement keeps the model warm for sixty
+seconds; cancellation and owner retirement stop its process.
+
+Renderer platform code owns audio-only capture and its worklet. The conversation
+runtime owns draft locking, audio delivery, Stop/Retry/cancel, and one undoable
+append. UI unmount is not recording ownership. Navigation stops capture while
+retaining the original target; native close uses the existing release barrier
+because unsent chat drafts are not journaled. Audio and transcript content must
+not enter logs, analytics, or remote services.
+Interactive release handlers keep only their current request alive with a
+capability-checked heartbeat while awaiting the reader's decision. Ordinary save
+barriers retain their bounded deadline; lost heartbeats, stale request ids,
+untrusted frames and renderer loss cannot authorize a late close.
+Update installation disables windows while gathering saves, so voice work
+refuses that request immediately rather than opening an unusable confirmation.
+The updater re-enables the window and can be retried after the draft is resolved.
 
 ## Agent Sessions and Permissions
 
@@ -1472,6 +1526,11 @@ registered host boundaries; renderer shared types are a different layer.
   (`electron/notifications/native.ts`), where Windows application identity and
   notification availability are handled. New notification kinds reuse this
   platform boundary rather than adding platform branches to product code.
+- Voice capture belongs to `renderer/src/platform/audio`; the agent and Settings
+  features receive separate ports through app composition. They share only the
+  model-state domain and query key, without importing each other. The shared
+  composer retains its editor, context chips and send behavior while presenting
+  the voice runtime's recording controls.
 - Capture scope and generation before await; reject stale completion even for
   same-folder subtree mutation. Separate request lanes cannot cancel unrelated work.
   Stores, query caches, timers, subscriptions, workers, and URLs have explicit
@@ -1644,8 +1703,12 @@ main-frame origin and capability for each parsed IPC call and stamps HTTP/socket
 identity itself. Canonical API/agent paths only; asset requests carry no window
 authority and retain server path checks. CSP/root containment, navigation/popup/
 webview denial, and narrow preload methods cannot be weakened by document content.
-Only sanitized clipboard write is granted to the application origin; paste needs
-no background clipboard-read permission.
+Sanitized clipboard write is granted to the application origin; paste needs no
+background clipboard-read permission. Microphone access additionally requires a
+short-lived grant armed through `speech.capture` by the registered live main
+frame, with the exact application origin and audio-only request. Video, mixed
+media, subframes, unarmed requests, and other origins are refused. Capture end
+and window destruction revoke the grant; OS permission remains independent.
 The production image CSP admits project previews only through the configured
 server's `/asset/` route and temporary attachment previews through
 `/api/agent/attachment-preview`, alongside bundled/data/blob images and the
@@ -1940,7 +2003,11 @@ before committing. Release-specific evidence stays in the [Release Runbook](rele
 | Scheduled tasks | `server/scheduled-tasks.ts`, `electron/scheduled-tasks/scheduler.ts`, `electron/scheduled-tasks/ipc.ts`, `renderer/src/features/agent/application/scheduled-run.ts` | `pnpm test:server`, `pnpm test:electron`, focused `pnpm test:renderer src/features/agent` |
 
 Source tests, controlled native smokes, model quality, and packaged delivery
-prove different things. Story accessibility checks execute each story's
+prove different things. Renderer component tests bind timeout/interval pairs to
+the actual Happy DOM window in `renderer/src/test/environment.ts`. Its delegated
+abort/close retires callbacks before DOM globals disappear; teardown then restores
+the caller's timer functions for the next environment. Live callback errors retain
+the runner's normal failure behavior. Story accessibility checks execute each story's
 interaction once at default/light appearance; happy-dom cannot establish painted
 contrast or layout. Theme/density review remains a browser/runtime concern.
 Use the [test selection policy](../AGENTS.md#test-selection) and

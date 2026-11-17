@@ -1,9 +1,11 @@
-/** Edits that keep the document and the owner's props in agreement: chipping
+/**
+ * Edits that keep the document and the owner's props in agreement: chipping
  *  the `@path` runs in a value that arrived from outside, projecting the armed
  *  skill as the leading token, and deleting a chip as one character. Every
  *  function here dispatches to a live view; the pure `chipRuns` is the one it
  *  all rests on, and is exercised on its own. */
-import type { StateEffect } from '@codemirror/state';
+import { isolateHistory } from '@codemirror/commands';
+import { Transaction, type StateEffect } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
 
 import {
@@ -15,7 +17,18 @@ import {
   type MentionEffect,
 } from './mention-markers';
 
+/** Dictation is one undo step and leaves existing mention widgets intact. */
+export function appendDictation(view: EditorView, snapshot: { before: string; after: string }) {
+  const suffix = snapshot.after.slice(snapshot.before.length);
+  view.dispatch({
+    changes: { from: view.state.doc.length, insert: suffix },
+    selection: { anchor: view.state.doc.length + suffix.length },
+    annotations: isolateHistory.of('full'),
+  });
+}
+
 export function deleteMentionSelection(view: EditorView, backward: boolean) {
+  if (view.state.readOnly) return false;
   const selection = view.state.selection.main;
   const mentions = view.state.field(mentionField);
   let from = selection.from;
@@ -96,6 +109,7 @@ export function replaceDocument(
   text: string,
   paths: readonly string[],
   skill: { label: string } | null,
+  recordHistory = true,
 ) {
   const runs = chipRuns(text, paths);
   let result = skill ? `${MENTION} ` : '';
@@ -114,6 +128,7 @@ export function replaceDocument(
   result += text.slice(cursor);
   view.dispatch({
     changes: { from: 0, insert: result, to: view.state.doc.length },
+    ...(recordHistory ? {} : { annotations: Transaction.addToHistory.of(false) }),
     effects,
     selection: { anchor: result.length },
   });

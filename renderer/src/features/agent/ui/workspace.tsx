@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useStore } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
 
+import { Button } from '@/components/ui/button';
 import type { AgentCatalogPort } from '@/features/agent/application/ports';
 import type { AgentSessionRuntime } from '@/features/agent/application/session-runtime';
 import { honoredAccessMode } from '@/features/agent/domain/access';
@@ -82,6 +83,7 @@ function ChatWorkspace({
       activeModel: session.activeModel,
       connection: session.connection,
       delivery: session.delivery,
+      draftLocked: Boolean(session.draftLocked),
       preparingPrompt: session.preparingPrompt,
       queuePaused: session.queuePaused,
       effort: session.effort,
@@ -249,6 +251,18 @@ function ChatWorkspace({
         onRefresh={catalog.refresh}
         runtimeUpdate={selectedAgent.updatable ? runtimeUpdate : undefined}
       />
+      {state.draftLocked && activeTurn && (
+        <div className="flex justify-end px-5 py-1">
+          <Button
+            size="compact"
+            variant="tertiary"
+            onClick={active.interrupt}
+            disabled={state.delivery === 'stopping'}
+          >
+            Stop agent response
+          </Button>
+        </div>
+      )}
       {composerShown && selectedAgent.updatable && selectedAgent.upgrade && (
         <AgentUpgradeOfferCard offer={selectedAgent.upgrade} runtimeUpdate={runtimeUpdate} />
       )}

@@ -43,9 +43,10 @@ export function agentCanSend(connection: AgentConnection): boolean {
  *  it now or queue it behind the running turn, no earlier send is still
  *  settling, and the queue has room. */
 export function agentComposerAccepts(
-  state: Pick<AgentSessionState, 'connection' | 'delivery' | 'queuedPrompts'>,
+  state: Pick<AgentSessionState, 'connection' | 'delivery' | 'queuedPrompts' | 'draftLocked'>,
 ): boolean {
   return (
+    !state.draftLocked &&
     (state.connection.kind === 'draft' || state.connection.kind === 'live') &&
     state.delivery !== 'unknown' &&
     state.delivery !== 'stopping' &&
@@ -108,6 +109,7 @@ export function agentSessionIsUnstarted(state: AgentSessionState): boolean {
  *  chat would be indistinguishable from it. */
 export function agentSessionIsBlank(state: AgentSessionState): boolean {
   return (
+    !state.draftLocked &&
     agentSessionIsUnstarted(state) &&
     !agentSessionIsBusy(state) &&
     state.connection.kind !== 'restoring' &&
@@ -169,9 +171,10 @@ export function agentSessionIsBusy(
 
 /** A catalog connection may exist before the first request; it carries no conversation to transfer. */
 export function agentCanChangeAgent(
-  state: Pick<AgentSessionState, 'connection' | 'delivery' | 'transcript'>,
+  state: Pick<AgentSessionState, 'connection' | 'delivery' | 'transcript' | 'draftLocked'>,
 ): boolean {
   return (
+    !state.draftLocked &&
     state.transcript.length === 0 &&
     state.connection.kind !== 'restoring' &&
     !agentSessionIsBusy(state)

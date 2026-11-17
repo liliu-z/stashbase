@@ -27,6 +27,10 @@ export async function connectToWindow({ debugPort, origin, timeoutMs = 60_000 })
 
   let nextId = 0;
   const pending = new Map();
+  socket.addEventListener('close', () => {
+    for (const call of pending.values()) call.reject(new Error('The inspected window closed.'));
+    pending.clear();
+  });
   const listeners = new Set();
   socket.addEventListener("message", (event) => {
     const message = JSON.parse(event.data);
@@ -42,6 +46,7 @@ export async function connectToWindow({ debugPort, origin, timeoutMs = 60_000 })
 
   const send = (method, params = {}) =>
     new Promise((resolve, reject) => {
+      if (socket.readyState !== WebSocket.OPEN) { reject(new Error('The inspected window is unavailable.')); return; }
       const id = ++nextId;
       pending.set(id, { resolve, reject });
       socket.send(JSON.stringify({ id, method, params }));

@@ -18,9 +18,10 @@ describe('document native save barrier', () => {
     const handlers: Array<() => boolean | Promise<boolean>> = [];
     const lifecycle = documentWindowLifecycle({
       onPrepareContextRelease: vi.fn((handler) => {
-        handlers.push(handler);
+        const release = () => handler('close');
+        handlers.push(release);
         return () => {
-          handlers.splice(handlers.indexOf(handler), 1);
+          handlers.splice(handlers.indexOf(release), 1);
         };
       }),
     });

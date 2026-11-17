@@ -1,0 +1,5 @@
+The jfk.wav speech sample is the public-domain recording of President John F.
+Kennedy's 1961 inaugural address distributed by transcribe.cpp:
+https://github.com/handy-computer/transcribe.cpp/blob/main/samples/jfk.wav
+
+Used only for native inference verification; not included in desktop resources.

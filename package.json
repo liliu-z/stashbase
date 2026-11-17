@@ -62,7 +62,7 @@
     "test:renderer-architecture": "node --test scripts/electron/dev.test.mjs scripts/renderer/architecture.test.mjs scripts/renderer/check-web.test.mjs scripts/renderer/conventions.test.mjs scripts/renderer/size.test.mjs && pnpm check:renderer-architecture",
     "test:renderer": "pnpm --filter @stashbase/renderer test",
     "test:protocols": "node --import tsx --test \"shared/protocols/**/*.test.ts\"",
-    "test:electron-boundary": "pnpm build:electron-boundary && node --test --test-reporter=spec \"electron/{app-protocol,window-security}.test.cjs\" \"electron/{bug-report,external-files,external-navigation,notifications,project,renderer,scheduled-tasks,text-services,updates,window,workspace}/*.test.cjs\"",
+    "test:electron-boundary": "pnpm build:electron-boundary && node --test --test-reporter=spec \"electron/{app-protocol,window-security}.test.cjs\" \"electron/{bug-report,external-files,external-navigation,notifications,project,renderer,scheduled-tasks,speech,text-services,updates,window,workspace}/*.test.cjs\"",
     "test:electron-boundary:smoke": "pnpm build:web && pnpm build:electron-boundary && pnpm test:electron:smoke:built",
     "test:electron": "pnpm test:protocols && pnpm test:electron-boundary && node --test --test-reporter=spec \"electron/{main-probe,multi-window,window-restore,bug-report-*}.test.cjs\"",
     "test:electron:smoke": "pnpm test:electron-boundary:smoke",
@@ -75,6 +75,10 @@
     "profile:pdf-memory": "node scripts/profiling/pdf-memory.mjs",
     "profile:editing": "node scripts/profiling/editing.mjs",
     "profile:first-send": "node scripts/profiling/first-send.mjs",
+    "profile:speech:continuous": "node --import tsx scripts/profiling/speech-continuous.mjs",
+    "profile:speech": "node --import tsx scripts/profiling/speech.mjs",
+    "profile:speech-ui": "node --import tsx scripts/profiling/speech-ui.mjs",
+    "test:speech:native": "node --import tsx scripts/profiling/speech.mjs --verify-continuous",
     "profile:budgets": "node scripts/profiling/budgets.mjs",
     "profile:project-availability": "node --import tsx --import ./server/__tests__/isolated-home.ts scripts/profiling/project-availability.mjs",
     "profile:compare": "node scripts/profiling/compare.mjs",
@@ -176,6 +180,10 @@
     ],
     "extraResources": [
       {
+        "from": "assets/speech",
+        "to": "assets/speech"
+      },
+      {
         "from": "python",
         "to": "python",
         "filter": [
@@ -205,6 +213,14 @@
     ],
     "asar": true,
     "asarUnpack": [
+      "node_modules/transcribe-cpp/**/*",
+      "node_modules/@transcribe-cpp/**/*",
+      "node_modules/koffi/**/*",
+      "node_modules/@koromix/**/*",
+      "node_modules/.pnpm/transcribe-cpp*/**/*",
+      "node_modules/.pnpm/@transcribe-cpp*/**/*",
+      "node_modules/.pnpm/koffi*/**/*",
+      "node_modules/.pnpm/@koromix*/**/*",
       "node_modules/better-sqlite3/**/*",
       "node_modules/@anthropic-ai/claude-agent-sdk*/**/*",
       "node_modules/opencode-ai/bin/**/*",
@@ -213,6 +229,9 @@
       "node_modules/.pnpm/opencode-ai*/node_modules/opencode-ai/bin/**/*"
     ],
     "mac": {
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "StashBase uses your microphone for local voice typing when you start a recording."
+      },
       "category": "public.app-category.productivity",
       "minimumSystemVersion": "12.0",
       "hardenedRuntime": true,
@@ -246,6 +265,13 @@
       ]
     },
     "win": {
+      "extraFiles": [
+        {
+          "from": "build/native.nosync/speech-crt",
+          "to": ".",
+          "filter": ["*.dll"]
+        }
+      ],
       "extraResources": [
         {
           "from": "build/native.nosync/rg.exe",
@@ -299,6 +325,7 @@
     "sanitize-html": "^2.17.6",
     "tar": "7.5.22",
     "toml-eslint-parser": "^0.10.1",
+    "transcribe-cpp": "0.4.2",
     "ws": "^8.20.1",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "3.25.76"

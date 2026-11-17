@@ -94,6 +94,8 @@ export interface AgentSessionState {
    *  one Agent's mode to another and switching back restores it. */
   accessModes: Partial<Record<AgentId, AgentAccessMode>>;
   draft: string;
+  /** A dictation owns this draft until its result is accepted or discarded. */
+  draftLocked?: boolean;
   /** Bound context for the draft: mentioned sources and transient uploads. */
   context: AgentContextItem[];
   /** Why the last send or attach was refused; cleared by any draft change. */

@@ -1,4 +1,5 @@
 import { createNotificationsPreload } from '../notifications/preload.ts';
+import { createSpeechCapturePreload } from '../speech/preload.ts';
 
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 
@@ -21,6 +22,7 @@ contextBridge.exposeInMainWorld(
     externalFiles: createExternalFilesPreload(ipcRenderer, (file) => webUtils.getPathForFile(file)),
     externalNavigation: createExternalNavigationPreload(ipcRenderer),
     notifications: createNotificationsPreload(ipcRenderer),
+    speech: createSpeechCapturePreload(ipcRenderer),
     runtime: createRuntimeConfig(process.argv),
     project: createProjectPreload(ipcRenderer),
     scheduledTasks: createScheduledTasksPreload(ipcRenderer),

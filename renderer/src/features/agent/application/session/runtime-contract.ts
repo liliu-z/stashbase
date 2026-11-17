@@ -10,6 +10,8 @@ import type {
   AgentSessionPort,
 } from '@/features/agent/application/ports';
 import type { AgentUsageEvent } from '@/features/agent/application/session/usage';
+import type { VoiceTypingPorts } from '@/features/agent/application/speech-port';
+import type { VoiceTypingRuntime } from '@/features/agent/application/voice-typing';
 import type { AgentAccessMode } from '@/features/agent/domain/access';
 import type { AgentContextItem } from '@/features/agent/domain/context';
 import type { AgentHistoryEntry } from '@/features/agent/domain/conversation-history';
@@ -26,6 +28,7 @@ import type { QueueEntry } from './prompts';
 type AgentSessionScope = CapturedScope<AgentScope>;
 
 export interface AgentSessionRuntime {
+  readonly voice?: VoiceTypingRuntime;
   readonly id: string;
   readonly signal: AbortSignal;
   readonly store: StoreApi<AgentSessionState>;
@@ -103,6 +106,7 @@ export interface AgentSessionRuntime {
 }
 
 export interface AgentSessionRuntimeOptions {
+  voice?: VoiceTypingPorts;
   recordUsage?: ((event: AgentUsageEvent) => void) | undefined;
   agent: AgentId;
   autostart?: boolean | undefined;

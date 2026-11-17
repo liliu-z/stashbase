@@ -16,7 +16,15 @@
  *  file composes them, so a group shrinks where it is owned. */
 'use client';
 
-import { forwardRef, useCallback, useMemo, useRef, useState, type HTMLAttributes } from 'react';
+import {
+  forwardRef,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  type HTMLAttributes,
+  type ReactNode,
+} from 'react';
 
 import {
   ComposerActions,
@@ -73,6 +81,10 @@ interface InputMessageProps
   onSend?: (value: string, files: File[], meta?: { queuedId?: string }) => void;
   /** Disables the field, send button, and drag-and-drop. */
   disabled?: boolean;
+  /** Locks the field and file changes while leaving consumer-owned actions usable. */
+  readOnly?: boolean;
+  /** Consumer-owned actions temporarily replace the ordinary action bar. */
+  actionSlot?: ReactNode;
   /** When false the field still takes and keeps a draft, but no submit
    *  dispatches it. For a composer whose runtime cannot carry a turn yet:
    *  disabling the whole control would take the draft away with it. */
@@ -93,6 +105,8 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
       leftSlot,
       rightSlot,
       disabled,
+      readOnly = false,
+      actionSlot,
       minRows = 1,
       maxRows = 8,
       clickToFocus = true,
@@ -133,10 +147,10 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
     const composerFiles = useComposerFiles({
       accept,
       acceptsDrag,
-      disabled,
+      disabled: disabled || readOnly,
       files,
       maxFiles,
-      onFilesChange,
+      onFilesChange: readOnly ? undefined : onFilesChange,
     });
 
     /** Puts a queued message back only when the current draft can be preserved. */
@@ -161,6 +175,7 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
     const trimmed = value.trim();
     const canSend =
       !disabled &&
+      !readOnly &&
       sendable &&
       (trimmed.length > 0 || composerFiles.items.length > 0 || sendableWithoutText);
     const dropHint = composerFiles.dragOver && composerFiles.supported;
@@ -218,6 +233,9 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
       hovered && clickToFocus && !disabled && !composerFiles.dragOver
         ? `0 0 0 1px var(--border), ${EDGE_DROP}`
         : undefined;
+    const preview = (
+      <FilePreviewRow files={composerFiles} previewSlot={previewSlot} tileSize={filePreviewSize} />
+    );
 
     const composer = (
       // Presentational shell: the consumer's editor is the control. This box
@@ -249,18 +267,20 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
       >
         <SurfaceProvider value={2}>
           {composerFiles.input}
-          <FilePreviewRow
-            files={composerFiles}
-            previewSlot={previewSlot}
-            tileSize={filePreviewSize}
-          />
+          {readOnly ? (
+            <div inert className="[&_button]:hidden">
+              {preview}
+            </div>
+          ) : (
+            preview
+          )}
           <QueueRegion queue={composerQueue} show={showQueue} />
           <ConsumerEditorSlot
             editor={editor}
             field={{
               ariaDescribedBy: fieldProps?.['aria-describedby'],
               ariaLabel: fieldProps?.['aria-label'] ?? 'Message',
-              disabled: disabled ?? false,
+              disabled: Boolean(disabled || readOnly),
               maxRows,
               minRows,
               onValueChange,
@@ -271,19 +291,21 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
             }}
             hostRef={editorHostRef}
           />
-          <ComposerActions
-            canSend={canSend}
-            disabled={disabled}
-            leftSlot={leftSlot}
-            onSend={() => handleSend()}
-            onStop={onStop}
-            queueable={composerQueue.supported}
-            steerable={onSteer !== undefined}
-            rightSlot={rightSlot}
-            sendLabel={sendLabel}
-            slotContext={slotContext}
-            streaming={composerQueue.streaming}
-          />
+          {actionSlot ?? (
+            <ComposerActions
+              canSend={canSend}
+              disabled={disabled}
+              leftSlot={leftSlot}
+              onSend={() => handleSend()}
+              onStop={onStop}
+              queueable={composerQueue.supported}
+              steerable={onSteer !== undefined}
+              rightSlot={rightSlot}
+              sendLabel={sendLabel}
+              slotContext={slotContext}
+              streaming={composerQueue.streaming}
+            />
+          )}
         </SurfaceProvider>
       </div>
     );
