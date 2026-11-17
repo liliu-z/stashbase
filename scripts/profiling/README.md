@@ -256,8 +256,9 @@ verifies the pinned checksum and transcribes the public-domain JFK sample twice
 through native Parakeet buffered streaming in `transcribe-cpp` inside Electron's embedded Node. `--download` explicitly
 prepares the approximately 731 MB model in `profiling.nosync/speech-model` instead.
 Neither command uses agent credentials or the developer's microphone. Source CI
-runs the real-model smoke and a two-minute production-service continuity check
-on both macOS architectures and Windows/Linux x64;
+runs the real-model smoke and a 77-second production-service continuity check
+(two rollovers plus the final tail) on both macOS architectures and Windows/Linux
+x64, fitting the whole-job budget on slow Intel CPU runners;
 this does not establish packaged DLL loading, signing, or OS microphone access.
 
 `pnpm profile:speech --model <path> --soak-minutes 60` repeats short native sessions

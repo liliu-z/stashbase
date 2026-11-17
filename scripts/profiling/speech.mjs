@@ -80,7 +80,10 @@ else {
   for (const key of Object.keys(environment)) if (/^(TRANSCRIBE|GGML|KOFFI)_/u.test(key)) delete environment[key];
   const launches = [
     ['--import', 'tsx', fileURLToPath(import.meta.url), '--child', '--model', model, '--runs', String(runs), '--soak-minutes', String(soakMinutes), ...(offline ? ['--offline'] : [])],
-    ...(args.includes('--verify-continuous') ? [['--import', 'tsx', fileURLToPath(new URL('./speech-continuous.mjs', import.meta.url)), '--child', '--model', model, '--minutes', '2']] : []),
+    // The repeated fixture lasts 77 seconds: it crosses both production rollovers
+    // (40 and 72 seconds) and verifies the final tail. Keep the longer default
+    // profiling scenario separate so Intel CPU CI fits its whole-job budget.
+    ...(args.includes('--verify-continuous') ? [['--import', 'tsx', fileURLToPath(new URL('./speech-continuous.mjs', import.meta.url)), '--child', '--model', model, '--minutes', '1.25']] : []),
   ];
   for (const arguments_ of launches) {
     const processChild = spawn(electron, arguments_, { cwd: root, env: environment, stdio: 'inherit', windowsHide: true });
