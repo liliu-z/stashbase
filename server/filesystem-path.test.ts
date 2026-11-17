@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { once } from 'node:events';
 import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
@@ -329,56 +330,73 @@ test('slow async realpath resolution leaves unrelated event-loop work live', asy
   await resolution;
 });
 
-test('a request waiting on async realpath does not delay an unrelated request', async (t) => {
+test('a request waiting on async realpath does not delay an unrelated request', { timeout: 10_000 }, async (t) => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-path-http-concurrency-'));
   const root = path.join(temp, 'root');
   fs.mkdirSync(root);
   fs.writeFileSync(path.join(root, 'inside.md'), 'inside');
-  t.after(() => fs.rmSync(temp, { recursive: true, force: true }));
-
   const originalRealpath = fs.realpath.native;
   let releaseFirstRealpath: (() => void) | undefined;
   let firstRealpathReleased = false;
-  fs.realpath.native = ((value: fs.PathLike, callback: (error: NodeJS.ErrnoException | null, path?: string) => void) => {
-    if (!releaseFirstRealpath) {
-      releaseFirstRealpath = () => {
-        if (firstRealpathReleased) return;
-        firstRealpathReleased = true;
-        originalRealpath(value, callback);
-      };
-      return;
-    }
-    originalRealpath(value, callback);
-  }) as typeof fs.realpath.native;
-  t.after(() => {
-    releaseFirstRealpath?.();
-    fs.realpath.native = originalRealpath;
-  });
-
-  let markSlowStarted: (() => void) | undefined;
-  const slowStarted = new Promise<void>((resolve) => { markSlowStarted = resolve; });
-  const server = http.createServer(async (req, res) => {
+  let disposing = false;
+  let slowResponse: Promise<string> | undefined;
+  let slowHandler: Promise<void> | undefined;
+  const stop = new AbortController();
+  const signal = AbortSignal.any([t.signal, stop.signal]);
+  const server = http.createServer((req, res) => {
     if (req.url === '/slow') {
-      markSlowStarted?.();
-      await filesystemPath.resolveUnderAsync(root, 'inside.md', { access: 'existing' });
-      res.end('slow');
+      slowHandler = filesystemPath.resolveUnderAsync(root, 'inside.md', { access: 'existing' }).then(() => {
+        if (!res.destroyed) res.end('slow');
+      }, (error) => {
+        if (!res.destroyed) {
+          res.statusCode = 500;
+          res.end(String(error));
+        }
+      });
       return;
     }
     res.end('fast');
   });
-  await new Promise<void>((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
-  });
-  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
-  const address = server.address();
-  assert.ok(address && typeof address === 'object');
-  const base = `http://127.0.0.1:${address.port}`;
-
-  const slowResponse = fetch(`${base}/slow`);
-  await slowStarted;
-  assert.equal(await (await fetch(`${base}/fast`)).text(), 'fast');
-  assert.ok(releaseFirstRealpath, 'slow request reached the artificial filesystem gate');
-  releaseFirstRealpath();
-  assert.equal(await (await slowResponse).text(), 'slow');
+  try {
+    fs.realpath.native = ((value: fs.PathLike, callback: (error: NodeJS.ErrnoException | null, path?: string) => void) => {
+      if (!disposing && !releaseFirstRealpath) {
+        releaseFirstRealpath = () => {
+          if (firstRealpathReleased) return;
+          firstRealpathReleased = true;
+          originalRealpath(value, callback);
+        };
+        server.emit('realpath-blocked');
+        return;
+      }
+      originalRealpath(value, callback);
+    }) as typeof fs.realpath.native;
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(0, '127.0.0.1', resolve);
+    });
+    const address = server.address();
+    assert.ok(address && typeof address === 'object');
+    const base = `http://127.0.0.1:${address.port}`;
+    // Request arrival precedes Windows' asynchronous path preparation. Wait for
+    // the actual blocked filesystem call before proving the fast request is live.
+    const blocked = once(server, 'realpath-blocked', { signal });
+    slowResponse = fetch(`${base}/slow`, { signal }).then(response => response.text());
+    // A failed earlier assertion must not turn cleanup's abort into a second error.
+    void slowResponse.catch(() => {});
+    await blocked;
+    assert.equal(await (await fetch(`${base}/fast`, { signal })).text(), 'fast');
+    assert.ok(releaseFirstRealpath, 'slow request reached the artificial filesystem gate');
+    releaseFirstRealpath();
+    assert.equal(await slowResponse, 'slow');
+  } finally {
+    disposing = true;
+    releaseFirstRealpath?.();
+    stop.abort();
+    const closed = new Promise<void>(resolve => server.close(() => resolve()));
+    server.closeAllConnections();
+    await Promise.allSettled([slowResponse, slowHandler]);
+    await closed;
+    fs.realpath.native = originalRealpath;
+    fs.rmSync(temp, { recursive: true, force: true });
+  }
 });
