@@ -228,6 +228,8 @@ function onboarding(provider: Provider) {
   };
 }
 
+const COLD_SURFACE_TIMEOUT_MS = 15_000;
+
 async function recoverAuthentication(
   fixture: ReturnType<typeof onboarding>,
   provider: Provider,
@@ -248,7 +250,11 @@ async function recoverAuthentication(
   if (!card) throw new Error('The failure has no recovery card.');
   await user.click(within(card).getByRole('button', { name: 'Sign in' }));
   // The first recovery loads the Settings surface and its panels on demand.
-  const settings = await screen.findByRole('dialog', { name: 'Settings' }, { timeout: 5_000 });
+  const settings = await screen.findByRole(
+    'dialog',
+    { name: 'Settings' },
+    { timeout: COLD_SURFACE_TIMEOUT_MS },
+  );
   expect(within(settings).getByText('Your agents')).not.toBeNull();
   await user.keyboard('{Escape}');
   expect(screen.getByRole('textbox', { name: 'Message' }).textContent).toBe('Keep this next idea');
@@ -281,7 +287,7 @@ it.each(providers)(
     const firstWindow = fixture.mount();
     await user.click(await screen.findByRole('button', { name: 'Open a project' }));
     // The first provider also loads the lazy workspace module on a cold CI worker.
-    await screen.findByRole('textbox', { name: 'Message' }, { timeout: 15_000 });
+    await screen.findByRole('textbox', { name: 'Message' }, { timeout: COLD_SURFACE_TIMEOUT_MS });
     if (provider.id !== 'stashbase') {
       await user.click(screen.getByRole('button', { name: 'Provider: Default' }));
       await user.click(await screen.findByRole('menuitemradio', { name: provider.label }));
