@@ -1975,6 +1975,14 @@ frames; completed spool files were removed. Stop completed in about 2.83 seconds
 in that run. These are fixture measurements, not physical microphone or minimum
 hardware guarantees; GPU memory is not established by process RSS.
 
+A fresh macOS arm64 built-app fixture then recorded for seventy seconds,
+retained a typed prefix, appended the completed local transcript without sending,
+and returned from a native close decision held beyond five seconds. Settings
+reported the verified model ready. Stop-to-draft was about 1.17 seconds in this
+one run; recording/completion screenshots were inspected. Chromium blocked the
+fake audio file under its sandbox, so this isolated fixture used `--no-sandbox`;
+it is not physical-microphone or production-sandbox acceptance.
+
 **Local voice typing (2026-11-15):** the shared composer in Chat and Documents
 uses `application/voice-typing.ts`, `platform/audio/speech-capture.ts` and its
 worklet. `server/routes/speech.ts` admits a folder-explicit recording;

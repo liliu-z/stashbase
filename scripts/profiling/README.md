@@ -278,8 +278,10 @@ verifies Keep working after a confirmation held longer than five seconds. The
 launcher is not packaged. Software-update version metadata is not part of this
 capture check. Add `--seconds 70` to check continuous capture beyond the initial
 microphone permission window and across native segment boundaries.
-On a Linux test environment without usable namespaces, `--no-sandbox` applies only to this
-isolated verification launch. The scenario currently uses the POSIX profiling
+If Chromium cannot read the fake audio file under its sandbox, or a Linux
+test environment lacks usable namespaces, `--no-sandbox` applies only to this
+isolated verification launch. This does not establish production-sandbox microphone
+access. The scenario currently uses the POSIX profiling
 harness; Windows uses the embedded-Node smoke plus native packaged acceptance.
 
 Local Linux x64/WSL evidence includes a successful real-model smoke and complete
