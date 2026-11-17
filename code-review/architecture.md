@@ -369,7 +369,8 @@ are idempotent and conflicting/missing sequences fail. A cancelled request canno
 resurrect through a late start. Window retirement and shutdown release this owner.
 Concurrent acknowledgements and cancellation share one retirement, so spool
 removal and idle unloading have a single owner on every platform. In-flight
-retries share retirement and recheck their owner after each await; cancellation
+retries share retirement, await any in-flight audio publication, and recheck
+their owner after each await; cancellation
 or window retirement cannot revive a worker through a stale retry.
 
 The model owner silently prepares one pinned GGUF revision at launch, outside

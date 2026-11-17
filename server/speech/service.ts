@@ -266,13 +266,18 @@ export function createSpeechService(options: {
       const job = owned(window, id);
       if (job.retrying) return job.retrying;
       if (job.phase !== 'failed') return snapshot(job);
+      const ensureOwner = () => {
+        if (!current(job) || job.phase !== 'failed') throw failure('That recording was cancelled.', 404);
+      };
       job.retrying = (async () => {
         await job.pumping;
-        if (!current(job) || job.phase !== 'failed') throw failure('That recording was cancelled.', 404);
+        ensureOwner();
+        await job.mutation.catch(() => {});
+        ensureOwner();
         await engine.close();
         // Cancellation/window retirement wins over an in-flight retry. Sharing
         // this flight also prevents a second retry from closing its replacement.
-        if (!current(job) || job.phase !== 'failed') throw failure('That recording was cancelled.', 404);
+        ensureOwner();
         job.cursor = job.segmentStart;
         job.segmentSamples = 0;
         job.nativeStarted = false;

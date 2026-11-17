@@ -215,3 +215,46 @@ test('overlapping retries share retirement instead of closing a newly restarted 
   await until(() => service.status('one', job.id).phase === 'ready');
   assert.equal(service.status('one', job.id).text, 'Segment 1.');
 });
+
+test('retry preserves an audio publication already in flight when native recognition fails', async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'speech-retry-publication-'));
+  let failFeed!: () => void;
+  const failed = new Promise<void>((resolve) => { failFeed = resolve; });
+  let publish!: () => void;
+  const publication = new Promise<void>((resolve) => { publish = resolve; });
+  let publishing = false;
+  let firstFeed = true;
+  let retired = false;
+  const replayed: string[] = [];
+  const engine = fakeEngine({
+    async feed(pcm) {
+      if (firstFeed) { firstFeed = false; await failed; throw new Error('native failure'); }
+      replayed.push(Buffer.from(pcm).toString('base64'));
+    },
+    async close() { retired = true; },
+  });
+  const service = createSpeechService({ root, modelPath: () => '/verified.gguf', engine: engine.backend, cpu: true });
+  const rename = fs.rename;
+  t.mock.method(fs, 'rename', async (from, to) => {
+    if (path.basename(String(to)) === '1.pcm') { publishing = true; await publication; }
+    return rename(from, to);
+  });
+  t.after(async () => { failFeed(); publish(); await service.close(); await fs.rm(root, { recursive: true, force: true }); });
+  const job = await service.start('one', '/project', 'chat');
+  await service.push('one', job.id, 0, frame);
+  const pendingAudio = service.push('one', job.id, 1, other);
+  await until(() => publishing);
+  failFeed();
+  await until(() => service.status('one', job.id).phase === 'failed');
+  const retry = service.retry('one', job.id);
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(retired, false, 'retry cannot replace the audio mutation queue before publication settles');
+  publish();
+  await pendingAudio;
+  await retry;
+  await service.finish('one', job.id, 2);
+  await until(() => service.status('one', job.id).phase === 'ready');
+  assert.equal(service.status('one', job.id).nextSequence, 2);
+  assert.deepEqual(replayed, [frame, other], 'both accepted frames must reach the replacement worker exactly once');
+  assert.equal(service.status('one', job.id).text, 'Segment 1.');
+});

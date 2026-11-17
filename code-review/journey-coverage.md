@@ -1964,7 +1964,8 @@ one capture frame, unlimited advertised limits, exact sample accounting,
 final-tail delivery, repeated finish, failed finalization, whole-word ownership
 and intentional repetitions. Service checks cover CPU replay after a committed
 overlap without duplicating earlier text, cancellation while retry retires a
-worker, and concurrent retries sharing one retirement.
+worker, concurrent retries sharing one retirement, and preserving an audio
+publication already in flight when the engine fails.
 
 On macOS arm64 (2026-11-17), one production service/embedded-Node worker job
 processed 3,608 seconds of controlled audio with accelerated, bounded delivery.
