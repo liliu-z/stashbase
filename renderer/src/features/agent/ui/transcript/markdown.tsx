@@ -13,6 +13,7 @@ import { remarkMathSyntax } from '@/shared/runtime/markdown-math';
 import { MARKDOWN_PROSE_CLASS } from '@/shared/ui/markdown-prose';
 
 import { CopyAction } from './copy-action';
+import { remarkFileCitations } from './markdown-citations';
 import { copyRenderedMathSource, preserveMarkdownSource } from './markdown-copy';
 
 function isHttpUrl(href: string): boolean {
@@ -148,7 +149,7 @@ export const AgentMarkdown = memo(function AgentMarkdown({
     >
       <ReactMarkdown
         components={markdownComponents({ onOpenExternal, onOpenSource, sourceFor })}
-        remarkPlugins={[remarkGfm, remarkMathSyntax]}
+        remarkPlugins={[remarkGfm, remarkMathSyntax, remarkFileCitations]}
         rehypePlugins={[
           preserveMarkdownSource,
           [rehypeKatex, { trust: false, strict: 'ignore', maxExpand: 1000, maxSize: 20 }],

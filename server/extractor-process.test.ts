@@ -56,7 +56,9 @@ const CHILD_SOURCE = 'setInterval(() => undefined, 1000)';
 const PARENT_SOURCE = [
   "const { spawn } = require('node:child_process');",
   "const fs = require('node:fs');",
-  `const child = spawn(process.execPath, ['-e', ${JSON.stringify(CHILD_SOURCE)}], { stdio: 'ignore' });`,
+  // The detached parent has no console, so on Windows an unhidden child would
+  // open a terminal window that the test then kills mid-launch.
+  `const child = spawn(process.execPath, ['-e', ${JSON.stringify(CHILD_SOURCE)}], { stdio: 'ignore', windowsHide: true });`,
   "fs.writeFileSync(process.argv[1], String(child.pid));",
   'setInterval(() => undefined, 1000);',
 ].join('\n');

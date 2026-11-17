@@ -15,6 +15,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { probeAgentCommand } from './agent-probe.ts';
 import { agentCliEnv, commandDir } from './agent-cli.ts';
+import { agentCliLaunch, type AgentCliLaunch } from './agent-cli-launch.ts';
 import { terminateExtractorTree, waitForExtractorTree } from './extractor-process.ts';
 import { AgentAccountRefusedError, AgentConfigurationError } from './agent-setup-diagnostic.ts';
 
@@ -167,23 +168,37 @@ export async function loginToAntigravity(
 
 /** The interactive run needs a terminal to start its browser sign-in. POSIX
  * gets a pseudo-terminal from `script`; Windows gives a detached console
- * process its own visible window. */
+ * process its own visible window. On Windows, `agy` may be a `.cmd`/`.bat`
+ * shim, which Node refuses to start directly (`spawn EINVAL`), so it starts
+ * the way every other Agent CLI does. */
+export function antigravitySignInLaunch(
+  executable: string,
+  platform: NodeJS.Platform = process.platform,
+): AgentCliLaunch {
+  if (platform === 'win32') return agentCliLaunch(executable, [], platform);
+  return {
+    command: 'script',
+    args: platform === 'darwin'
+      ? ['-q', '/dev/null', executable]
+      : ['-q', '-e', '-c', shellQuote(executable), '/dev/null'],
+  };
+}
+
 function spawnAntigravitySignIn(executable: string): ChildProcess {
+  const { command, args, windowsVerbatimArguments } = antigravitySignInLaunch(executable);
   const options = {
     cwd: os.tmpdir(),
     env: agentCliEnv({}, [commandDir(executable)]),
     detached: true,
+    windowsVerbatimArguments,
   };
   if (process.platform === 'win32') {
-    return spawn(executable, [], { ...options, stdio: 'ignore', windowsHide: false });
+    return spawn(command, args, { ...options, stdio: 'ignore', windowsHide: false });
   }
-  const args = process.platform === 'darwin'
-    ? ['-q', '/dev/null', executable]
-    : ['-q', '-e', '-c', shellQuote(executable), '/dev/null'];
   // StashBase does not relay terminal input. Node's piped stdin is a socket,
   // which macOS script rejects during tcgetattr before it starts the CLI.
   // /dev/null lets script create the CLI's own pseudo-terminal normally.
-  return spawn('script', args, { ...options, stdio: ['ignore', 'pipe', 'pipe'] });
+  return spawn(command, args, { ...options, stdio: ['ignore', 'pipe', 'pipe'] });
 }
 
 function shellQuote(value: string): string {

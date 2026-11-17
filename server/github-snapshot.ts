@@ -7,6 +7,7 @@ import { createGunzip } from 'node:zlib';
 import { Header, Parser, type ReadEntry } from 'tar';
 import type { ParsedGitHubRepositoryUrl } from '../shared/github-import.ts';
 import { GitHubImportError } from './github-import-error.ts';
+import { windowsFileNameProblem } from './folder-relative-path.ts';
 
 const DEFAULT_LIMITS = {
   downloadBytes: 512 * 1024 * 1024,
@@ -171,8 +172,7 @@ async function extractSnapshot(
     combined.throwIfAborted();
     const parts = entry.path.replace(/\/$/, '').split('/');
     if (parts.some((part) => !part || part === '.' || part === '..' || part.toLowerCase() === '.git'
-      || /[\\:\x00-\x1f<>"|?*]/.test(part) || /[. ]$/.test(part)
-      || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(part))) throw invalidArchive();
+      || windowsFileNameProblem(part) !== null)) throw invalidArchive();
     root ??= parts[0];
     if (parts[0] !== root || !['File', 'Directory', 'SymbolicLink'].includes(entry.type)
       || (parts.length === 1 && entry.type !== 'Directory')) throw invalidArchive();

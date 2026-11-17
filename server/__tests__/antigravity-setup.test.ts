@@ -6,7 +6,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { antigravityAuthState, antigravityIsAuthenticated, loginToAntigravity } from '../antigravity-setup.ts';
+import { antigravityAuthState, antigravityIsAuthenticated, antigravitySignInLaunch, loginToAntigravity } from '../antigravity-setup.ts';
 import { AgentAccountRefusedError } from '../agent-setup-diagnostic.ts';
 import { AgentBootstrapCoordinator, verifyAgentExecutable } from '../agent-runtime-installer.ts';
 import { antigravityCurrentModel, antigravityModelsFromListing, withCurrentModel } from '../antigravity-model-catalog.ts';
@@ -123,6 +123,36 @@ test('a refused account does not start an interactive login', async () => {
     isAuthenticated: async () => { throw error; },
     spawnSignIn: () => { throw new Error('A refused account must not start login.'); },
   }), (received) => received === error);
+});
+
+test('Windows sign-in starts an agy .cmd shim through cmd.exe instead of failing with EINVAL', (t) => {
+  const shim = 'C:\\Users\\Jane Doe\\AppData\\Roaming\\npm\\agy.cmd';
+  const windows = antigravitySignInLaunch(shim, 'win32');
+  assert.equal(windows.windowsVerbatimArguments, true);
+  assert.deepEqual(windows.args.slice(0, 3), ['/d', '/s', '/c']);
+  assert.match(windows.args[3], /Jane\^ Doe/);
+  const native = 'C:\\Users\\Jane\\AppData\\Local\\agy\\bin\\agy.exe';
+  assert.deepEqual(antigravitySignInLaunch(native, 'win32'), { command: native, args: [] });
+  assert.deepEqual(antigravitySignInLaunch('/opt/agy', 'darwin'), { command: 'script', args: ['-q', '/dev/null', '/opt/agy'] });
+  assert.deepEqual(antigravitySignInLaunch('/opt/agy', 'linux'), { command: 'script', args: ['-q', '-e', '-c', "'/opt/agy'", '/dev/null'] });
+
+  if (process.platform !== 'win32') return;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase agy shim '));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const marker = path.join(dir, 'started.txt');
+  const real = path.join(dir, 'agy.cmd');
+  fs.writeFileSync(real, `@echo started>"${marker}"\r\n`);
+  // The direct spawn this replaces: Node refuses batch files without a shell.
+  assert.throws(() => {
+    const direct = spawnSync(real, [], { windowsHide: true, stdio: 'ignore' });
+    if (direct.error) throw direct.error;
+  }, /EINVAL/);
+  const launch = antigravitySignInLaunch(real);
+  const result = spawnSync(launch.command, launch.args, {
+    windowsVerbatimArguments: launch.windowsVerbatimArguments, windowsHide: true, stdio: 'ignore',
+  });
+  assert.equal(result.status, 0);
+  assert.equal(fs.readFileSync(marker, 'utf8').trim(), 'started');
 });
 
 // A signed-out answer in words the check does not read must still leave a way
@@ -281,7 +311,7 @@ test('stream-json events read in their nested and flat forms, and failures carry
     tool: { name: 'view_file', parameters: { AbsolutePath: '/a' }, output: 'text', error: '' },
   });
   assert.deepEqual(parseAntigravityLine('{"event":"result","result":{"status":"error","error":{"message":"bad model"},"denied_actions":[{"action":"command","display_name":"Run rm"}]}}'), {
-    kind: 'result', conversationId: '', status: 'ERROR', response: '', error: 'bad model', deniedActions: ['Run rm'],
+    kind: 'result', conversationId: '', status: 'ERROR', response: '', error: 'bad model', finishedReason: '', deniedActions: ['Run rm'],
   });
   assert.equal(parseAntigravityLine('jetski: no output produced'), null);
   // Recorded from agy 1.4.0: a refused tool ends in ERROR, not DONE.
@@ -289,7 +319,7 @@ test('stream-json events read in their nested and flat forms, and failures carry
     conversation_id: 'c', step_index: 2, state: 'ERROR', step_type: 'tool', tool_name: 'call_mcp_tool',
     tool_info: { name: 'call_mcp_tool', parameters: { Arguments: {}, ServerName: 'stashbase', ToolName: 'list_projects' }, error: { type: 'TOOL_ERROR', message: 'permission check failed' } },
   } }));
-  assert.equal(failed?.kind === 'step' && failed.state, 'done');
+  assert.equal(failed?.kind === 'step' && failed.state, 'error');
   assert.equal(failed?.kind === 'step' && failed.tool?.error, 'permission check failed');
   assert.equal(antigravityErrorFromStderr('noise\nAGY_ERROR: {"short_error":"429 rate limited","retryable":true}\n'), '429 rate limited');
   assert.equal(antigravityErrorFromStderr('error: unknown model "x"'), 'unknown model "x"');

@@ -49,6 +49,16 @@ The map is navigation, not proof that every caller has been reviewed.
 
 ## J01: Onboarding
 
+**Antigravity completion validation (2026-11-16):** `pnpm check`, 38 focused
+Antigravity checks, a fresh build and built Electron smoke passed. An isolated
+desktop chat with a controlled `agy` completed two successive replies despite
+repeated terminal interruption errors, showed ordinary notices without Retry,
+and remained sendable; the resulting window was inspected visually. The separate
+persistent real-provider profile launched through `verify:onboarding` but its
+catalog reported Antigravity uninstalled. Installation, sign-in and a real reply
+through the changed adapter remain unverified; the controlled CLI establishes
+the application flow, not provider behavior.
+
 **Patch release validation (2026-11-10):** The merged sign-in recovery and
 ready-only model-catalog changes passed `pnpm check`, 93 focused renderer
 checks, 20 host catalog checks, renderer lint/format, documentation validation,
@@ -926,8 +936,12 @@ Host/services: `server/folder.ts`, `server/github-import.ts`, `server/project-fi
   `sidebar.test.tsx` covers the routing to entry, the current project as a
   no-op, same-name disambiguation, the failure line, and Show in Finder
   revealing the current project (with its failure line). `routes/project.test.ts`
-  refuses to reveal an unregistered or missing folder; a successful reveal
-  opens the OS file manager and is not exercised by any test or driven pass. An isolated macOS
+  refuses to reveal an unregistered or missing folder. `http.test.ts` pins the
+  file-manager command per platform; on Windows the path is quoted inside
+  Explorer's `/select,` switch and passed verbatim, because a space or comma had
+  opened another folder (2026-11-15). A Windows 11 run revealed a file under a
+  folder containing both, and Explorer opened that folder with the file selected.
+  macOS and Linux reveals remain undriven. An isolated macOS
   built-app pass opened a seeded project, chose another recent project from the
   switcher, and got a second window on it while the first kept its project and
   closed the menu. Open, Create, and Import through the switcher reuse the
@@ -2785,8 +2799,11 @@ followed sign-in that ends without signing in is reported, not restarted, and a
 stop that finds an update or background connection leaves it alone.
 **Gap:** signing in again after a refused credential disables status polling
 and the after-exit check, so a CLI that keeps waiting after a successful
-browser sign-in still waits out the 10-minute limit. Antigravity's sign-in
-launch does not yet go through `agent-cli-launch.ts`. Stop carries no attempt
+browser sign-in still waits out the 10-minute limit. Antigravity's Windows
+sign-in launch now goes through `agent-cli-launch.ts` (2026-11-15): a direct
+spawn of an `agy.cmd` shim failed with `spawn EINVAL`. `antigravity-setup.test.ts`
+pins the launch per platform and, on Windows, runs a `.cmd` shim from a spaced
+directory through it; a real `agy` sign-in on Windows remains unverified. Stop carries no attempt
 id, so a late stop can still end a newer sign-in started in another window.
 Chat first-send now follows Antigravity's sign-in retry (2026-10-26); the
 adapter and built-app evidence are recorded in J01.
@@ -3724,9 +3741,22 @@ its decisions and `isReadOnlyCommand`, but no driven pass has run it.
 Attachments now reach Antigravity as the prompt's `Attached files:` paths, as for
 Claude and Codex: given an image path, a real headless `agy` read and described
 the image itself, and replay restores the cards (`antigravity-agent.test.ts`).
-Not proven: no StashBase chat has run on a real `agy`, so the hook's payload and
-its running in a StashBase-launched stream-json process, stdio MCP startup there,
-and pseudo-terminal sign-in remain unexercised. Windows sign-in, the Windows
+On 2026-11-16, a macOS report on `agy` 1.5.9 showed an interruption card after
+completed replies. Read-only inspection found one earlier interruption record
+followed by more than a hundred newer steps, consistent with the upstream
+[repeated terminal error report](https://github.com/google-antigravity/antigravity-cli/issues/969).
+The adapter now requires a nonempty `DONE` main-conversation response in the
+current turn before downgrading that exact error to a notice. Completed trailing
+checkpoints are allowed; unfinished steps/tools, a later error, other error
+messages, timeout/cancellation reasons and process loss remain failures.
+`antigravity-agent.test.ts` exercises recovered and subsequent repeated errors,
+empty-DONE text deltas, history preservation, no automatic replay, process reuse,
+state reset, child replies and the genuine-failure boundaries. These are
+controlled stream events; the reported live conversation has not been replayed
+through the changed adapter.
+Not proven by a driven real-provider pass: the hook's payload and its running
+in a StashBase-launched stream-json process, stdio MCP startup there,
+and pseudo-terminal sign-in. Windows sign-in, the Windows
 hook launcher, and a signed-in provider turn remain release checks.
 
 **Document context (2026-09-25):** a passage is a context kind in
@@ -4022,6 +4052,20 @@ Host/services: `server/project-file-mutations.ts`, `server/text-file-transaction
   and `agent-convergence.test.tsx` (a cited link selects Documents and Find lands
   on the phrase) cover it. Not proven: that a real runtime cites as instructed,
   and a phrase spanning a line break in the rendered text is not found.
+- **Antigravity file citations (2026-11-16):** A reported reply exposed
+  `[::cite_file{path="..." lines="1-25"}::]` as prose: the host forwards native
+  text and the transcript previously recognized only Markdown links.
+  `ui/transcript/markdown-citations.ts` now parses these tokens before Markdown
+  consumes path punctuation, so streamed and restored replies use the existing
+  source resolver and document opener. The filename and optional line range
+  remain visible; opening does not claim line navigation. Code examples remain
+  literal, and refused paths and URL schemes do not acquire another opener.
+  `markdown.test.tsx` covers those outcomes; `AntigravityCitations` in the
+  transcript Story shows the reported two-file shape. The focused Markdown,
+  citation and convergence suites pass 47 checks; types, formatting and lint
+  pass. Visual inspection could not complete because browser access and native
+  screen capture were unavailable. A new real-provider turn and packaged-app
+  verification remain unproven.
 - **Block copy (2026-10-30):** `renderer/src/features/agent/ui/transcript/markdown.tsx`
   gives each fenced block in a reply its own Copy, revealed on hover or focus,
   which copies the block's text without the fence's closing line break. Blocks

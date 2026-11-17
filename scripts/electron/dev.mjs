@@ -41,10 +41,16 @@ export async function runDevelopmentElectron() {
   // Main and preload load generated modules even when Vite serves the renderer.
   await import("./boundary.mjs");
   await waitForDevelopmentServers();
-  const child = spawn(electronPath, ["."], {
+  await runForwardedChild(electronPath, ["."], developmentElectronEnvironment());
+}
+
+/** Runs one development child in this terminal, forwards Ctrl+C/termination
+ * to it, and exits with its result so `concurrently -k` sees the real outcome. */
+export async function runForwardedChild(command, args, env, stdio = "inherit") {
+  const child = spawn(command, args, {
     cwd: process.cwd(),
-    env: developmentElectronEnvironment(),
-    stdio: "inherit",
+    env,
+    stdio,
   });
 
   const forwardSignal = (signal) => {

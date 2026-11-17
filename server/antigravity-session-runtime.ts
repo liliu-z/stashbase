@@ -98,6 +98,8 @@ interface TurnState {
   assistantText: string;
   blocks: AntigravityHistoryBlock[];
   tools: Map<number, { id: string; name: string; input: JsonObject; done: boolean }>;
+  /** Only this turn's main-conversation steps can confirm a completed reply. */
+  completionSteps: Map<number, Pick<AntigravityStep, 'type' | 'state'> & { hasText: boolean }>;
   stepError: string;
   titleHint: string;
 }
@@ -331,6 +333,7 @@ export class AntigravitySession implements AttributedAgentSession {
       assistantText: '',
       blocks: [{ kind: 'user', id: `u${Date.now()}`, text: prompt, at: Date.now() }],
       tools: new Map(),
+      completionSteps: new Map(),
       stepError: '',
       titleHint,
     };
@@ -431,6 +434,14 @@ export class AntigravitySession implements AttributedAgentSession {
   private onStep(step: AntigravityStep): void {
     const turn = this.turn;
     if (!this.busy || !turn) return;
+    if (step.conversationId && step.conversationId === this.conversationId) {
+      const previous = turn.completionSteps.get(step.index);
+      turn.completionSteps.set(step.index, {
+        type: step.type,
+        state: step.state,
+        hasText: !!step.textDelta.trim() || previous?.hasText === true,
+      });
+    }
     if (step.type === 'error_message') {
       turn.stepError = step.textDelta || step.tool?.error || turn.stepError;
       return;
@@ -445,7 +456,7 @@ export class AntigravitySession implements AttributedAgentSession {
         turn.tools.set(step.index, tool);
         this.send({ t: 'tool', id, name: tool.name, input: tool.input });
       }
-      if (step.state === 'done' && !tool.done) {
+      if ((step.state === 'done' || step.state === 'error') && !tool.done) {
         tool.done = true;
         const isError = !!step.tool.error;
         const content = step.tool.output || step.tool.error;
@@ -472,7 +483,12 @@ export class AntigravitySession implements AttributedAgentSession {
       if (requested) this.retireProcess('interrupted');
       return;
     }
-    if (result.status === 'SUCCESS') {
+    const recoveredInterruption = result.conversationId === this.conversationId
+      && this.pendingApprovals.size === 0 && isRecoveredStreamInterruption(turn, result);
+    if (result.status === 'SUCCESS' || recoveredInterruption) {
+      if (recoveredInterruption) {
+        this.send({ t: 'notice', message: 'Antigravity reported a stream interruption, but confirmed this reply finished.' });
+      }
       if (!turn.streamedText && result.response) {
         turn.streamedText = true;
         turn.assistantText += result.response;
@@ -733,6 +749,33 @@ export function antigravityAccessMode(value: unknown): AgentAccessMode {
 
 function toolId(turn: TurnState, stepIndex: number): string {
   return `step-${turn.key}-${stepIndex}`;
+}
+
+function isStreamInterruption(message: string): boolean {
+  return message.trim().replace(/\s+/g, ' ')
+    === 'The stream was interrupted. Please continue the task you were working on.';
+}
+
+/** agy can carry an old interruption into later successful results:
+ * https://github.com/google-antigravity/antigravity-cli/issues/969
+ * Text alone is not proof. Require the current main conversation's final
+ * response to be DONE, allowing only completed checkpoints after it. */
+function isRecoveredStreamInterruption(turn: TurnState, result: AntigravityResult): boolean {
+  if (result.status !== 'ERROR' || !isStreamInterruption(result.error)
+    || (result.finishedReason && result.finishedReason !== 'error')
+    || (turn.stepError && !isStreamInterruption(turn.stepError))
+    || [...turn.tools.values()].some((tool) => !tool.done)) return false;
+  let lastIndex = -1;
+  let answered = false;
+  for (const [index, step] of turn.completionSteps) {
+    if (step.state === 'active' || step.state === 'unknown') return false;
+    if (step.type === 'checkpoint' && step.state === 'done') continue;
+    if (index > lastIndex) {
+      lastIndex = index;
+      answered = step.type === 'agent_response' && step.state === 'done' && step.hasText;
+    }
+  }
+  return answered;
 }
 
 function sameLaunch(a: AntigravityLaunch, b: AntigravityLaunch): boolean {
