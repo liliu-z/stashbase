@@ -144,6 +144,19 @@ P_0=\frac{EPS_{\text{FY28}}\times PE}{1+r}
   );
   assert.equal(fs.existsSync(corruptedSource), false);
 
+  if (process.platform === 'win32') {
+    // Windows reported these as ENOENT/EINVAL; `:` also left an empty hidden
+    // `.note.md` behind, because the staged name became an alternate data stream.
+    const draftsBefore = fs.readdirSync(path.join(root, 'Drafts')).sort();
+    for (const name of ['What is this?.md', 'note.md:hidden.md']) {
+      await assert.rejects(
+        callTool(base, token, 'write_file', { path: path.join(root, 'Drafts', name), content: 'draft' }),
+        /INVALID_FILE_WRITE|not a valid Windows file name/,
+      );
+    }
+    assert.deepEqual(fs.readdirSync(path.join(root, 'Drafts')).sort(), draftsBefore);
+  }
+
   const literalFormula = String.raw`$$
 P_0=\frac{EPS_{\text{FY28}}\times PE}{1+r}
 $$`;
