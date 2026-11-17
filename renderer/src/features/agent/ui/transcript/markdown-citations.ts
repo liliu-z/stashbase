@@ -1,16 +1,11 @@
 /** Read Antigravity's file citations before Markdown interprets their paths.
  * A text construct keeps code examples literal and works on replay as well as
  * streamed replies, without rewriting the stored conversation. */
-import type { RemarkPluginRaw } from '@milkdown/kit/transformer';
-
-type Parser = ThisParameterType<RemarkPluginRaw<undefined>>;
-const dataOf = (parser: Parser) => parser.data();
-type ParserData = ReturnType<typeof dataOf>;
-type SyntaxExtension = NonNullable<ParserData['micromarkExtensions']>[number];
-type Construct = Exclude<
-  NonNullable<NonNullable<SyntaxExtension['text']>[number]>,
-  readonly unknown[]
->;
+import {
+  markdownParserData as dataOf,
+  type MarkdownConstruct as Construct,
+  type MarkdownParser as Parser,
+} from '@/shared/runtime/markdown-parser';
 
 const PREFIX = '[::cite_file{';
 const TOKEN = 'stashbaseFileCitation';
