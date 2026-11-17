@@ -159,3 +159,59 @@ test('CPU recovery after a committed overlap retains its ownership boundary with
   assert.deepEqual(ranges, [{ startSample: 0, endSample: 38 * 16000 }, { startSample: 6 * 16000 }, { startSample: 6 * 16000 }]);
   assert.deepEqual(await fs.readdir(path.join(root, job.id)), []);
 });
+
+test('cancellation during retry retirement cannot launch another native worker', async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'speech-retry-cancel-'));
+  let loads = 0;
+  let failFeed = true;
+  let closeCalls = 0;
+  let holdClose = false;
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const engine = fakeEngine({
+    async load() { loads++; },
+    async feed() { if (failFeed) { failFeed = false; throw new Error('native failure'); } },
+    async close() { closeCalls++; if (holdClose) await gate; },
+  });
+  const service = createSpeechService({ root, modelPath: () => '/verified.gguf', engine: engine.backend, cpu: true });
+  t.after(async () => { release(); await service.close(); await fs.rm(root, { recursive: true, force: true }); });
+  const job = await service.start('one', '/project', 'chat');
+  await service.push('one', job.id, 0, frame);
+  await until(() => service.status('one', job.id).phase === 'failed');
+  const before = loads;
+  holdClose = true;
+  const retry = service.retry('one', job.id);
+  await until(() => closeCalls === 1);
+  const cancel = service.cancel('one', job.id);
+  release();
+  await Promise.allSettled([retry, cancel]);
+  assert.equal(loads, before, 'a cancelled retry must not reload the native model');
+  assert.throws(() => service.status('one', job.id), /no longer available/);
+  assert.deepEqual(await fs.readdir(root), []);
+});
+
+test('overlapping retries share retirement instead of closing a newly restarted worker', async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'speech-shared-retry-'));
+  let failFeed = true;
+  let closeCalls = 0;
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const engine = fakeEngine({
+    async feed() { if (failFeed) { failFeed = false; throw new Error('native failure'); } },
+    async close() { closeCalls++; await gate; },
+  });
+  const service = createSpeechService({ root, modelPath: () => '/verified.gguf', engine: engine.backend, cpu: true });
+  t.after(async () => { release(); await service.close(); await fs.rm(root, { recursive: true, force: true }); });
+  const job = await service.start('one', '/project', 'chat');
+  await service.push('one', job.id, 0, frame);
+  await until(() => service.status('one', job.id).phase === 'failed');
+  const first = service.retry('one', job.id);
+  const second = service.retry('one', job.id);
+  await until(() => closeCalls >= 1);
+  release();
+  await Promise.all([first, second]);
+  assert.equal(closeCalls, 1, 'one failed recording has one retry retirement');
+  await service.finish('one', job.id, 1);
+  await until(() => service.status('one', job.id).phase === 'ready');
+  assert.equal(service.status('one', job.id).text, 'Segment 1.');
+});

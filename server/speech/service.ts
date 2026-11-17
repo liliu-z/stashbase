@@ -32,6 +32,7 @@ interface Recording {
   mutation: Promise<void>;
   pumping: Promise<void> | null;
   retirement: Promise<void> | null;
+  retrying: Promise<SpeechJob> | null;
 }
 
 export function createSpeechService(options: {
@@ -193,7 +194,7 @@ export function createSpeechService(options: {
         id, window, folder, conversation, phase: 'recording', nextSequence: 0,
         cursor: 0, segmentStart: 0, segmentSamples: 0, segmentSkipSamples: 0, pendingBytes: 0, nativeStarted: false,
         stopRequested: false, cpu, error: null, forcedError: null,
-        text: [], receipts: new Map(), mutation: Promise.resolve(), pumping: null, retirement: null,
+        text: [], receipts: new Map(), mutation: Promise.resolve(), pumping: null, retirement: null, retrying: null,
       };
       recording = job;
       job.mutation = fs.mkdir(directory(job), { mode: 0o700 });
@@ -263,20 +264,28 @@ export function createSpeechService(options: {
     },
     async retry(window: string, id: string): Promise<SpeechJob> {
       const job = owned(window, id);
+      if (job.retrying) return job.retrying;
       if (job.phase !== 'failed') return snapshot(job);
-      await job.pumping;
-      await engine.close();
-      job.cursor = job.segmentStart;
-      job.segmentSamples = 0;
-      job.nativeStarted = false;
-      job.cpu = true;
-      job.error = null;
-      job.forcedError = null;
-      job.mutation = Promise.resolve();
-      job.stopRequested = false;
-      job.phase = 'recording';
-      pump(job);
-      return snapshot(job);
+      job.retrying = (async () => {
+        await job.pumping;
+        if (!current(job) || job.phase !== 'failed') throw failure('That recording was cancelled.', 404);
+        await engine.close();
+        // Cancellation/window retirement wins over an in-flight retry. Sharing
+        // this flight also prevents a second retry from closing its replacement.
+        if (!current(job) || job.phase !== 'failed') throw failure('That recording was cancelled.', 404);
+        job.cursor = job.segmentStart;
+        job.segmentSamples = 0;
+        job.nativeStarted = false;
+        job.cpu = true;
+        job.error = null;
+        job.forcedError = null;
+        job.mutation = Promise.resolve();
+        job.stopRequested = false;
+        job.phase = 'recording';
+        pump(job);
+        return snapshot(job);
+      })().finally(() => { job.retrying = null; });
+      return job.retrying;
     },
     async cancel(window: string, id: string) {
       if (!recording || recording.id !== id) {

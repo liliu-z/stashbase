@@ -1963,7 +1963,8 @@ right context at rollover. `stream.test.ts` covers native limits smaller than
 one capture frame, unlimited advertised limits, exact sample accounting,
 final-tail delivery, repeated finish, failed finalization, whole-word ownership
 and intentional repetitions. Service checks cover CPU replay after a committed
-overlap without duplicating earlier text.
+overlap without duplicating earlier text, cancellation while retry retires a
+worker, and concurrent retries sharing one retirement.
 
 On macOS arm64 (2026-11-17), one production service/embedded-Node worker job
 processed 3,608 seconds of controlled audio with accelerated, bounded delivery.
