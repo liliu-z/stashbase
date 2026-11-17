@@ -32,7 +32,8 @@ claude mcp add stashbase -- %USERPROFILE%\.stashbase\bin\stashbase-mcp.cmd
 
 ### Claude Desktop
 
-In `~/Library/Application Support/Claude/claude_desktop_config.json`:
+In `~/Library/Application Support/Claude/claude_desktop_config.json`
+(Windows: `%APPDATA%\Claude\claude_desktop_config.json`):
 
 ```json
 {
@@ -43,6 +44,8 @@ In `~/Library/Application Support/Claude/claude_desktop_config.json`:
   }
 }
 ```
+
+On Windows, use `"command": "C:\\Users\\YOUR_USER\\.stashbase\\bin\\stashbase-mcp.cmd"`.
 
 ### Codex CLI
 
@@ -57,7 +60,8 @@ command = "C:\\Users\\YOUR_USER\\.stashbase\\bin\\stashbase-mcp.cmd"
 
 ### Antigravity CLI
 
-In `~/.gemini/config/mcp_config.json`:
+In `~/.gemini/config/mcp_config.json`
+(Windows: `%USERPROFILE%\.gemini\config\mcp_config.json`):
 
 ```json
 {
@@ -68,6 +72,9 @@ In `~/.gemini/config/mcp_config.json`:
   }
 }
 ```
+
+On Windows, use `"command": "C:\\Users\\YOUR_USER\\.stashbase\\bin\\stashbase-mcp.cmd"`.
+StashBase writes this entry itself when you use Antigravity in its Chat.
 
 Restart the client after changing its MCP configuration.
 

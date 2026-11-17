@@ -3,19 +3,17 @@
  * before CommonMark decodes escapes; original positions support exact copying,
  * and Documents can retain editable inline source with container prefixes removed.
  */
-import type { RemarkPluginRaw } from '@milkdown/kit/transformer';
 import remarkMath from 'remark-math';
+
+import {
+  markdownParserData as dataOf,
+  type MarkdownConstruct as Construct,
+  type MarkdownParser as Parser,
+  type MarkdownParserData as ParserData,
+} from './markdown-parser';
 
 /** Tokenize LaTeX before CommonMark can consume escapes or emphasis. Using a
  * text construct lets the Markdown parser own code spans, fences and nesting. */
-type Parser = ThisParameterType<RemarkPluginRaw<MathSyntaxOptions>>;
-const dataOf = (parser: Parser) => parser.data();
-type ParserData = ReturnType<typeof dataOf>;
-type SyntaxExtension = NonNullable<ParserData['micromarkExtensions']>[number];
-type Construct = Exclude<
-  NonNullable<NonNullable<SyntaxExtension['text']>[number]>,
-  readonly unknown[]
->;
 type State = ReturnType<Construct['tokenize']>;
 type FromExtension = Exclude<NonNullable<ParserData['fromMarkdownExtensions']>[number], unknown[]>;
 type FromHandler = NonNullable<FromExtension['exit']>[string];
