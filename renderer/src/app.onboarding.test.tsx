@@ -280,7 +280,8 @@ it.each(providers)(
     const user = userEvent.setup();
     const firstWindow = fixture.mount();
     await user.click(await screen.findByRole('button', { name: 'Open a project' }));
-    await screen.findByRole('textbox', { name: 'Message' }, { timeout: 5000 });
+    // The first provider also loads the lazy workspace module on a cold CI worker.
+    await screen.findByRole('textbox', { name: 'Message' }, { timeout: 15_000 });
     if (provider.id !== 'stashbase') {
       await user.click(screen.getByRole('button', { name: 'Provider: Default' }));
       await user.click(await screen.findByRole('menuitemradio', { name: provider.label }));
