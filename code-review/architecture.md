@@ -2003,7 +2003,11 @@ before committing. Release-specific evidence stays in the [Release Runbook](rele
 | Scheduled tasks | `server/scheduled-tasks.ts`, `electron/scheduled-tasks/scheduler.ts`, `electron/scheduled-tasks/ipc.ts`, `renderer/src/features/agent/application/scheduled-run.ts` | `pnpm test:server`, `pnpm test:electron`, focused `pnpm test:renderer src/features/agent` |
 
 Source tests, controlled native smokes, model quality, and packaged delivery
-prove different things. Story accessibility checks execute each story's
+prove different things. Renderer component tests bind timeout/interval pairs to
+the actual Happy DOM window in `renderer/src/test/environment.ts`. Its delegated
+abort/close retires callbacks before DOM globals disappear; teardown then restores
+the caller's timer functions for the next environment. Live callback errors retain
+the runner's normal failure behavior. Story accessibility checks execute each story's
 interaction once at default/light appearance; happy-dom cannot establish painted
 contrast or layout. Theme/density review remains a browser/runtime concern.
 Use the [test selection policy](../AGENTS.md#test-selection) and
