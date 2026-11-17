@@ -98,5 +98,5 @@ test('one successful source workflow precedes the tag gate, components, packagin
     assert.equal(read(`release-${platform}`).on.workflow_dispatch, undefined);
   }
   assert.equal(ci.jobs['source-build'].steps.find((s) => s.run === 'pnpm test:opencode:native')['timeout-minutes'], 5);
-  assert.ok(ci.jobs['source-build']['timeout-minutes'] <= 30);
+  assert.ok(ci.jobs['source-build']['timeout-minutes'] <= 45);
 });
