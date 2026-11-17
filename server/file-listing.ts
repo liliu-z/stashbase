@@ -345,9 +345,11 @@ const HIDDEN_OS_FILES = new Set<string>([
   'Icon\r',
 ]);
 const HIDDEN_WINDOWS_FILES = new Set<string>(['desktop.ini', 'thumbs.db', 'ehthumbs.db']);
+// The prefix alone is a valid ordinary filename, including Markdown drafts.
+const OFFICE_LOCK_FILE = /^~\$.*\.(?:doc[xm]?|dot[xm]?|xls[xmb]?|xlt[xm]?|ppt[xm]?|pps[xm]?|pot[xm]?)$/i;
 
 function isOsJunkFile(name: string): boolean {
-  return HIDDEN_OS_FILES.has(name) || HIDDEN_WINDOWS_FILES.has(name.toLowerCase()) || name.startsWith('~$');
+  return HIDDEN_OS_FILES.has(name) || HIDDEN_WINDOWS_FILES.has(name.toLowerCase()) || OFFICE_LOCK_FILE.test(name);
 }
 
 /** A Windows drive root holds the recycle bin and restore data; neither is

@@ -1049,6 +1049,11 @@ Host/services: `server/folder.ts`, `server/github-import.ts`, `server/project-fi
 
 ## J03: Documents
 
+**Office lock classification (2026-11-17):** `file-listing.test.ts` covers
+Office lock extensions beside ordinary `~$`-prefixed Markdown, text, JSON and
+HTML sources. These sources remain visible with either hidden-file preference;
+the Markdown source also remains in the turn-change walk.
+
 Host text saves now start the same restricted write diagnostic trace described in
 [J07](#j07-converge). This observes the existing source/version transaction and
 keeps its original permissions and save result; it does not add source reads.
