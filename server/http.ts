@@ -212,20 +212,29 @@ export async function validateEmbedderKey(
  *  `open -R` selects the file in Finder; Windows uses `explorer /select`;
  *  Linux falls back to opening the containing directory since most
  *  desktops don't have a portable "reveal one file" command. */
-export function revealInOsFileManager(absPath: string): void {
-  let cmd: string;
-  let args: string[];
-  if (process.platform === 'darwin') {
-    cmd = 'open';
-    args = ['-R', absPath];
-  } else if (process.platform === 'win32') {
-    cmd = 'explorer.exe';
-    args = [`/select,${absPath}`];
-  } else {
-    cmd = 'xdg-open';
-    args = [path.dirname(absPath)];
+/** The file-manager command that shows `absPath` selected. Explorer parses its
+ *  own command line: Node's automatic quoting of a spaced argument hides the
+ *  `/select,` switch, and an unquoted comma splits the path, so on Windows the
+ *  path is quoted inside the switch and passed verbatim. */
+export function fileManagerRevealCommand(absPath: string, platform: NodeJS.Platform = process.platform): {
+  command: string;
+  args: string[];
+  windowsVerbatimArguments?: boolean;
+} {
+  if (platform === 'darwin') return { command: 'open', args: ['-R', absPath] };
+  if (platform === 'win32') {
+    return {
+      command: 'explorer.exe',
+      args: [`/select,"${path.win32.normalize(absPath)}"`],
+      windowsVerbatimArguments: true,
+    };
   }
-  const proc = childProcess.spawn(cmd, args, { detached: true, stdio: 'ignore' });
+  return { command: 'xdg-open', args: [path.dirname(absPath)] };
+}
+
+export function revealInOsFileManager(absPath: string): void {
+  const { command: cmd, args, windowsVerbatimArguments } = fileManagerRevealCommand(absPath);
+  const proc = childProcess.spawn(cmd, args, { detached: true, stdio: 'ignore', windowsVerbatimArguments });
   proc.on('error', (err) => {
     log.warn(`reveal: spawn ${cmd} failed:`, err);
   });

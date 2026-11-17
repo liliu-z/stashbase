@@ -936,8 +936,12 @@ Host/services: `server/folder.ts`, `server/github-import.ts`, `server/project-fi
   `sidebar.test.tsx` covers the routing to entry, the current project as a
   no-op, same-name disambiguation, the failure line, and Show in Finder
   revealing the current project (with its failure line). `routes/project.test.ts`
-  refuses to reveal an unregistered or missing folder; a successful reveal
-  opens the OS file manager and is not exercised by any test or driven pass. An isolated macOS
+  refuses to reveal an unregistered or missing folder. `http.test.ts` pins the
+  file-manager command per platform; on Windows the path is quoted inside
+  Explorer's `/select,` switch and passed verbatim, because a space or comma had
+  opened another folder (2026-11-15). A Windows 11 run revealed a file under a
+  folder containing both, and Explorer opened that folder with the file selected.
+  macOS and Linux reveals remain undriven. An isolated macOS
   built-app pass opened a seeded project, chose another recent project from the
   switcher, and got a second window on it while the first kept its project and
   closed the menu. Open, Create, and Import through the switcher reuse the
