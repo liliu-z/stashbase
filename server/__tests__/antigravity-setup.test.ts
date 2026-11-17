@@ -195,6 +195,17 @@ while :; do sleep 1; done
   assert.equal((await coordinator.wait('antigravity')).phase, 'ready');
   const pid = Number(fs.readFileSync(marker, 'utf8').trim());
   assert.ok(pid > 0, 'the sign-in ran with a terminal for input and output');
+  // The PTY leader can close just before the OS reaps its sign-in child.
+  // Observe real retirement with a bound instead of racing that final reap.
+  const retiredBy = Date.now() + 2000;
+  while (Date.now() < retiredBy) {
+    try { process.kill(pid, 0); }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ESRCH') break;
+      throw error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
   assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, 'the login process was retired');
   assert.ok(checks >= 3);
 });
