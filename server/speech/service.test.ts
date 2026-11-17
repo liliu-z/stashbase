@@ -235,7 +235,7 @@ test('retry preserves an audio publication already in flight when native recogni
   });
   const service = createSpeechService({ root, modelPath: () => '/verified.gguf', engine: engine.backend, cpu: true });
   const rename = fs.rename;
-  t.mock.method(fs, 'rename', async (from, to) => {
+  t.mock.method(fs, 'rename', async (from: Parameters<typeof rename>[0], to: Parameters<typeof rename>[1]) => {
     if (path.basename(String(to)) === '1.pcm') { publishing = true; await publication; }
     return rename(from, to);
   });
