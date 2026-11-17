@@ -198,10 +198,14 @@ it('keeps formulas through Chat, Agent writing, document edits and copy-paste/sa
     editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: revised } });
   });
   fireEvent.keyDown(editor.contentDOM, { key: 'ArrowDown', code: 'ArrowDown' });
-  await waitFor(() =>
-    expect(fixture.sources.get('Written.md')?.content).toBe(
-      MATH_MARKDOWN.replace(MATH_TEX.fraction, revised),
-    ),
+  // The editor settles for 300 ms before the 500 ms autosave delay. Allow
+  // scheduler overhead on the full cross-platform suite without weakening content checks.
+  await waitFor(
+    () =>
+      expect(fixture.sources.get('Written.md')?.content).toBe(
+        MATH_MARKDOWN.replace(MATH_TEX.fraction, revised),
+      ),
+    { timeout: 5000 },
   );
   written = await reopenFile('Written.md', user);
   expect(formulas(written)).toEqual(
@@ -215,7 +219,10 @@ it('keeps formulas through Chat, Agent writing, document edits and copy-paste/sa
   copiedResponse.setData('text/plain', await navigator.clipboard.readText());
   let copied = await openFile('Copied.md', user);
   await paste(copied, copiedResponse);
-  await waitFor(() => expect(fixture.sources.get('Copied.md')?.content).toContain(MATH_TEX.matrix));
+  await waitFor(
+    () => expect(fixture.sources.get('Copied.md')?.content).toContain(MATH_TEX.matrix),
+    { timeout: 5000 },
+  );
   const saved = fixture.sources.get('Copied.md')?.content ?? '';
   for (const tex of Object.values(MATH_TEX)) expect(saved).toContain(tex);
   expect(saved).toContain(String.raw`\$10`);
@@ -235,8 +242,9 @@ it('keeps formulas through Chat, Agent writing, document edits and copy-paste/sa
   expect(selected.getData('text/plain')).toBe(`$$\n${MATH_TEX.matrix}\n$$`);
   let selection = await openFile('Selection.md', user);
   await paste(selection, selected);
-  await waitFor(() =>
-    expect(fixture.sources.get('Selection.md')?.content).toContain(MATH_TEX.matrix),
+  await waitFor(
+    () => expect(fixture.sources.get('Selection.md')?.content).toContain(MATH_TEX.matrix),
+    { timeout: 5000 },
   );
   selection = await reopenFile('Selection.md', user);
   expect(formulas(selection)).toEqual([MATH_TEX.matrix]);
