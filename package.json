@@ -36,7 +36,7 @@
     "dev": "concurrently -k -s first -n web,srv,desktop -c cyan,green,magenta \"npm:dev:web\" \"npm:dev:server\" \"npm:dev:desktop\"",
     "dev:web": "vp run @stashbase/renderer#dev",
     "storybook": "pnpm --filter @stashbase/renderer storybook",
-    "dev:server": "STASHBASE_DEV_VITE=1 tsx watch server/index.ts",
+    "dev:server": "node scripts/dev-server.mjs",
     "dev:desktop": "node scripts/electron/dev.mjs",
     "start": "tsx server/index.ts",
     "mcp": "tsx mcp/server.ts",
