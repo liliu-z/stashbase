@@ -1284,7 +1284,9 @@ allowance snapshot to the gateway so their explanation reflects held capacity.
   background work or streamed output. All windows share category suppression and
   sessions. Electron's main-process input observer supplies content-free input
   presence across opaque HTML frames; visible/focused window checks and the active
-  reading surface gate app/read engagement. Authored DOM events and postMessage
+  reading surface gate app/read engagement. A bounded rendering defer lets opaque
+  iframe focus settle; expiry and disposal discard pending input rather than
+  crediting a later surface. Authored DOM events and postMessage
   cannot manufacture this bridge signal; keys, text and coordinates do not cross it.
   Shared project read/write/edit results belong to `project-operations`, with
   identity captured before await and origin supplied by the accepted transport or

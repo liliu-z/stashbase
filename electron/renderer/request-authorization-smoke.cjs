@@ -253,8 +253,17 @@ async function checkFrameInput(window, serverOrigin) {
     }
     assert.fail(`native iframe input was not observed: ${JSON.stringify(await snapshot())}; ${JSON.stringify(await window.webContents.executeJavaScript('({focused: document.hasFocus(), visibility: document.visibilityState, active: document.activeElement?.tagName, hover: document.querySelector("iframe")?.matches(":hover")})'))}`);
   };
-  window.webContents.sendInputEvent({ type: 'mouseMove', x: 60, y: 20 });
-  await new Promise(resolve => setTimeout(resolve, 100));
+  const movePointer = async (x, y, overFrame) => {
+    window.webContents.sendInputEvent({ type: 'mouseMove', x, y });
+    const deadline = Date.now() + 2000;
+    while (Date.now() < deadline) {
+      const hovering = await window.webContents.executeJavaScript('Boolean(document.querySelector("iframe")?.matches(":hover"))');
+      if (hovering === overFrame) return;
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    assert.fail(`native pointer hover did not settle over the intended pane (${overFrame})`);
+  };
+  await movePointer(60, 20, true);
   window.webContents.sendInputEvent({ type: 'mouseDown', x: 60, y: 20, button: 'left', clickCount: 1 });
   window.webContents.sendInputEvent({ type: 'mouseUp', x: 60, y: 20, button: 'left', clickCount: 1 });
   let state = await waitForRead(0);
@@ -263,13 +272,14 @@ async function checkFrameInput(window, serverOrigin) {
   window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'A' });
   state = await waitForRead(state.reads);
   assert.ok(state.kinds.includes('keyboard'));
+  await movePointer(60, 120, true);
   window.webContents.sendInputEvent({ type: 'mouseWheel', x: 60, y: 120, deltaY: -30, deltaX: 0 });
   state = await waitForRead(state.reads);
   // A wheel over another pane must not count as reading the still-focused frame.
-  window.webContents.sendInputEvent({ type: 'mouseMove', x: 650, y: 120 });
-  await new Promise(resolve => setTimeout(resolve, 100));
+  await movePointer(650, 120, false);
   window.webContents.sendInputEvent({ type: 'mouseWheel', x: 650, y: 120, deltaY: -30, deltaX: 0 });
-  await new Promise(resolve => setTimeout(resolve, 100));
+  // Observe the whole input-attribution window before checking the negative case.
+  await new Promise(resolve => setTimeout(resolve, 300));
   assert.equal((await snapshot()).reads, state.reads);
   await window.webContents.executeJavaScript('window.releaseFrameInput()');
   window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'A' });

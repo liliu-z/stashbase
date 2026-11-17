@@ -1130,13 +1130,16 @@ intact. Packaged distribution behavior is not established.
 **HTML engagement:** native `electron/window/lifecycle.ts` input-presence events
 cross the narrow window preload/adapter without keys, positions or document
 content. The active reading surface credits only its focused iframe, with pointer
-hover checked for pointer/wheel input. Application composition counts foreground
+hover checked for pointer/wheel input. Bounded rendering deferral preserves input
+while opaque-frame focus settles; the mounted scenario covers this ordering and
+cancellation before a pending read. The native smoke moves to and observes its
+intended hover target before sending wheel input. Application composition counts foreground
 app activity through the same native subscription. Authored scripts and frame
 messages cannot manufacture this input signal; sandbox permissions are unchanged.
 The macOS built Electron smoke exercised first-click focus, keyboard, wheel,
 adjacent-pane exclusion, synthetic input refusal and disposal against the real
 opaque frame. Mounted HTML activity and existing form-data tests passed in a
-focused rerun. Windows/Linux input behavior and production event receipt remain
+focused rerun. Physical Windows/Linux input and production event receipt remain
 unverified.
 
 **Interactive-note creation (2026-10-28):** New tab offers text and interactive

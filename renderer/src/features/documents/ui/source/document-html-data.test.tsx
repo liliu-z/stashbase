@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vite-plus/test';
 
 import type { DocumentSourcePort } from '@/features/documents/application/ports';
@@ -35,12 +35,19 @@ it('counts native input in the active HTML reader and retires its subscription w
   const frame = await screen.findByTitle<HTMLIFrameElement>('form.html HTML preview');
   frame.focus();
   const hover = vi.spyOn(frame, 'matches').mockReturnValue(false);
-  const emit = async (kind: 'keyboard' | 'pointer') => {
+  const emit = async (kind: 'keyboard' | 'pointer', settleFocus?: () => void) => {
     vi.useFakeTimers();
     act(() => {
       for (const listener of listeners) listener(kind);
     });
     await act(async () => vi.advanceTimersByTimeAsync(0));
+    if (settleFocus) {
+      await act(async () => {
+        vi.advanceTimersToNextFrame();
+      });
+      act(settleFocus);
+    }
+    await act(async () => vi.advanceTimersByTimeAsync(40));
     vi.useRealTimers();
   };
   fireEvent.focus(frame);
@@ -56,17 +63,33 @@ it('counts native input in the active HTML reader and retires its subscription w
   hover.mockReturnValue(true);
   await emit('pointer');
   expect(recordUsage).toHaveBeenCalledTimes(2);
+  document.body.tabIndex = -1;
+  document.body.focus();
+  // Native input can arrive before the renderer dispatch establishes frame focus.
+  await emit('pointer', () => frame.focus());
+  expect(recordUsage).toHaveBeenCalledTimes(3);
+  document.body.removeAttribute('tabindex');
   vi.spyOn(document, 'hasFocus').mockReturnValue(false);
   await emit('keyboard');
-  expect(recordUsage).toHaveBeenCalledTimes(2);
+  expect(recordUsage).toHaveBeenCalledTimes(3);
   vi.spyOn(document, 'hasFocus').mockReturnValue(true);
   await act(async () => {
     await runtime.open({ folderPath: '/project/notes', path: 'other.html' });
   });
-  await screen.findByTitle('other.html HTML preview');
+  const currentFrame = await screen.findByTitle('other.html HTML preview');
   frame.focus();
   await emit('keyboard');
-  expect(recordUsage).toHaveBeenCalledTimes(2);
+  expect(recordUsage).toHaveBeenCalledTimes(3);
+  currentFrame.focus();
+  vi.useFakeTimers();
+  act(() => {
+    for (const listener of listeners) listener('keyboard');
+  });
+  cleanup();
+  await act(async () => vi.advanceTimersByTimeAsync(40));
+  vi.useRealTimers();
+  expect(recordUsage).toHaveBeenCalledTimes(3);
+  expect(listeners.size).toBe(0);
 });
 
 it('binds only its own frame, requires input activation, autosaves data, keeps the form through navigation, and reloads it for HTML and data changes', async () => {
