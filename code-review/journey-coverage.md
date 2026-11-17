@@ -2741,8 +2741,11 @@ followed sign-in that ends without signing in is reported, not restarted, and a
 stop that finds an update or background connection leaves it alone.
 **Gap:** signing in again after a refused credential disables status polling
 and the after-exit check, so a CLI that keeps waiting after a successful
-browser sign-in still waits out the 10-minute limit. Antigravity's sign-in
-launch does not yet go through `agent-cli-launch.ts`. Stop carries no attempt
+browser sign-in still waits out the 10-minute limit. Antigravity's Windows
+sign-in launch now goes through `agent-cli-launch.ts` (2026-11-15): a direct
+spawn of an `agy.cmd` shim failed with `spawn EINVAL`. `antigravity-setup.test.ts`
+pins the launch per platform and, on Windows, runs a `.cmd` shim from a spaced
+directory through it; a real `agy` sign-in on Windows remains unverified. Stop carries no attempt
 id, so a late stop can still end a newer sign-in started in another window.
 Chat first-send now follows Antigravity's sign-in retry (2026-10-26); the
 adapter and built-app evidence are recorded in J01.
