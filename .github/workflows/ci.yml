@@ -15,7 +15,8 @@ concurrency:
 jobs:
   source-build:
     name: Source build (${{ matrix.os }})
-    timeout-minutes: 30
+    # The source audit and real-model CPU verification share this job's budget.
+    timeout-minutes: 45
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
