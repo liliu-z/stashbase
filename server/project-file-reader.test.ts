@@ -12,6 +12,7 @@ import { agentContextFile, readProjectFile } from './project-file-reader.ts';
 import { registerAttributedAgentSession, unregisterAttributedAgentSession } from './agent-session-registry.ts';
 import { withAgentProjectScope } from './project-request-scope.ts';
 import { filesystemPath } from './filesystem-path.ts';
+import { fileSymlink } from './__tests__/filesystem-links.ts';
 
 test('explicit generic context keeps exact source paths without reading their bytes', async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-generic-context-'));
@@ -111,8 +112,7 @@ test('legacy derived reads retain project scope, source containment, and the bou
   fs.unlinkSync(source);
   const outside = path.join(root, 'outside.pdf');
   fs.writeFileSync(outside, 'outside');
-  fs.symlinkSync(outside, source);
-  await assert.rejects(readProjectFile(derived), { status: 404 });
+  if (fileSymlink(outside, source, t)) await assert.rejects(readProjectFile(derived), { status: 404 });
 });
 
 
