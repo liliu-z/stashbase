@@ -84,27 +84,44 @@ interface LinkMatch {
   end: number;
   /** The raw href text. */
   href: string;
+  /** How the destination was written, which decides how a rewrite encodes it. */
+  style: LinkStyle;
 }
+
+/** `md-angle` is a Markdown `<destination>`: spaces are literal there, but
+ *  `<`, `>` and line breaks are not. */
+type LinkStyle = 'md' | 'md-angle' | 'html';
 
 /** Match every `[text](url)` and `![alt](url)` and emit the URL span.
- *  Title (`[..](url "title")`) is preserved by only capturing the
- *  URL portion. Nested brackets in the text part are tolerated one
- *  level deep — good enough for hand-written docs. */
+ *  The destination is either `<...>` (group 1) or a bare run that may hold
+ *  one level of balanced parentheses, as CommonMark allows (group 2). The
+ *  optional title may be `"..."`, `'...'` or `(...)` and is preserved by only
+ *  capturing the URL portion. Nested brackets in the text part are tolerated
+ *  one level deep — good enough for hand-written docs. */
+const MD_LINK =
+  /!?\[(?:[^\[\]]|\[[^\[\]]*\])*\]\([ \t]*(?:<([^<>\n]*)>|((?:[^\s()<]|\([^\s()]*\))(?:[^\s()]|\([^\s()]*\))*))(?:\s+(?:"[^"]*"|'[^']*'|\([^()]*\)))?[ \t]*\)/gd;
+
 function extractMdLinks(content: string): LinkMatch[] {
-  return hrefMatches(content, /(!?\[(?:[^\[\]]|\[[^\[\]]*\])*\])\(([^)\s]+?)((?:\s+"[^"]*")?)\)/gd);
+  return hrefMatches(content, MD_LINK, ['md-angle', 'md']);
 }
 
-/** Match every `<a ... href="..." ...>`. Quotes can be `"` or `'`. */
+/** Match every `<a ... href="..." ...>`. Quotes can be `"` or `'`; the other
+ *  quote may appear inside the value (`href="It's.md"`). */
 function extractHtmlLinks(content: string): LinkMatch[] {
-  return hrefMatches(content, /<a\b[^>]*?\bhref\s*=\s*(["'])([^"']*)\1/gid);
+  return hrefMatches(content, /<a\b[^>]*?\bhref\s*=\s*(?:"([^"]*)"|'([^']*)')/gid, ['html', 'html']);
 }
 
-/** Every match's second capture group is the href; `d` gives its offsets. */
-function hrefMatches(content: string, re: RegExp): LinkMatch[] {
+/** Each listed capture group is one alternative form of the href; `d` gives
+ *  its offsets, and the style at the same position records which form matched. */
+function hrefMatches(content: string, re: RegExp, styles: LinkStyle[]): LinkMatch[] {
   const out: LinkMatch[] = [];
   for (const m of content.matchAll(re)) {
-    const span = m.indices?.[2];
-    if (span) out.push({ start: span[0], end: span[1], href: m[2] });
+    styles.some((style, index) => {
+      const span = m.indices?.[index + 1];
+      if (!span) return false;
+      out.push({ start: span[0], end: span[1], href: m[index + 1], style });
+      return true;
+    });
   }
   return out;
 }
@@ -127,15 +144,16 @@ function decodeLinkPath(pathPart: string): string | null {
 /** Markdown destinations end at whitespace or `)` and treat `<`/`>` as
  *  delimiters; HTML attributes end at their quote. `%`, `?` and `#` would be
  *  read back as an escape, a query or an anchor in either format. */
-const LINK_UNSAFE = {
+const LINK_UNSAFE: Record<LinkStyle, RegExp> = {
   md: /[%?#\s()<>]/gu,
+  'md-angle': /[%?#<>\n\r]/gu,
   html: /[%?#\s"'<>]/gu,
-} as const;
+};
 
-function encodeLinkPath(name: string, format: 'md' | 'html'): string {
+function encodeLinkPath(name: string, style: LinkStyle): string {
   // encodeURIComponent leaves `(`, `)` and `'` as they are, so ASCII is
   // escaped by hand; Unicode whitespace still takes its UTF-8 escape.
-  return name.replace(LINK_UNSAFE[format], (ch) => {
+  return name.replace(LINK_UNSAFE[style], (ch) => {
     const code = ch.charCodeAt(0);
     return code < 0x80 ? `%${code.toString(16).toUpperCase().padStart(2, '0')}` : encodeURIComponent(ch);
   });
@@ -201,7 +219,7 @@ function rewriteOneHref(
   fromDir: string,
   toDir: string,
   renames: RenameEntry[],
-  format: 'md' | 'html',
+  style: LinkStyle,
 ): string | null {
   const resolved = resolveLink(href, fromDir);
   if (!resolved) return null;
@@ -212,7 +230,7 @@ function rewriteOneHref(
   const newPath = toDir
     ? (posix.relative(toDir, newTarget) || '.')
     : newTarget;
-  const newHref = encodeLinkPath(newPath, format) + resolved.suffix;
+  const newHref = encodeLinkPath(newPath, style) + resolved.suffix;
   return newHref === href ? null : newHref;
 }
 
@@ -235,7 +253,7 @@ function rewriteLinks(opts: {
   // Splice from the back so earlier offsets stay valid.
   for (let i = matches.length - 1; i >= 0; i--) {
     const m = matches[i];
-    const newHref = rewriteOneHref(m.href, fromDir, toDir, renames, format);
+    const newHref = rewriteOneHref(m.href, fromDir, toDir, renames, m.style);
     if (newHref == null) continue;
     result = result.slice(0, m.start) + newHref + result.slice(m.end);
     changes++;

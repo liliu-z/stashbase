@@ -63,3 +63,33 @@ test('HTML links decode before matching and escape their own delimiters when rew
     planRenameLinksAsync([{ kind: 'file', old: 'My Note.md', new: `It's done.md` }]));
   assert.equal(plan[0]?.newContent, `<a href="It%27s%20done.md">n</a>`);
 });
+
+test('angle-bracket destinations follow a rename and keep their form', async () => {
+  assert.equal(
+    await rewrittenIndex('[c](<My Note.md> "Title")\n![i](<img/old pic.png>)\n', ['My Note.md'], { kind: 'file', old: 'My Note.md', new: 'Final <v2> Note.md' }),
+    '[c](<Final %3Cv2%3E Note.md> "Title")\n![i](<img/old pic.png>)\n',
+  );
+});
+
+test('single-quoted and parenthesised titles no longer hide a link from a rename', async () => {
+  assert.equal(
+    await rewrittenIndex("[e](other.md 'Title')\n[p](other.md (Title))\n", ['other.md'], { kind: 'file', old: 'other.md', new: 'next.md' }),
+    "[e](next.md 'Title')\n[p](next.md (Title))\n",
+  );
+});
+
+test('balanced parentheses in a destination are part of the path', async () => {
+  assert.equal(
+    await rewrittenIndex('[f](paren(1).md) and (see [g](paren(1).md))\n', ['paren(1).md'], { kind: 'file', old: 'paren(1).md', new: 'paren(2).md' }),
+    '[f](paren%282%29.md) and (see [g](paren%282%29.md))\n',
+  );
+});
+
+test('an HTML href may contain the other quote character', async () => {
+  const root = fs.mkdtempSync(path.join(scratch, 'project-'));
+  fs.writeFileSync(path.join(root, 'page.html'), `<a href="It's.md">a</a><a href='say "hi".md'>b</a>`);
+  fs.writeFileSync(path.join(root, "It's.md"), 'note');
+  const plan = await runWithFolderRoot(root, () =>
+    planRenameLinksAsync([{ kind: 'file', old: "It's.md", new: 'Final.md' }]));
+  assert.equal(plan[0]?.newContent, `<a href="Final.md">a</a><a href='say "hi".md'>b</a>`);
+});

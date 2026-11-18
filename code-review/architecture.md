@@ -174,9 +174,10 @@ preview, content editing, and rename/delete are separate permissions.
   covers inline Markdown links/images and HTML anchor hrefs, not reference-style
   definitions or other HTML attributes. Link paths are percent-decoded per segment
   before matching, as the reader resolves them, and a rewritten path encodes only
-  characters that would break or change the link (`links.test.ts`). Angle-bracket
-  destinations, single-quoted titles, unbalanced parentheses and code spans are
-  not yet handled. MCP file moves stay inside one project.
+  characters that would break or change the link (`links.test.ts`). Markdown
+  `<destinations>` keep their form, titles may use any CommonMark quoting, and a
+  bare destination may hold balanced parentheses. Links inside code spans and
+  fences are still rewritten. MCP file moves stay inside one project.
 
 ### Import Publication
 
