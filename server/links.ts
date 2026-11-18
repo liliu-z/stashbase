@@ -25,6 +25,12 @@
  *     (after stripping the leading slash). Anything that resolves
  *     outside the folder root is skipped.
  *   - `?query` and `#anchor` suffixes are preserved verbatim.
+ *   - Each path segment is percent-decoded before matching, as the reader
+ *     resolves links (`renderer/src/features/documents/domain/link-target.ts`),
+ *     so `My%20Note.md` names `My Note.md`. A rewritten path encodes only the
+ *     characters that would otherwise break or change the link (spaces, `%`,
+ *     `?`, `#`, and the format's own delimiters); other text, including
+ *     non-ASCII names, stays as written.
  */
 import path from 'node:path';
 import { detectFormat } from './format.ts';
@@ -103,6 +109,38 @@ function hrefMatches(content: string, re: RegExp): LinkMatch[] {
   return out;
 }
 
+/** Percent-decode each `/`-separated segment the way the reader does. A
+ *  segment that is not valid percent-encoding is kept as written (a name may
+ *  contain a bare `%`). Returns null when decoding would produce a separator
+ *  or a dot segment, which the reader refuses to treat as a project link. */
+function decodeLinkPath(pathPart: string): string | null {
+  const segments: string[] = [];
+  for (const raw of pathPart.split('/')) {
+    let segment = raw;
+    try { segment = decodeURIComponent(raw); } catch { /* keep the literal segment */ }
+    if (segment !== raw && (/[\\/]/.test(segment) || segment === '.' || segment === '..')) return null;
+    segments.push(segment);
+  }
+  return segments.join('/');
+}
+
+/** Markdown destinations end at whitespace or `)` and treat `<`/`>` as
+ *  delimiters; HTML attributes end at their quote. `%`, `?` and `#` would be
+ *  read back as an escape, a query or an anchor in either format. */
+const LINK_UNSAFE = {
+  md: /[%?#\s()<>]/gu,
+  html: /[%?#\s"'<>]/gu,
+} as const;
+
+function encodeLinkPath(name: string, format: 'md' | 'html'): string {
+  // encodeURIComponent leaves `(`, `)` and `'` as they are, so ASCII is
+  // escaped by hand; Unicode whitespace still takes its UTF-8 escape.
+  return name.replace(LINK_UNSAFE[format], (ch) => {
+    const code = ch.charCodeAt(0);
+    return code < 0x80 ? `%${code.toString(16).toUpperCase().padStart(2, '0')}` : encodeURIComponent(ch);
+  });
+}
+
 /** Split a raw href into its folder-relative path target and any
  *  `?query` / `#anchor` tail. Returns null for external URLs,
  *  anchor-only links, or anything that escapes the folder root. */
@@ -126,6 +164,9 @@ function resolveLink(href: string, fileDir: string): { path: string; suffix: str
     pathPart = pathPart.slice(0, cut);
   }
   if (!pathPart) return null;
+  const decoded = decodeLinkPath(pathPart);
+  if (decoded === null) return null;
+  pathPart = decoded;
 
   let resolved: string;
   if (pathPart.startsWith('/')) {
@@ -160,6 +201,7 @@ function rewriteOneHref(
   fromDir: string,
   toDir: string,
   renames: RenameEntry[],
+  format: 'md' | 'html',
 ): string | null {
   const resolved = resolveLink(href, fromDir);
   if (!resolved) return null;
@@ -170,7 +212,7 @@ function rewriteOneHref(
   const newPath = toDir
     ? (posix.relative(toDir, newTarget) || '.')
     : newTarget;
-  const newHref = newPath + resolved.suffix;
+  const newHref = encodeLinkPath(newPath, format) + resolved.suffix;
   return newHref === href ? null : newHref;
 }
 
@@ -193,7 +235,7 @@ function rewriteLinks(opts: {
   // Splice from the back so earlier offsets stay valid.
   for (let i = matches.length - 1; i >= 0; i--) {
     const m = matches[i];
-    const newHref = rewriteOneHref(m.href, fromDir, toDir, renames);
+    const newHref = rewriteOneHref(m.href, fromDir, toDir, renames, format);
     if (newHref == null) continue;
     result = result.slice(0, m.start) + newHref + result.slice(m.end);
     changes++;
