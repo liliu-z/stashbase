@@ -49,6 +49,7 @@ import { useFolderRefresh } from './composition/folder/use-folder-refresh';
 import { useTreeFollowsDocument } from './composition/folder/use-tree-follows-document';
 import { useTurnReview } from './composition/folder/use-turn-review';
 import { useGalleryShop } from './composition/gallery/use-gallery-shop';
+import { useTabMenuActions } from './composition/layout/use-tab-menu-actions';
 import { WorkspaceDialogs } from './composition/layout/workspace-dialogs';
 import { WorkspaceLayout } from './composition/layout/workspace-layout';
 import { workspaceNoticeSlots } from './composition/layout/workspace-notice-slots';
@@ -85,6 +86,7 @@ function WorkspaceWindow() {
   const dependencies = useDependencies();
   // Two adapter records this function hands on more than once.
   const { documents: docs, workspace: workspaceDeps } = dependencies;
+  const tabMenu = useTabMenuActions(dependencies);
   useAppearanceSurface(dependencies.settings.appearanceApi, dependencies.settings.setAppearance);
   const session = useWorkspaceSession(
     workspaceDeps.adapters.project,
@@ -380,6 +382,7 @@ function WorkspaceWindow() {
             newTab={newTab}
             onToggleChatPane={() => setChatPaneOpen((open) => !open)}
             sidebarNotices={notices.cornerShown}
+            tabMenu={tabMenu}
             documents={documents}
             hasActiveFolder={activeFolder !== null}
             mode={chrome.navigator.mode}

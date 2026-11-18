@@ -19,6 +19,15 @@ export function useDocumentTabs(runtime: DocumentTabsRuntime) {
   const activate = useCallback((tabId: string) => void runtime.activate(tabId), [runtime]);
   const close = useCallback((tabId: string) => void runtime.close(tabId), [runtime]);
   const keep = useCallback((tabId: string) => void runtime.keep(tabId), [runtime]);
+  /** Closes several tabs in order, as Close does one: each saves first, and
+   *  the first one that stays open (a draft the reader is asked about, or a
+   *  save that failed) stops the rest so nothing closes behind its question. */
+  const closeTabs = useCallback(
+    async (tabIds: readonly string[]) => {
+      for (const tabId of tabIds) if (!(await runtime.close(tabId))) return;
+    },
+    [runtime],
+  );
 
-  return { activate, activeTab, activeTabId, close, keep, tabs };
+  return { activate, activeTab, activeTabId, close, closeTabs, keep, tabs };
 }

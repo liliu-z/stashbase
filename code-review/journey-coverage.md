@@ -1049,6 +1049,18 @@ Host/services: `server/folder.ts`, `server/github-import.ts`, `server/project-fi
 
 ## J03: Documents
 
+**Tab menu (2026-11-18):** `ui/workspace/tab-menu.tsx` builds the menu that
+`tabs.tsx` opens from a right click (at the pointer) or the menu key/Shift+F10
+(under the tab). Close, Close others, Close to the right and Close all run through
+`use-document-tabs.ts` (`closeTabs`), which closes tabs in order through the
+runtime's `close` and stops at the first one that stays open. App composition's
+`use-tab-menu-actions.ts` lends the file-manager reveal and Copy path / Copy
+relative path (`systemEntryPath`); an external file offers no relative path.
+`tabs.test.tsx` covers the right-click and keyboard menus, disabled entries,
+the copy and reveal calls, and the stop at a tab that stays open. Clipboard and
+reveal failures are not reported from the tab menu, and the menu has not been
+driven in the built app.
+
 **Office lock classification (2026-11-17):** `file-listing.test.ts` covers
 Office lock extensions beside ordinary `~$`-prefixed Markdown, text, JSON and
 HTML sources. These sources remain visible with either hidden-file preference;
