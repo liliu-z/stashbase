@@ -164,6 +164,7 @@ function WorkspaceWindow() {
     preparation,
     revisions,
     session,
+    tabMenu,
     workspace,
   });
 
@@ -382,7 +383,7 @@ function WorkspaceWindow() {
             newTab={newTab}
             onToggleChatPane={() => setChatPaneOpen((open) => !open)}
             sidebarNotices={notices.cornerShown}
-            tabMenu={tabMenu}
+            tabMenu={tabMenu.actions}
             documents={documents}
             hasActiveFolder={activeFolder !== null}
             mode={chrome.navigator.mode}

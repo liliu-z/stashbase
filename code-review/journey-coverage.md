@@ -1057,9 +1057,11 @@ runtime's `close` and stops at the first one that stays open. App composition's
 `use-tab-menu-actions.ts` lends the file-manager reveal and Copy path / Copy
 relative path (`systemEntryPath`); an external file offers no relative path.
 `tabs.test.tsx` covers the right-click and keyboard menus, disabled entries,
-the copy and reveal calls, and the stop at a tab that stays open. Clipboard and
-reveal failures are not reported from the tab menu, and the menu has not been
-driven in the built app.
+the copy and reveal calls, and the stop at a tab that stays open. A failed copy
+or reveal raises a dismissible floating notice through `use-workspace-notices.ts`,
+using the file tree's clipboard sentence and the file viewer's reveal sentence;
+the next successful copy or reveal clears it (`use-tab-menu-actions.test.ts`,
+`use-workspace-notices.test.ts`). The menu has not been driven in the built app.
 
 **Office lock classification (2026-11-17):** `file-listing.test.ts` covers
 Office lock extensions beside ordinary `~$`-prefixed Markdown, text, JSON and
