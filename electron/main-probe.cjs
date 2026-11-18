@@ -261,12 +261,13 @@ function createServerSpawn({ command, args, platform = process.platform }) {
   return { command: quote(command), args: args.map(quote), shell: true };
 }
 
-/** Source launches compile the TypeScript server on demand, so their first
- * process can legitimately take longer on a cold or contended machine than
- * the pre-bundled packaged entry. Keep packaged startup failure fast while
- * giving source launches a separate bounded readiness budget. */
-function serverStartupTimeoutMs({ packaged }) {
-  return packaged ? 10_000 : 30_000;
+/** Bounded readiness budget for an owned, still-running server. A crash fails
+ * immediately through the child exit check, so this only bounds a live child
+ * that has not answered yet. Packaged Windows cold starts can exceed ten
+ * seconds while antivirus scans freshly installed native modules and the
+ * bundled entry, so packaged and source launches share the same budget. */
+function serverStartupTimeoutMs() {
+  return 30_000;
 }
 
 /** A listener that accepted the TCP connection but did not finish the health

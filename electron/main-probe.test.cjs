@@ -309,9 +309,9 @@ test('Windows source launch keeps a spaced checkout path intact through cmd.exe'
   }
 });
 
-test('source server startup covers cold TypeScript loading without weakening packaged failure bounds', () => {
+test('server startup covers cold source loading and slow packaged Windows starts', () => {
   assert.equal(serverStartupTimeoutMs({ packaged: false }), 30_000);
-  assert.equal(serverStartupTimeoutMs({ packaged: true }), 10_000);
+  assert.equal(serverStartupTimeoutMs({ packaged: true }), 30_000);
 });
 
 test('Electron waits through a temporarily unresponsive server instead of spawning a competitor', async () => {
