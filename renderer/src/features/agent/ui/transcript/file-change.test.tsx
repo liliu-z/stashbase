@@ -38,6 +38,19 @@ describe('Agent file change evidence', () => {
     expect(container.querySelector('.cm-content')?.getAttribute('contenteditable')).toBe('false'); // dom-contract: CodeMirror internals
   });
 
+  it('names a project change by its project folder and keeps the full path on hover', () => {
+    render(
+      <AgentFileChangeView
+        change={{ action: 'edited', path: '/project/Research/notes.md', patch: '+new\n' }}
+        sourceFor={() => ({ folderPath: '/project', path: 'Research/notes.md' })}
+      />,
+    );
+
+    const section = screen.getByRole('region', { name: 'Edited notes.md' });
+    expect(section.textContent).not.toContain('/project');
+    expect(screen.getByText('Research').getAttribute('title')).toBe('/project/Research/notes.md');
+  });
+
   it('shows server counts, line numbers for whole files, and patches by marker', () => {
     const { container } = render(
       <>
@@ -90,6 +103,12 @@ describe('Agent file change evidence', () => {
     expect(list.textContent).toContain('plan.md');
     expect(list.textContent).toContain('Wrote');
     expect(list.textContent).toContain('config.json');
+    // A project file names its folder within the project; the absolute path
+    // stays available on hover. A file outside the project keeps its path.
+    const projectFolder = screen.getByText('notes');
+    expect(projectFolder.getAttribute('title')).toBe('/project/Research/notes/plan.md');
+    expect(list.textContent).not.toContain('/project/Research');
+    expect(list.textContent).toContain('/elsewhere');
     expect(screen.queryByRole('button', { name: 'Open config.json' })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Open plan.md' }));
     expect(onOpenSource).toHaveBeenCalledWith(

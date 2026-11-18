@@ -80,7 +80,15 @@ function iconFor(tool: AgentToolBlock): ToolIcon {
 /** The payload a tool surface renders once, shared by the row and the
  *  permission card so the ladder cannot drift: the diff when the call is a
  *  file change with evidence, the bounded inert text otherwise. */
-function AgentToolPayload({ indent = true, tool }: { indent?: boolean; tool: AgentToolBlock }) {
+function AgentToolPayload({
+  indent = true,
+  sourceFor,
+  tool,
+}: {
+  indent?: boolean;
+  sourceFor?: ((path: string) => SourceReference | null) | undefined;
+  tool: AgentToolBlock;
+}) {
   const changes = fileChangesForTool(tool.name, tool.input).filter(
     (change) => change.text !== undefined || change.patch !== undefined,
   );
@@ -95,7 +103,7 @@ function AgentToolPayload({ indent = true, tool }: { indent?: boolean; tool: Age
       )}
     >
       {changes.map((change) => (
-        <AgentFileChangeView change={change} key={fileChangeKey(change)} />
+        <AgentFileChangeView change={change} key={fileChangeKey(change)} sourceFor={sourceFor} />
       ))}
       {questions && (
         <AgentQuestionSummary answers={agentQuestionAnswers(tool.input)} questions={questions} />
@@ -123,7 +131,13 @@ function AgentToolPayload({ indent = true, tool }: { indent?: boolean; tool: Age
   );
 }
 
-function AgentToolRow({ tool }: { tool: AgentToolBlock }) {
+function AgentToolRow({
+  sourceFor,
+  tool,
+}: {
+  sourceFor?: ((path: string) => SourceReference | null) | undefined;
+  tool: AgentToolBlock;
+}) {
   const shape = useShape();
   const [open, setOpen] = useState(false);
   // The payload stays unmounted until the row is opened and leaves again once
@@ -201,7 +215,7 @@ function AgentToolRow({ tool }: { tool: AgentToolBlock }) {
       </button>
       {hasDetails && (
         <Disclosure id={panelId} open={open}>
-          <AgentToolPayload tool={tool} />
+          <AgentToolPayload sourceFor={sourceFor} tool={tool} />
         </Disclosure>
       )}
     </div>
@@ -270,7 +284,7 @@ export function AgentActivityGroup({
                   {step.text}
                 </p>
               ) : (
-                <AgentToolRow key={step.id} tool={step} />
+                <AgentToolRow key={step.id} sourceFor={sourceFor} tool={step} />
               ),
             )}
         </ThinkingStepsContent>
@@ -278,7 +292,7 @@ export function AgentActivityGroup({
       {tools
         .filter((tool) => tool.status === 'denied')
         .map((tool) => (
-          <AgentToolRow key={tool.id} tool={tool} />
+          <AgentToolRow key={tool.id} sourceFor={sourceFor} tool={tool} />
         ))}
       <AgentChangedFiles changes={changes} onOpenSource={onOpenSource} sourceFor={sourceFor} />
     </div>
@@ -288,8 +302,10 @@ export function AgentActivityGroup({
 export function AgentPermissionCard({
   tool,
   onReply,
+  sourceFor,
 }: {
   tool: AgentToolBlock;
+  sourceFor?: ((path: string) => SourceReference | null) | undefined;
   onReply(
     toolUseId: string,
     permissionId: string,
@@ -313,7 +329,7 @@ export function AgentPermissionCard({
       headingRef={headingRef}
       icon={CircleAlert}
     >
-      <AgentToolPayload indent={false} tool={tool} />
+      <AgentToolPayload indent={false} sourceFor={sourceFor} tool={tool} />
       {permissionId && tool.approvalScopes?.includes('always') && (
         <p className="text-sm text-muted-foreground">
           Applies to this permission. Individual actions can still require approval.

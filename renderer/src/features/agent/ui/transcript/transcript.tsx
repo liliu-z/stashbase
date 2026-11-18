@@ -168,7 +168,7 @@ const TranscriptBlock = memo(function TranscriptBlock({
       {questions ? (
         <AgentQuestionCard onReply={onPermission} questions={questions} tool={block} />
       ) : (
-        <AgentPermissionCard onReply={onPermission} tool={block} />
+        <AgentPermissionCard onReply={onPermission} sourceFor={sourceFor} tool={block} />
       )}
     </div>
   );
