@@ -69,6 +69,7 @@ const TranscriptBlock = memo(function TranscriptBlock({
   onOpenExternal,
   onOpenSource,
   onReviewTurnChange,
+  projectPathFor,
   sourceFor,
   onPermission,
   onRetry,
@@ -93,6 +94,7 @@ const TranscriptBlock = memo(function TranscriptBlock({
     | ((source: SourceReference, phrase: string | null, quoteFormat?: 'markdown') => void)
     | undefined;
   onReviewTurnChange?: ((review: AgentTurnChangeReview) => void) | undefined;
+  projectPathFor?: ((path: string) => string | null) | undefined;
   sourceFor?: ((path: string) => SourceReference | null) | undefined;
   /** When the prompt a closing reply answers was sent, for the duration. */
   promptAt: number | undefined;
@@ -144,6 +146,7 @@ const TranscriptBlock = memo(function TranscriptBlock({
         files={block.files}
         onOpenSource={onOpenSource}
         onReviewTurnChange={onReviewTurnChange}
+        projectPathFor={projectPathFor}
         sourceFor={sourceFor}
         turnId={block.turnId}
       />
@@ -168,7 +171,7 @@ const TranscriptBlock = memo(function TranscriptBlock({
       {questions ? (
         <AgentQuestionCard onReply={onPermission} questions={questions} tool={block} />
       ) : (
-        <AgentPermissionCard onReply={onPermission} sourceFor={sourceFor} tool={block} />
+        <AgentPermissionCard onReply={onPermission} projectPathFor={projectPathFor} tool={block} />
       )}
     </div>
   );
@@ -191,6 +194,7 @@ export const AgentTranscript = memo(function AgentTranscript({
   onUpdateApp,
   onReviewTurnChange,
   pending = NO_PENDING,
+  projectPathFor,
   runtimeUpdate,
   signedIn,
   sourceFor,
@@ -222,6 +226,8 @@ export const AgentTranscript = memo(function AgentTranscript({
   /** The in-place update of the conversation's runtime, offered on a turn
    *  the runtime was too old for. Absent where nothing can run one. */
   runtimeUpdate?: AgentRuntimeUpdateView | undefined;
+  /** A touched path's place in the project, listed or not, for its label. */
+  projectPathFor?: ((path: string) => string | null) | undefined;
   /** The workspace source behind a changed path, or null when it is not one. */
   sourceFor?: ((path: string) => SourceReference | null) | undefined;
   /** The File behind a sent upload, when this session still holds it. */
@@ -283,6 +289,7 @@ export const AgentTranscript = memo(function AgentTranscript({
         key={group.id}
         live={activeTurn && group === liveGroup}
         onOpenSource={onOpenSource}
+        projectPathFor={projectPathFor}
         sourceFor={sourceFor}
         steps={group.steps}
       />
@@ -302,6 +309,7 @@ export const AgentTranscript = memo(function AgentTranscript({
             onOpenExternal={onOpenExternal}
             onOpenSource={onOpenSource}
             onReviewTurnChange={onReviewTurnChange}
+            projectPathFor={projectPathFor}
             sourceFor={sourceFor}
             onPermission={decide}
             onRetry={onRetry}

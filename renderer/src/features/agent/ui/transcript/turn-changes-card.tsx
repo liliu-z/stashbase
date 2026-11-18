@@ -76,12 +76,14 @@ export function AgentTurnChangesCard({
   files,
   onOpenSource,
   onReviewTurnChange,
+  projectPathFor,
   sourceFor,
   turnId,
 }: {
   files: readonly AgentTurnChangedFile[];
   onOpenSource?: ((source: SourceReference, phrase: string | null) => void) | undefined;
   onReviewTurnChange?: ((review: AgentTurnChangeReview) => void) | undefined;
+  projectPathFor?: ((path: string) => string | null) | undefined;
   sourceFor?: ((path: string) => SourceReference | null) | undefined;
   turnId: string;
 }) {
@@ -121,7 +123,7 @@ export function AgentTurnChangesCard({
                 iconSize={14}
                 layout="path-first"
                 path={file.path}
-                shownPath={source?.path}
+                shownPath={projectPathFor?.(file.path) ?? source?.path}
               />
               <Counts additions={file.additions} deletions={file.deletions} />
               <span

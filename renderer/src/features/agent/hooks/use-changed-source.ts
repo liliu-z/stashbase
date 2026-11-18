@@ -21,3 +21,11 @@ export function useChangedSource(runtime: AgentWorkspaceRuntime, scope: AgentSco
     [scope, environment],
   );
 }
+
+/** Names a path a turn touched by its place in the project, whether or not
+ *  the file exists now: a file about to be created or just deleted still has
+ *  a project folder. Labels use this; opening a file still needs
+ *  `useChangedSource`, which also requires the file to be listed. */
+export function useProjectPathFor(scope: AgentScope) {
+  return useMemo(() => (path: string) => changedSource(scope, path)?.path ?? null, [scope]);
+}

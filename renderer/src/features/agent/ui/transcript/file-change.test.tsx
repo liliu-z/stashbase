@@ -42,7 +42,7 @@ describe('Agent file change evidence', () => {
     render(
       <AgentFileChangeView
         change={{ action: 'edited', path: '/project/Research/notes.md', patch: '+new\n' }}
-        sourceFor={() => ({ folderPath: '/project', path: 'Research/notes.md' })}
+        projectPathFor={() => 'Research/notes.md'}
       />,
     );
 
@@ -80,6 +80,23 @@ describe('Agent file change evidence', () => {
     const lineNodes = patch.querySelectorAll('[data-line]'); // dom-contract: see comment above
     const kinds = [...lineNodes].map((row) => row.getAttribute('data-line'));
     expect(kinds).toEqual(['meta', 'meta', 'meta', 'del', 'add', 'ctx']);
+  });
+
+  it('names an unlisted project file by its project folder without offering Open', () => {
+    render(
+      <AgentChangedFiles
+        changes={[{ action: 'deleted', path: '/project/Research/old/notes.md' }]}
+        onOpenSource={vi.fn()}
+        projectPathFor={() => 'old/notes.md'}
+        sourceFor={() => null}
+      />,
+    );
+
+    expect(screen.getByText('old').getAttribute('title')).toBe('/project/Research/old/notes.md');
+    expect(screen.getByRole('list', { name: 'Changed files' }).textContent).not.toContain(
+      '/project',
+    );
+    expect(screen.queryByRole('button', { name: 'Open notes.md' })).toBeNull();
   });
 
   it('lists changed files once and offers Open only for workspace sources', async () => {

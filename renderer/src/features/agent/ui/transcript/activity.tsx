@@ -82,11 +82,11 @@ function iconFor(tool: AgentToolBlock): ToolIcon {
  *  file change with evidence, the bounded inert text otherwise. */
 function AgentToolPayload({
   indent = true,
-  sourceFor,
+  projectPathFor,
   tool,
 }: {
   indent?: boolean;
-  sourceFor?: ((path: string) => SourceReference | null) | undefined;
+  projectPathFor?: ((path: string) => string | null) | undefined;
   tool: AgentToolBlock;
 }) {
   const changes = fileChangesForTool(tool.name, tool.input).filter(
@@ -103,7 +103,11 @@ function AgentToolPayload({
       )}
     >
       {changes.map((change) => (
-        <AgentFileChangeView change={change} key={fileChangeKey(change)} sourceFor={sourceFor} />
+        <AgentFileChangeView
+          change={change}
+          key={fileChangeKey(change)}
+          projectPathFor={projectPathFor}
+        />
       ))}
       {questions && (
         <AgentQuestionSummary answers={agentQuestionAnswers(tool.input)} questions={questions} />
@@ -132,10 +136,10 @@ function AgentToolPayload({
 }
 
 function AgentToolRow({
-  sourceFor,
+  projectPathFor,
   tool,
 }: {
-  sourceFor?: ((path: string) => SourceReference | null) | undefined;
+  projectPathFor?: ((path: string) => string | null) | undefined;
   tool: AgentToolBlock;
 }) {
   const shape = useShape();
@@ -215,7 +219,7 @@ function AgentToolRow({
       </button>
       {hasDetails && (
         <Disclosure id={panelId} open={open}>
-          <AgentToolPayload sourceFor={sourceFor} tool={tool} />
+          <AgentToolPayload projectPathFor={projectPathFor} tool={tool} />
         </Disclosure>
       )}
     </div>
@@ -237,6 +241,7 @@ export function AgentActivityGroup({
   focusToolId = null,
   live = false,
   onOpenSource,
+  projectPathFor,
   sourceFor,
   steps,
 }: {
@@ -248,6 +253,7 @@ export function AgentActivityGroup({
    *  what makes the group live, not a single call's status. */
   live?: boolean;
   onOpenSource?: ((source: SourceReference, phrase: string | null) => void) | undefined;
+  projectPathFor?: ((path: string) => string | null) | undefined;
   sourceFor?: ((path: string) => SourceReference | null) | undefined;
   steps: AgentActivityStep[];
 }) {
@@ -284,7 +290,7 @@ export function AgentActivityGroup({
                   {step.text}
                 </p>
               ) : (
-                <AgentToolRow key={step.id} sourceFor={sourceFor} tool={step} />
+                <AgentToolRow key={step.id} projectPathFor={projectPathFor} tool={step} />
               ),
             )}
         </ThinkingStepsContent>
@@ -292,9 +298,14 @@ export function AgentActivityGroup({
       {tools
         .filter((tool) => tool.status === 'denied')
         .map((tool) => (
-          <AgentToolRow key={tool.id} sourceFor={sourceFor} tool={tool} />
+          <AgentToolRow key={tool.id} projectPathFor={projectPathFor} tool={tool} />
         ))}
-      <AgentChangedFiles changes={changes} onOpenSource={onOpenSource} sourceFor={sourceFor} />
+      <AgentChangedFiles
+        changes={changes}
+        onOpenSource={onOpenSource}
+        projectPathFor={projectPathFor}
+        sourceFor={sourceFor}
+      />
     </div>
   );
 }
@@ -302,10 +313,10 @@ export function AgentActivityGroup({
 export function AgentPermissionCard({
   tool,
   onReply,
-  sourceFor,
+  projectPathFor,
 }: {
   tool: AgentToolBlock;
-  sourceFor?: ((path: string) => SourceReference | null) | undefined;
+  projectPathFor?: ((path: string) => string | null) | undefined;
   onReply(
     toolUseId: string,
     permissionId: string,
@@ -329,7 +340,7 @@ export function AgentPermissionCard({
       headingRef={headingRef}
       icon={CircleAlert}
     >
-      <AgentToolPayload indent={false} sourceFor={sourceFor} tool={tool} />
+      <AgentToolPayload indent={false} projectPathFor={projectPathFor} tool={tool} />
       {permissionId && tool.approvalScopes?.includes('always') && (
         <p className="text-sm text-muted-foreground">
           Applies to this permission. Individual actions can still require approval.

@@ -228,12 +228,12 @@ export function Counts({ additions, deletions }: { additions: number; deletions:
 /** One change as evidence: the file strip, then its diff or patch. */
 export function AgentFileChangeView({
   change,
-  sourceFor,
+  projectPathFor,
 }: {
   change: AgentFileChange;
   /** Names a change inside the project by its project path, as the turn's
    *  Changed files card does; the absolute path stays in the tooltip. */
-  sourceFor?: ((path: string) => SourceReference | null) | undefined;
+  projectPathFor?: ((path: string) => string | null) | undefined;
 }) {
   const shape = useShape();
   const name = basePathName(change.path);
@@ -254,7 +254,7 @@ export function AgentFileChangeView({
         <ChangedFileLabel
           iconSize={12}
           path={change.path}
-          shownPath={sourceFor?.(change.path)?.path}
+          shownPath={projectPathFor?.(change.path) ?? undefined}
         />
         <span className="shrink-0 text-muted-foreground">
           {FILE_CHANGE_ACTION_LABEL[change.action]}
@@ -285,10 +285,12 @@ export function AgentFileChangeView({
 export function AgentChangedFiles({
   changes,
   onOpenSource,
+  projectPathFor,
   sourceFor,
 }: {
   changes: readonly AgentFileChange[];
   onOpenSource?: ((source: SourceReference, phrase: string | null) => void) | undefined;
+  projectPathFor?: ((path: string) => string | null) | undefined;
   sourceFor?: ((path: string) => SourceReference | null) | undefined;
 }) {
   const shape = useShape();
@@ -303,7 +305,11 @@ export function AgentChangedFiles({
             className={cn('flex min-h-8 items-center gap-2 px-2 text-ui-12', shape.item)}
             key={change.path}
           >
-            <ChangedFileLabel iconSize={14} path={change.path} shownPath={source?.path} />
+            <ChangedFileLabel
+              iconSize={14}
+              path={change.path}
+              shownPath={projectPathFor?.(change.path) ?? source?.path}
+            />
             <span className="ml-auto shrink-0 text-muted-foreground">
               {FILE_CHANGE_ACTION_LABEL[change.action]}
             </span>
