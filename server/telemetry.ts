@@ -18,6 +18,7 @@ import { hostedUsageFetch } from './hosted-auth-transport.ts';
 import { GALLERY_DOWNLOAD_API_URL, usageBatchUrl } from '../shared/hosted-auth-network.ts';
 import packageInfo from '../package.json' with { type: 'json' };
 import { resetWriteDiagnostics } from './write-diagnostic-lifecycle.ts';
+import { initialUsageIdentity, clearServerStartTelemetry } from './telemetry-bootstrap.ts';
 export type { TelemetryState } from './telemetry-state.ts';
 
 const turnIdentity = (turn: PendingTurn): UsageIdentity => ({ installationId: turn.installationId, anonymousId: turn.anonymousId, firstSeenAt: turn.firstSeenAt, ...(turn.userId ? { userId: turn.userId } : {}) });
@@ -56,6 +57,8 @@ export function createTelemetry(options: {
   write(config: AppConfigFile): void;
   fetch?: typeof fetch;
   now?: () => number;
+  initialIdentity?: () => UsageIdentity | undefined;
+  clearStartup?: () => void;
 }) {
   const now = options.now ?? Date.now;
   const sendFetch = options.fetch ?? fetch;
@@ -280,6 +283,7 @@ export function createTelemetry(options: {
 
   const synchronize = (config: AppConfigFile, state: TelemetryState): UsageIdentity => {
     synchronizeRenderer(config);
+    if (config.telemetry === undefined) Object.assign(state, options.initialIdentity?.());
     usageIdentity(state, now());
     const userId = accountUsageId(config);
     if (state.userId !== userId) {
@@ -651,7 +655,7 @@ export function createTelemetry(options: {
       catch { /* Never replace the original condition. */ }
     },
     update(next: { enabled: boolean }) {
-      if (!next.enabled) { collectionStopped = true; cancel(); options.native?.clear(); resetWriteDiagnostics(); }
+      if (!next.enabled) { collectionStopped = true; cancel(); options.native?.clear(); options.clearStartup?.(); resetWriteDiagnostics(); }
       const config = options.read();
       const state = usageState(config, now());
       // Disabling erases the queue and all local analytics identity. No final
@@ -688,6 +692,7 @@ export const telemetry = createTelemetry({
   projectToken: destination.projectToken, host: destination.host,
   version: packageInfo.version, os: process.platform,
   read: readAppConfigStrict, write: writeAppConfigStrict,
+  initialIdentity: initialUsageIdentity, clearStartup: clearServerStartTelemetry,
   // Follow the system proxy like account traffic; Node fetch would bypass it.
   fetch: hostedUsageFetch,
 });

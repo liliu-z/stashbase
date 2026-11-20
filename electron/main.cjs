@@ -147,6 +147,11 @@ const RESOURCES_ROOT = app.isPackaged ? process.resourcesPath : PROJECT_ROOT;
 const { createNativeDiagnostics, telemetryAvailable } = require('../dist/electron/diagnostics/native.cjs');
 const { attachWindowDiagnostics, attachChildProcessDiagnostics } = require('./renderer/lifecycle-diagnostics.cjs');
 const appSessionId = crypto.randomUUID();
+const { createServerStartTelemetry } = require('../dist/electron/diagnostics/server-start.cjs');
+const serverStartTelemetry = createServerStartTelemetry({
+  version: app.getVersion(), distribution: app.isPackaged ? 'packaged' : 'source',
+  fetch: (url, init) => net.fetch(url, init),
+});
 let hostInstanceId;
 const nativeDiagnostics = createNativeDiagnostics({ available: telemetryAvailable(), distribution: app.isPackaged ? 'packaged' : 'source', version: app.getVersion() });
 process.on('uncaughtExceptionMonitor', (error) => nativeDiagnostics.record(error, 'uncaught', { process: 'electron-main', app_session_id: appSessionId }));
@@ -849,6 +854,7 @@ function spawnServer(instanceId) {
 
 async function startOrReuseServer() {
   let spawnedChild = null;
+  const attempt = serverStartTelemetry.begin(appSessionId);
   try {
     if (!authNetworkBridge) {
       const { createAuthNetworkBridge } = require('../dist/electron/account/auth-network.cjs');
@@ -861,13 +867,21 @@ async function startOrReuseServer() {
     const child = await startServer({
       packaged: app.isPackaged,
       port: SERVER_PORT,
+      onStage: (stage, context) => attempt.stage(stage, context),
       probe: (instanceId, timeoutMs = 300) => probeServer(SERVER_PORT, timeoutMs, instanceId),
-      onReady: (health) => { hostInstanceId = health.instanceId; preparationStorageWarning = health.preparationStorageWarning ?? null; },
+      onReady: (health) => {
+        hostInstanceId = health.instanceId;
+        attempt.stage('ready', health.instanceId ? { host_instance_id: health.instanceId } : {});
+        preparationStorageWarning = health.preparationStorageWarning ?? null;
+      },
       spawn: (instanceId) => { spawnedChild = spawnServer(instanceId); return spawnedChild; },
     });
+    attempt.success(!child);
     if (!child) console.log(`[electron] reusing existing server at ${SERVER_URL}`);
   } catch (err) {
+    attempt.failed(err, err?.startupContext);
     stopSpawnedServer(spawnedChild);
+    await serverStartTelemetry.settle();
     throw Object.assign(new Error(appendServerLogHint(err?.message ?? String(err)), { cause: err }), { startupContext: err?.startupContext });
   }
 }

@@ -12,14 +12,14 @@ export const usageDistributionSchema = z.enum(['source', 'packaged']);
 const id = z.string().uuid();
 const userId = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/);
 const timestamp = z.string().datetime();
-const identitySchema = z.object({
+export const usageIdentitySchema = z.object({
   installationId: id,
   anonymousId: id,
   userId: userId.optional(),
   firstSeenAt: timestamp,
 });
-export type UsageIdentity = z.infer<typeof identitySchema>;
-const queuedSchema = identitySchema.extend({
+export type UsageIdentity = z.infer<typeof usageIdentitySchema>;
+export const queuedUsageSchema = usageIdentitySchema.extend({
   uuid: id,
   timestamp,
   version: z.string().max(80),
@@ -30,9 +30,9 @@ const queuedSchema = identitySchema.extend({
   rendererDelivery: rendererDeliverySchema.optional(),
   event: z.union([telemetryEventSchema, z.object({ event: z.literal('$identify') }).strict()]),
 }).strict();
-export type QueuedUsage = z.infer<typeof queuedSchema>;
+export type QueuedUsage = z.infer<typeof queuedUsageSchema>;
 
-const turnSchema = identitySchema.extend({
+const turnSchema = usageIdentitySchema.extend({
   turnId: id, runtime: z.enum(['stashbase', 'claude', 'codex', 'antigravity']),
   version: z.string().max(80), os: z.string().max(20), sessionId: id.optional(),
   distribution: usageDistributionSchema,
@@ -76,13 +76,13 @@ export function usageState(config: AppConfigFile, now: number): TelemetryState {
   const raw = config.telemetry;
   if (raw === undefined) return { enabled: true };
   if (raw?.enabled !== true) return { enabled: false };
-  const identity = identitySchema.safeParse(raw);
+  const identity = usageIdentitySchema.safeParse(raw);
   const delivery = hostDeliverySchema.safeParse(raw.delivery);
   const queue: QueuedUsage[] = [];
   let expired = 0;
   let invalid = 0;
   for (const item of Array.isArray(raw.queue) ? raw.queue : []) {
-    const parsed = queuedSchema.safeParse(item);
+    const parsed = queuedUsageSchema.safeParse(item);
     if (!parsed.success || Date.parse(parsed.data.timestamp) > now + 60_000 || queue.length >= QUEUE_LIMIT) invalid++;
     else if (Date.parse(parsed.data.timestamp) <= now - QUEUE_TTL) expired++;
     else queue.push(parsed.data);

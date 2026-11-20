@@ -3,6 +3,7 @@
 export const electronBoundaryEntries = {
   'account/auth-network': 'electron/account/auth-network.ts',
   'diagnostics/native': 'server/native-diagnostics.ts',
+  'diagnostics/server-start': 'server/server-start-telemetry.ts',
   'bug-report/review-ipc': 'electron/bug-report/review-ipc.ts',
   'bug-report/review-preload': 'electron/bug-report/review-preload.ts',
   'bug-report/review-window-preload': 'electron/bug-report/review-window-preload.ts',

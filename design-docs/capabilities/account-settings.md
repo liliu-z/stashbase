@@ -342,6 +342,12 @@ reader to current credits rather than claiming all credits are spent.
   and person identities remain separate; signing out or switching accounts retires
   the prior anonymous identity. No hardware fingerprint or document/chat content
   participates. Local activity remains usable without signing in.
+  Desktop server startup reports its initiation and success or failure before
+  the workspace loads, including elapsed time and the last observed stage.
+  Reporting must remain possible when the local server cannot start. First-use
+  reports use an anonymous installation identity that continues into normal use;
+  they cannot identify a person who has never signed in. The same opt-out controls
+  these reports and their offline retention.
   Diagnostic explanations, paths, stack traces, nested causes and bounded process
   output are retained to support debugging. Known credential patterns are filtered;
   documents, chats, arbitrary provider payloads and whole logs are not collected.

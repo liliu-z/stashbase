@@ -44,6 +44,9 @@ in provider history; absence is not evidence of source use.
 
 | Event | Meaning | Additional fields |
 |---|---|---|
+| `server_start_initiated` | Main starts a shared server-readiness attempt, before the workspace exists | `app_session_id`, `attempt_id`, `stage`, `elapsed_ms` |
+| `server_start_success` | The expected server passes health, before creating the workspace window | Same IDs, `elapsed_ms`, `stage: ready`, `reused`, available `context.host_instance_id` |
+| `server_start_failed` | Network initialization, port arbitration, spawn or readiness fails | Same IDs, `elapsed_ms`, last `stage`, redacted `diagnostic.message`/cause and available probe `context` |
 | `app_opened` | Workspace mounts, once per host lifetime | None |
 | `app_active` | Trusted pointer, keyboard or wheel input in a visible, focused app window | `mode`: welcome / documents / chat |
 | `document_engaged` | Interaction inside the active document surface, or an actual editor change | `activity`: read / edit; allowlisted `format` |
@@ -150,6 +153,18 @@ missing record cannot establish that a request never reached the host.
 Metadata contains only method, a registered route template or allowlisted service
 name, timings, status and ephemeral correlation IDs; it contains no query,
 request/response body or user-supplied path components.
+
+For desktop startup, filter the three `server_start_*` events by
+`installation_id`, then group by `app_session_id` and `attempt_id`. The last
+entered `stage` is `network`, `arbitration`, `spawn`, `waiting_ready`, or `ready`.
+`context.process_start_id` joins the owned child, and a failed readiness wait
+also includes the last `probe_result`, duration/status, probe count and any
+identity mismatch field. `elapsed_ms` includes setup and arbitration as well
+as readiness; it excludes the later diagnostic upload. A first-use failure is
+anonymous until a subsequent sign-in links that identity. An initiation without
+a terminal event can mean abrupt termination or lost delivery, not a proven hang.
+The waiting-ready stage cannot by itself distinguish module loading, OS scanning
+or another child-process stall.
 
 Allowance-query failures keep the local response status separate from the
 upstream status/request ID or original network cause. Daemon and agent startup
@@ -330,12 +345,24 @@ only temporary failures retry. Account/privacy changes and host replacement disc
 older renderer requests. These short retries do not survive a closed renderer and
 never resend an Agent task. There is no second durable renderer queue.
 Renderer error delivery queues up to 100 errors and retries each up to three times.
-Native processes spool up to 50 bounded diagnostic records for seven days, including startup,
+Native processes spool up to 50 bounded diagnostic records for 30 days, including startup,
 renderer/child-process crashes, MCP startup and actual updater failures. The host
 imports them every five seconds or on shutdown, retaining occurrence time and
-source version. A crash before any host can run is recoverable only after a later
-healthy launch; a full spool can lose further errors. Normal lifecycle observations
+source version. Generic native diagnostics captured before any host can run are
+recoverable only after a later healthy launch; a full spool can lose further errors. Normal lifecycle observations
 stop admission at 25 pending records to leave room for failures.
+
+Desktop server-start facts have a separate main-owned spool under the application
+data directory's `server-start-telemetry/events`. They can upload without a host
+or renderer, using Electron's system-proxy transport. It admits at most 50 events
+and stops admitting initiations at 25 to reserve space for terminal outcomes;
+records expire after 30 days. Offline attempts retry with their original UUID,
+time, version and identity at the next launch or terminal event. Each drain has
+a 1.5-second deadline; a startup failure waits for an existing drain and one
+final drain before showing its blocking native dialog. Normal entry never waits
+for delivery. Opt-out erases this spool and the initial anonymous seed and aborts
+active transmission. Unreadable preferences fail closed. Ingestion acceptance
+does not prove dashboard visibility, and a permanently refused event is discarded.
 
 Queue expiry, saturation, unavailable local storage, ingestion rejection and
 uninstall can still lose events. HTTP acceptance alone does not establish that a
@@ -522,9 +549,11 @@ verification; local tests use replaced transport.
 
 ## Implementation and operator setup
 
-`server/telemetry.ts` owns identity, admission, session attribution, opt-out and
-transport. `server/telemetry-state.ts` validates persisted envelopes and maps them
-to the Capture API. The event allowlist is
+`server/telemetry.ts` owns host identity, admission, session attribution, opt-out and
+transport. The desktop startup exception is owned by `server/server-start-telemetry.ts`;
+`server/telemetry-bootstrap.ts` shares only the initial anonymous seed without
+letting main write the host configuration. `server/telemetry-state.ts` validates
+persisted envelopes and maps them to the Capture API. The event allowlist is
 `shared/protocols/http/telemetry.ts`; renderer intake accepts only renderer-owned
 facts. Authentication and billing facts cannot be supplied by renderer event
 requests. No analytics SDK or remote configuration runs.
@@ -532,7 +561,7 @@ requests. No analytics SDK or remote configuration runs.
 `server/telemetry-destination.json` contains the public PostHog ingestion token
 and host, never a Personal API key or secret. Forks should clear or replace it.
 Disable IP retention in the receiving project and choose its event retention
-period independently from the seven-day local delivery limit.
+period independently from the 30-day local delivery limit.
 
 ### Testing and development
 

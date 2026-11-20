@@ -95,6 +95,19 @@ const diagnosticFields = {
   turn_id: z.string().uuid().optional(), request_id: z.string().uuid().optional(),
   context: diagnosticContextSchema.optional(),
 };
+export const serverStartStageSchema = z.enum(['network', 'arbitration', 'spawn', 'waiting_ready', 'ready']);
+const serverStartFields = {
+  app_session_id: z.string().uuid(), attempt_id: z.string().uuid(),
+  stage: serverStartStageSchema, elapsed_ms: z.number().nonnegative(),
+  context: diagnosticContextSchema.optional(),
+};
+export const serverStartEventSchemas = [
+  z.object({ event: z.literal('server_start_initiated'), ...serverStartFields }).strict(),
+  z.object({ event: z.literal('server_start_success'), ...serverStartFields, reused: z.boolean() }).strict(),
+  z.object({ event: z.literal('server_start_failed'), ...serverStartFields, diagnostic }).strict(),
+] as const;
+export const serverStartEventSchema = z.discriminatedUnion('event', serverStartEventSchemas);
+export type ServerStartEvent = z.infer<typeof serverStartEventSchema>;
 export interface ErrorContext {
   source: 'server' | 'renderer' | 'agent' | 'native';
   turn_id?: string | undefined;
@@ -107,6 +120,7 @@ export interface ErrorContext {
 /** Strict field allowlist. The Node collection owner additionally redacts every
  * diagnostic; schema validation alone is not a privacy boundary. */
 export const telemetryEventSchema = z.discriminatedUnion('event', [
+  ...serverStartEventSchemas,
   z.object({ event: z.literal('app_opened') }).strict(),
   z.object({ event: z.literal('app_active'), mode: z.enum(['welcome', 'documents', 'chat']) }).strict(),
   z.object({ event: z.literal('document_engaged'), activity: z.enum(['read', 'edit']),

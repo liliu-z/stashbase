@@ -1280,10 +1280,15 @@ allowance snapshot to the gateway so their explanation reflects held capacity.
 
 ## Usage Statistics
 
-- Node owns analytics identity, preferences, sessions and a bounded durable queue
+- Node owns analytics preferences, account transitions, sessions and a bounded durable queue
   in the strict owner-only app-config store. Missing preferences default on;
   malformed/unreadable state fails closed. Configuration writes remain synchronous
   and atomic; no network response may replace a captured stale config snapshot.
+  Before the first host, main may publish a random initial anonymous identity in
+  `server/telemetry-bootstrap.ts`'s separate seed file. The host adopts that seed
+  only while analytics configuration is absent; main never writes app-config.
+  Opt-out removes the seed along with queued startup events. Later account and
+  privacy transitions remain host-owned and cannot revive that seed.
 - Installation IDs are random properties, never hardware IDs or aliases between
   people. Separate anonymous IDs link to a verified host account through PostHog
   identify. Logout, confirmed invalidation and direct account switches retire the
@@ -1462,10 +1467,18 @@ allowance snapshot to the gateway so their explanation reflects held capacity.
   inherits a prior request trace.
   Native startup, crash, MCP stdio and updater errors use the bounded private
   `server/native-diagnostics.ts` spool when the host is unavailable. Native code
-  never creates analytics identity or sends network requests. The host drains it
+  does not send this diagnostic spool. The host drains it
   with original UUID/time/version and captured identity, and opt-out clears it.
   An unowned first-launch failure cannot transfer to a later account. The updater
   records the original error in main before projecting its renderer snapshot.
+  The three `server_start_*` facts are a narrow exception: main owns their
+  separate bounded spool in `server/server-start-telemetry.ts` and delivers them
+  through Electron's proxy-aware fetch, independently of the failed host.
+  They reuse established analytics identity or the first-launch seed, preserve
+  UUID/time/version through retry, and recheck consent before transmission.
+  Opt-out/unreadable preferences abort active delivery; removing the spool also
+  retires an admitted collector if saving opt-out fails. Success never waits for
+  telemetry; failure permits two bounded drains before the blocking native dialog.
 - Host log level is the reported severity. `log.error` means an operation failed
   for the user or data may be inconsistent; `log.warn` means it degraded and
   continued; an expected state (no embedding key, a size limit the UI states,
@@ -1827,6 +1840,13 @@ Startup failures retain the last probe result/duration/status or mismatched
 identity field, probe count and total elapsed time. Refusal, connect/response
 timeout, transport failure, HTTP failure and invalid JSON remain distinguishable;
 health bodies and actual identity paths are not added to probe metadata.
+Main records one initiation and at most one terminal startup fact per shared
+readiness attempt, before creating the workspace window. An app-session ID joins
+retries; each attempt gets its own ID and retains any spawned host instance ID.
+Terminal facts include monotonic elapsed time and the last entered phase; timeout
+facts retain the health-probe evidence. A source-server reuse is explicit success.
+These observations do not establish why the OS or child stalled, and abrupt main
+termination can leave an initiation without a terminal fact.
 Single-instance and startup arbitration prevent duplicate initial windows.
 Packaged launches own their server; bounded POSIX orphan reclaim verifies sibling
 identity and a dead parent before killing. Foreign/live-parented listeners remain untouched.

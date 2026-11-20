@@ -161,11 +161,13 @@ async function startServer({
   spawn,
   probeOptions,
   onReady = () => {},
+  onStage = () => {},
   timeoutMs = serverStartupTimeoutMs({ packaged }),
   handoffTimeoutMs = 12_000,
   now = Date.now,
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 }) {
+  onStage('arbitration');
   let existing = await waitForStableServerProbe(probe, probeOptions);
   if (existing.compatible && !packaged) { onReady(existing); return null; }
   if (packaged && existing.compatible) {
@@ -196,7 +198,9 @@ async function startServer({
   // child arbitrate EADDRINUSE: it alone verifies the entry path and missing
   // parent before reclaiming, and leaves live or foreign listeners alone.
   const instanceId = randomUUID();
+  onStage('spawn', { process_start_id: instanceId, host_instance_id: instanceId });
   const child = spawn(instanceId);
+  onStage('waiting_ready');
   let spawnError = null;
   const onError = (error) => { spawnError = error; };
   child.on('error', onError);

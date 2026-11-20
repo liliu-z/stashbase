@@ -49,6 +49,24 @@ The map is navigation, not proof that every caller has been reviewed.
 
 ## J01: Onboarding
 
+**Desktop startup events (2026-11-18):** main records `server_start_initiated`
+before network/server preparation and exactly one observed success or failure
+per shared readiness attempt. App-session, attempt and host-instance IDs join
+the phases; failures retain redacted diagnostics and the last health probe.
+`server/server-start-telemetry.ts` owns a bounded spool and independent native
+delivery so a first-launch host failure can be reported before any renderer.
+`server/telemetry-bootstrap.ts` shares its initial anonymous identity with the
+later host without a second app-config writer. Controlled regressions exercise
+a ten-second readiness timeout without a host, later sign-in linking, owned
+success/source reuse, port/spawn failure, offline replay, bounded transport,
+ingestion refusal and opt-out. `pnpm check`, 93 focused startup/telemetry checks,
+98 protocol checks, docs/inventory checks and fresh builds passed. The built
+Electron lifecycle smoke sends initiation and a real readiness timeout through
+Electron networking to a local collector before any host or window exists;
+the remaining built smoke scenarios passed too. Windows device reproduction and actual PostHog
+ingestion/dashboard visibility remain unverified; these events add diagnostic
+evidence and do not repair the reported Windows startup failure.
+
 **Antigravity completion validation (2026-11-16):** `pnpm check`, 38 focused
 Antigravity checks, a fresh build and built Electron smoke passed. An isolated
 desktop chat with a controlled `agy` completed two successive replies despite

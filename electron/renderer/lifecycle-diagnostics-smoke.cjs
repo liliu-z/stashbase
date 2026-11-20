@@ -3,7 +3,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { once } = require('node:events');
 const { randomUUID } = require('node:crypto');
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, net } = require('electron');
 const { WebSocketServer } = require('ws');
 const { attachWindowDiagnostics, attachChildProcessDiagnostics } = require('./lifecycle-diagnostics.cjs');
 const { createNativeDiagnostics } = require('../../dist/electron/diagnostics/native.cjs');
@@ -15,6 +15,7 @@ app.on('window-all-closed', () => {});
 
 async function run() {
   await app.whenReady();
+  await verifyServerStartup();
   const windowId = randomUUID(), hostId = randomUUID();
   // Explicit fixture collector: no network delivery and no real preferences.
   const native = createNativeDiagnostics({ available: true, distribution: 'source', version: 'fixture',
@@ -65,6 +66,59 @@ async function run() {
   }
   await verifyNetworkExit(native, hostId);
   await verifyIntentionalClose();
+}
+
+async function verifyServerStartup() {
+  const { createServerStartTelemetry } = require('../../dist/electron/diagnostics/server-start.cjs');
+  const { startServer, probeServerHealth } = require('../main-probe.cjs');
+  const http = require('node:http');
+  const received = [];
+  const sink = http.createServer(async (request, response) => {
+    let body = '';
+    for await (const chunk of request) body += chunk;
+    received.push(...JSON.parse(body).batch);
+    response.end('{}');
+  });
+  await new Promise(resolve => sink.listen(0, '127.0.0.1', resolve));
+  const unused = http.createServer();
+  await new Promise(resolve => unused.listen(0, '127.0.0.1', resolve));
+  const port = unused.address().port;
+  await new Promise(resolve => unused.close(resolve));
+  const reporter = createServerStartTelemetry({ available: true, distribution: 'source', version: 'fixture',
+    directory: path.join(root, 'startup-events'), read: () => ({}),
+    // Explicit local replacement: even enabled fixture collection cannot reach
+    // the production destination. Exercise Electron's real network stack.
+    fetch: (_url, init) => net.fetch(`http://127.0.0.1:${sink.address().port}/capture`, init),
+  });
+  const attempt = reporter.begin(randomUUID());
+  let child;
+  try {
+    await reporter.flush();
+    assert.equal(received[0].event, 'server_start_initiated');
+    assert.equal(BrowserWindow.getAllWindows().length, 0);
+    await assert.rejects(startServer({ packaged: true, port, timeoutMs: 300, onStage: attempt.stage,
+      probe: (instanceId, timeout = 100) => probeServerHealth(port, timeout,
+        { protocolVersion: 1, appRoot: root, resourcesPath: root, instanceId }),
+      spawn: () => {
+        child = require('node:child_process').spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'],
+          { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, stdio: 'ignore' });
+        return child;
+      },
+    }), error => { attempt.failed(error, error.startupContext); return /did not come up/.test(error.message); });
+    await reporter.settle();
+    assert.deepEqual(received.map(event => event.event), ['server_start_initiated', 'server_start_failed']);
+    assert.equal(received[1].properties.context.probe_result, 'connection_refused');
+    assert.equal(received[1].properties.stage, 'waiting_ready');
+    assert.equal(received[1].properties.attempt_id, received[0].properties.attempt_id);
+    assert.equal(BrowserWindow.getAllWindows().length, 0);
+    console.log('real Electron startup timeout delivered before any host or renderer, using only a local collector');
+  } finally {
+    if (child && child.exitCode === null && child.signalCode === null) {
+      const exited = once(child, 'exit'); child.kill(); await exited;
+    }
+    sink.closeAllConnections();
+    await new Promise(resolve => sink.close(resolve));
+  }
 }
 
 async function verifyIntentionalClose() {
