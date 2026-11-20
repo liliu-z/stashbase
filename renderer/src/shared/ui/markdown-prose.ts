@@ -1,7 +1,6 @@
 /**
  * How rendered Markdown reads wherever the app shows an Agent's prose: the
- * transcript, and a Gallery persona's sample reply. One list, so a sample
- * looks the way the same reply would in a Chat.
+ * transcript and shared reply surfaces.
  */
 export const MARKDOWN_PROSE_CLASS = [
   'min-w-0 text-ui-14 leading-[1.6] whitespace-normal text-foreground',

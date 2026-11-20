@@ -57,24 +57,12 @@ test('project Agent choices persist in isolation, reject unregistered scopes, an
       saved = (await (await fetch(url)).json()).projects.find(entry => entry.scope === filesystemPath.absolute(project));
       assert.deepEqual(saved.efforts, {codex:null,claude:'medium',antigravity:'high'});
       assert.equal(saved.agent, 'claude');
-      // A persona chosen in an older Chat becomes the project's choice for new
-      // Chats without changing its Agent; null starts them with none.
-      const choose = (scope, agent, persona) => fetch(url, { method:'PUT', headers:{'content-type':'application/json'}, body:JSON.stringify({scope,agent,persona}) });
-      assert.equal((await choose(project, 'codex', 'journalist')).status, 200);
-      let chosen = (await (await fetch(url)).json()).projects.find(entry => entry.scope === filesystemPath.absolute(project));
-      assert.equal(chosen.persona, 'journalist');
-      assert.equal(chosen.agent, 'claude');
-      assert.equal((await choose(project, 'claude', null)).status, 200);
-      chosen = (await (await fetch(url)).json()).projects.find(entry => entry.scope === filesystemPath.absolute(project));
-      assert.equal(chosen.persona, null);
-      assert.equal((await choose(project, 'claude', '../escape')).status, 400);
       const chooseModel = (scope, agent, model) => fetch(url, { method:'PUT', headers:{'content-type':'application/json'}, body:JSON.stringify({scope,agent,model}) });
       assert.equal((await chooseModel(project, 'codex', 'writer')).status, 200);
       assert.equal((await chooseModel(project, 'claude', 'opus')).status, 200);
       assert.equal((await chooseModel(project, 'antigravity', 'gemini')).status, 200);
       assert.equal((await save(project, 'codex', 'high')).status, 200);
-      assert.equal((await choose(project, 'codex', 'journalist')).status, 200);
-      chosen = (await (await fetch(url)).json()).projects.find(entry => entry.scope === filesystemPath.absolute(project));
+      const chosen = (await (await fetch(url)).json()).projects.find(entry => entry.scope === filesystemPath.absolute(project));
       assert.deepEqual(chosen.models, { codex: 'writer', claude: 'opus', antigravity: 'gemini' });
       assert.deepEqual(chosen.efforts, { codex: 'high', claude: 'medium', antigravity: 'high' });
       let defaults = await (await fetch(url)).json();
@@ -83,7 +71,6 @@ test('project Agent choices persist in isolation, reject unregistered scopes, an
       assert.deepEqual(config.readAppConfigStrict().lastSelectedModels, defaults.defaultModels);
       assert.deepEqual(config.readAppConfigStrict().lastSelectedEfforts, defaults.defaultEfforts);
       assert.equal(chosen.agent, 'claude');
-      assert.equal(chosen.persona, 'journalist');
       assert.equal((await chooseModel(project, 'codex', null)).status, 200);
       assert.equal(config.readAppConfigStrict().agentPreferences.find(entry => entry.scope === filesystemPath.absolute(project)).models.codex, null);
       assert.equal((await (await fetch(url)).json()).defaultModels.codex, null);

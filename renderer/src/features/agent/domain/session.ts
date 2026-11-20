@@ -147,8 +147,6 @@ export function transitionAgentSession(
       return { ...state, model: action.model };
     case 'set-effort':
       return { ...state, effort: action.effort };
-    case 'set-persona':
-      return { ...state, persona: action.persona };
     case 'models': {
       const catalogIds = new Set(action.models.map((model) => model.id));
       const unavailable = state.model !== null && !catalogIds.has(state.model);
@@ -363,7 +361,6 @@ export function transitionAgentSession(
       return {
         ...state,
         effort: action.effort,
-        persona: action.persona ?? null,
         lastModified: action.lastModified,
         nativeSessionId: action.nativeSessionId,
         transcript: action.transcript,

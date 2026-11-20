@@ -191,8 +191,6 @@ const agentSessionConnectFields = {
   model: boundedText(200).optional(),
   resume: boundedText(512).optional(),
   crew: z.string().regex(/^[a-zA-Z0-9_-]{1,512}$/u).optional(),
-  /** The library persona the Chat runs under; absent runs none. */
-  persona: z.string().regex(/^[a-z0-9][a-z0-9-]{0,95}$/u).optional(),
 };
 
 export const agentSessionConnectSchema = z.object({

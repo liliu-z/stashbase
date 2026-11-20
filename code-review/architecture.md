@@ -569,7 +569,7 @@ The updater re-enables the window and can be retried after the draft is resolved
   chat owns its app-server/thread. After a Default turn, the host may prepare one
   unused OpenCode process and its MCP connection for the next chat. Claiming that
   spare transfers exclusive ownership, including its private attribution id;
-  active chats never share it. Window, project, account, persona and instruction
+  active chats never share it. Window, project, account and instruction
   path must match; a fresh model catalog and current attached tools must match
   its configuration or it is retired and started again. Prewarming creates no
   native chat or model request. Subsequent matching turns refresh its idle
@@ -613,7 +613,7 @@ The updater re-enables the window and can be retried after the draft is resolved
   first prompt with the chat's mode, model, and effort as launch flags. A change
   to any of them, Stop, or process exit retires it, and the next prompt resumes
   the same conversation with `--conversation`. `agy` accepts no caller system
-  prompt, so the agent role, persona, and routing policy ride ahead of each
+  prompt, so the agent role and routing policy ride ahead of each
   process's first message. Like a Claude session, each chat reads the runtime's current models
   when it starts; because one `agy` read takes 10–20 seconds, it opens on the
   remembered list and replaces it when the read lands, and chats opened within
@@ -662,8 +662,8 @@ The updater re-enables the window and can be retried after the draft is resolved
   / `lastSelectedEfforts` maps. The preferences response supplies `defaultModels`
   and `defaultEfforts`, using existing remembered project choices where an agent
   has no user-wide value. Renderer seeding overlays project choices on those maps;
-  explicit null resets override inherited values. Switching agents, restoring
-  history, and persona changes do not replace another agent's defaults. Removing
+  explicit null resets override inherited values. Switching agents and restoring
+  history do not replace another agent's defaults. Removing
   a project retains the user-wide choices. Composer choices
   update the window cache immediately and persist in order; new/blank chats seed
   from that cache, while history clears the new-chat model before resuming and
@@ -676,11 +676,11 @@ The updater re-enables the window and can be retried after the draft is resolved
   overwriting preferences. An effort reset or a model change that changes effort
   reconnects with the intended effort, so native resume cannot retain the old one.
   Model and effort writes preserve the
-  preferred agent, persona, and other runtimes' choices.
+  preferred agent and other runtimes' choices.
   An explicit agent selection atomically saves both the project choice and the
   user-wide `lastSelectedAgent`. The preferences response supplies the fallback
   for unchosen projects: that selection, an existing remembered project choice,
-  or Default when neither exists. Model, effort and persona writes preserve it;
+  or Default when neither exists. Model and effort writes preserve it;
   removing a project does not clear it. The renderer reads preferences on project
   entry, so an already open Welcome window sees another window's later choice.
   Failed preference reads/writes remain visible.
@@ -734,9 +734,8 @@ The updater re-enables the window and can be retried after the draft is resolved
   subagent, or another tool whose writes name no file reports that the folder
   may have changed, and the shell reconciles it the same way. Reads, listings,
   searches, and questions report nothing.
-- A persona is per-Chat guidance resolved at native mount and composed
-  with the shared role and internal conversation and tool-routing policy in
-  `server/agent-runtime-instructions.ts`. Default and native adapters use that
+- Shared runtime instructions compose the role and internal conversation and
+  tool-routing policy in `server/agent-runtime-instructions.ts`. Default and native adapters use that
   same composition; provider-native prompts remain in place. The policy owns
   the default to answer in Chat and the requirement for a user request or
   applicable loaded project workflow before file output. It guides model
@@ -753,16 +752,6 @@ The updater re-enables the window and can be retried after the draft is resolved
   as tight `$...$` and dollar amounts as ordinary text, matching the shared rule,
   and to put paste-ready reply text in a fenced `text` block, which the
   transcript gives its own Copy.
-  `server/agent-persona.ts` owns the library: one Markdown file per persona in
-  app data, seeded once from `assets/agent-personas/`, plus the record of each
-  native session's persona. The Chat's persona id travels on its connection;
-  the shared Agent Contract records it against the `session-id` every runtime
-  announces, and replay returns it. The project's choice for new Chats is an
-  agent preference. A change never mutates a running native prompt: the
-  renderer resumes the Chat's own conversation, as it does for effort, so the
-  persona applies from the next turn. Gallery personas are Gallery index data;
-  the composition layer adds them through the agent's library, since the
-  features do not import each other. Brainstorming needs no sources/wiki/index.
 - Default receives explicit transient attachment references in the prompt
   protocol. `server/routes/attach.ts` binds uploads to an explicit registered
   project and records their digest; `server/agent-attachments.ts` validates
@@ -1975,12 +1964,7 @@ Only successful catalog loads remain fresh for the window session. Failed loads
 retain any successful catalog (or the bundled fallback) and remain retryable.
 The selected entry is an ID resolved against that catalog, not an independent
 copy of its metadata. Image retries retain the restricted proxy origin. Gallery metadata never installs
-ongoing agent instructions. Personas ride the
-same index as an optional array; an index without it keeps the bundled persona
-snapshot. The overlay frame is shared, but its entrance fixes one shop: the
-sidebar's Gallery shows projects and the picker's Browse personas shows
-personas, with no switch between them. Adding one copies it into the reader's library through the agent's
-library port and chooses it for no Chat.
+ongoing agent instructions. Gallery browses and copies projects only.
 
 ## Validation
 

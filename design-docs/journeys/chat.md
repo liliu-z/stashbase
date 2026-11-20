@@ -12,10 +12,7 @@ Chat, Documents assistance, and runtimes.
    its scope; conversation navigation follows actual visits.
 2. Type or [dictate an idea](../capabilities/agent-sessions.md#voice-typing),
    optionally attach context and choose supported agent options.
-   The action clearly sends, queues, or stops work. A persona sets how the agent
-   talks and writes in this Chat from the next message on and remains distinct
-   from the current request. The reader can switch personas between messages,
-   write a new one, or browse ready-made personas to add one. Default also offers
+   The action clearly sends, queues, or stops work. Default also offers
    Crew: select who handles matching work in this chat and choose each member's
    model. Existing chats keep their choices; new chats inherit the last selection.
 3. Follow replies and useful progress. Routine tools and provided thinking are

@@ -16,7 +16,6 @@ import { CodexRpcPeer } from '../codex-rpc-transport.ts';
 import { runtimeDescriptorFor } from '../agent-contract.ts';
 import { BUILT_IN_AGENT_ADAPTERS } from '../agent-adapters.ts';
 import { CodexSession } from '../codex-session-runtime.ts';
-import { agentPersonaLibrary } from '../agent-persona.ts';
 import { composeAgentRuntimeInstructions } from '../agent-runtime-instructions.ts';
 import { clearCurrentFolder, runWithWindowId, openProjectFolder } from '../folder.ts';
 import { attachAgentDiagnostics } from '../error-reporting.ts';
@@ -375,14 +374,11 @@ test('Codex publishes its native model catalog before ready and forwards a selec
   session.dispose();
 });
 
-test("Codex injects the Chat's Persona with hidden StashBase routing policy", async (t) => {
+test("Codex injects the shared role and StashBase routing policy", async (t) => {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-codex-instructions-'));
-  const persona = 'Prefer primary research notes.';
   await runWithWindowId('instructions-window', () => openProjectFolder(folder));
-  const chosen = agentPersonaLibrary().create({ name: 'Researcher', description: '', icon: 'flask-conical', prompt: persona });
   t.after(() => {
     runWithWindowId('instructions-window', () => clearCurrentFolder());
-    agentPersonaLibrary().remove(chosen.id);
     fs.rmSync(folder, { recursive: true, force: true });
   });
   const ws = new FakeWebSocket();
@@ -398,7 +394,6 @@ test("Codex injects the Chat's Persona with hidden StashBase routing policy", as
     undefined,
     () => native.proc as unknown as ChildProcessWithoutNullStreams,
   );
-  session.persona = chosen.id;
   t.after(() => session.dispose());
 
   session.begin();
@@ -409,7 +404,7 @@ test("Codex injects the Chat's Persona with hidden StashBase routing policy", as
   const developerInstructions = native.requests.find(
     (request) => request.method === 'thread/start',
   )?.params.developerInstructions;
-  assert.equal(developerInstructions, composeAgentRuntimeInstructions(persona));
+  assert.equal(developerInstructions, composeAgentRuntimeInstructions());
 });
 
 test('Codex holds a model chosen while its catalog is still being read and applies it to the first turn', async (t) => {

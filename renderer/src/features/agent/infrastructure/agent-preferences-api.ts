@@ -25,7 +25,6 @@ export function createAgentPreferencesAdapter(client: HttpClient): AgentPreferen
           agent,
           ...(change.model === undefined ? {} : { model: change.model }),
           ...(change.effort === undefined ? {} : { effort: change.effort }),
-          ...(change.persona === undefined ? {} : { persona: change.persona }),
         },
         schema: projectAgentPreferenceSchema,
       });

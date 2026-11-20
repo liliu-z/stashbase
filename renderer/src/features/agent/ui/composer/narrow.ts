@@ -2,7 +2,7 @@
  *  card is the `@container`, so these read the pane rather than the window.
  *
  *  At the narrow step the words a reader can do without go: the provider's
- *  name, the mode's name, the persona's name, and Default's Tools label.
+ *  name, the mode's name and Default's Tools label.
  *  The model-and-thinking control keeps its model and level, which the
  *  folded triggers beside it leave room for. At the narrowest step those go
  *  too and every trigger is an icon; a hover tooltip still names each

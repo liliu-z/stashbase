@@ -167,7 +167,6 @@ export function createAgentTransport({
           agent: session.agent,
           effort: session.effort ?? undefined,
           model: session.model ?? undefined,
-          persona: session.persona ?? undefined,
           ...(session.agent === 'stashbase' ? { crew: session.nativeSessionId ?? session.id } : {}),
           resume: options.resume,
           scope: session.scope,

@@ -3,11 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useMemo } from 'react';
 import { expect, screen, userEvent, waitFor } from 'storybook/test';
 
-import type {
-  AgentPersonaPort,
-  AgentToolChange,
-  AgentToolsPort,
-} from '@/features/agent/application/ports';
+import type { AgentToolChange, AgentToolsPort } from '@/features/agent/application/ports';
 import { AgentHistoryError } from '@/features/agent/application/ports';
 import { createAgentWorkspaceRuntime } from '@/features/agent/application/workspace-runtime';
 import type {
@@ -18,32 +14,6 @@ import type {
 import { cn } from '@/lib/utils';
 
 import ManagedAgentWorkspace from './workspace';
-
-const storyPersonas = [
-  {
-    description: 'Build-in-public updates',
-    gallery: 'builder',
-    icon: 'hammer',
-    id: 'builder',
-    name: 'Builder',
-    prompt: 'Lead with what shipped.',
-  },
-  {
-    description: 'A neutral news report',
-    gallery: 'journalist',
-    icon: 'newspaper',
-    id: 'journalist',
-    name: 'Journalist',
-    prompt: 'Report what happened.',
-  },
-] as const;
-
-const storyPersona: AgentPersonaPort = {
-  list: async () => [...storyPersonas],
-  create: async (input) => ({ ...input, gallery: input.gallery ?? null, id: 'story-persona' }),
-  update: async (id, input) => ({ ...input, gallery: input.gallery ?? null, id }),
-  remove: async () => {},
-};
 
 /** Default with every tool off, the state a new reader starts in. A change
  *  is kept for the story's life so the menu can be walked through. */
@@ -524,7 +494,6 @@ function WorkspacePreview({
                 };
               },
             }}
-            persona={storyPersona}
             tools={storyTools}
             onOpenExternal={() => undefined}
             onOpenAgentSettings={() => undefined}

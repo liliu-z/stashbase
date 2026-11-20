@@ -138,7 +138,7 @@ describe('AgentSessionRuntime', () => {
     test.listeners[0]?.onEvent({ kind: 'identified', id: 'native-astra' });
     test.listeners[0]?.onEvent({ kind: 'ready' });
     expect(modelChoice(runtime.store.getState()).effort).toBe('high');
-    runtime.setPersona('journalist');
+    runtime.refreshTools();
     expect(test.requests().at(-1)).toMatchObject({ effort: 'high', resume: 'native-astra' });
     test.listeners.at(-1)?.onEvent({ kind: 'ready' });
     runtime.setEffort(null);
@@ -170,10 +170,10 @@ describe('AgentSessionRuntime', () => {
     runtime.dispose();
   });
 
-  it('runs a chosen persona by resuming its own conversation, and a draft starts with it', () => {
+  it('refreshes tools on the same conversation without starting an unstarted draft', () => {
     const test = harness();
     const runtime = createAgentSessionRuntime({
-      agent: 'claude',
+      agent: 'stashbase',
       id: 'chat-1',
       port: test.port,
       scheduler: test.scheduler,
@@ -181,32 +181,21 @@ describe('AgentSessionRuntime', () => {
     });
     test.listeners[0]?.onEvent({ kind: 'ready' });
     test.listeners[0]?.onEvent({ id: 'native-1', kind: 'identified' });
-
-    expect(runtime.setPersona('journalist')).toBe(true);
+    runtime.refreshTools();
     expect(test.requests()).toHaveLength(2);
-    expect(test.requests().at(-1)).toMatchObject({ persona: 'journalist', resume: 'native-1' });
-
-    // Choosing what already runs restarts nothing.
-    expect(runtime.setPersona('journalist')).toBe(true);
-    expect(test.requests()).toHaveLength(2);
-
-    // Editing the running persona restarts on the same conversation.
-    runtime.applyPersona();
-    expect(test.requests()).toHaveLength(3);
-    expect(test.requests().at(-1)).toMatchObject({ persona: 'journalist', resume: 'native-1' });
-
+    expect(test.requests().at(-1)).toMatchObject({ resume: 'native-1' });
     const draft = createAgentSessionRuntime({
-      agent: 'claude',
+      agent: 'stashbase',
       autostart: false,
       id: 'chat-2',
       port: test.port,
       scheduler: test.scheduler,
       scope: { kind: 'folder', path: '/project/Research' },
     });
-    draft.setPersona('builder');
-    expect(test.requests()).toHaveLength(3);
+    draft.refreshTools();
+    expect(test.requests()).toHaveLength(2);
     draft.start();
-    expect(test.requests().at(-1)).toMatchObject({ persona: 'builder' });
+    expect(test.requests()).toHaveLength(3);
   });
 
   it('loads replay before reconnecting exactly that native session', async () => {

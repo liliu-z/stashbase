@@ -13,11 +13,8 @@ export type { AgentCatalogPort, AgentContextPort, AgentSessionPort } from './app
 export type { AgentFilesChanged } from './application/session-runtime';
 export type { AgentScopeEnvironment } from './domain/context';
 export type { AgentScope } from './domain/session';
-export type { AgentPersonaPort } from './application/ports';
-export { createAgentPersonaAdapter } from './infrastructure/agent-persona-api';
 export { createAgentToolsAdapter } from './infrastructure/agent-tools-api';
 export type { AgentToolsPort } from './application/ports';
-export { useAgentPersonaLibrary } from './hooks/use-agent-persona';
 export type { AgentWorkspaceRuntime } from './application/workspace-runtime';
 
 export { createAgentPreferencesAdapter } from './infrastructure/agent-preferences-api';

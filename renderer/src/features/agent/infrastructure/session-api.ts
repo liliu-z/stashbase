@@ -201,7 +201,7 @@ export function createAgentSessionAdapter(
       const transcript = replay.messages.map((block) =>
         replayedBlock(block, entry.scope, serverOrigin),
       );
-      return { effort: replay.effort, persona: replay.persona ?? null, transcript };
+      return { effort: replay.effort, transcript };
     },
     async rename(entry, title, signal) {
       const row = await httpRequest(client, {

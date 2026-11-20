@@ -34,8 +34,8 @@ A project keeps its explicitly selected agent. A project without its own choice
 inherits the user's latest explicit agent selection across projects, including
 after restart, so an existing native subscription remains the starting point.
 With no remembered selection, use **Default**, even when signed out. Explicitly
-choosing Default also makes it the starting point for new projects. Model, effort,
-and persona changes, readiness, and history restoration never rewrite this choice.
+choosing Default also makes it the starting point for new projects. Model and effort changes,
+readiness, and history restoration never rewrite this choice.
 [Account and Settings](account-settings.md) owns access prerequisites and credentials.
 The [Chat journey](../journeys/chat.md#first-send) owns the first-send interaction.
 
@@ -209,7 +209,7 @@ for unsent text.
   A project without its own model or effort choice inherits the user's last
   explicit choice for that agent across projects. Using another agent does not
   replace these defaults. An existing project's explicit choices, including a
-  reset to the native default, take precedence; personas remain project-scoped.
+  reset to the native default, take precedence.
   A remembered model list cannot erase a saved choice. Codex retains an explicit
   model and thinking effort through reconnects and catalog changes; a refused
   choice fails visibly instead of retrying the message on a different model.
@@ -274,20 +274,6 @@ for unsent text.
   Each root turn retains its catalog snapshot. The service owns model availability,
   provider, price, and reasoning configuration. Default therefore has no separate
   main-model or thinking selector. Native OpenCode sub-agents are disabled.
-- A persona is standing
-  session guidance chosen per Chat in the composer from the reader's persona
-  library, or none. Switching between personas is the reason to keep several;
-  a persona that never changes belongs in the project's own instruction files.
-  Choosing one applies from that Chat's next message by resuming its own
-  conversation, and becomes the persona the project's next new Chat starts
-  with; other open Chats keep theirs. Reopening a Chat from history restores
-  its persona. The library is shared by every project and lives in app data,
-  never in a project folder. A new library starts with the packaged personas;
-  the reader can write, edit, and delete any of them, and add copies from the
-  Gallery. Editing a persona applies to every Chat that runs it from that
-  Chat's next message; a deleted persona leaves its Chats running none. A
-  persona is distinct from permissions, requests, and user-owned native
-  instruction files, which own how the agent works.
 - When the desktop app is in the background or minimized, a pending approval
   or clarifying question sends a local system notification. Requests arriving
   together are grouped per window, and each pending request is announced once.
@@ -316,7 +302,7 @@ for unsent text.
   writing, and revision in ordinary local projects. It can
   also perform programming and configuration work when the reader requests it,
   within session permissions. Document viewer and search
-  formats do not restrict Agent text-file access. A persona can narrow that role.
+  formats do not restrict Agent text-file access.
 - Answers, analysis, discussion, and proposed drafts or revisions stay in Chat
   by default. Local file changes require the reader's request or an applicable
   loaded project-instruction workflow that requires file output for the current

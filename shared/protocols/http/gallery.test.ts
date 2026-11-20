@@ -60,41 +60,6 @@ test('repository URLs must be accepted by the public GitHub acquisition contract
   assert.equal(galleryEntrySchema.safeParse({ ...ENTRY, repo: 'https://github.com/owner/repo.git/' }).success, true);
 });
 
-const PERSONA = {
-  category: 'news',
-  description: 'A neutral news report',
-  id: 'journalist',
-  name: 'Journalist',
-  prompt: 'Report what happened.',
-};
-
-test('an index without personas still reads, and personas are optional per field', () => {
-  // Personas were added after the first publication; absent is not an error.
-  assert.equal(galleryIndexSchema.parse({ wikis: [ENTRY] }).personas, undefined);
-  const parsed = galleryIndexSchema.parse({ wikis: [], personas: [PERSONA] });
-  assert.equal(parsed.personas?.[0]?.sample, undefined);
-  assert.equal(parsed.personas?.[0]?.icon, undefined);
-});
-
-test('an unknown persona icon reads as none, but an unusable persona refuses the index', () => {
-  const parsed = galleryIndexSchema.parse({
-
-    wikis: [],
-    personas: [{ ...PERSONA, icon: 'rocket' }],
-  });
-  assert.equal(parsed.personas?.[0]?.icon, undefined);
-  // An id names a file in the reader's library, so a path is refused whole.
-  assert.equal(
-    galleryIndexSchema.safeParse({ wikis: [], personas: [{ ...PERSONA, id: '../x' }] }).success,
-    false,
-  );
-  assert.equal(
-    galleryIndexSchema.safeParse({ wikis: [], personas: [{ ...PERSONA, prompt: '' }] }).success,
-    false,
-  );
-});
-
-
 test('reads a catalog without a version gate in publisher order with one cover per project', () => {
   const cover = 'https://assets.stashbase.ai/wikis/x-content-starter/screenshots/cover.png';
   const parsed = galleryIndexSchema.safeParse({

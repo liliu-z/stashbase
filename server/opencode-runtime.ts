@@ -23,7 +23,6 @@ import {
 import type { Config as NativeConfig } from '@opencode-ai/sdk/v2/types';
 import { getHostedAccountSession } from './app-config.ts';
 import { ensureMcpLauncher } from './agent-mcp.ts';
-import { resolveAgentPersona } from './agent-persona.ts';
 import { composeAgentRuntimeInstructions } from './agent-runtime-instructions.ts';
 import { agentCliPath } from './agent-cli.ts';
 import { appDataRoot } from './local-data.ts';
@@ -220,7 +219,6 @@ export function buildOpenCodeConfig(
   model: { apiKey: string; baseUrl: string; model: string },
   mcp: string,
   mcpEnvironment: Record<string, string> = {},
-  persona?: string,
   profiles: readonly HostedAgentProfile[] = [],
   directory?: string,
   tools: readonly EnabledAgentTool[] = [],
@@ -229,7 +227,7 @@ export function buildOpenCodeConfig(
   // rule to the main agent's instructions; the tools' own models never see
   // them.
   const runtimeInstructions = [
-    composeAgentRuntimeInstructions(persona),
+    composeAgentRuntimeInstructions(),
     defaultAgentToolInstructions(tools),
   ].filter(Boolean).join('\n\n');
   const toolPermissions = Object.fromEntries(tools.map(({ tool }) => [`stashbase_${tool.agent.toolName}`, 'allow']));
@@ -327,12 +325,11 @@ export function buildOpenCodeConfig(
 function openCodeConfig(
   model: { apiKey: string; baseUrl: string; model: string },
   mcpEnvironment: Record<string, string>,
-  persona: string | undefined,
   profiles: readonly HostedAgentProfile[],
   directory: string,
   tools: readonly EnabledAgentTool[],
 ): Config {
-  return buildOpenCodeConfig(model, ensureMcpLauncher(), mcpEnvironment, persona, profiles, directory, tools);
+  return buildOpenCodeConfig(model, ensureMcpLauncher(), mcpEnvironment, profiles, directory, tools);
 }
 
 class OpenCodeRuntime {
@@ -346,7 +343,6 @@ class OpenCodeRuntime {
 
   constructor(
     private readonly mcpEnvironment: Record<string, string> = {},
-    private readonly persona?: string,
     private readonly requireAccount = true,
     private readonly agentSessionId = 'history',
     private readonly profiles: () => readonly HostedAgentProfile[] = () => [],
@@ -491,7 +487,7 @@ class OpenCodeRuntime {
       if (!model) throw new Error('The agent model broker is not running.');
       // Private-directory/config preparation can be slow independently of the
       // native spawn call. Neither belongs to the ready-announcement deadline.
-      const env = openCodeRuntimeEnvironment(openCodeConfig(model, this.mcpEnvironment, this.persona, this.profiles(), directory, this.tools()), username, password);
+      const env = openCodeRuntimeEnvironment(openCodeConfig(model, this.mcpEnvironment, this.profiles(), directory, this.tools()), username, password);
       stage = 'spawn';
       advanceTiming('spawn_ms');
       const child = ownAgentProcess(spawn(executable, [
@@ -566,7 +562,7 @@ const runtimes = new Set<OpenCodeRuntime>();
 // History is local OpenCode state and remains readable while signed out. The
 // loopback model broker is configured so the pinned server can start, but it
 // cannot reach the hosted gateway without a later authenticated model call.
-const historyRuntime = new OpenCodeRuntime({}, undefined, false, 'history', undefined, undefined, 'history');
+const historyRuntime = new OpenCodeRuntime({}, false, 'history', undefined, undefined, 'history');
 
 export interface OpenCodeSessionRuntime {
   /** A prewarmed process already has its own private MCP/broker identity. */
@@ -599,8 +595,6 @@ export type { AgentToolResult } from './default-agent-tools.ts';
 interface OpenCodeContext {
   windowId: string;
   directory: string;
-  /** The library persona this Chat runs under. */
-  persona: string | undefined;
   crew?: string;
 }
 
@@ -618,9 +612,9 @@ interface PreparedOpenCode {
 
 const warmSlot = new OpenCodeWarmSlot<PreparedOpenCode>();
 
-function startupKey(context: OpenCodeContext, persona: string | undefined): string {
+function startupKey(context: OpenCodeContext): string {
   return JSON.stringify([
-    context.windowId, context.directory, persona, getHostedAccountSession()?.userId,
+    context.windowId, context.directory, getHostedAccountSession()?.userId,
     // Instruction contents are read natively at prompt time. Its selected
     // path is process configuration and must still be the project's first.
     ['AGENTS.md', 'CLAUDE.md', 'CONTEXT.md'].find((name) => fs.existsSync(path.join(context.directory, name))),
@@ -631,9 +625,8 @@ function startupKey(context: OpenCodeContext, persona: string | undefined): stri
  * never run a session or a model request; only that unused server can move
  * to the next chat. Read the catalog afresh before accepting its config. */
 export function createOpenCodeSessionRuntime(context: OpenCodeContext): OpenCodeSessionRuntime {
-  const persona = resolveAgentPersona(context.persona);
   const choices = context.crew ? crewChatChoices(context.crew) : undefined;
-  const key = startupKey(context, persona);
+  const key = startupKey(context);
   const prepared = warmSlot.take(key);
   const attributionId = prepared?.attributionId ?? crypto.randomUUID();
   let profiles: readonly HostedAgentProfile[] = [];
@@ -647,7 +640,7 @@ export function createOpenCodeSessionRuntime(context: OpenCodeContext): OpenCode
   const makeRuntime = () => new OpenCodeRuntime({
     STASHBASE_WINDOW_ID: context.windowId,
     STASHBASE_AGENT_SESSION_ID: attributionId,
-  }, persona, true, attributionId, () => profiles, () => tools);
+  }, true, attributionId, () => profiles, () => tools);
   let sessionRuntime = prepared?.runtime ?? makeRuntime();
   const relayExit = (error: Error) => { for (const listener of listeners) listener(error); };
   let stopExitListener = () => {};
@@ -699,7 +692,7 @@ export function createOpenCodeSessionRuntime(context: OpenCodeContext): OpenCode
     const nextId = crypto.randomUUID();
     const nextRuntime = new OpenCodeRuntime({
       STASHBASE_WINDOW_ID: context.windowId, STASHBASE_AGENT_SESSION_ID: nextId,
-    }, persona, true, nextId, () => profiles, () => tools, 'prewarm');
+    }, true, nextId, () => profiles, () => tools, 'prewarm');
     const next: PreparedOpenCode = {
       key, windowId: context.windowId, directory: context.directory,
       attributionId: nextId, profiles, tools, runtime: nextRuntime,

@@ -24,7 +24,6 @@ import { EMPTY_CHAT_PROMPT } from '@/features/agent/domain/starters';
 import { useAgentAccess } from '@/features/agent/hooks/use-agent-access';
 import { useAgentCatalog } from '@/features/agent/hooks/use-agent-catalog';
 import { useAgentModelRefresh } from '@/features/agent/hooks/use-agent-model-refresh';
-import { useAgentPersona } from '@/features/agent/hooks/use-agent-persona';
 import { useAgentRuntimeUpdate } from '@/features/agent/hooks/use-agent-runtime-update';
 import { useAgentSignInRecovered } from '@/features/agent/hooks/use-agent-sign-in-recovery';
 import { useAttentionFocus } from '@/features/agent/hooks/use-attention-focus';
@@ -42,7 +41,6 @@ import { AgentProviderControl } from './composer/provider';
 import { AgentThinkingControl } from './composer/thinking';
 import { connectionNotice } from './connection-notice';
 import { NewChatButton } from './new-chat-button';
-import { AgentPersonaControl } from './persona/agent-persona-control';
 import { ScheduledTasksButton } from './scheduled/scheduled-tasks-button';
 import { AgentTranscript } from './transcript/transcript';
 import { AgentUpgradeOfferCard } from './upgrade-offer';
@@ -54,10 +52,8 @@ function ChatWorkspace({
   catalog,
   catalogPort,
   header = true,
-  persona: personaApi,
   scheduledTasks,
   tools: toolsApi,
-  onBrowsePersonas,
   onOpenAgentSettings,
   onOpenAppSettings,
   onSignIn,
@@ -87,7 +83,6 @@ function ChatWorkspace({
       preparingPrompt: session.preparingPrompt,
       queuePaused: session.queuePaused,
       effort: session.effort,
-      persona: session.persona,
       model: session.model,
       models: session.models,
       nativeSessionId: session.nativeSessionId,
@@ -131,12 +126,6 @@ function ChatWorkspace({
   const busy = agentSessionIsBusy(active.store.getState());
   const armedSkill = agentSkills(state.skillCatalog).find((skill) => skill.id === state.skill);
   const empty = state.transcript.length === 0 && !state.preparingPrompt;
-  const persona = useAgentPersona(
-    personaApi,
-    state.persona,
-    runtime.choosePersona,
-    active.applyPersona,
-  );
   const honoredModes = readyAgent?.abilities.modes;
   useEffect(() => {
     if (!honoredModes || honoredModes.length === 0) return;
@@ -297,11 +286,6 @@ function ChatWorkspace({
                 id,
                 text,
               }))}
-              // Persona stays beside attachments. Provider, permissions and
-              // model controls stay together when the Agent changes.
-              leftSlot={
-                <AgentPersonaControl disabled={busy} onBrowse={onBrowsePersonas} picker={persona} />
-              }
               rightSlot={
                 <>
                   <AgentProviderControl
@@ -340,7 +324,7 @@ function ChatWorkspace({
                       tools={{
                         api: toolsApi,
                         chat: state.nativeSessionId ?? activeId,
-                        onChanged: active.applyPersona,
+                        onChanged: active.refreshTools,
                         onSaving: setCrewSaving,
                       }}
                     />

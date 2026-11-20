@@ -199,10 +199,6 @@
         ]
       },
       {
-        "from": "assets/agent-personas",
-        "to": "assets/agent-personas"
-      },
-      {
         "from": "node_modules/opencode-ai/bin/opencode.exe",
         "to": "opencode/opencode.exe"
       },

@@ -1,5 +1,5 @@
 /** The agent feature's ports: the services a conversation, its catalog,
- *  personas, tools, and context reach through, each implemented in
+ *  tools and context reach through, each implemented in
  *  `infrastructure/`. */
 import type {
   AgentContextExtra,
@@ -24,33 +24,8 @@ import type {
 } from '@/features/agent/domain/session';
 import type { AgentSessionCommand } from '@/features/agent/domain/session-command';
 import { featureErrorClass, type FeatureError } from '@/shared/domain/feature-error';
-import type { PersonaIconName } from '@/shared/domain/persona-icon';
 import type { SourceReference } from '@/shared/domain/source-reference';
 
-/** One persona in the reader's library. */
-export interface AgentPersona {
-  readonly id: string;
-  readonly name: string;
-  /** One line under the name in the picker. */
-  readonly description: string;
-  readonly icon: PersonaIconName;
-  /** The exact text a session receives. */
-  readonly prompt: string;
-  /** The Gallery entry it was copied from; null for the reader's own. */
-  readonly gallery: string | null;
-}
-
-/** What a create or an edit sends. */
-export interface AgentPersonaInput {
-  readonly name: string;
-  readonly description: string;
-  readonly icon: PersonaIconName;
-  readonly prompt: string;
-  readonly gallery?: string | null | undefined;
-}
-
-/** The reader's persona library, shared by every project. Which persona a
- *  Chat runs under is session state; the service composes the real prompt. */
 /** A Default Agent tool from the service's catalog, which the main agent
  *  may call once the user turns it on, on a model from the tool model pool. */
 export interface AgentTool {
@@ -98,13 +73,6 @@ export interface AgentToolsPort {
   ): Promise<readonly AgentTool[]>;
 }
 
-export interface AgentPersonaPort {
-  list(signal: AbortSignal): Promise<AgentPersona[]>;
-  create(input: AgentPersonaInput, signal: AbortSignal): Promise<AgentPersona>;
-  update(id: string, input: AgentPersonaInput, signal: AbortSignal): Promise<AgentPersona>;
-  remove(id: string, signal: AbortSignal): Promise<void>;
-}
-
 export interface AgentCatalogPort {
   listAgents(signal: AbortSignal): Promise<AgentCatalog>;
   /** Starts a preparation step, or `stop`s waiting on one the reader started,
@@ -119,8 +87,6 @@ export interface AgentCatalogPort {
 interface AgentReplay {
   transcript: AgentTranscriptBlock[];
   effort: string | null;
-  /** The persona this Chat last ran under, when it still exists. */
-  persona?: string | null | undefined;
 }
 
 export interface AgentSocket {
@@ -145,7 +111,6 @@ export interface AgentConnectRequest {
   effort?: string | undefined;
   model?: string | undefined;
   access?: AgentAccessMode | undefined;
-  persona?: string | undefined;
   crew?: string | undefined;
 }
 
@@ -201,8 +166,6 @@ export interface ProjectAgentPreference {
   agent: AgentId;
   models?: Partial<Record<AgentId, string | null | undefined>> | undefined;
   efforts?: Partial<Record<AgentId, string | null | undefined>> | undefined;
-  /** The persona this project's next new Chat starts with. */
-  persona?: string | null | undefined;
 }
 
 export interface AgentPreferencesPort {
@@ -216,7 +179,7 @@ export interface AgentPreferencesPort {
     scope: AgentScope,
     agent: AgentId,
     signal: AbortSignal,
-    change?: { model?: string | null; effort?: string | null; persona?: string | null },
+    change?: { model?: string | null; effort?: string | null },
   ): Promise<void>;
 }
 

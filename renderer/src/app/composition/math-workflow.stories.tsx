@@ -11,7 +11,6 @@ import {
   useAgentWorkspaceRuntime,
   type AgentCatalogPort,
   type AgentContextPort,
-  type AgentPersonaPort,
   type AgentSessionPort,
   type AgentToolsPort,
 } from '@/features/agent/public';
@@ -57,12 +56,6 @@ const catalog: AgentCatalogPort = {
 const context: AgentContextPort = {
   resolve: unavailable,
   upload: unavailable,
-};
-const persona: AgentPersonaPort = {
-  list: async () => [],
-  create: unavailable,
-  update: unavailable,
-  remove: unavailable,
 };
 const tools: AgentToolsPort = { list: async () => [], set: unavailable };
 const session: AgentSessionPort = {
@@ -193,7 +186,6 @@ function MathWorkflowSession({ onReset }: { onReset(): void }) {
                 onOpenAppSettings={ignore}
                 onOpenExternal={ignore}
                 onSignIn={ignore}
-                persona={persona}
                 runtime={agent}
                 tools={tools}
               />

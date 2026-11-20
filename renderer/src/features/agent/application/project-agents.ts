@@ -35,14 +35,6 @@ export function createProjectAgents(port: AgentPreferencesPort | undefined, sign
     const effort = { ...defaultEfforts, ...preference?.efforts }[state.agent] ?? null;
     session.store.setState({ model, effort });
   };
-  /** A new Chat starts with its project's persona; a started one keeps the
-   *  persona it already runs under. */
-  const seedPersona = (session: AgentSessionRuntime) => {
-    const state = session.store.getState();
-    if (!agentSessionIsUnstarted(state)) return;
-    const persona = choices.get(agentScopeKey(state.scope))?.persona ?? null;
-    if (state.persona !== persona) session.store.setState({ persona });
-  };
   const save = (
     scope: AgentScope,
     agent: AgentId,
@@ -117,10 +109,9 @@ export function createProjectAgents(port: AgentPreferencesPort | undefined, sign
     store,
     load,
     seedRuntimeChoices,
-    /** What a new or reused Chat starts from: its project's model, effort and persona. */
+    /** What a new or reused Chat starts from: its project's model and effort. */
     seed(session: AgentSessionRuntime) {
       seedRuntimeChoices(session);
-      seedPersona(session);
     },
     apply(session: AgentSessionRuntime) {
       const state = session.store.getState();
@@ -128,7 +119,6 @@ export function createProjectAgents(port: AgentPreferencesPort | undefined, sign
       const agent = preferred(state.scope);
       if (state.agent !== agent) session.changeAgent(agent);
       seedRuntimeChoices(session);
-      seedPersona(session);
     },
     get: preferred,
     rememberEffort(scope: AgentScope, agent: AgentId, effort: string | null) {
@@ -136,20 +126,6 @@ export function createProjectAgents(port: AgentPreferencesPort | undefined, sign
     },
     rememberModel(scope: AgentScope, agent: AgentId, model: string | null) {
       remember(scope, agent, { model });
-    },
-    /** Runs a Chat under a persona, or none. A persona chosen in any Chat
-     *  becomes the one this project's next new Chat starts with. Refused while
-     *  the Chat's turn runs. */
-    choose(session: AgentSessionRuntime, persona: string | null): boolean {
-      if (!session.setPersona(persona)) return false;
-      const { agent, scope } = session.store.getState();
-      if (signal.aborted || store.getState().loading || store.getState().failure) return true;
-      const key = agentScopeKey(scope);
-      const previous = choices.get(key);
-      if ((previous?.persona ?? null) === persona) return true;
-      choices.set(key, { ...previous, scope: key, agent: previous?.agent ?? agent, persona });
-      void save(scope, agent, { persona });
-      return true;
     },
     async select(scope: AgentScope, agent: AgentId): Promise<boolean> {
       if (saving || signal.aborted || store.getState().loading || store.getState().failure)

@@ -98,24 +98,6 @@ test('the supported renderer build is the only packaged renderer input', async (
   assert.match(pkg.scripts?.build ?? '', /build:electron-boundary/);
 });
 
-test('packaged Agent Personas include every preset the picker offers', () => {
-  // A packaged placeholder or a missing preset would start a session with no
-  // persona while the picker says one is chosen.
-  for (const id of ['builder', 'marketer', 'journalist', 'storyteller']) {
-    const source = fs.readFileSync(path.join(root, 'assets', 'agent-personas', `${id}.md`), 'utf8').trim();
-    const prompt = source.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, '').trim();
-    assert.match(prompt, /^Take the persona of /);
-  }
-
-  assert.deepEqual(
-    pkg.build?.extraResources?.find((entry) => entry?.to === 'assets/agent-personas'),
-    {
-      from: 'assets/agent-personas',
-      to: 'assets/agent-personas',
-    },
-  );
-});
-
 test('electron-builder includes local CommonJS dependencies outside electron/', () => {
   const missing = [];
   const relativeRequire = /require\(\s*['"](\.\.\/[^'"]+)['"]\s*\)/g;

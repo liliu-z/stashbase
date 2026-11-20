@@ -51,7 +51,7 @@ export function antigravityUserMessage(text: string): string {
   return `${JSON.stringify({ event: 'user', message: { role: 'user', content: text } })}\n`;
 }
 
-/** The routing policy and persona ride ahead of the first message a process
+/** The role and routing policy ride ahead of the first message a process
  * sends, because `agy` takes no system prompt from its caller. */
 export function antigravityPromptWithInstructions(instructions: string, prompt: string): string {
   return `<stashbase_session_instructions>\n${instructions}\n</stashbase_session_instructions>\n\n${prompt}`;

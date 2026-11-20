@@ -13,13 +13,8 @@
  */
 import type { GalleryPort } from '@/features/gallery/application/ports';
 import type { GalleryEntry } from '@/features/gallery/domain/entry';
-import type { GalleryPersona } from '@/features/gallery/domain/persona';
 import type { HttpClient } from '@/platform/http/client';
-import {
-  galleryIndexSchema,
-  type GalleryEntryWire,
-  type GalleryPersonaWire,
-} from '@/protocols/http/gallery';
+import { galleryIndexSchema, type GalleryEntryWire } from '@/protocols/http/gallery';
 
 const GALLERY_INDEX_PATH = '/api/gallery/index';
 const GALLERY_IMAGE_PATH = '/api/gallery/image';
@@ -45,18 +40,6 @@ function toEntry(wire: GalleryEntryWire, serverOrigin: string): GalleryEntry {
   };
 }
 
-function toPersona(wire: GalleryPersonaWire): GalleryPersona {
-  return {
-    category: wire.category,
-    description: wire.description,
-    icon: wire.icon ?? null,
-    id: wire.id,
-    name: wire.name,
-    prompt: wire.prompt,
-    sample: wire.sample ?? null,
-  };
-}
-
 export function createGalleryIndexAdapter(
   client: HttpClient,
   serverOrigin: string,
@@ -69,7 +52,6 @@ export function createGalleryIndexAdapter(
         const index = galleryIndexSchema.safeParse(response.body);
         if (!index.success) return null;
         return {
-          personas: index.data.personas?.map(toPersona) ?? null,
           wikis: index.data.wikis.map((entry) => toEntry(entry, serverOrigin)),
         };
       } catch {

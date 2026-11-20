@@ -79,14 +79,8 @@ export interface AgentSessionRuntime {
   steer(text: string): void;
   setAccessMode(mode: AgentAccessMode): void;
   setEffort(effort: string | null): void;
-  /** Runs this Chat under a library persona, or none. A started session
-   *  restarts on its own conversation so the persona applies from the next
-   *  message; an unstarted one starts with it. Answers false when refused
-   *  because a turn is running. */
-  setPersona(persona: string | null): boolean;
-  /** Restarts a started session on its own conversation so it reads its
-   *  persona's prompt as stored now, after the reader edited it. */
-  applyPersona(): void;
+  /** Reloads tool configuration on the same started conversation after Crew changes. */
+  refreshTools(): void;
   setModel(model: string | null): void;
   /** Arms a catalog skill for the next turn, or disarms with null. */
   setSkill(skill: string | null): void;

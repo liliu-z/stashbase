@@ -62,16 +62,6 @@ export function mount(container: HTMLElement, startupMs: number) {
           }),
           prepareAgent: async () => ({ agents: [] }),
         }}
-        persona={{
-          list: async () => [],
-          create: async () => {
-            throw new Error('unused');
-          },
-          update: async () => {
-            throw new Error('unused');
-          },
-          remove: async () => {},
-        }}
         tools={{ list: async () => [], set: async () => [] }}
         onOpenAgentSettings={() => {}}
         onOpenAppSettings={() => {}}

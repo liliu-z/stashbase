@@ -18,8 +18,7 @@ or Antigravity works inside it with you.
   update your notes, and link them back to their sources. It reads PDFs, Word
   documents, and scans too, with the text extracted on your computer.
 - 💬 **Bring the agent you already use.** Claude, Codex, and Antigravity run on
-  your existing accounts, and StashBase charges nothing for them. Pick a persona
-  or write your own to set the voice.
+  your existing accounts, and StashBase charges nothing for them.
 
 ## Product Preview
 

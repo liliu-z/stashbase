@@ -28,7 +28,6 @@ export interface AgentWorkspaceRuntime {
   readonly preferences: ReturnType<typeof createProjectAgents>['store'];
   loadPreferences(): Promise<void>;
   chooseAgent(agent: AgentId): Promise<boolean>;
-  choosePersona(persona: string | null): boolean;
   activate(id: string): void;
   visit(direction: -1 | 1): void;
   activeSession(): AgentSessionRuntime;

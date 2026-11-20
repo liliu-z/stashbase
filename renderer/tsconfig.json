@@ -13,7 +13,6 @@
       "@/contracts/agent-runtime": ["../shared/agent-runtime.ts"],
       "@/contracts/agent-protocol": ["../shared/agent-protocol.ts"],
       "@/contracts/account": ["../shared/account.ts"],
-      "@/contracts/agent-persona": ["../shared/agent-persona.ts"],
       "@/contracts/appearance-themes": ["../shared/appearance-themes.ts"],
       "@/contracts/scheduled-task-timing": ["../shared/scheduled-task-timing.ts"],
       "@/*": ["./src/*"]

@@ -3,7 +3,6 @@ import type { ReactNode } from 'react';
 import { SURFACE_FAILED } from '@/features/agent/application/failure-messages';
 import type {
   AgentCatalogPort,
-  AgentPersonaPort,
   AgentToolsPort,
   ScheduledTasksPort,
 } from '@/features/agent/application/ports';
@@ -22,15 +21,10 @@ export interface AgentWorkspaceProps {
    *  names the chat then, and the Chats panel beside it manages the history
    *  and New chat. */
   header?: boolean | undefined;
-  /** The reader's persona library. */
-  persona: AgentPersonaPort;
   /** The project's scheduled tasks, shown in the chat's place on request. */
   scheduledTasks?: ScheduledTasksPort | undefined;
   /** Default's optional model tools. */
   tools: AgentToolsPort;
-  /** Opens the Gallery on its personas. The Gallery is a sibling feature, so
-   *  the composition layer supplies this. */
-  onBrowsePersonas?: (() => void) | undefined;
   /** Opens General settings, which own application updates. */
   onOpenAppSettings(): void;
   onOpenExternal(href: string): void;

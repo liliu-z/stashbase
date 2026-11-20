@@ -2,10 +2,8 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
 import type { GalleryEntry } from '@/features/gallery/domain/entry';
-import type { GalleryPersona } from '@/features/gallery/domain/persona';
-import { GALLERY_PERSONA_SNAPSHOT } from '@/features/gallery/domain/persona-snapshot';
 
-import { GalleryOverlay, type GallerySection } from './overlay';
+import { GalleryOverlay } from './overlay';
 
 const ENTRIES: GalleryEntry[] = [
   {
@@ -32,21 +30,13 @@ const ENTRIES: GalleryEntry[] = [
 
 function ShopPreview({
   opened = false,
-  startOn = 'projects',
   unpublished = false,
 }: {
   opened?: boolean;
-  startOn?: GallerySection;
   unpublished?: boolean;
 }) {
   const first = unpublished ? (ENTRIES[1] ?? null) : (ENTRIES[0] ?? null);
-  const [entry, setEntry] = useState<GalleryEntry | null>(
-    opened && startOn === 'projects' ? first : null,
-  );
-  const [persona, setPersona] = useState<GalleryPersona | null>(
-    opened && startOn === 'personas' ? (GALLERY_PERSONA_SNAPSHOT[4] ?? null) : null,
-  );
-  const [added, setAdded] = useState<ReadonlySet<string>>(new Set(['builder', 'journalist']));
+  const [entry, setEntry] = useState<GalleryEntry | null>(opened ? first : null);
   return (
     <GalleryOverlay
       copying={false}
@@ -54,21 +44,11 @@ function ShopPreview({
       entry={entry}
       onBack={() => {
         setEntry(null);
-        setPersona(null);
       }}
       onClose={() => undefined}
       onCopy={() => undefined}
       onOpen={setEntry}
       open
-      personas={{
-        added,
-        adding: false,
-        onAdd: (next) => setAdded((previous) => new Set([...previous, next.id])),
-        onOpen: setPersona,
-        persona,
-        personas: GALLERY_PERSONA_SNAPSHOT,
-      }}
-      section={startOn}
     />
   );
 }
@@ -94,12 +74,3 @@ export const EntryPage: Story = { args: { opened: true } };
  *  a cover. Every slot states itself; none reshapes the page. This is
  *  also what the shop looks like offline. */
 export const UnpublishedEntry: Story = { args: { opened: true, unpublished: true } };
-
-/** The personas shop, opened from the composer's Browse personas: each card
- *  opens with the start of its own sample, so a voice can be judged before
- *  its page is opened. Added ones say so. */
-export const PersonaShelf: Story = { args: { startOn: 'personas' } };
-
-/** One persona's page: the sample reply to the shared request, then the
- *  exact prompt, and the one action that copies it into the library. */
-export const PersonaPage: Story = { args: { opened: true, startOn: 'personas' } };
