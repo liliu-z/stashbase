@@ -1049,6 +1049,18 @@ Host/services: `server/folder.ts`, `server/github-import.ts`, `server/project-fi
 
 ## J03: Documents
 
+**Rename literal preservation (2026-11-20):** `server/links.ts` uses CommonMark
+positions to confirm inline links/images before matching their destinations;
+escaped prose, inline code, fenced/indented code and raw HTML are excluded. `server/links.test.ts` checks that live
+angle-bracket links follow a rename while adjacent literal examples, nested
+fences, unclosed fences and escaped prose retain their original bytes. Reference-style links
+remain outside the cascade. Entity and escape cases also verify that an HTML
+attribute or Markdown destination follows its rendered target, never a different
+file with an entity-looking name, while retaining its original query/fragment.
+HTML fixtures preserve comment/script examples, data attributes and duplicate
+attributes while updating the actual anchor href.
+
+
 **Office lock classification (2026-11-17):** `file-listing.test.ts` covers
 Office lock extensions beside ordinary `~$`-prefixed Markdown, text, JSON and
 HTML sources. These sources remain visible with either hidden-file preference;

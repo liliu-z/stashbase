@@ -25,8 +25,18 @@
  *     (after stripping the leading slash). Anything that resolves
  *     outside the folder root is skipped.
  *   - `?query` and `#anchor` suffixes are preserved verbatim.
+ *   - Each path segment is percent-decoded before matching, as the reader
+ *     resolves links (`renderer/src/features/documents/domain/link-target.ts`),
+ *     so `My%20Note.md` names `My Note.md`. A rewritten path encodes only the
+ *     characters that would otherwise break or change the link (spaces, `%`,
+ *     `?`, `#`, and the format's own delimiters); other text, including
+ *     non-ASCII names, stays as written.
  */
 import path from 'node:path';
+import { fromMarkdown } from 'mdast-util-from-markdown';
+import { decodeHTMLAttribute } from 'entities';
+import { Parser } from 'htmlparser2';
+import { decodeString } from 'micromark-util-decode-string';
 import { detectFormat } from './format.ts';
 import { listFilesAsync } from './file-listing.ts';
 import { logger, errorMessage } from './log.ts';
@@ -78,32 +88,133 @@ interface LinkMatch {
   end: number;
   /** The raw href text. */
   href: string;
+  /** Destination after markup escapes/entities, before URL percent decoding. */
+  target: string;
+  /** Full markup span, confirmed against CommonMark for Markdown links. */
+  markupStart: number;
+  markupEnd: number;
+  /** How the destination was written, which decides how a rewrite encodes it. */
+  style: LinkStyle;
 }
+
+/** `md-angle` is a Markdown `<destination>`: spaces are literal there, but
+ *  `<`, `>` and line breaks are not. */
+type LinkStyle = 'md' | 'md-angle' | 'html';
 
 /** Match every `[text](url)` and `![alt](url)` and emit the URL span.
- *  Title (`[..](url "title")`) is preserved by only capturing the
- *  URL portion. Nested brackets in the text part are tolerated one
- *  level deep — good enough for hand-written docs. */
+ *  The destination is either `<...>` (group 1) or a bare run that may hold
+ *  one level of balanced parentheses, as CommonMark allows (group 2). The
+ *  optional title may be `"..."`, `'...'` or `(...)` and is preserved by only
+ *  capturing the URL portion. Nested brackets in the text part are tolerated
+ *  one level deep — good enough for hand-written docs. */
+const MD_LINK =
+  /!?\[(?:[^\[\]]|\[[^\[\]]*\])*\]\([ \t]*(?:<([^<>\n]*)>|((?:[^\s()<]|\([^\s()]*\))(?:[^\s()]|\([^\s()]*\))*))(?:\s+(?:"[^"]*"|'[^']*'|\([^()]*\)))?[ \t]*\)/gd;
+
 function extractMdLinks(content: string): LinkMatch[] {
-  return hrefMatches(content, /(!?\[(?:[^\[\]]|\[[^\[\]]*\])*\])\(([^)\s]+?)((?:\s+"[^"]*")?)\)/gd);
+  // CommonMark owns recognition: escaped prose and literal examples are
+  // not links. The matcher below only locates destinations in supported forms.
+  const targets = new Map<string, string>();
+  type MarkdownTree = ReturnType<typeof fromMarkdown>;
+  function collect(node: MarkdownTree | MarkdownTree['children'][number]): void {
+    if (node.type === 'link' || node.type === 'image') {
+      const start = node.position?.start.offset;
+      const end = node.position?.end.offset;
+      if (start !== undefined && end !== undefined) targets.set(`${start}:${end}`, node.url);
+    }
+    if ('children' in node) {
+      for (const child of node.children) collect(child);
+    }
+  }
+  collect(fromMarkdown(content));
+  return hrefMatches(content, MD_LINK, ['md-angle', 'md']).flatMap((match) => {
+    const target = targets.get(`${match.markupStart}:${match.markupEnd}`);
+    return target === undefined ? [] : [{ ...match, target }];
+  });
 }
 
-/** Match every `<a ... href="..." ...>`. Quotes can be `"` or `'`. */
+/** HTML owns tag/attribute recognition, so comments, scripts, data-href and
+ * duplicate attributes cannot masquerade as the anchor's actual destination.
+ * Keep source offsets: parsing never reserializes the user's HTML. */
 function extractHtmlLinks(content: string): LinkMatch[] {
-  return hrefMatches(content, /<a\b[^>]*?\bhref\s*=\s*(["'])([^"']*)\1/gid);
+  const links: LinkMatch[] = [];
+  let anchor = false;
+  let hrefSeen = false;
+  const parser = new Parser({
+    onopentagname(name) {
+      anchor = name === 'a';
+      hrefSeen = false;
+    },
+    onattribute(name, target, quote) {
+      if (!anchor || name !== 'href' || hrefSeen) return;
+      hrefSeen = true;
+      if (quote !== '"' && quote !== "'") return;
+      const raw = content.slice(parser.startIndex, parser.endIndex);
+      const opening = raw.indexOf(quote, raw.indexOf('=') + 1);
+      if (opening < 0 || !raw.endsWith(quote)) return;
+      const start = parser.startIndex + opening + 1;
+      const end = parser.endIndex - 1;
+      links.push({
+        start, end, href: content.slice(start, end), target, style: 'html',
+        markupStart: parser.startIndex, markupEnd: parser.endIndex,
+      });
+    },
+  }, { decodeEntities: true });
+  parser.end(content);
+  return links;
 }
 
-/** Every match's second capture group is the href; `d` gives its offsets. */
-function hrefMatches(content: string, re: RegExp): LinkMatch[] {
+/** Each listed capture group is one alternative form of the href; `d` gives
+ *  its offsets, and the style at the same position records which form matched. */
+function hrefMatches(content: string, re: RegExp, styles: LinkStyle[]): LinkMatch[] {
   const out: LinkMatch[] = [];
   for (const m of content.matchAll(re)) {
-    const span = m.indices?.[2];
-    if (span) out.push({ start: span[0], end: span[1], href: m[2] });
+    styles.some((style, index) => {
+      const span = m.indices?.[index + 1];
+      if (!span) return false;
+      out.push({
+        start: span[0], end: span[1], href: m[index + 1], target: m[index + 1], style,
+        markupStart: m.index, markupEnd: m.index + m[0].length,
+      });
+      return true;
+    });
   }
   return out;
 }
 
-/** Split a raw href into its folder-relative path target and any
+/** Percent-decode each `/`-separated segment the way the reader does. A
+ *  segment that is not valid percent-encoding is kept as written (a name may
+ *  contain a bare `%`). Returns null when decoding would produce a separator
+ *  or a dot segment, which the reader refuses to treat as a project link. */
+function decodeLinkPath(pathPart: string): string | null {
+  const segments: string[] = [];
+  for (const raw of pathPart.split('/')) {
+    let segment = raw;
+    try { segment = decodeURIComponent(raw); } catch { /* keep the literal segment */ }
+    if (segment !== raw && (/[\\/]/.test(segment) || segment === '.' || segment === '..')) return null;
+    segments.push(segment);
+  }
+  return segments.join('/');
+}
+
+/** Markdown destinations end at whitespace or `)` and treat `<`/`>` as
+ *  delimiters; HTML attributes end at their quote. `%`, `?` and `#` would be
+ *  read back as an escape, a query or an anchor in either format. */
+const LINK_UNSAFE: Record<LinkStyle, RegExp> = {
+  md: /[%?&#\s()<>]/gu,
+  'md-angle': /[%?&#<>\n\r]/gu,
+  html: /[%?&#\s"'<>]/gu,
+};
+
+function encodeLinkPath(name: string, style: LinkStyle): string {
+  // encodeURIComponent leaves `(`, `)` and `'` as they are, so ASCII is
+  // escaped by hand; Unicode whitespace still takes its UTF-8 escape.
+  return name.replace(LINK_UNSAFE[style], (ch) => {
+    const code = ch.charCodeAt(0);
+    return code < 0x80 ? `%${code.toString(16).toUpperCase().padStart(2, '0')}` : encodeURIComponent(ch);
+  });
+}
+
+/** Split a markup-decoded href into its folder-relative path target and any
  *  `?query` / `#anchor` tail. Returns null for external URLs,
  *  anchor-only links, or anything that escapes the folder root. */
 function resolveLink(href: string, fileDir: string): { path: string; suffix: string } | null {
@@ -126,6 +237,9 @@ function resolveLink(href: string, fileDir: string): { path: string; suffix: str
     pathPart = pathPart.slice(0, cut);
   }
   if (!pathPart) return null;
+  const decoded = decodeLinkPath(pathPart);
+  if (decoded === null) return null;
+  pathPart = decoded;
 
   let resolved: string;
   if (pathPart.startsWith('/')) {
@@ -152,16 +266,32 @@ function applyRenameForward(name: string, renames: RenameEntry[]): string {
   return name;
 }
 
+/** Keep the original suffix bytes after resolving its markup semantics. A
+ * delimiter may itself be an entity or Markdown escape, so find the raw tail
+ * whose decoded spelling is the resolved suffix rather than cutting at `#`
+ * inside a numeric entity. Never guess when a suffix cannot be retained. */
+function originalSuffix(href: string, suffix: string, style: LinkStyle): string | null {
+  if (!suffix || href.endsWith(suffix)) return suffix;
+  const decode = style === 'html' ? decodeHTMLAttribute : decodeString;
+  for (const match of href.matchAll(/[?#&\\]/g)) {
+    const candidate = href.slice(match.index);
+    if (decode(candidate) === suffix) return candidate;
+  }
+  return null;
+}
+
 /** Decide what the link href should become after the rename. Returns
  *  `null` when the link is untouchable (external, broken, etc.) or
  *  doesn't need rewriting. */
 function rewriteOneHref(
   href: string,
+  target: string,
   fromDir: string,
   toDir: string,
   renames: RenameEntry[],
+  style: LinkStyle,
 ): string | null {
-  const resolved = resolveLink(href, fromDir);
+  const resolved = resolveLink(target, fromDir);
   if (!resolved) return null;
   const newTarget = applyRenameForward(resolved.path, renames);
   // If nothing about the target changed AND the source file didn't
@@ -170,7 +300,9 @@ function rewriteOneHref(
   const newPath = toDir
     ? (posix.relative(toDir, newTarget) || '.')
     : newTarget;
-  const newHref = newPath + resolved.suffix;
+  const suffix = originalSuffix(href, resolved.suffix, style);
+  if (suffix === null) return null;
+  const newHref = encodeLinkPath(newPath, style) + suffix;
   return newHref === href ? null : newHref;
 }
 
@@ -193,7 +325,7 @@ function rewriteLinks(opts: {
   // Splice from the back so earlier offsets stay valid.
   for (let i = matches.length - 1; i >= 0; i--) {
     const m = matches[i];
-    const newHref = rewriteOneHref(m.href, fromDir, toDir, renames);
+    const newHref = rewriteOneHref(m.href, m.target, fromDir, toDir, renames, m.style);
     if (newHref == null) continue;
     result = result.slice(0, m.start) + newHref + result.slice(m.end);
     changes++;

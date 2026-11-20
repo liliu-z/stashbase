@@ -172,7 +172,17 @@ preview, content editing, and rename/delete are separate permissions.
 - Link rewrites plan against versions before rename and apply through the shared
   transaction owner. Rollback restores only bytes it still owns. Current cascade
   covers inline Markdown links/images and HTML anchor hrefs, not reference-style
-  definitions or other HTML attributes. MCP file moves stay inside one project.
+  definitions or other HTML attributes. Link paths are percent-decoded per segment
+  before matching, as the reader resolves them, and a rewritten path encodes only
+  characters that would break or change the link (`links.test.ts`). Markdown
+  `<destinations>` keep their form, titles may use any CommonMark quoting, and a
+  bare destination may hold balanced parentheses. CommonMark confirms the complete inline-link/image markup before a rewrite;
+  escaped prose, code examples and raw HTML regions are not Markdown links.
+  Markup escapes/entities resolve before URL percent decoding; rewritten paths
+  encode ampersands to keep entity-looking filenames literal. Original query and
+  fragment spelling is retained after semantic target resolution. HTML parsing
+  identifies real anchor attributes; comments, scripts, data attributes and
+  duplicate href attributes do not authorize a rewrite. MCP file moves stay inside one project.
 
 ### Import Publication
 
