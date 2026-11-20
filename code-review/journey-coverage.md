@@ -1812,6 +1812,23 @@ received HTTP 200 from the real Python/MFS daemon on retry. The document remaine
 visible and its source bytes unchanged. The fixture used a shortened first
 watchdog, a private profile, disabled telemetry and no external provider calls.
 
+**MFS daemon OpenBLAS pool (2026-11-20):** on an 8-thread, 7.7 GB Windows laptop
+the v2.18.12 frozen daemon committed about 1.2 GB from its first bind (400
+Markdown notes, keyword only) and held it until quit; a real 13-project profile
+held 1.35 GB at launch and 2.19 GB with search by meaning. With commit nearly
+exhausted it failed startup twice with `OpenBLAS error: Memory allocation still
+failed after 10 retries`. `mfs-daemon.ts` now pins `OPENBLAS_NUM_THREADS=1`;
+`indexer-mfs-path.test.ts` shows a real spawned child receives it even when the
+host environment asks for eight. Isolated source-host passes using that frozen
+daemon (`STASHBASE_DAEMON_BIN`) measured 1,231 → 107 MB committed by the daemon
+(StashBase total 1,807 → 645 MB), 400 notes indexed in 18.1 / 18.5 s, and five
+MFS keyword searches returning the same hits before and after (5, 0, 5, 0, 0)
+at matching latencies. On the real 13-project profile with search by meaning,
+the installed v2.18.12 launched with the same variable held 529 MB instead of
+1,639 MB (StashBase 963 instead of 2,057 MB); five meaning searches returned
+identical top-three results at 349–369 ms once warm (320–729 ms without it).
+macOS and Linux remain unmeasured.
+
 **Windows extractor launch recovery (2026-10-24):** the reported stack reaches
 `runExtractor` before a child starts; historical logs contain no native Windows
 error beyond `UNKNOWN`, so its original cause remains unproven. Controlled sync
