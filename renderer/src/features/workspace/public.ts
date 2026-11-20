@@ -20,7 +20,12 @@ export { useReveal } from './hooks/use-reveal';
 export { refreshFolderListing } from './application/queries';
 export type { WorkspaceRuntime } from './application/runtime';
 export { AGENT_PANE_WIDTH } from './domain/session';
-export { fileIsRestricted, type WorkspaceEntry, type WorkspaceListing } from './domain/tree';
+export {
+  fileIsRestricted,
+  systemEntryPath,
+  type WorkspaceEntry,
+  type WorkspaceListing,
+} from './domain/tree';
 export type { ActiveProjectFolder, ProjectRegistrySnapshot } from './domain/project';
 export type { WorkspaceScope } from './domain/workspace';
 export { createWorkspaceAdapters, type WorkspaceAdapters } from './infrastructure/adapters';

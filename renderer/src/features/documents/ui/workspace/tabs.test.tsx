@@ -22,36 +22,8 @@ import { withQueryClient } from '@/test/query';
 
 import { DocumentOutline } from './outline';
 import { DocumentTabs } from './tabs';
+import { createRuntime, loadedSourceApi } from './tabs.harness';
 import { DocumentWorkspace } from './workspace';
-
-function createRuntime(api: DocumentSourcePort = loadedSourceApi) {
-  let next = 2;
-  const runtime = createDocumentTabsRuntime({
-    api,
-    createId: () => `tab-${++next}`,
-    createQueries: () => documentQueryScope(),
-    folderPath: '/project/notes',
-    generation: 1,
-    restored: {
-      activeTabId: 'tab-2',
-      tabs: [
-        {
-          id: 'tab-1',
-          source: { folderPath: '/project/notes', path: 'plan.md' },
-        },
-        {
-          id: 'tab-2',
-          source: { folderPath: '/project/notes', path: 'drafts/other.md' },
-        },
-      ],
-    },
-  });
-  return runtime;
-}
-
-const loadedSourceApi = sourceApi({
-  load: vi.fn(async () => textSource({ content: '# Loaded' })),
-});
 
 const documentWorkspaceProps = {
   assetApi: assetApi({ load: vi.fn(pending()) }),

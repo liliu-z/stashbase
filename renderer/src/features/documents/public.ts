@@ -29,6 +29,7 @@ export { useRevisionPreview } from './hooks/use-revision-preview';
 export { RevisionPreview } from './ui/workspace/revision-preview';
 export { NewTabPage } from './ui/workspace/new-tab';
 export { DocumentTabs } from './ui/workspace/tabs';
+export type { DocumentTabMenuActions } from './ui/workspace/tab-menu';
 export { DocumentHistoryButtons } from './ui/workspace/history-buttons';
 export { DocumentOutline, DocumentOutlineEmpty } from './ui/workspace/outline';
 export { DocumentWorkspace } from './ui/workspace/workspace';

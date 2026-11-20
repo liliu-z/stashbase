@@ -10,6 +10,7 @@ import {
   DocumentHistoryButtons,
   DocumentTabs,
   useHasOpenDocuments,
+  type DocumentTabMenuActions,
   type NewTab,
   type DocumentTabsRuntime,
 } from '@/features/documents/public';
@@ -56,6 +57,7 @@ export function WorkspaceTitlebar({
   newTab,
   onToggleChatPane,
   sidebarNotices,
+  tabMenu,
 }: {
   agent: AgentWorkspaceRuntime;
   chatPaneOpen: boolean;
@@ -70,6 +72,8 @@ export function WorkspaceTitlebar({
   /** True while the sidebar's foot holds a notice, which a collapsed sidebar
    *  takes off screen with it. */
   sidebarNotices: boolean;
+  /** Showing a tab's file on disk and copying its path, for the tab menu. */
+  tabMenu?: DocumentTabMenuActions | undefined;
 }) {
   const PanelRight = useIcon('panel-right');
   // The compact square, the one the sidebar's band draws its toggle and
@@ -171,6 +175,7 @@ export function WorkspaceTitlebar({
           >
             <DocumentTabs
               className="workspace-titlebar-controls max-w-full"
+              menuActions={tabMenu}
               newTab={newTab}
               runtime={documents}
             />

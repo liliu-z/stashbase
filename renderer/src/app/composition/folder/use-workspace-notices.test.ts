@@ -42,6 +42,25 @@ describe('useWorkspaceNotices', () => {
     expect(messages(result.current.strip)).toEqual(['The host lost this folder.']);
   });
 
+  it('floats a tab menu copy or reveal that failed, dismissed by its own owner', () => {
+    const dismissTabMenuFailure = vi.fn();
+    const { result } = renderHook(() =>
+      useWorkspaceNotices(
+        notices({
+          dismissTabMenuFailure,
+          tabMenuFailure: {
+            message: 'StashBase could not reach the clipboard.',
+            tone: 'capability',
+          },
+        }),
+      ),
+    );
+    expect(result.current.corner).toEqual([]);
+    expect(messages(result.current.floating)).toEqual(['StashBase could not reach the clipboard.']);
+    result.current.floating[0]?.onDismiss?.();
+    expect(dismissTabMenuFailure).toHaveBeenCalledOnce();
+  });
+
   it('floats the failure of a reprocess the reader asked for', () => {
     const { result } = renderHook(() =>
       useWorkspaceNotices(

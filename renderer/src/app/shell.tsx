@@ -49,6 +49,7 @@ import { useFolderRefresh } from './composition/folder/use-folder-refresh';
 import { useTreeFollowsDocument } from './composition/folder/use-tree-follows-document';
 import { useTurnReview } from './composition/folder/use-turn-review';
 import { useGalleryShop } from './composition/gallery/use-gallery-shop';
+import { useTabMenuActions } from './composition/layout/use-tab-menu-actions';
 import { WorkspaceDialogs } from './composition/layout/workspace-dialogs';
 import { WorkspaceLayout } from './composition/layout/workspace-layout';
 import { workspaceNoticeSlots } from './composition/layout/workspace-notice-slots';
@@ -77,20 +78,17 @@ export function App({ dependencies }: { dependencies: AppDependencies }) {
   );
 }
 
-/** The workspace window, assembled. Every behaviour lives in a hook under
- *  `./composition` and every port in a binder beside it; this function only
- *  decides what each one is given. */
+/** Binds window capabilities and hands their results to each region.
+ *  Behaviour belongs in composition hooks and feature owners. */
 function WorkspaceWindow() {
   const [chatPaneOpen, setChatPaneOpen] = useState(true);
   const dependencies = useDependencies();
-  // Two adapter records this function hands on more than once.
   const { documents: docs, workspace: workspaceDeps } = dependencies;
+  const tabMenu = useTabMenuActions(dependencies);
   useAppearanceSurface(dependencies.settings.appearanceApi, dependencies.settings.setAppearance);
-  const session = useWorkspaceSession(
-    workspaceDeps.adapters.project,
-    workspaceDeps.adapters.session,
-  );
-  const project = useProject(workspaceDeps.adapters.project).data ?? null;
+  const { project: projectApi, session: sessionApi } = workspaceDeps.adapters;
+  const session = useWorkspaceSession(projectApi, sessionApi);
+  const project = useProject(projectApi).data ?? null;
   const workspace = useWorkspace(workspaceDeps.adapters.project, session);
   const listing = useFiles(workspace, workspaceDeps.adapters.files).data;
   const documents = useDocumentWorkspace(
@@ -162,6 +160,7 @@ function WorkspaceWindow() {
     preparation,
     revisions,
     session,
+    tabMenu,
     workspace,
   });
 
@@ -380,6 +379,7 @@ function WorkspaceWindow() {
             newTab={newTab}
             onToggleChatPane={() => setChatPaneOpen((open) => !open)}
             sidebarNotices={notices.cornerShown}
+            tabMenu={tabMenu.actions}
             documents={documents}
             hasActiveFolder={activeFolder !== null}
             mode={chrome.navigator.mode}

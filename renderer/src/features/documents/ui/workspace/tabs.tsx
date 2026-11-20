@@ -2,15 +2,22 @@
  * The open documents' tab strip. A preview tab wears its name in italics and
  * says so in its label; a double click, or Enter on the focused tab, keeps
  * it. Delete closes the focused tab, and every tab is a drag source for its
- * file. Given a `newTab`, the strip ends in a plus that opens the New tab,
+ * file. A right click, the menu key or Shift+F10 opens the tab's menu. Given a `newTab`, the strip ends in a plus that opens the New tab,
  * a tab holding no document whose page offers the first moves; the New tab
  * sits last and selected, and choosing a document closes it.
  */
 import { Circle, Plus, X } from 'lucide-react';
-import { useLayoutEffect, useRef, type KeyboardEvent, type ReactNode } from 'react';
+import {
+  useLayoutEffect,
+  useRef,
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+} from 'react';
 import { useStore } from 'zustand';
 
 import { Button } from '@/components/ui/button';
+import { pointAnchor } from '@/components/ui/dropdown';
 import { TabItem, Tabs, TabsList } from '@/components/ui/tabs';
 import { Tooltip } from '@/components/ui/tooltip';
 import type { DocumentRuntime } from '@/features/documents/application/document-runtime';
@@ -24,12 +31,18 @@ import type { IconComponentProps } from '@/lib/icon-context';
 import { cn } from '@/lib/utils';
 import { isExternalSource } from '@/shared/domain/external-source';
 import type { SourceReference } from '@/shared/domain/source-reference';
+import { useRequestSignals } from '@/shared/runtime/use-request-signals';
 import { writeSourceDrag } from '@/shared/utils/source-drag';
+
+import { DocumentTabMenu, useTabMenu, type DocumentTabMenuActions } from './tab-menu';
 
 export interface DocumentTabsProps {
   className?: string;
   /** What stands in for the strip with nothing open and no `newTab`. */
   emptyContent?: ReactNode;
+  /** Showing a tab's file on disk and copying its path. Absent, the tab menu
+   *  offers only closing. */
+  menuActions?: DocumentTabMenuActions | undefined;
   /** The New tab the strip's plus opens. Absent, there is no plus. */
   newTab?: NewTab | undefined;
   runtime: DocumentTabsRuntime;
@@ -57,6 +70,7 @@ function tabLabel(name: string, dirty: boolean, preview: boolean): string {
 function DocumentTab({
   document,
   onClose,
+  onContextMenu,
   onKeep,
   onKeyDown,
   preview,
@@ -66,6 +80,7 @@ function DocumentTab({
 }: {
   document: DocumentRuntime;
   onClose: (tabId: string) => void;
+  onContextMenu: (event: MouseEvent<HTMLButtonElement>, tabId: string) => void;
   onKeep: (tabId: string) => void;
   onKeyDown: (event: KeyboardEvent<HTMLButtonElement>, tabId: string) => void;
   preview: boolean;
@@ -96,6 +111,7 @@ function DocumentTab({
       onDoubleClick={preview ? () => onKeep(value) : undefined}
       // The open document is a source the user can hand to another surface —
       // dropping a tab on the Agent composer binds it as explicit context.
+      onContextMenu={(event) => onContextMenu(event, value)}
       onDragStart={(event) => writeSourceDrag(event.dataTransfer, source)}
       onKeyDown={(event) => onKeyDown(event, value)}
       onTrailingClick={() => onClose(value)}
@@ -110,10 +126,13 @@ function DocumentTab({
 export function DocumentTabs({
   className,
   emptyContent = null,
+  menuActions,
   newTab,
   runtime,
 }: DocumentTabsProps) {
-  const { activate, activeTabId, close, keep, tabs } = useDocumentTabs(runtime);
+  const { activate, activeTabId, close, closeTabs, keep, tabs } = useDocumentTabs(runtime);
+  const menu = useTabMenu();
+  const signalFor = useRequestSignals<'close-menu'>();
   // The tab pills are the ladder's segment height, one step under the row's
   // control, so the plus takes the compact square, the same 28px the pills
   // beside it stand at, rather than the row's 36px.
@@ -160,7 +179,10 @@ export function DocumentTabs({
   }
 
   const onTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, tabId: string) => {
-    if (event.key === 'Delete') {
+    if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+      event.preventDefault();
+      menu.show({ anchor: event.currentTarget, tabId });
+    } else if (event.key === 'Delete') {
       event.preventDefault();
       focusAfterClose.current = true;
       close(tabId);
@@ -169,6 +191,26 @@ export function DocumentTabs({
       keep(tabId);
     }
   };
+
+  const onTabContextMenu = (event: MouseEvent<HTMLButtonElement>, tabId: string) => {
+    event.preventDefault();
+    menu.show({ anchor: pointAnchor(event.clientX, event.clientY), tabId });
+  };
+
+  // Closing from the menu hands focus to whichever tab is then in front, as
+  // Delete does, rather than leaving it on a tab that has gone.
+  const closeFromMenu = (tabIds: string[]) => {
+    const signal = signalFor('close-menu');
+    void closeTabs(tabIds).then((closed) => {
+      if (!closed || signal.aborted || runtime.signal.aborted) return;
+      const active = runtime.store.getState().activeTabId;
+      if (active) tabElements.current.get(active)?.focus();
+    });
+  };
+  const menuTabIndex = menu.shown ? tabs.findIndex((tab) => tab.id === menu.shown?.tabId) : -1;
+  const menuTab = menuTabIndex >= 0 ? tabs[menuTabIndex] : undefined;
+  const others = menuTab ? tabs.filter((tab) => tab.id !== menuTab.id).map((tab) => tab.id) : [];
+  const toRight = tabs.slice(menuTabIndex + 1).map((tab) => tab.id);
 
   const registerTab = (tabId: string, element: HTMLButtonElement | null) => {
     if (element) tabElements.current.set(tabId, element);
@@ -196,6 +238,7 @@ export function DocumentTabs({
                 document={document}
                 key={tab.id}
                 onClose={close}
+                onContextMenu={onTabContextMenu}
                 onKeep={keep}
                 onKeyDown={onTabKeyDown}
                 preview={tab.preview}
@@ -222,6 +265,20 @@ export function DocumentTabs({
         </TabsList>
       </Tabs>
       {plus}
+      {menuTab && (
+        <DocumentTabMenu
+          actions={menuActions}
+          commands={{
+            close: () => closeFromMenu([menuTab.id]),
+            closeAll: () => closeFromMenu(tabs.map((tab) => tab.id)),
+            closeOthers: others.length ? () => closeFromMenu(others) : null,
+            closeToRight: toRight.length ? () => closeFromMenu(toRight) : null,
+          }}
+          menu={menu}
+          name={sourceName(menuTab.source)}
+          source={menuTab.source}
+        />
+      )}
     </div>
   );
 }

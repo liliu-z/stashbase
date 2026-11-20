@@ -20,7 +20,8 @@ export interface WorkspaceNoticePlacement {
  *
  * Three owners can raise one. Preparation the shell ran on the reader's
  * behalf, on opening a document or syncing a folder, reports from the corner:
- * the reader was not watching it. A reprocess the reader asked for floats. A turn review the reader asked for that did
+ * the reader was not watching it. A reprocess the reader asked for floats, as
+ * does a tab menu's copy or reveal that failed. A turn review the reader asked for that did
  * not open floats over the workspace, since nothing opened to carry it. The
  * host disagreeing about which folder this window is on is a standing
  * condition that only resolves when the host answers again, so it holds the
@@ -30,21 +31,26 @@ export interface WorkspaceNoticePlacement {
 export function useWorkspaceNotices({
   dismissPreparationFailure,
   dismissRevisionFailure,
+  dismissTabMenuFailure = () => undefined,
   hostFailure,
   preparationFailure,
   preparationRequested = false,
   revisionFailures,
+  tabMenuFailure = null,
 }: {
   dismissPreparationFailure: () => void;
   /** Drops one review notice by its sentence, which is what the cards key
    *  on. */
   dismissRevisionFailure: (message: string) => void;
+  dismissTabMenuFailure?: (() => void) | undefined;
   hostFailure: string | null;
   preparationFailure: FailureView | null;
   /** The failure answers a reprocess the reader asked for. */
   preparationRequested?: boolean;
   /** Reviews that were asked for and could not be shown. */
   revisionFailures: readonly string[];
+  /** A copy or reveal the reader chose from a tab menu that failed. */
+  tabMenuFailure?: FailureView | null | undefined;
 }): WorkspaceNoticePlacement {
   return useMemo(() => {
     // A floating card names its dismissal in words; the corner's cross needs
@@ -76,6 +82,17 @@ export function useWorkspaceNotices({
           onDismiss: () => dismissRevisionFailure(message),
           tone: 'capability' as const,
         })),
+        ...(tabMenuFailure
+          ? [
+              {
+                action: null,
+                dismissLabel: 'Dismiss',
+                message: tabMenuFailure.message,
+                onDismiss: dismissTabMenuFailure,
+                tone: tabMenuFailure.tone,
+              },
+            ]
+          : []),
       ],
       // Not the reader's request coming back, so said as a capability that
       // could not answer.
@@ -94,9 +111,11 @@ export function useWorkspaceNotices({
   }, [
     dismissPreparationFailure,
     dismissRevisionFailure,
+    dismissTabMenuFailure,
     hostFailure,
     preparationFailure,
     preparationRequested,
     revisionFailures,
+    tabMenuFailure,
   ]);
 }

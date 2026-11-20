@@ -17,6 +17,7 @@ import {
   useWorkspaceNotices,
   type WorkspaceNoticePlacement,
 } from '@/app/composition/folder/use-workspace-notices';
+import type { TabMenuActions } from '@/app/composition/layout/use-tab-menu-actions';
 import type { DocumentTabsRuntime } from '@/features/documents/public';
 import type { SettingsSectionId, SettingsTarget } from '@/features/settings/public';
 import type {
@@ -92,6 +93,7 @@ export function useWorkspaceCommands({
   preparation,
   revisions,
   session,
+  tabMenu,
   workspace,
 }: {
   documents: DocumentTabsRuntime | null;
@@ -100,6 +102,8 @@ export function useWorkspaceCommands({
   preparation: Pick<PreparationCommands, 'dismissFailure' | 'failure' | 'failureRequested'>;
   revisions: TurnReview;
   session: WorkspaceSessionController;
+  /** A tab menu's failed copy or reveal, raised as a floating notice. */
+  tabMenu?: Pick<TabMenuActions, 'dismissFailure' | 'failure'> | undefined;
   workspace: WorkspaceRuntime | null;
 }): WorkspaceCommands {
   const memberCount = project?.projects.length ?? 0;
@@ -147,6 +151,8 @@ export function useWorkspaceCommands({
     preparationFailure: preparation.failure,
     preparationRequested: preparation.failureRequested,
     revisionFailures: revisions.failures,
+    tabMenuFailure: tabMenu?.failure,
+    dismissTabMenuFailure: tabMenu?.dismissFailure,
   });
 
   return {

@@ -15,7 +15,11 @@ source mutations, saving, and release guarantees.
    and scrolls the row fully into view. A folder the reader folds
    stays folded until a document inside it comes in front again. While another
    panel covers Files, the row is brought into view when Files is shown.
-2. Keep a preview or start editing to retain its tab. New tab offers **Create text
+2. Keep a preview or start editing to retain its tab. A tab's menu (right click,
+   the menu key or Shift+F10) closes it, the others, those to its right, or all,
+   each saving as Close does; the first tab that stays open for a draft question
+   or a failed save stops the rest. It also shows the file in the system file
+   manager and copies its path. New tab offers **Create text
    note**, which opens a blank Markdown file, and **Create interactive note**, which
    opens a usable blank HTML note in its own directory with `index.html` and
    `assets/`. Both create beside the Files selection and offer inline naming.
