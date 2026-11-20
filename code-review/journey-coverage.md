@@ -1511,7 +1511,10 @@ An isolated macOS Electron source preview with a two-page PDF verified idle
 hiding, top-edge reveal, hiding after mouse zoom, keyboard reveal, page editing
 and jumping, and the unchanged image toolbar. Chromium focus emulation kept the
 fixture focused during native input events. The composition was inspected by eye;
-physical touch input, packaged delivery and Windows/Linux remain unverified.
+A pre-release fix uses any coarse pointer capability so a secondary touch input
+also keeps controls available. A built Electron pass verified desktop idle hiding,
+emulated-touch visibility, and the compiled hybrid-device media rule. Physical
+touch input, packaged delivery and Windows/Linux remain unverified.
 
 **Chinese IME composition (2026-10-11):** `ui/markdown/outline-adapter.ts`
 renders heading anchors through ProseMirror decorations and removes Milkdown's

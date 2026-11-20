@@ -40,8 +40,8 @@ four megapixels and 4,096 pixels on its longest side, so on a high-DPI display a
 Letter or A4 page is drawn below screen resolution beyond about 140% zoom, and
 larger pages sooner.
 On pointer devices, PDF controls fade away during reading and reappear near the
-top of the pane. Keyboard focus and value editing keep them visible; touch
-controls stay available.
+top of the pane. Keyboard focus and value editing keep them visible; controls
+stay available on touch-capable devices, including those with a mouse.
 
 Image previews initially fit the document pane. Zooming can extend beyond the
 pane's bounds, with scrolling to reach the whole image; fitting it again restores

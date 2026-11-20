@@ -87,7 +87,7 @@ export function ViewerToolbar({
           // pinning them open after a pointer click on a zoom button.
           autoHideWithin &&
             !pointerVisible &&
-            'pointer-events-none opacity-0 has-[:focus-visible]:pointer-events-auto has-[:focus-visible]:opacity-100 pointer-coarse:pointer-events-auto pointer-coarse:opacity-100',
+            'pointer-events-none opacity-0 has-[:focus-visible]:pointer-events-auto has-[:focus-visible]:opacity-100 any-pointer-coarse:pointer-events-auto any-pointer-coarse:opacity-100',
           shape.container,
           className,
         )}
