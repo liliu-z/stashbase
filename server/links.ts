@@ -33,6 +33,7 @@
  *     non-ASCII names, stays as written.
  */
 import path from 'node:path';
+import { fromMarkdown } from 'mdast-util-from-markdown';
 import { detectFormat } from './format.ts';
 import { listFilesAsync } from './file-listing.ts';
 import { logger, errorMessage } from './log.ts';
@@ -84,6 +85,9 @@ interface LinkMatch {
   end: number;
   /** The raw href text. */
   href: string;
+  /** Full markup span, confirmed against CommonMark for Markdown links. */
+  markupStart: number;
+  markupEnd: number;
   /** How the destination was written, which decides how a rewrite encodes it. */
   style: LinkStyle;
 }
@@ -102,7 +106,24 @@ const MD_LINK =
   /!?\[(?:[^\[\]]|\[[^\[\]]*\])*\]\([ \t]*(?:<([^<>\n]*)>|((?:[^\s()<]|\([^\s()]*\))(?:[^\s()]|\([^\s()]*\))*))(?:\s+(?:"[^"]*"|'[^']*'|\([^()]*\)))?[ \t]*\)/gd;
 
 function extractMdLinks(content: string): LinkMatch[] {
-  return hrefMatches(content, MD_LINK, ['md-angle', 'md']);
+  // CommonMark owns recognition: escaped prose and literal examples are
+  // not links. The matcher below only locates destinations in supported forms.
+  const targets = new Set<string>();
+  type MarkdownTree = ReturnType<typeof fromMarkdown>;
+  function collect(node: MarkdownTree | MarkdownTree['children'][number]): void {
+    if (node.type === 'link' || node.type === 'image') {
+      const start = node.position?.start.offset;
+      const end = node.position?.end.offset;
+      if (start !== undefined && end !== undefined) targets.add(`${start}:${end}`);
+    }
+    if ('children' in node) {
+      for (const child of node.children) collect(child);
+    }
+  }
+  collect(fromMarkdown(content));
+  return hrefMatches(content, MD_LINK, ['md-angle', 'md']).filter(
+    (match) => targets.has(`${match.markupStart}:${match.markupEnd}`),
+  );
 }
 
 /** Match every `<a ... href="..." ...>`. Quotes can be `"` or `'`; the other
@@ -119,7 +140,7 @@ function hrefMatches(content: string, re: RegExp, styles: LinkStyle[]): LinkMatc
     styles.some((style, index) => {
       const span = m.indices?.[index + 1];
       if (!span) return false;
-      out.push({ start: span[0], end: span[1], href: m[index + 1], style });
+      out.push({ start: span[0], end: span[1], href: m[index + 1], style, markupStart: m.index, markupEnd: m.index + m[0].length });
       return true;
     });
   }

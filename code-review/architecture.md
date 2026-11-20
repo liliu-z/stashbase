@@ -176,8 +176,8 @@ preview, content editing, and rename/delete are separate permissions.
   before matching, as the reader resolves them, and a rewritten path encodes only
   characters that would break or change the link (`links.test.ts`). Markdown
   `<destinations>` keep their form, titles may use any CommonMark quoting, and a
-  bare destination may hold balanced parentheses. Links inside code spans and
-  fences are still rewritten. MCP file moves stay inside one project.
+  bare destination may hold balanced parentheses. CommonMark confirms the complete inline-link/image markup before a rewrite;
+  escaped prose, code examples and raw HTML regions are not Markdown links. MCP file moves stay inside one project.
 
 ### Import Publication
 

@@ -93,3 +93,25 @@ test('an HTML href may contain the other quote character', async () => {
     planRenameLinksAsync([{ kind: 'file', old: "It's.md", new: 'Final.md' }]));
   assert.equal(plan[0]?.newContent, `<a href="Final.md">a</a><a href='say "hi".md'>b</a>`);
 });
+
+
+test('rename preserves literal link examples inside inline, fenced and indented code', async () => {
+  const literals = [
+    String.raw`\[example](<old.md>)`,
+    '[example]\\(<old.md>)',
+    '`[example](<old.md>)`',
+    '``[example](old.md) ` more``',
+    '~~~md\n[example](<old.md>)\n~~~',
+    '```md\n[example](old.md)\n```',
+    '    [example](<old.md>)',
+    '> ```md\n> [example](<old.md>)\n> ```',
+    '```md\n[example](<old.md>)',
+  ];
+  for (const literal of literals) {
+    const input = '[live](<old.md>)\n\n' + literal + '\n';
+    assert.equal(
+      await rewrittenIndex(input, ['old.md'], { kind: 'file', old: 'old.md', new: 'new.md' }),
+      '[live](<new.md>)\n\n' + literal + '\n',
+    );
+  }
+});
