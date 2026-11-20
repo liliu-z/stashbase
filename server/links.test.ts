@@ -115,3 +115,44 @@ test('rename preserves literal link examples inside inline, fenced and indented 
     );
   }
 });
+
+test('markup entities identify their rendered target and renamed entity-looking names stay literal', async () => {
+  const root = fs.mkdtempSync(path.join(scratch, 'project-'));
+  const html = `<a href="It's&copy;.md?view=a&amp;b=2#part">n</a>`;
+  fs.writeFileSync(path.join(root, 'page.html'), html);
+  fs.writeFileSync(path.join(root, "It's©.md"), 'actual target');
+  fs.writeFileSync(path.join(root, "It's&copy;.md"), 'unrelated literal file');
+  const plan = (old: string, name: string) => runWithFolderRoot(root, () =>
+    planRenameLinksAsync([{ kind: 'file', old, new: name }]));
+  assert.equal((await plan("It's&copy;.md", 'Unrelated.md')).length, 0);
+  assert.equal((await plan("It's©.md", 'Next&copy;.md'))[0]?.newContent,
+    `<a href="Next%26copy;.md?view=a&amp;b=2#part">n</a>`);
+  assert.equal(
+    await rewrittenIndex('[a](<Old&copy; Note.md> "Title")\n', ['Old© Note.md'],
+      { kind: 'file', old: 'Old© Note.md', new: 'New&copy; Note.md' }),
+    '[a](<New%26copy; Note.md> "Title")\n',
+  );
+  assert.equal(
+    await rewrittenIndex(String.raw`[a](old.md?value=a\*b&amp;c=2#part)` + '\n', ['old.md'],
+      { kind: 'file', old: 'old.md', new: 'new.md' }),
+    String.raw`[a](new.md?value=a\*b&amp;c=2#part)` + '\n',
+  );
+});
+
+test('HTML rename follows actual href attributes, preserving script and comment examples', async () => {
+  const root = fs.mkdtempSync(path.join(scratch, 'project-'));
+  const literal = `<script>const example = '<a href="It\'s.md">';</script><!-- <a href="It's.md"> -->`;
+  fs.writeFileSync(path.join(root, 'page.html'), literal + `<a data-href="It's.md" href="other.md">other</a><a href="It's.md">live</a><a href="other.md" href="It's.md">duplicate</a>`);
+  fs.writeFileSync(path.join(root, "It's.md"), 'note');
+  const plan = await runWithFolderRoot(root, () => planRenameLinksAsync([{ kind: 'file', old: "It's.md", new: 'Next.md' }]));
+  assert.equal(plan[0]?.newContent, literal + `<a data-href="It's.md" href="other.md">other</a><a href="Next.md">live</a><a href="other.md" href="It's.md">duplicate</a>`);
+});
+
+
+test('entity-spelled query and fragment delimiters retain their original bytes', async () => {
+  const root = fs.mkdtempSync(path.join(scratch, 'project-'));
+  fs.writeFileSync(path.join(root, 'page.html'), '<a href="old.md&#63;view=a&amp;b=2&#35;part">n</a>');
+  fs.writeFileSync(path.join(root, 'old.md'), 'target');
+  const plan = await runWithFolderRoot(root, () => planRenameLinksAsync([{ kind: 'file', old: 'old.md', new: 'new.md' }]));
+  assert.equal(plan[0]?.newContent, '<a href="new.md&#63;view=a&amp;b=2&#35;part">n</a>');
+});
