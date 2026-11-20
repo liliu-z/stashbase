@@ -234,6 +234,12 @@ export class MfsDaemon extends EventEmitter {
           // GOAWAY ~every minute. The reconnect is transparent — only
           // the log is noisy. Drop gRPC's INFO chatter to ERROR.
           GRPC_VERBOSITY: process.env.GRPC_VERBOSITY ?? 'ERROR',
+          // OpenBLAS commits a buffer pool per CPU thread at import: ~1.1 GB on
+          // 8 threads that the daemon's light vector math never touches, and a
+          // failed start when commit is short. With one thread the whole daemon
+          // commits ~0.1 GB. Fixed, not inherited, so a global setting cannot
+          // bring the pool back.
+          OPENBLAS_NUM_THREADS: '1',
         },
         stdio: ['pipe', 'pipe', 'pipe'],
         detached: process.platform !== 'win32',

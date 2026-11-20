@@ -93,6 +93,24 @@ test('a daemon close deadline fences replacement until the old process actually 
   assert.equal(daemon.currentGeneration(), 2);
 });
 
+test('the daemon runs OpenBLAS on one thread even when the host environment asks for more', async (t) => {
+  const inherited = process.env.OPENBLAS_NUM_THREADS;
+  process.env.OPENBLAS_NUM_THREADS = '8';
+  t.after(() => {
+    if (inherited === undefined) delete process.env.OPENBLAS_NUM_THREADS;
+    else process.env.OPENBLAS_NUM_THREADS = inherited;
+  });
+  const daemon = new MfsDaemon(() => ({ command: process.execPath, cwd: os.tmpdir(), args: ['-e', `
+    process.stdout.write(JSON.stringify({ event: 'fixture-env', threads: process.env.OPENBLAS_NUM_THREADS }) + '\\n');
+    process.stdout.write(JSON.stringify({ event: 'ready' }) + '\\n');
+    process.stdin.resume();
+  `] }));
+  t.after(() => daemon.close());
+  const reported = new Promise<{ threads?: string }>(resolve => daemon.once('daemon:fixture-env', resolve));
+  await daemon.ensureReady();
+  assert.equal((await reported).threads, '1', 'per-thread OpenBLAS buffers commit ~1.1 GB on an 8-thread machine');
+});
+
 test('retirement between readiness and dispatch does not write to the closing stdin', async (t) => {
   const daemon = new MfsDaemon(() => ({ command: process.execPath, cwd: os.tmpdir(), args: ['-e',
     "process.stdout.write('{\"event\":\"ready\"}\\n'); process.stdin.resume()"] }));
