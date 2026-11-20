@@ -59,7 +59,10 @@ delivery so a first-launch host failure can be reported before any renderer.
 later host without a second app-config writer. Controlled regressions exercise
 a ten-second readiness timeout without a host, later sign-in linking, owned
 success/source reuse, port/spawn failure, offline replay, bounded transport,
-ingestion refusal and opt-out. `pnpm check`, 93 focused startup/telemetry checks,
+ingestion refusal and opt-out. Additional pre-release regressions cover opt-out
+during configuration reads, offline-spool replay, and event publication when
+saving preferences fails; the collector cannot recreate deleted data or resume
+after retirement. `pnpm check`, 93 focused startup/telemetry checks,
 98 protocol checks, docs/inventory checks and fresh builds passed. The built
 Electron lifecycle smoke sends initiation and a real readiness timeout through
 Electron networking to a local collector before any host or window exists;

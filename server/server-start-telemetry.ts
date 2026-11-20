@@ -2,9 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { readAppConfigStrict, type AppConfigFile } from './app-config.ts';
-import { writeFileAtomic } from './atomic-write.ts';
 import { telemetryAvailable } from './telemetry-environment.ts';
-import { initialUsageIdentity, clearServerStartTelemetry, serverStartTelemetryRoot } from './telemetry-bootstrap.ts';
+import { initialUsageIdentity, readInitialUsageIdentity, clearServerStartTelemetry, serverStartTelemetryRoot } from './telemetry-bootstrap.ts';
 import { accountUsageId, usageState, usageIdentitySchema, queuedUsageSchema, usagePayload, QUEUE_TTL, type QueuedUsage } from './telemetry-state.ts';
 import { serverStartEventSchema, errorDiagnostic, boundedDiagnosticContext, type ServerStartEvent, type DiagnosticContext } from '../shared/protocols/http/telemetry.ts';
 import { usageBatchUrl } from '../shared/hosted-auth-network.ts';
@@ -28,15 +27,25 @@ export function createServerStartTelemetry(options: {
   let sending: Promise<void> | undefined;
   let pending: AbortController | undefined;
   let admitted = false;
+  let retired = false;
+  let initialIdentity: ReturnType<typeof initialUsageIdentity>;
+  const retire = () => { retired = true; pending?.abort(); };
   const files = () => fs.existsSync(eventsDirectory)
     ? fs.readdirSync(eventsDirectory).filter(name => /^[0-9a-f-]{36}\.json$/.test(name)) : [];
   const consent = () => {
-    if (!available) return false;
+    if (!available || retired) return false;
     // Host opt-out deletes this spool even when app-config persistence fails.
     // Once admitted, a removed spool retires this main-process collector too.
-    if (admitted && !fs.existsSync(eventsDirectory)) { pending?.abort(); return false; }
+    const existing = fs.existsSync(eventsDirectory);
+    if (admitted && !existing) { retire(); return false; }
+    admitted ||= existing;
     const enabled = usageState(read(), now()).enabled;
-    if (!enabled) { pending?.abort(); clearServerStartTelemetry(directory); }
+    if (!enabled) { retire(); clearServerStartTelemetry(directory); }
+    else {
+      const exists = fs.existsSync(eventsDirectory);
+      if (admitted && !exists) { retire(); return false; }
+      admitted ||= exists;
+    }
     return enabled;
   };
   const capture = (event: ServerStartEvent) => {
@@ -45,7 +54,8 @@ export function createServerStartTelemetry(options: {
       const config = read();
       const state = usageState(config, now());
       if (!state.enabled) return;
-      const initial = config.telemetry === undefined ? initialUsageIdentity(directory, now()) : undefined;
+      const initial = config.telemetry === undefined
+        ? (initialIdentity ??= admitted ? readInitialUsageIdentity(directory) : initialUsageIdentity(directory, now())) : undefined;
       const identity = initial ?? usageIdentitySchema.safeParse(state).data;
       // An unsynchronized account transition belongs to the host. Never attach
       // a new attempt to the previous person's anonymous identity.
@@ -56,14 +66,22 @@ export function createServerStartTelemetry(options: {
         uuid: randomUUID(), timestamp: new Date(now()).toISOString(),
         version: options.version, distribution: options.distribution, os: process.platform, event: parsed,
       };
-      fs.mkdirSync(eventsDirectory, { recursive: true, mode: 0o700 });
+      if (!admitted) {
+        fs.mkdirSync(eventsDirectory, { recursive: true, mode: 0o700 });
+        admitted = true;
+      }
       // Expiry also runs without a network connection so old failures cannot
       // permanently fill the bounded spool.
       const existing = entries();
       if (existing.length >= (event.event === 'server_start_initiated' ? 25 : 50)) return;
-      writeFileAtomic(path.join(eventsDirectory, `${queued.uuid}.json`), JSON.stringify(queued), { mode: 0o600 });
-      admitted = true;
-    } catch { /* Launch never depends on diagnostic storage. */ }
+      // UUID files are append-only. Never use a writer that recreates parents:
+      // host opt-out can remove this directory after the consent check. A crash
+      // can leave an incomplete record, which entries() rejects on the next read.
+      fs.writeFileSync(path.join(eventsDirectory, `${queued.uuid}.json`), JSON.stringify(queued), { flag: 'wx', mode: 0o600 });
+    } catch (error) {
+      if (admitted && (error as NodeJS.ErrnoException).code === 'ENOENT') retire();
+      // Launch never depends on diagnostic storage.
+    }
   };
   const entries = (): Array<{ file: string; entry: QueuedUsage }> => files().flatMap(name => {
     const file = path.join(eventsDirectory, name);

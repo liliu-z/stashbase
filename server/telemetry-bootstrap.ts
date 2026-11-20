@@ -5,6 +5,13 @@ import { usageIdentity, usageIdentitySchema, type UsageIdentity } from './teleme
 
 export const serverStartTelemetryRoot = () => path.join(appDataRoot(), 'server-start-telemetry');
 
+/** Reading an admitted collector's seed must never recreate a revoked spool. */
+export function readInitialUsageIdentity(directory = serverStartTelemetryRoot()): UsageIdentity | undefined {
+  try {
+    return usageIdentitySchema.omit({ userId: true }).strict().parse(JSON.parse(fs.readFileSync(path.join(directory, 'identity.json'), 'utf8')));
+  } catch { return undefined; }
+}
+
 /** Main cannot write the host's app-config. Publish an initial anonymous seed
  * separately; the host adopts it only while telemetry has never been initialized.
  * Later sign-in/opt-out/account transitions remain exclusively host-owned. */
@@ -17,7 +24,7 @@ export function initialUsageIdentity(directory = serverStartTelemetryRoot(), now
       try { fs.writeFileSync(file, JSON.stringify(identity), { flag: 'wx', mode: 0o600 }); }
       catch (error) { if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error; }
     }
-    return usageIdentitySchema.omit({ userId: true }).strict().parse(JSON.parse(fs.readFileSync(file, 'utf8')));
+    return readInitialUsageIdentity(directory);
   } catch { return undefined; }
 }
 

@@ -1477,7 +1477,10 @@ allowance snapshot to the gateway so their explanation reflects held capacity.
   They reuse established analytics identity or the first-launch seed, preserve
   UUID/time/version through retry, and recheck consent before transmission.
   Opt-out/unreadable preferences abort active delivery; removing the spool also
-  retires an admitted collector if saving opt-out fails. Success never waits for
+  retires an admitted collector if saving opt-out fails. Admission observes an
+  existing spool before reading preferences; later publication never recreates
+  its parent or initial seed. Retirement remains latched if another collector
+  creates a new spool. Success never waits for
   telemetry; failure permits two bounded drains before the blocking native dialog.
 - Host log level is the reported severity. `log.error` means an operation failed
   for the user or data may be inconsistent; `log.warn` means it degraded and

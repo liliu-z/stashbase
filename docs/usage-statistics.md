@@ -361,7 +361,10 @@ time, version and identity at the next launch or terminal event. Each drain has
 a 1.5-second deadline; a startup failure waits for an existing drain and one
 final drain before showing its blocking native dialog. Normal entry never waits
 for delivery. Opt-out erases this spool and the initial anonymous seed and aborts
-active transmission. Unreadable preferences fail closed. Ingestion acceptance
+active transmission. An admitted collector cannot recreate deleted startup data,
+including when opt-out overlaps event publication or configuration persistence
+fails. A retired collector cannot resume after a later opt-in. Unreadable
+preferences fail closed. Ingestion acceptance
 does not prove dashboard visibility, and a permanently refused event is discarded.
 
 Queue expiry, saturation, unavailable local storage, ingestion rejection and

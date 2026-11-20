@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import { createServerStartTelemetry } from './server-start-telemetry.ts';
 import { initialUsageIdentity, clearServerStartTelemetry } from './telemetry-bootstrap.ts';
 import { createTelemetry } from './telemetry.ts';
-import { QUEUE_TTL } from './telemetry-state.ts';
+import { QUEUE_TTL, usageIdentity } from './telemetry-state.ts';
 import type { AppConfigFile } from './app-config.ts';
 import { rendererTelemetryEventSchema } from '../shared/protocols/http/telemetry.ts';
 
@@ -197,6 +197,80 @@ test('opt-out aborts an in-flight request, erases seed and events, and cannot se
   await reporter.settle();
   assert.equal(aborted, true);
   assert.equal(fs.existsSync(f.directory), false);
+});
+
+test('concurrent opt-out cannot recreate a previously admitted spool when saving preferences fails', async t => {
+  for (const initialized of [false, true]) {
+    const f = fixture(t);
+    if (initialized) f.write({ telemetry: { enabled: true, ...usageIdentity({ enabled: true }, f.now()) } });
+    let revoke = false;
+    let reads = 0;
+    const reporter = createServerStartTelemetry({ ...f.options, read: () => {
+      const snapshot = f.read();
+      // The host removes startup data but cannot persist the disabled setting.
+      // Main's second read has already captured the previous enabled snapshot.
+      if (revoke && ++reads === 2) clearServerStartTelemetry(f.directory);
+      return snapshot;
+    } });
+    const attempt = reporter.begin(randomUUID());
+    await reporter.flush();
+    revoke = true;
+    attempt.failed(new Error('after concurrent opt-out'));
+    revoke = false;
+    await reporter.settle();
+    assert.deepEqual(f.sent.map(event => event.event), ['server_start_initiated']);
+    assert.equal(fs.existsSync(f.directory), false);
+
+    // A new collector or a later opt-in cannot revive this retired collector.
+    fs.mkdirSync(path.join(f.directory, 'events'), { recursive: true });
+    reporter.begin(randomUUID()).success(true);
+    await reporter.settle();
+    assert.deepEqual(f.sent.map(event => event.event), ['server_start_initiated']);
+    assert.deepEqual(f.records(), []);
+  }
+});
+
+test('resuming an offline spool observes revocation during its first preference read', async t => {
+  const f = fixture(t);
+  f.write({ telemetry: { enabled: true, ...usageIdentity({ enabled: true }, f.now()) } });
+  const offline = createServerStartTelemetry({ ...f.options, fetch: async () => { throw new Error('offline'); } });
+  offline.begin(randomUUID());
+  await offline.settle();
+  let revoked = false;
+  const resumed = createServerStartTelemetry({ ...f.options, read: () => {
+    const snapshot = f.read();
+    if (!revoked) { revoked = true; clearServerStartTelemetry(f.directory); }
+    return snapshot;
+  } });
+  resumed.begin(randomUUID()).failed(new Error('after revocation'));
+  await resumed.settle();
+  assert.deepEqual(f.sent, []);
+  assert.equal(fs.existsSync(f.directory), false);
+});
+
+test('revocation at event publication cannot recreate the parent or reactivate the collector', async t => {
+  const f = fixture(t);
+  const reporter = createServerStartTelemetry(f.options);
+  const attempt = reporter.begin(randomUUID());
+  await reporter.flush();
+  const write = fs.writeFileSync;
+  let revoke = true;
+  t.mock.method(fs, 'writeFileSync', (...args: Parameters<typeof fs.writeFileSync>) => {
+    if (revoke && path.dirname(String(args[0])) === path.join(f.directory, 'events')) {
+      revoke = false;
+      clearServerStartTelemetry(f.directory);
+    }
+    return write(...args);
+  });
+  attempt.failed(new Error('revoked at publication'));
+  await reporter.settle();
+  assert.equal(revoke, false);
+  assert.equal(fs.existsSync(f.directory), false);
+  fs.mkdirSync(path.join(f.directory, 'events'), { recursive: true });
+  reporter.begin(randomUUID()).success(true);
+  await reporter.settle();
+  assert.deepEqual(f.sent.map(event => event.event), ['server_start_initiated']);
+  assert.deepEqual(f.records(), []);
 });
 
 test('suppressed, unreadable and malformed preferences produce no identity, spool or requests', async t => {
