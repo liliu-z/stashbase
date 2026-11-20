@@ -1,4 +1,4 @@
-import { Expand, Maximize2, Minus } from 'lucide-react';
+import { Expand, Maximize2, Minus, Plus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import type { DocumentAsset } from '@/features/documents/application/ports';
@@ -56,6 +56,9 @@ export function ImageDocument({ name, resource }: { name: string; resource: Docu
           title="Actual size; double-click to set zoom"
           value={Math.round(image.scale * 100)}
         />
+        <ViewerToolbarButton label="Zoom in" onClick={() => image.zoomBy(1.2)}>
+          <Plus aria-hidden="true" />
+        </ViewerToolbarButton>
         <ViewerToolbarButton
           active={image.mode === 'fit'}
           aria-pressed={image.mode === 'fit'}
@@ -78,10 +81,10 @@ export function ImageDocument({ name, resource }: { name: string; resource: Docu
             retry={() => setLoadFailed(false)}
           />
         ) : (
-          <div className="flex min-h-full min-w-full items-center justify-center px-6 pt-16 pb-6">
+          <div className="flex min-h-full w-max min-w-full items-center justify-center px-6 pt-16 pb-6">
             <img
               alt={name}
-              className="block h-auto flex-none shadow-surface-3"
+              className="block h-auto max-w-none flex-none shadow-surface-3"
               draggable={false}
               onError={() => setLoadFailed(true)}
               onLoad={(event) =>

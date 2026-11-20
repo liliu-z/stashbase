@@ -1472,6 +1472,16 @@ Enlarge image, and Escape back to the preview worked and were reviewed by eye.
 This verifies the source runtime with fixture bytes, not the reported user's
 file, project navigation end to end, or packaged delivery.
 
+**Image zoom beyond the pane (2026-11-12):** `ui/image/document.tsx` restores
+Zoom in and lets the image's scroll surface grow with its explicit zoomed size,
+overriding the default image maximum width. `document.test.tsx` exercises zoom
+in/out after entering a percentage and returning to Fit to view. An isolated
+macOS Electron source preview with real renderer styles reproduced the old width
+cap, then verified growing image dimensions beyond the pane, scrolling to all
+edges, fit restoration, the visible plus button at 360px pane width, and opening
+and closing the enlarged preview. This used a controlled SVG; packaged delivery
+and Windows/Linux remain unverified.
+
 **Chinese IME composition (2026-10-11):** `ui/markdown/outline-adapter.ts`
 renders heading anchors through ProseMirror decorations and removes Milkdown's
 competing heading-id synchronizer. Direct heading DOM writes previously made

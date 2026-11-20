@@ -12,6 +12,7 @@ afterEach(() => {
 
 describe('image document', () => {
   it('uses compact viewer controls and opens the shared dialog lightbox', async () => {
+    const user = userEvent.setup();
     render(
       <ImageDocument
         name="diagram.png"
@@ -39,11 +40,20 @@ describe('image document', () => {
     pressKey(zoomInput, 'Enter');
     expect(screen.getByRole('button', { name: 'Zoom percentage' }).textContent).toBe('150%');
 
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Enlarge image' }));
+    await user.click(screen.getByRole('button', { name: 'Zoom in' }));
+    expect(screen.getByRole('button', { name: 'Zoom percentage' }).textContent).toBe('180%');
+    await user.click(screen.getByRole('button', { name: 'Zoom out' }));
+    expect(screen.getByRole('button', { name: 'Zoom percentage' }).textContent).toBe('150%');
+    await user.click(screen.getByRole('button', { name: 'Fit to view' }));
+    expect(screen.getByRole('button', { name: 'Fit to view' }).getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Enlarge image' }));
     expect(await screen.findByRole('dialog', { name: 'Image preview' })).not.toBeNull();
     expect(screen.getByRole('toolbar', { name: 'Image zoom controls' })).not.toBeNull();
 
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Close' }));
+    await user.click(screen.getByRole('button', { name: 'Close' }));
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 });
