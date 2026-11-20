@@ -11,6 +11,7 @@ import {
   type CSSProperties,
   type MouseEvent,
   type ReactNode,
+  type RefObject,
 } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -23,22 +24,70 @@ import { SINGLE_CLICK_DELAY_MS } from '@/shared/utils/click-intent';
 const VALUE_TYPOGRAPHY_CLASS = 'font-sans text-ui-12 leading-none tabular-nums';
 
 export function ViewerToolbar({
+  autoHideWithin,
   children,
   className,
   label,
 }: {
+  autoHideWithin?: RefObject<HTMLElement | null>;
   children: ReactNode;
   className?: string;
   label: string;
 }) {
   const shape = useShape();
+  const [pointerVisible, setPointerVisible] = useState(true);
+
+  useEffect(() => {
+    const surface = autoHideWithin?.current;
+    if (!surface) return;
+    let nearTop = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const cancelHide = () => {
+      clearTimeout(timer);
+      timer = undefined;
+    };
+    const hideSoon = () => {
+      if (timer !== undefined) return;
+      timer = setTimeout(() => {
+        timer = undefined;
+        setPointerVisible(false);
+      }, 1500);
+    };
+    const onPointerMove = (event: PointerEvent) => {
+      const y = event.clientY - surface.getBoundingClientRect().top;
+      const next = y >= 0 && y <= 64;
+      if (next === nearTop) return;
+      nearTop = next;
+      if (nearTop) {
+        cancelHide();
+        setPointerVisible(true);
+      } else hideSoon();
+    };
+    const onPointerLeave = () => {
+      nearTop = false;
+      hideSoon();
+    };
+    hideSoon();
+    surface.addEventListener('pointermove', onPointerMove);
+    surface.addEventListener('pointerleave', onPointerLeave);
+    return () => {
+      cancelHide();
+      surface.removeEventListener('pointermove', onPointerMove);
+      surface.removeEventListener('pointerleave', onPointerLeave);
+    };
+  }, [autoHideWithin]);
 
   return (
     <div className="pointer-events-none absolute inset-x-0 top-3 z-20 flex justify-center px-3">
       <div
         aria-label={label}
         className={cn(
-          'pointer-events-auto flex h-10 max-w-full items-center gap-1 border border-border bg-[color-mix(in_oklab,var(--surface-3)_72%,transparent)] px-1.5 text-foreground shadow-surface-5 backdrop-blur-xl backdrop-saturate-150 transition-[background-color,box-shadow] duration-fast focus-within:bg-[color-mix(in_oklab,var(--surface-3)_82%,transparent)] focus-within:shadow-surface-6 hover:bg-[color-mix(in_oklab,var(--surface-3)_82%,transparent)] hover:shadow-surface-6',
+          'pointer-events-auto flex h-10 max-w-full items-center gap-1 border border-border bg-[color-mix(in_oklab,var(--surface-3)_72%,transparent)] px-1.5 text-foreground shadow-surface-5 backdrop-blur-xl backdrop-saturate-150 transition-[background-color,box-shadow,opacity] duration-fast focus-within:bg-[color-mix(in_oklab,var(--surface-3)_82%,transparent)] focus-within:shadow-surface-6 hover:bg-[color-mix(in_oklab,var(--surface-3)_82%,transparent)] hover:shadow-surface-6 motion-reduce:transition-none',
+          // Keyboard focus (including text inputs) reveals controls without
+          // pinning them open after a pointer click on a zoom button.
+          autoHideWithin &&
+            !pointerVisible &&
+            'pointer-events-none opacity-0 has-[:focus-visible]:pointer-events-auto has-[:focus-visible]:opacity-100 pointer-coarse:pointer-events-auto pointer-coarse:opacity-100',
           shape.container,
           className,
         )}

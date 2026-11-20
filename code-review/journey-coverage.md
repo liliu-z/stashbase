@@ -1482,6 +1482,16 @@ edges, fit restoration, the visible plus button at 360px pane width, and opening
 and closing the enlarged preview. This used a controlled SVG; packaged delivery
 and Windows/Linux remain unverified.
 
+**PDF controls during reading (2026-11-13):** `ui/pdf/document.tsx` opts into
+`ui/viewer-toolbar.tsx`'s idle disclosure. The toolbar owns its timer and pointer
+listeners; hidden controls pass pointer input through to the page, while keyboard
+focus and value editing reveal them. Image controls remain continuously visible.
+An isolated macOS Electron source preview with a two-page PDF verified idle
+hiding, top-edge reveal, hiding after mouse zoom, keyboard reveal, page editing
+and jumping, and the unchanged image toolbar. Chromium focus emulation kept the
+fixture focused during native input events. The composition was inspected by eye;
+physical touch input, packaged delivery and Windows/Linux remain unverified.
+
 **Chinese IME composition (2026-10-11):** `ui/markdown/outline-adapter.ts`
 renders heading anchors through ProseMirror decorations and removes Milkdown's
 competing heading-id synchronizer. Direct heading DOM writes previously made

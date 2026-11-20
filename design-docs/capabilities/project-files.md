@@ -39,6 +39,9 @@ its last drawing until the new one replaces it. Each page is drawn with at most
 four megapixels and 4,096 pixels on its longest side, so on a high-DPI display a
 Letter or A4 page is drawn below screen resolution beyond about 140% zoom, and
 larger pages sooner.
+On pointer devices, PDF controls fade away during reading and reappear near the
+top of the pane. Keyboard focus and value editing keep them visible; touch
+controls stay available.
 
 Image previews initially fit the document pane. Zooming can extend beyond the
 pane's bounds, with scrolling to reach the whole image; fitting it again restores
