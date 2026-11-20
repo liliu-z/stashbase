@@ -28,7 +28,6 @@ import {
 import type { Agent } from '@/features/agent/domain/agent-catalog';
 import {
   agentCatalogPort,
-  agentPersonaApi,
   agentToolsApi,
   BUILT_IN_AGENT,
   CLAUDE_AGENT,
@@ -96,7 +95,6 @@ export function renderWorkspace(
         <ManagedAgentWorkspace
           onOpenAppSettings={onOpenAppSettings}
           catalog={catalog}
-          persona={agentPersonaApi()}
           tools={tools}
           onOpenAgentSettings={onOpenAgentSettings}
           onOpenExternal={vi.fn()}

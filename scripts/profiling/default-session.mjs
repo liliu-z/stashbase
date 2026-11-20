@@ -50,7 +50,7 @@ const revision = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: ch
 async function connect() {
   const started = performance.now();
   const runtime = createOpenCodeSessionRuntime({ windowId: 'profile', directory: project,
-    agentSessionId: randomUUID(), persona: undefined });
+    agentSessionId: randomUUID() });
   await runtime.models();
   const client = await runtime.client(project);
   if ((await client.mcp.status({ throwOnError: true })).data.stashbase?.status !== 'connected') {

@@ -13,7 +13,6 @@ import type { ComponentProps } from 'react';
 import { createAgentPreferencesAdapter, type AgentPreferencesPort } from '@/features/agent/public';
 import {
   createAgentCatalogAdapter,
-  createAgentPersonaAdapter,
   createAgentToolsAdapter,
   createAgentContextAdapter,
   createAgentSessionAdapter,
@@ -22,7 +21,6 @@ import {
   createScheduledRunsAdapter,
   createScheduledTasksAdapter,
   type AgentCatalogPort,
-  type AgentPersonaPort,
   type AgentToolsPort,
   type AgentContextPort,
   type AgentSessionPort,
@@ -109,7 +107,6 @@ export interface AppDependencies {
     catalog: AgentCatalogPort;
     preferences?: AgentPreferencesPort;
     context: AgentContextPort;
-    persona: AgentPersonaPort;
     /** Default's optional model tools. */
     tools: AgentToolsPort;
     session: AgentSessionPort;
@@ -189,7 +186,6 @@ export function createDependencies(): AppDependencies {
         : {}),
       catalog: createAgentCatalogAdapter(http),
       preferences: createAgentPreferencesAdapter(http),
-      persona: createAgentPersonaAdapter(http),
       tools: createAgentToolsAdapter(http),
       context: createAgentContextAdapter(http, bridge.runtime.serverOrigin),
       session: createAgentSessionAdapter(http, bridge.runtime.serverOrigin),

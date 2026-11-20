@@ -4,8 +4,8 @@ Shared terms for product copy, design, code review, and tests.
 
 ## Naming During Review
 
-Start with the meaning and scope, then inspect the name. Product copy, packaged
-personas, and guides use the vocabulary here. Code identifiers may use
+Start with the meaning and scope, then inspect the name. Product copy and guides
+use the vocabulary here. Code identifiers may use
 established technical terms; renaming a persisted field, protocol, or path
 requires checking current readers and writers; historical-data-only compatibility follows
 the [maintenance policy](../MAINTENANCE.md#previous-version-data-policy).
@@ -92,24 +92,14 @@ Its words are sent with the request; it is not a file attachment or a revision.
 A reply's link to a passage in a project file, carrying a short quoted phrase
 that Documents locates on open. A plain file link is not a citation.
 
-## Persona
-
-Who the agent is when it talks and writes in a Chat. The reader keeps a
-library of personas shared by every project: written themselves, or added as a
-copy from **Browse personas**. Each Chat runs under one persona or none, and a
-project's next new Chat starts with the persona last chosen there. How the
-agent works belongs to the user-owned `AGENTS.md` / `CLAUDE.md` native
-instruction files; a persona is distinct from them, from access control, and
-from internal routing.
-
 ## Crew
 
 The Default Agent's optional specialists, such as Writer and Reviewer. Turning a
 member on assigns matching work to it in this chat on the selected model. New
 chats inherit the last choices; existing chats keep their own. The current request
 still governs the work. With none selected, the main agent handles the task.
-A persona supplies standing guidance; Crew assigns responsibilities. Each member
-performs a separate text generation. Code and service identifiers may call this
+Each member performs a separate text generation. Code and service identifiers may
+call this
 a tool because MCP carries the invocation; the product calls it Crew to make the
 user's explicit choice clear.
 

@@ -5,7 +5,6 @@ import { describe, expect, it, vi } from 'vite-plus/test';
 
 import type { GalleryIndex } from '@/features/gallery/application/ports';
 import type { GalleryEntry } from '@/features/gallery/domain/entry';
-import { GALLERY_PERSONA_SNAPSHOT } from '@/features/gallery/domain/persona-snapshot';
 import { GALLERY_SNAPSHOT } from '@/features/gallery/domain/snapshot';
 import { createTestQueryClient, queryWrapper } from '@/test/query';
 
@@ -38,13 +37,13 @@ function mount(loadIndex: () => Promise<GalleryIndex | null>) {
 
 describe('useGallery', () => {
   it('paints the bundled shelf on the first frame rather than an empty state', () => {
-    const { result } = mount(async () => ({ personas: null, wikis: [published()] }));
+    const { result } = mount(async () => ({ wikis: [published()] }));
     expect(result.current.bundled).toBe(true);
     expect(result.current.entries).toEqual(GALLERY_SNAPSHOT);
   });
 
   it('replaces the shelf with the published index and fills its gaps', async () => {
-    const { result } = mount(async () => ({ personas: null, wikis: [published()] }));
+    const { result } = mount(async () => ({ wikis: [published()] }));
     await waitFor(() => expect(result.current.bundled).toBe(false));
     // Published values win; the build's own knowledge fills what the index has
     // not said yet.
@@ -64,7 +63,7 @@ describe('useGallery', () => {
     const loadIndex = vi
       .fn()
       .mockResolvedValueOnce(null)
-      .mockResolvedValue({ personas: null, wikis: [published()] });
+      .mockResolvedValue({ wikis: [published()] });
     const { result, unmount } = mount(loadIndex);
     try {
       await waitFor(() => expect(loadIndex).toHaveBeenCalledTimes(1));
@@ -78,23 +77,5 @@ describe('useGallery', () => {
       unmount();
       onlineManager.setOnline(true);
     }
-  });
-
-  it('keeps the bundled personas until the index publishes its own', async () => {
-    const persona = {
-      category: 'news',
-      description: 'Published',
-      icon: null,
-      id: 'published',
-      name: 'Published',
-      prompt: 'Report.',
-      sample: null,
-    };
-    const older = mount(async () => ({ personas: null, wikis: [published()] }));
-    await waitFor(() => expect(older.result.current.bundled).toBe(false));
-    expect(older.result.current.personas).toEqual(GALLERY_PERSONA_SNAPSHOT);
-
-    const newer = mount(async () => ({ personas: [persona], wikis: [published()] }));
-    await waitFor(() => expect(newer.result.current.personas).toEqual([persona]));
   });
 });

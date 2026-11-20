@@ -57,7 +57,7 @@ import {
 } from '@anthropic-ai/claude-agent-sdk';
 import { logger, errorMessage } from './log.ts';
 import { getCurrentFolder, normalizeWindowId, registeredRootForAbs, runWithWindowId } from './folder.ts';
-import { resolveAgentRuntimeInstructions } from './agent-runtime-instructions.ts';
+import { composeAgentRuntimeInstructions } from './agent-runtime-instructions.ts';
 import { agentCliEnv, commandDir, resolveAgentCli } from './agent-cli.ts';
 import { agentCliLaunch } from './agent-cli-launch.ts';
 import { ensureClaudeFolderTrust } from './agent-rules.ts';
@@ -331,9 +331,6 @@ export class AgentSession implements AttributedAgentSession {
   private sessionId: string | null = null;
   /** The folder this session is bound to, captured at start. */
   private cwd: string | null = null;
-  /** The library persona this Chat runs under, read when the native
-   *  session starts. */
-  persona: string | undefined;
   private models: AgentModel[] = [];
   /** Whether publishModels has run, so a model picked earlier is held for it
    *  rather than refused against a catalog that is not read yet. */
@@ -463,13 +460,11 @@ export class AgentSession implements AttributedAgentSession {
           // Apply the shared Access choice when the native session starts.
           // Later changes still use the SDK's live setPermissionMode API.
           permissionMode: this.access,
-          // Preserve Claude's native preset, then append the Chat's chosen
-          // Persona plus StashBase's internal project routing policy. The
-          // policy is never stored in the Persona.
+          // Preserve Claude's native preset and append the shared app policy.
           systemPrompt: {
             type: 'preset',
             preset: 'claude_code',
-            append: resolveAgentRuntimeInstructions(this.persona),
+            append: composeAgentRuntimeInstructions(),
           },
           // Resuming a past session loads its conversation history so the
           // user can continue it. The transcript itself is rendered from
@@ -1176,7 +1171,6 @@ export function attachAgentWebSocket(ws: WebSocket, options: AgentConnectionOpti
     undefined,
     options.folder,
   );
-  session.persona = options.persona;
   sessions.add(session);
   if (resume) session.begin(() => nativeOwnership.acquire(resume, session));
   else session.begin();

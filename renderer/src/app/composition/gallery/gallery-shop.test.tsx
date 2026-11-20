@@ -39,7 +39,7 @@ function harness({ folderOpen }: { folderOpen: boolean }) {
   const snapshot = projectRegistrySnapshot();
   const dependencies = appDependencies({
     gallery: galleryPort({
-      loadIndex: vi.fn(async () => ({ personas: null, wikis: [PUBLISHED] })),
+      loadIndex: vi.fn(async () => ({ wikis: [PUBLISHED] })),
     }),
     workspace: {
       adapters: workspaceAdapters({

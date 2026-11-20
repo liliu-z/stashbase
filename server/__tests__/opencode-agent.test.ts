@@ -693,7 +693,7 @@ test('bundled OpenCode config disables sharing and updates while asking for ever
 
   const attributed = buildOpenCodeConfig({
     apiKey: 'loopback-secret', baseUrl: 'http://127.0.0.1:1234/v1', model: 'stashbase-agent-default',
-  }, '/private/stashbase-mcp', { STASHBASE_WINDOW_ID: 'window-1', STASHBASE_AGENT_SESSION_ID: 'session-1' }, 'Use StashBase tools.');
+  }, '/private/stashbase-mcp', { STASHBASE_WINDOW_ID: 'window-1', STASHBASE_AGENT_SESSION_ID: 'session-1' });
   assert.deepEqual(attributed.mcp?.stashbase, {
     type: 'local',
     command: ['/private/stashbase-mcp'],
@@ -703,7 +703,7 @@ test('bundled OpenCode config disables sharing and updates while asking for ever
   });
   for (const profile of ['stashbase-folder', 'stashbase-edit'] as const) {
     const prompt = attributed.agent?.[profile]?.prompt ?? '';
-    assert.equal(prompt, composeAgentRuntimeInstructions('Use StashBase tools.'));
+    assert.equal(prompt, composeAgentRuntimeInstructions());
   }
 });
 
@@ -1139,7 +1139,7 @@ test('an unreadable model list leaves the Default Agent on its unversioned defau
 });
 
 test('OpenCode config lists one model per hosted profile with its own limits', () => {
-  const config = buildOpenCodeConfig({ apiKey: 'k', baseUrl: 'http://127.0.0.1:1/v1', model: 'stashbase-agent-default' }, '/mcp', {}, undefined, PROFILES);
+  const config = buildOpenCodeConfig({ apiKey: 'k', baseUrl: 'http://127.0.0.1:1/v1', model: 'stashbase-agent-default' }, '/mcp', {}, PROFILES);
   assert.equal(config.model, 'stashbase/writer-fast');
   const models = config.provider!.stashbase!.models!;
   assert.deepEqual(Object.keys(models), ['writer-fast', 'writer-pro']);
@@ -1166,7 +1166,7 @@ function fixtureWriter(): EnabledAgentTool {
 test('an enabled tool is exposed to the main agent with its description, and nothing can start a sub-agent', () => {
   const writer = fixtureWriter();
   const config = buildOpenCodeConfig({ apiKey: 'k', baseUrl: 'http://127.0.0.1:1/v1', model: 'stashbase-agent-default' },
-    '/mcp', { STASHBASE_WINDOW_ID: 'w' }, undefined, PROFILES, undefined, [writer]);
+    '/mcp', { STASHBASE_WINDOW_ID: 'w' }, PROFILES, undefined, [writer]);
   const agents = config.agent as Record<string, Record<string, unknown>>;
   const permission = config.permission as Record<string, unknown>;
   assert.equal(permission.task, 'deny');

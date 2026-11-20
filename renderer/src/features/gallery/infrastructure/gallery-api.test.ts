@@ -33,7 +33,6 @@ const load = (transport: HttpClient) =>
 describe('gallery index adapter', () => {
   it('makes every optional slot explicit rather than absent', async () => {
     const index = await load(client({ body: { wikis: [ENTRY] } }));
-    expect(index?.personas).toBeNull();
     expect(index?.wikis).toEqual([
       {
         about: 'Why I made this.',

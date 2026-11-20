@@ -114,9 +114,9 @@ function onboarding(provider: Provider) {
   };
   dependencies.agent.preferences = {
     load: async () => preferences,
-    save: async (scope, agent, _signal, { model, effort, persona } = {}) => {
+    save: async (scope, agent, _signal, { model, effort } = {}) => {
       const previous = preferences.projects.find((entry) => entry.scope === scope.path);
-      const selectingAgent = model === undefined && effort === undefined && persona === undefined;
+      const selectingAgent = model === undefined && effort === undefined;
       preferences = {
         ...preferences,
         defaultAgent: selectingAgent ? agent : preferences.defaultAgent,
@@ -136,7 +136,6 @@ function onboarding(provider: Provider) {
             agent: selectingAgent ? agent : (previous?.agent ?? agent),
             ...(model === undefined ? {} : { models: { ...previous?.models, [agent]: model } }),
             ...(effort === undefined ? {} : { efforts: { ...previous?.efforts, [agent]: effort } }),
-            ...(persona === undefined ? {} : { persona }),
           },
         ],
       };

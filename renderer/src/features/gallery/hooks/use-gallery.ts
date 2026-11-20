@@ -3,15 +3,12 @@ import { useMemo } from 'react';
 
 import type { GalleryPort } from '@/features/gallery/application/ports';
 import { enrichedFromSnapshot, type GalleryEntry } from '@/features/gallery/domain/entry';
-import type { GalleryPersona } from '@/features/gallery/domain/persona';
-import { GALLERY_PERSONA_SNAPSHOT } from '@/features/gallery/domain/persona-snapshot';
 import { GALLERY_SNAPSHOT } from '@/features/gallery/domain/snapshot';
 
 const GALLERY_QUERY_KEY = ['gallery', 'index'] as const;
 
 export interface GalleryView {
   entries: readonly GalleryEntry[];
-  personas: readonly GalleryPersona[];
   bundled: boolean;
   recovery: { pending: boolean; retry(): void } | null;
 }
@@ -46,7 +43,6 @@ export function useGallery(port: Pick<GalleryPort, 'loadIndex'>): GalleryView {
   );
   return {
     entries,
-    personas: query.data?.personas ?? GALLERY_PERSONA_SNAPSHOT,
     bundled: query.data === undefined,
     recovery:
       query.isError || query.isPaused

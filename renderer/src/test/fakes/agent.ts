@@ -8,8 +8,6 @@ import type {
   AgentCatalogPort,
   AgentConnectionListener,
   AgentContextPort,
-  AgentPersona,
-  AgentPersonaPort,
   AgentTool,
   AgentToolChange,
   AgentToolsPort,
@@ -108,19 +106,6 @@ export function idleAgentSessionPort(overrides: Partial<AgentSessionPort> = {}):
   }).port;
 }
 
-/** One packaged persona, as a new library holds it. */
-export function agentPersona(overrides: Partial<AgentPersona> = {}): AgentPersona {
-  return {
-    description: 'A neutral news report',
-    gallery: 'journalist',
-    icon: 'newspaper',
-    id: 'journalist',
-    name: 'Journalist',
-    prompt: 'Report what happened.',
-    ...overrides,
-  };
-}
-
 const FAKE_TOOLS = [
   { id: 'writer', label: 'Writer', icon: 'pen-line' },
   { id: 'reviewer', label: 'Reviewer', icon: 'search-check' },
@@ -159,33 +144,6 @@ export function agentToolsApi(
       choices = { ...choices, [id]: { ...choices[id], ...change } };
       return tools();
     }),
-  };
-}
-
-/** A library that stores what it is given, starting from `initial`. */
-export function agentPersonaApi(
-  overrides: Partial<AgentPersonaPort> = {},
-  initial: AgentPersona[] = [agentPersona()],
-): AgentPersonaPort {
-  let stored = [...initial];
-  let created = 0;
-  return {
-    list: vi.fn(async () => [...stored]),
-    create: vi.fn(async (input) => {
-      created += 1;
-      const persona = { ...input, gallery: input.gallery ?? null, id: `persona-${created}` };
-      stored = [...stored, persona];
-      return persona;
-    }),
-    update: vi.fn(async (id, input) => {
-      const persona = { ...input, gallery: input.gallery ?? null, id };
-      stored = stored.map((entry) => (entry.id === id ? persona : entry));
-      return persona;
-    }),
-    remove: vi.fn(async (id) => {
-      stored = stored.filter((entry) => entry.id !== id);
-    }),
-    ...overrides,
   };
 }
 

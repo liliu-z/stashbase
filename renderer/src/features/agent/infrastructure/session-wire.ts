@@ -166,7 +166,6 @@ export function socketUrl(
     access: ACCESS_MODE_WIRE[request.access ?? 'auto'],
     effort: request.effort,
     model: request.model,
-    persona: request.persona,
     crew: request.crew,
     resume: request.resume,
     folder: request.scope.path,

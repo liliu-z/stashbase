@@ -12,13 +12,13 @@ import { retireAgentProcess, ownAgentProcess, type AgentStopReason } from './age
  * and effort as launch flags, so a later change restarts it on the same
  * conversation (`--conversation`). Stop interrupts the process and retires it;
  * the next prompt resumes the conversation in a fresh one. Antigravity takes
- * no system prompt from its caller, so the routing policy and persona ride
+ * no system prompt from its caller, so the role and routing policy ride
  * ahead of the first message each process receives.
  */
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import type { WebSocket } from 'ws';
-import { resolveAgentRuntimeInstructions } from './agent-runtime-instructions.ts';
+import { composeAgentRuntimeInstructions } from './agent-runtime-instructions.ts';
 import {
   consumeAgentTurnFailure,
   simulatedTurnFailureScript,
@@ -136,8 +136,6 @@ export class AntigravitySession implements AttributedAgentSession {
   /** Private per-session attribution id. Rides the `agy` environment to the
    *  StashBase MCP host and the approval hook, which present it to the host. */
   readonly attributionId = randomUUID();
-  /** The library persona this Chat runs under, composed into its instructions. */
-  persona: string | undefined;
 
   private closed = false;
   private ready = false;
@@ -346,7 +344,7 @@ export class AntigravitySession implements AttributedAgentSession {
       }
       const text = this.instructionsSent
         ? prompt
-        : antigravityPromptWithInstructions(resolveAgentRuntimeInstructions(this.persona), prompt);
+        : antigravityPromptWithInstructions(composeAgentRuntimeInstructions(), prompt);
       this.instructionsSent = true;
       agentDiagnosticStage(this.ws, 'runtime_dispatched');
       proc.stdin.write(antigravityUserMessage(text));
@@ -819,7 +817,6 @@ export function attachAntigravityWebSocket(ws: WebSocket, options: AgentConnecti
     ws, options.windowId, options.effort, options.resume, options.access, options.model, options.folder,
     (s) => sessions.delete(s),
   );
-  session.persona = options.persona;
   sessions.add(session);
   session.begin();
 }

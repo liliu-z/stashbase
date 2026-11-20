@@ -276,9 +276,6 @@ simulators use a separate development-only entry. Neither belongs in normal Sett
   cause only; the surface showing them offers Retry. Downloads,
   installation, and sign-in have bounded waits; timeout releases their process
   ownership before retry becomes available.
-- A persona applies from its Chat's next message; a running turn keeps its
-  guidance. It does not rewrite native instruction files or
-  change permissions.
 - External MCP rotation invalidates the old token. Disable retires exposed access
   promptly, including unfinished requests, while ordinary local work remains usable.
 

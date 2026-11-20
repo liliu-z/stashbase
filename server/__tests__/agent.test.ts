@@ -18,7 +18,6 @@ import {
   claudeSkillPrompt,
   selectClaudeModel,
 } from '../agent.ts';
-import { agentPersonaLibrary } from '../agent-persona.ts';
 import { composeAgentRuntimeInstructions } from '../agent-runtime-instructions.ts';
 import { agentBootstrapStatus } from '../agent-runtime-installer.ts';
 import { clearCurrentFolder, runWithWindowId, openProjectFolder, registerProjectFolderAsync } from '../folder.ts';
@@ -68,12 +67,9 @@ function fakeClaudeQuery(failureOrMessages?: Error | SDKMessage[], failure?: Err
   } as unknown as Query;
 }
 
-test("Claude appends the Chat's Persona before hidden StashBase routing policy", async (t) => {
+test("Claude appends the shared role and StashBase routing policy", async (t) => {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-claude-instructions-'));
-  const persona = 'Prefer primary research notes.';
-  const chosen = agentPersonaLibrary().create({ name: 'Researcher', description: '', icon: 'flask-conical', prompt: persona });
   t.after(() => {
-    agentPersonaLibrary().remove(chosen.id);
     fs.rmSync(folder, { recursive: true, force: true });
   });
 
@@ -98,12 +94,11 @@ test("Claude appends the Chat's Persona before hidden StashBase routing policy",
     undefined,
     folder,
   );
-  session.persona = chosen.id;
   t.after(() => session.dispose());
 
   session.begin();
   await settle();
-  assert.equal(appended, composeAgentRuntimeInstructions(persona));
+  assert.equal(appended, composeAgentRuntimeInstructions());
 });
 
 interface TurnEvent {

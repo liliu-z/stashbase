@@ -398,7 +398,6 @@ export class OpenCodePanelSession {
     this.runtime = runtime ?? createOpenCodeSessionRuntime({
       windowId: this.windowId,
       directory: this.cwd,
-      persona: options.persona,
       ...(options.crew || options.resume ? { crew: options.crew ?? options.resume! } : {}),
     });
     this.attributionId = this.runtime.attributionId ?? randomUUID();

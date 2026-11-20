@@ -25,13 +25,12 @@ function workspace(preferences?: AgentPreferencesPort) {
 }
 
 describe('project model preferences', () => {
-  it('restores each agent model and effort on switching and new chats without losing the draft or persona', async () => {
+  it('restores each agent model and effort on switching and new chats without losing the draft', async () => {
     const { runtime, port } = workspace();
     await runtime.chooseAgent('codex');
     const draft = runtime.activeSession();
     draft.seedModels(models);
     draft.setDraft('Keep this idea');
-    runtime.choosePersona('journalist');
     draft.setModel('writer');
     draft.setEffort('high');
 
@@ -46,7 +45,6 @@ describe('project model preferences', () => {
       model: 'writer',
       effort: 'high',
       draft: 'Keep this idea',
-      persona: 'journalist',
     });
 
     const next = runtime.newChat();
@@ -54,7 +52,6 @@ describe('project model preferences', () => {
     expect(next.store.getState()).toMatchObject({
       model: 'writer',
       effort: 'high',
-      persona: 'journalist',
     });
     next.start();
     expect(port.connect).toHaveBeenLastCalledWith(
@@ -73,7 +70,6 @@ describe('project model preferences', () => {
     expect(runtime.activeSession().store.getState()).toMatchObject({
       model: 'writer',
       effort: 'high',
-      persona: null,
     });
     runtime.activeSession().start();
     expect(port.connect).toHaveBeenLastCalledWith(

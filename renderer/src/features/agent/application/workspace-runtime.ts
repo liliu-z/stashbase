@@ -174,7 +174,6 @@ export function createAgentWorkspaceRuntime({
       else if (agent !== current.agent) projectAgents.seedRuntimeChoices(session);
       return true;
     },
-    choosePersona: (persona) => !disposed && projectAgents.choose(runtime.activeSession(), persona),
     activate(id) {
       if (!disposed && sessions.has(id))
         store.setState((state) => activateAgentTab(state, id), true);

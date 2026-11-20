@@ -46,7 +46,7 @@ old presentation. Unconfirmed external-product analogies are not specifications.
   scope. These are not automatically implementation tasks.
 
 Evidence coverage labels belong to Journey Coverage and do not measure feature
-completion. Updating prose does not change UI copy, packaged personas,
+completion. Updating prose does not change UI copy, packaged assets,
 permissions, or data formats; record material mismatches until code changes.
 
 ## Previous-version Data Policy

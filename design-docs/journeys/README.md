@@ -223,7 +223,7 @@ component tests.
 ## J11: Turn a conversation into a project
 
 **Retired.** StashBase starts conversations inside an open project. There is no
-unbound chat, separate persona scope, or conversation migration. The ID stays
+unbound chat or conversation migration. The ID stays
 reserved so previous review references remain identifiable.
 
 Explicit MCP project creation belongs to J08; opening its result follows J02.
@@ -242,7 +242,7 @@ pages and source links.
 ### Required Results
 
 Wiki pages are ordinary requested project files, with no mandatory entry filename or
-automatic regeneration. Copying a prompt does not change the persona or authorize
+automatic regeneration. Copying a prompt does not authorize
 source reorganization.
 
 ### Failure and Recovery
@@ -261,11 +261,6 @@ completeness, grounding, and link quality require real-agent evaluation.
 Browse Gallery → inspect its single cover and introduction → Make a copy → confirm
 the folder name and location → enter.
 
-Ready-made personas share the Gallery's catalog but not its name or shelf: the
-composer's persona picker opens **Browse personas** → read a persona's sample reply and
-its exact prompt → add a copy to the persona library. The Gallery shows only projects,
-and Browse personas only personas, so personas never read as template projects.
-
 ### Required Results
 
 Browsing requires no project/account. A Gallery download counts once when a new
@@ -279,9 +274,7 @@ Project entries show one cover and an
 introduction, without a generating prompt or thumbnail strip. Make a copy asks for
 the folder name and location before downloading and never shows the repository URL. Use the current catalog
 entry and shared project-entry rules; a withdrawn
-entry cannot still be copied. Adding a persona copies it: later Gallery changes never
-reach it, it is edited like the reader's own, and adding it does not choose it for any
-Chat. Every persona sample answers the same request, so pages compare voices.
+entry cannot still be copied.
 
 ### Failure and Recovery
 

@@ -11,7 +11,7 @@ test('a spare can be claimed once, only for its matching configuration', async (
   const slot = new OpenCodeWarmSlot();
   const entry = spare('first');
   slot.put(entry);
-  assert.equal(slot.take('other-project-or-persona'), undefined);
+  assert.equal(slot.take('other-project'), undefined);
   assert.equal(slot.take('first'), entry);
   assert.equal(slot.take('first'), undefined, 'concurrent chats must not share a process');
   await slot.clear();

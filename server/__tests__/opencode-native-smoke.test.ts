@@ -268,7 +268,7 @@ test('pinned bundled OpenCode completes one SDK session against a fake compatibl
   const serverPort = await unusedPort();
   const username = 'stashbase';
   const password = 'native-smoke-secret';
-  const config = buildOpenCodeConfig(model, '/unused/stashbase-mcp', {}, undefined, SMOKE_PROFILES, temporaryRoot);
+  const config = buildOpenCodeConfig(model, '/unused/stashbase-mcp', {}, SMOKE_PROFILES, temporaryRoot);
   config.mcp = {
     stashbase: {
       type: 'local',
@@ -850,7 +850,7 @@ test('prewarmed native chats retain attribution, refresh configuration and relea
     setDefaultAgentTool(toolCatalog, 'writer', { enabled: false });
     fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   });
-  const context = { windowId: 'warm-window', directory: root, persona: undefined };
+  const context = { windowId: 'warm-window', directory: root };
   const first = createOpenCodeSessionRuntime(context);
   const firstClient = await first.client(root);
   assert.equal((await firstClient.mcp.status({ throwOnError: true })).data.stashbase?.status, 'connected');

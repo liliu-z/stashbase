@@ -77,8 +77,6 @@ import { mount as mountAntigravityHookRoutes } from './routes/antigravity-hook.t
 import { mount as mountAgentPreferencesRoutes } from './routes/agent-preferences.ts';
 import { mount as mountScheduledTaskRoutes } from './routes/scheduled-tasks.ts';
 import { mount as mountAgentToolRoutes } from './routes/agent-tools.ts';
-import { mount as mountAgentPersonaRoutes } from './routes/agent-persona.ts';
-import { isAgentPersonaId } from '../shared/agent-persona.ts';
 import { createRendererOriginPolicy } from './middleware/renderer-origin.ts';
 import { mount as mountAccountRoutes } from './routes/account.ts';
 import { BUILT_IN_AGENT_ADAPTERS } from './agent-adapters.ts';
@@ -336,7 +334,6 @@ mountMcpRoutes(app, mcpHttpService);
 mcpHttpService.mountLoopback(app); // local POST /mcp; Docker listener is opt-in and MCP-only
 mountAgentSessionsRoutes(app); // shared contract history surface for the built-in panel
 mountAntigravityHookRoutes(app); // approval for each tool call a StashBase Antigravity chat makes
-mountAgentPersonaRoutes(app);
 mountAgentPreferencesRoutes(app); // global + explicit member-folder Chat guidance
 mountScheduledTaskRoutes(app); // project task files, their switches and last runs
 
@@ -470,7 +467,7 @@ function connectionOptionsOf(req: import('node:http').IncomingMessage): AgentCon
   const query = new URL(req.url ?? '', 'http://localhost').searchParams;
   const crew = query.get('crew');
   const connectionId = query.get('telemetryConnectionId');
-  return { ...(connectionId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(connectionId) ? { telemetryConnectionId: connectionId } : {}), windowId: windowIdOf(req), effort: effortOf(req), resume: resumeOf(req), access: accessOf(req), model: modelOf(req), persona: personaOf(req), ...(crew && /^[a-zA-Z0-9_-]{1,512}$/.test(crew) ? { crew } : {}) };
+  return { ...(connectionId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(connectionId) ? { telemetryConnectionId: connectionId } : {}), windowId: windowIdOf(req), effort: effortOf(req), resume: resumeOf(req), access: accessOf(req), model: modelOf(req), ...(crew && /^[a-zA-Z0-9_-]{1,512}$/.test(crew) ? { crew } : {}) };
 }
 
 /** Model ids are opaque native identifiers. Keep only a small URL safety bound;
@@ -482,15 +479,6 @@ function modelOf(req: import('node:http').IncomingMessage): string | undefined {
   } catch { return undefined; }
 }
 
-/** The library persona the Chat runs under, off the WS URL. Only a
- *  well-formed id passes; whether it still exists is read at session start,
- *  and an unknown one runs none. */
-function personaOf(req: import('node:http').IncomingMessage): string | undefined {
-  try {
-    const value = new URL(req.url ?? '', `http://${req.headers.host ?? '127.0.0.1'}`).searchParams.get('persona');
-    return isAgentPersonaId(value) ? value : undefined;
-  } catch { return undefined; }
-}
 
 /** Raw explicit-folder request off the WS URL. Membership validation happens
  *  in the connection handler via `resolveAgentSessionScope`. */

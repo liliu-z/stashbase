@@ -2141,7 +2141,7 @@ The actual Chat-to-Documents copy/paste composition is covered in
 **Model and effort across projects (2026-10-29):** `server/routes/agent-preferences.ts`
 atomically saves each agent's last explicit model and effort alongside the project
 choice. `project-agents.ts` inherits these defaults only for missing project
-choices, preserving explicit null resets and leaving personas project-scoped.
+choices, preserving explicit null resets.
 The existing model-preference scenario first reproduced Codex → Claude → new
 project → Codex losing both choices. It now covers inheritance through the native
 connection request, loaded defaults, project overrides, and explicit resets.
@@ -2169,7 +2169,7 @@ automatic-review behavior with a signed-in account.
 persists the last selected Agent with the project choice. The renderer's
 `project-agents.ts` uses it only when the project has no choice; the workspace
 hook reads on entry. Existing preference tests cover restart inheritance,
-project overrides, explicit Default, write failure, and unrelated model/effort/persona
+project overrides, explicit Default, write failure, and unrelated model/effort
 updates; the hook covers another window choosing while Welcome is open.
 J01's controlled onboarding scenario also sends a completed first reply in a
 second empty project with the inherited Agent, without repeating setup or login.
@@ -3244,11 +3244,11 @@ preferences route. Switching an unsent draft and creating a new chat seed the mo
 before checking effort; clearing runtime-specific session state still removes skills
 without adding a notice. `model-preferences.test.ts` first reproduced the lost model
 and resulting effort reset, then covered switching, new-chat connection parameters,
-restart loading, project isolation, persona/draft retention, ordered saves, explicit
+restart loading, project isolation, draft retention, ordered saves, explicit
 clearing, refused changes and save failure. History restore clears the new-chat
 model before reconnecting; catalog fallback never overwrites preferences.
 `server/routes/agent-preferences.test.ts` covers disk persistence for all native
-agents, independent model/effort/persona updates, invalid inputs, project removal
+agents, independent model/effort updates, invalid inputs, project removal
 and corrupt-config preservation. A driven built-Storybook pass selected GPT-5.2
 Codex and High, switched to Claude and back, and confirmed both choices and the
 draft remained. The Story catalog now supplies its Codex models after switching.
@@ -3582,24 +3582,19 @@ Project choice and first Send: `renderer/src/features/agent/application/project-
 - **Contract Test:** `pnpm test:server`, renderer, project-operation, MCP, and
   config suites cover setup/consent, authentication, scope, permissions,
   queue/turn/history ownership, stop/retirement, failure classification,
-  persona, and transcript/layout state. Automatic grep/hybrid selection
+  and transcript/layout state. Automatic grep/hybrid selection
   follows current key configuration; explicit/provider failures do not silently
-  change strategy. Choosing a persona resumes that Chat's own conversation so
-  it applies from the next turn, and a new Chat starts with the project's last
-  choice (`session-runtime.test.ts`, `project-agents.test.ts`,
-  `use-agent-persona.test.ts`); the library, seeding, per-session record, and
-  socket seam are `server/agent-persona.test.ts`; replay joins the record
-  (`agent-history-routes.test.ts`); Claude and Codex compose the Chat's
-  persona before the routing policy.
-  An isolated built-app pass (2026-10-08, scratch HOME, no runtime signed in)
-  chose and switched personas in the composer, wrote a new one (it runs at
-  once), opened Browse personas…, read a Markdown sample, added
-  Essayist (the page then reads Added and the picker lists it), and deleted the
-  running persona (the Chat falls back to None and the project's choice to
-  null); the library held the four seeded files plus the added copy. No live
-  turn ran, so the socket seam and replay restore are test evidence only, and
-  two concurrently started Chats keeping separate personas is
-  `project-agents.test.ts` only.
+  change strategy.
+  Persona was retired on 2026-11-20: composer controls, library, Gallery entries,
+  preferences, replay metadata, and runtime injection are removed. Default role,
+  project instructions, model/effort choices, and Crew remain.
+  `agent.test.ts` and `codex-agent.test.ts` verify shared role/policy composition;
+  `session-runtime.test.ts` verifies tool refresh retains the native conversation
+  and does not start an untouched draft. An isolated built-app pass on 2026-11-20
+  confirmed the composer has no Persona control, attachment-to-provider Tab focus
+  remains visible, and voice and Send controls remain available. No external
+  provider login was exercised for this retirement. The controlled bundled-runtime
+  first-reply check and the rebuilt Electron smoke suite passed.
   `pnpm test:opencode:native` completes a turn with the bundled executable and a
   local fake gateway; broker suites cover token/turn isolation, retry, and credits.
   Focused first-send tests cover project-default selection, durable explicit
@@ -4348,8 +4343,7 @@ destination rather than probing every queued download.
 **Intent:** [J13](../design-docs/journeys/README.md#j13-download-a-ready-made-wiki-from-the-gallery).
 
 **Implementation:** Renderer: `renderer/src/app/composition/gallery/use-gallery-shop.tsx`, `renderer/src/features/workspace/hooks/use-project-entry.ts`, `renderer/src/features/workspace/ui/import-github-dialog.tsx` (the Make a copy confirmation).
-Personas: `renderer/src/features/gallery/ui/persona-page.tsx`, `renderer/src/features/gallery/domain/persona-snapshot.ts`, `renderer/src/app/shell.tsx` (add through `useAgentPersonaLibrary`).
-Host/services: `server/routes/gallery.ts`, `server/github-import.ts`, `server/github-snapshot.ts`, `electron/multi-window.cjs`, `server/agent-persona.ts`.
+Host/services: `server/routes/gallery.ts`, `server/github-import.ts`, `server/github-snapshot.ts`, `electron/multi-window.cjs`.
 
 **Status:** Partial.
 
@@ -4365,11 +4359,10 @@ Host/services: `server/routes/gallery.ts`, `server/github-import.ts`, `server/gi
   smoke also loads the built Gallery UI through `app://renderer`, decodes cover,
   and detail cover images using controlled
   proxy bytes with production CSP and native request authorization. See
-  [Gallery boundary](architecture.md#gallery). Persona parsing (optional array,
-  refused ids, unknown icons) is `gallery.test.ts`; the bundled persona
-  fallback is `use-gallery.test.tsx`; a Gallery add landing in the picker's
-  cache is `use-agent-persona.test.ts`; the two entrances never showing each
-  other's shelf is `gallery-refresh.test.tsx`.
+  [Gallery boundary](architecture.md#gallery). Persona browsing and library copies
+  were retired on 2026-11-20; project browsing, recovery, and confirmed acquisition
+  remain covered by the Gallery suites. An isolated built-app pass on 2026-11-20
+  opened the project-only shelf from the sidebar after the retirement.
 - **Confirmed copy and location (2026-11-05):** Make a copy opens a
   confirmation with the folder name and location and no repository URL;
   nothing downloads until it is confirmed. `gallery-shop.test.tsx` covers the
@@ -4403,12 +4396,6 @@ Host/services: `server/routes/gallery.ts`, `server/github-import.ts`, `server/gi
   inspection without account/runtime. A separate isolated built-app pass
   (2026-09-14) copies real `octocat/Hello-World` via a controlled Gallery index,
   registers it, opens a second bound window, and preserves the shop's null binding.
-  An isolated built-app pass on 2026-10-08 opened Browse personas from the
-  composer, read Essayist's sample and prompt, added its library copy, and
-  returned to the unchanged Builder selection. The sidebar Gallery showed
-  projects only; X Content Starter's detail showed one cover and its About
-  introduction with no prompt or thumbnail strip. Both surfaces were inspected
-  through the native UI, and project-detail composition was reviewed by eye.
   Injected window-open failure preserves the copy/registration. OS key/URL setup
   is substituted; packaged delivery is not exercised. An isolated macOS source
   Electron pass (2026-09-15) loads the built UI through the production app

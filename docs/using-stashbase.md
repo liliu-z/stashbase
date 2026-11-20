@@ -87,14 +87,8 @@ supported files directly.
   work in progress and the agent reads it at its next step. **Option/Alt+Enter**
   keeps it for after the reply instead. Other agents always keep it for after.
 
-Tool calls and file edits can be reviewed in Chat. Use **Persona** in the
-composer to choose who the agent is when it talks and writes in this chat. Your
-personas are shared by every project: Builder, Marketer, Journalist, and
-Storyteller to start, any you write with **New persona…**, and any you add from
-**Browse personas…**. Hover a persona to edit or delete it. A choice applies
-from your next message in that chat, and new chats in the project start with
-the persona you chose last. How the agent works belongs in your own `AGENTS.md`
-or `CLAUDE.md`; StashBase never creates or rewrites them.
+Tool calls and file edits can be reviewed in Chat. Project guidance belongs in
+your own `AGENTS.md` or `CLAUDE.md`; StashBase never creates or rewrites them.
 
 Default offers **Ask** (confirm changes and commands), **Edit** (allow ordinary
 document writes in this project; confirm other actions), and **Plan** (read and

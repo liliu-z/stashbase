@@ -11,7 +11,6 @@ import { DocumentSaveError } from '@/features/documents/test-support';
 import {
   agentCatalogPort,
   agentContextPort,
-  agentPersonaApi,
   agentToolsApi,
   agentSessionPort,
   BUILT_IN_AGENT,
@@ -177,7 +176,6 @@ function harness(): Harness {
     agent: {
       catalog: agentCatalogPort([BUILT_IN_AGENT]),
       context: agentContextPort(),
-      persona: agentPersonaApi(),
       tools: agentToolsApi(),
       session: session.port,
     },

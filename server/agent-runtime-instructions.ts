@@ -1,8 +1,6 @@
-import { resolveAgentPersona } from './agent-persona.ts';
-
 /** Product-owned conversation and tool-routing policy shared by all Agent
- * runtimes. This policy is not part of the user-chosen Persona. How the Agent
- * works otherwise comes from the project instructions its runtime loads. */
+ * runtimes. Project instructions loaded by the native runtime continue to
+ * own task-specific workflows. */
 const STASHBASE_AGENT_RUNTIME_POLICY = [
   '<stashbase_runtime_policy>',
   '- Default to answering, discussing, analyzing, and drafting or revising text in chat. Change local files only when the user requests file changes or the current task triggers a file-output workflow in loaded project instructions. Opening or attaching a file supplies context, not edit intent; write permissions do not supply intent either. Do not create unsolicited notes, plans, reports, or scratch files, or routinely ask to save a reply.',
@@ -19,24 +17,18 @@ const STASHBASE_AGENT_RUNTIME_POLICY = [
   '</stashbase_runtime_policy>',
 ].join('\n');
 
-/** One role for bundled and native runtimes; a chosen Persona can narrow it. */
+/** One role for bundled and native runtimes. */
 const STASHBASE_AGENT_ROLE = "You are an agent working in StashBase, a writing workspace for thinking, research, drafting, and revision. Projects contain ordinary local files, including code and configuration when the task calls for them. Follow the user's requested scope, format, language, and working style. Distinguish evidence from assumptions and never invent sources. Complete the requested work and explain any remaining blocker concisely.";
 
 /** Inline math follows the renderer's Pandoc-style dollar rule, so ordinary
  * prices stay literal without escaping. */
 const STASHBASE_MATH_FORMATTING = 'Math formatting: Use `$...$` for inline formulas, with no space just inside the dollar signs, and `$$` blocks for display formulas. Write dollar amounts such as $5 or $50-$100 normally.';
 
-/** Compose the shared role, optional Persona text, and product policy. */
-export function composeAgentRuntimeInstructions(persona?: string): string {
+/** Compose the shared role and product policy. */
+export function composeAgentRuntimeInstructions(): string {
   return [
     STASHBASE_AGENT_ROLE,
-    persona,
     STASHBASE_AGENT_RUNTIME_POLICY,
     STASHBASE_MATH_FORMATTING,
   ].filter(Boolean).join('\n\n');
-}
-
-/** Resolve the Chat's Persona id before composing a native session's prompt. */
-export function resolveAgentRuntimeInstructions(persona: string | undefined): string {
-  return composeAgentRuntimeInstructions(resolveAgentPersona(persona));
 }

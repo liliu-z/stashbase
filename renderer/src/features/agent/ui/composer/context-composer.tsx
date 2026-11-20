@@ -56,7 +56,6 @@ const ATTACH_ACCEPT = '';
 export interface AgentContextComposerProps {
   attachments: boolean;
   environment: AgentScopeEnvironment | null;
-  leftSlot?: ReactNode;
   maxRows?: number;
   minRows?: number;
   onQueueChange: (queue: QueuedMessage[]) => void;
@@ -95,7 +94,6 @@ function mentionEditorSlot(
 export function AgentContextComposer({
   attachments,
   environment,
-  leftSlot,
   maxRows = 6,
   minRows = 3,
   onQueueChange,
@@ -323,7 +321,7 @@ export function AgentContextComposer({
           skillsEnabled: skills,
           statuses,
         })}
-        leftSlot={attachmentSlot(attachments, leftSlot)}
+        leftSlot={attachmentSlot(attachments)}
         maxRows={maxRows}
         minRows={minRows}
         onQueueChange={(next) => {

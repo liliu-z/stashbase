@@ -2,7 +2,7 @@
  * App-level config persistence — the single `~/.stashbase/config.json`.
  * Writes enforce owner-only POSIX permissions; Windows relies on the user's
  * profile ACL. This module owns the file primitives and the user-preference
- * accessors (API keys, Agent Persona, terminal CLI, embedder provider); `folder.ts`
+ * accessors (API keys, terminal CLI, embedder provider); `folder.ts`
  * reuses the same primitives for project membership. Extracted from folder.ts:
  * credentials and preferences have nothing to do with the folder registry, and
  * routes that only need a key shouldn't import the whole window-context machinery.
@@ -100,8 +100,6 @@ export interface AppConfigFile {
     agent: 'stashbase' | 'codex' | 'claude' | 'antigravity';
     models?: Partial<Record<'stashbase' | 'codex' | 'claude' | 'antigravity', string | null>>;
     efforts?: Partial<Record<'stashbase' | 'codex' | 'claude' | 'antigravity', string | null>>;
-    /** The library persona this project's next new Chat starts with. */
-    persona?: string | null;
   }>;
   telemetry?: import('./telemetry.ts').TelemetryState;
   recentFolders?: RecentFolder[];

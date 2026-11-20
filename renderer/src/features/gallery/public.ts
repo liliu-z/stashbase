@@ -8,8 +8,7 @@
  */
 export type { GalleryIndex, GalleryPort } from './application/ports';
 export type { GalleryEntry } from './domain/entry';
-export type { GalleryPersona } from './domain/persona';
 export { createGalleryIndexAdapter } from './infrastructure/gallery-api';
 export { useGallery } from './hooks/use-gallery';
-export { GalleryOverlay, type GallerySection } from './ui/overlay';
+export { GalleryOverlay } from './ui/overlay';
 export { GalleryShop } from './ui/shop';

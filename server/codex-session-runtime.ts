@@ -11,7 +11,7 @@ import { agentProcessClosed, retireAgentProcess } from './agent-process.ts';
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import type { WebSocket } from 'ws';
-import { resolveAgentRuntimeInstructions } from './agent-runtime-instructions.ts';
+import { composeAgentRuntimeInstructions } from './agent-runtime-instructions.ts';
 import {
   consumeAgentTurnFailure,
   simulatedTurnFailureScript,
@@ -103,8 +103,6 @@ export class CodexSession implements AttributedAgentSession {
   private threadWriter: CodexThreadWriter | undefined;
   private proc: ChildProcessWithoutNullStreams | null = null;
   private cwd: string | null = null;
-  /** The library persona this Chat runs under, read when its thread starts. */
-  persona: string | undefined;
   private threadId: string | null = null;
   private threadAccessMode: AgentAccessMode | undefined;
   private workspaceSandboxPolicy: JsonObject | undefined;
@@ -587,10 +585,8 @@ export class CodexSession implements AttributedAgentSession {
       approvalPolicy: access.approvalPolicy,
       approvalsReviewer: access.approvalsReviewer,
       sandbox: access.sandbox,
-      // Keep the chosen Persona distinct from StashBase's internal
-      // project-routing policy even though Codex receives their composition
-      // through one native developer-instructions field.
-      developerInstructions: resolveAgentRuntimeInstructions(this.persona),
+      // Native project instructions remain alongside the shared app policy.
+      developerInstructions: composeAgentRuntimeInstructions(),
     };
     const result = await this.request(
       this.resumeThreadId ? 'thread/resume' : 'thread/start',
@@ -1165,7 +1161,6 @@ const sessions = liveSessionSet<CodexSession>();
 
 export function attachCodexWebSocket(ws: WebSocket, options: AgentConnectionOptions): void {
   const session = new CodexSession(ws, options.windowId, options.effort, options.resume, options.access, options.model, options.folder, (s) => sessions.delete(s));
-  session.persona = options.persona;
   sessions.add(session);
   session.begin();
 }

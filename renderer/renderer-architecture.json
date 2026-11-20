@@ -39,7 +39,6 @@
   ],
   "contractModules": [
     "shared/account.ts",
-    "shared/agent-persona.ts",
     "shared/agent-protocol.ts",
     "shared/agent-runtime.ts",
     "shared/appearance-themes.ts",
@@ -64,7 +63,6 @@
     "shared/protocols/electron/window-lifecycle.ts",
     "shared/protocols/electron/workspace-session.ts",
     "shared/protocols/http/agent-context.ts",
-    "shared/protocols/http/agent-persona.ts",
     "shared/protocols/http/agent-preferences.ts",
     "shared/protocols/http/agent-tools.ts",
     "shared/protocols/http/agent-runtime.ts",
