@@ -1820,7 +1820,10 @@ Each health probe uses a fresh connection and a bounded whole-response deadline.
 Port arbitration uses a short 300 ms probe; once a child is owned, a health
 response may take up to one second, capped by the remaining startup budget.
 Slow valid responses must not be repeatedly discarded by the arbitration timeout.
-The packaged ten-second and source thirty-second startup budgets remain unchanged.
+Packaged and source launches share a thirty-second startup budget for a live
+owned child; an exited child fails immediately. A packaged Windows cold start
+reported "did not come up within 10s" with an empty server log, so the former
+ten-second packaged budget rejected a server that was still loading.
 Startup failures retain the last probe result/duration/status or mismatched
 identity field, probe count and total elapsed time. Refusal, connect/response
 timeout, transport failure, HTTP failure and invalid JSON remain distinguishable;
