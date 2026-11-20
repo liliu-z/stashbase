@@ -78,21 +78,17 @@ export function App({ dependencies }: { dependencies: AppDependencies }) {
   );
 }
 
-/** The workspace window, assembled. Every behaviour lives in a hook under
- *  `./composition` and every port in a binder beside it; this function only
- *  decides what each one is given. */
+/** Binds window capabilities and hands their results to each region.
+ *  Behaviour belongs in composition hooks and feature owners. */
 function WorkspaceWindow() {
   const [chatPaneOpen, setChatPaneOpen] = useState(true);
   const dependencies = useDependencies();
-  // Two adapter records this function hands on more than once.
   const { documents: docs, workspace: workspaceDeps } = dependencies;
   const tabMenu = useTabMenuActions(dependencies);
   useAppearanceSurface(dependencies.settings.appearanceApi, dependencies.settings.setAppearance);
-  const session = useWorkspaceSession(
-    workspaceDeps.adapters.project,
-    workspaceDeps.adapters.session,
-  );
-  const project = useProject(workspaceDeps.adapters.project).data ?? null;
+  const { project: projectApi, session: sessionApi } = workspaceDeps.adapters;
+  const session = useWorkspaceSession(projectApi, sessionApi);
+  const project = useProject(projectApi).data ?? null;
   const workspace = useWorkspace(workspaceDeps.adapters.project, session);
   const listing = useFiles(workspace, workspaceDeps.adapters.files).data;
   const documents = useDocumentWorkspace(

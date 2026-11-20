@@ -9,6 +9,7 @@ import type { DocumentTabMenuActions } from '@/features/documents/public';
 import { systemEntryPath } from '@/features/workspace/public';
 import { isExternalSource } from '@/shared/domain/external-source';
 import type { FailureView } from '@/shared/domain/feature-error';
+import { useRequestSignals } from '@/shared/runtime/use-request-signals';
 import { writeToClipboard } from '@/shared/ui/clipboard';
 
 /** The same sentences the file tree and the file viewer use for these. */
@@ -34,25 +35,28 @@ export function useTabMenuActions({
   workspace,
 }: Pick<AppDependencies, 'documents' | 'workspace'>): TabMenuActions {
   const [failure, setFailure] = useState<FailureView | null>(null);
+  const signalFor = useRequestSignals<'tab-menu'>();
   const settle = useCallback(
-    (work: Promise<unknown>, onFailure: FailureView) =>
-      void work.then(
-        () => setFailure(null),
-        () => setFailure(onFailure),
-      ),
-    [],
+    async (work: (signal: AbortSignal) => Promise<unknown>, onFailure: FailureView) => {
+      const signal = signalFor('tab-menu');
+      try {
+        await work(signal);
+        if (!signal.aborted) setFailure(null);
+      } catch {
+        if (!signal.aborted) setFailure(onFailure);
+      }
+    },
+    [signalFor],
   );
   const actions = useMemo<DocumentTabMenuActions>(
     () => ({
       revealLabel: workspace.revealLabel,
       onReveal(source) {
-        // A menu choice has no view to cancel it from; the reveal finishes or
-        // fails on its own, as a row's reveal in the file tree does.
-        const { signal } = new AbortController();
-        settle(
-          isExternalSource(source)
-            ? documents.adapters.externalFiles.reveal(source, signal)
-            : workspace.adapters.files.reveal(source.folderPath, source.path, signal),
+        void settle(
+          (signal) =>
+            isExternalSource(source)
+              ? documents.adapters.externalFiles.reveal(source, signal)
+              : workspace.adapters.files.reveal(source.folderPath, source.path, signal),
           REVEAL_FAILURE,
         );
       },
@@ -60,11 +64,14 @@ export function useTabMenuActions({
         const path = isExternalSource(source)
           ? source.path
           : systemEntryPath(source.folderPath, source.path, form);
-        settle(writeToClipboard(path), CLIPBOARD_FAILURE);
+        void settle(() => writeToClipboard(path), CLIPBOARD_FAILURE);
       },
     }),
     [documents.adapters.externalFiles, settle, workspace.adapters.files, workspace.revealLabel],
   );
-  const dismissFailure = useCallback(() => setFailure(null), []);
+  const dismissFailure = useCallback(() => {
+    signalFor('tab-menu');
+    setFailure(null);
+  }, [signalFor]);
   return { actions, dismissFailure, failure };
 }

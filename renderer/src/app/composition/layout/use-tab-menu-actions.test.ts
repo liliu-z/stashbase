@@ -56,4 +56,36 @@ describe('useTabMenuActions', () => {
     act(() => result.current.dismissFailure());
     expect(result.current.failure).toBeNull();
   });
+  it('keeps a newer failure when an older reveal succeeds, and ignores dismissed work', async () => {
+    let finish!: () => void;
+    let fail!: (error: Error) => void;
+    clipboard(async () => {
+      throw new Error('clipboard denied');
+    });
+    const deps = dependencies(
+      () =>
+        new Promise<void>((resolve, reject) => {
+          finish = resolve;
+          fail = reject;
+        }),
+    );
+    const { result, unmount } = renderHook(() => useTabMenuActions(deps));
+    act(() => result.current.actions.onReveal(source));
+    act(() => result.current.actions.onCopyPath(source, 'absolute'));
+    await waitFor(() => expect(result.current.failure?.message).toContain('clipboard'));
+    await act(async () => finish());
+    expect(result.current.failure?.message).toContain('clipboard');
+    act(() => result.current.actions.onReveal(source));
+    act(() => result.current.dismissFailure());
+    await act(async () => fail(new Error('late reveal failure')));
+    expect(result.current.failure).toBeNull();
+    act(() => result.current.actions.onReveal(source));
+    unmount();
+    expect(deps.workspace.adapters.files.reveal).toHaveBeenLastCalledWith(
+      source.folderPath,
+      source.path,
+      expect.objectContaining({ aborted: true }),
+    );
+    await act(async () => fail(new Error('disposed')));
+  });
 });

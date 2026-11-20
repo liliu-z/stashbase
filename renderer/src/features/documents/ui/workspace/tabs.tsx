@@ -31,6 +31,7 @@ import type { IconComponentProps } from '@/lib/icon-context';
 import { cn } from '@/lib/utils';
 import { isExternalSource } from '@/shared/domain/external-source';
 import type { SourceReference } from '@/shared/domain/source-reference';
+import { useRequestSignals } from '@/shared/runtime/use-request-signals';
 import { writeSourceDrag } from '@/shared/utils/source-drag';
 
 import { DocumentTabMenu, useTabMenu, type DocumentTabMenuActions } from './tab-menu';
@@ -131,6 +132,7 @@ export function DocumentTabs({
 }: DocumentTabsProps) {
   const { activate, activeTabId, close, closeTabs, keep, tabs } = useDocumentTabs(runtime);
   const menu = useTabMenu();
+  const signalFor = useRequestSignals<'close-menu'>();
   // The tab pills are the ladder's segment height, one step under the row's
   // control, so the plus takes the compact square, the same 28px the pills
   // beside it stand at, rather than the row's 36px.
@@ -198,8 +200,12 @@ export function DocumentTabs({
   // Closing from the menu hands focus to whichever tab is then in front, as
   // Delete does, rather than leaving it on a tab that has gone.
   const closeFromMenu = (tabIds: string[]) => {
-    focusAfterClose.current = true;
-    void closeTabs(tabIds);
+    const signal = signalFor('close-menu');
+    void closeTabs(tabIds).then((closed) => {
+      if (!closed || signal.aborted || runtime.signal.aborted) return;
+      const active = runtime.store.getState().activeTabId;
+      if (active) tabElements.current.get(active)?.focus();
+    });
   };
   const menuTabIndex = menu.shown ? tabs.findIndex((tab) => tab.id === menu.shown?.tabId) : -1;
   const menuTab = menuTabIndex >= 0 ? tabs[menuTabIndex] : undefined;

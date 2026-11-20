@@ -22,32 +22,8 @@ import { withQueryClient } from '@/test/query';
 
 import { DocumentOutline } from './outline';
 import { DocumentTabs } from './tabs';
+import { createRuntime, loadedSourceApi } from './tabs.harness';
 import { DocumentWorkspace } from './workspace';
-
-const RESTORED_TABS = [
-  { id: 'tab-1', source: { folderPath: '/project/notes', path: 'plan.md' } },
-  { id: 'tab-2', source: { folderPath: '/project/notes', path: 'drafts/other.md' } },
-];
-
-function createRuntime(api: DocumentSourcePort = loadedSourceApi, tabs = RESTORED_TABS) {
-  let next = 2;
-  const runtime = createDocumentTabsRuntime({
-    api,
-    createId: () => `tab-${++next}`,
-    createQueries: () => documentQueryScope(),
-    folderPath: '/project/notes',
-    generation: 1,
-    restored: {
-      activeTabId: 'tab-2',
-      tabs,
-    },
-  });
-  return runtime;
-}
-
-const loadedSourceApi = sourceApi({
-  load: vi.fn(async () => textSource({ content: '# Loaded' })),
-});
 
 const documentWorkspaceProps = {
   assetApi: assetApi({ load: vi.fn(pending()) }),
@@ -57,12 +33,6 @@ const documentWorkspaceProps = {
   onReveal: vi.fn(async () => undefined),
   revealLabel: 'Show in file manager',
 };
-
-/** Right-clicks a tab and waits for its menu. */
-function openTabMenu(name: string) {
-  fireEvent.contextMenu(screen.getByRole('tab', { name }));
-  return screen.findByRole('menu', { name: `${name} tab actions` });
-}
 
 const runtimes: ReturnType<typeof createRuntime>[] = [];
 
@@ -199,76 +169,6 @@ describe('document tabs', () => {
     if (!closeGlyph) throw new Error('The active tab must expose a close control.');
     await user.click(closeGlyph);
     expect(screen.queryByRole('region', { name: 'Document workspace' })).toBeNull();
-  });
-
-  it('offers closing and the file on disk from a tab menu, by right click or keyboard', async () => {
-    const runtime = createRuntime(loadedSourceApi, [
-      ...RESTORED_TABS,
-      { id: 'tab-3', source: { folderPath: '/project/notes', path: 'summary.md' } },
-    ]);
-    runtimes.push(runtime);
-    const user = userEvent.setup();
-    const menuActions = {
-      onCopyPath: vi.fn(),
-      onReveal: vi.fn(),
-      revealLabel: 'Show in file manager',
-    };
-    withQueryClient(<DocumentTabs menuActions={menuActions} runtime={runtime} />);
-    const tabIds = () => runtime.store.getState().tabs.map((tab) => tab.id);
-    const other = { folderPath: '/project/notes', path: 'drafts/other.md' };
-
-    await user.click(
-      within(await openTabMenu('other.md')).getByRole('menuitem', { name: 'Copy relative path' }),
-    );
-    expect(menuActions.onCopyPath).toHaveBeenCalledWith(other, 'relative');
-    await user.click(
-      within(await openTabMenu('other.md')).getByRole('menuitem', { name: 'Show in file manager' }),
-    );
-    expect(menuActions.onReveal).toHaveBeenCalledWith(other);
-
-    await user.click(
-      within(await openTabMenu('other.md')).getByRole('menuitem', { name: 'Close to the right' }),
-    );
-    await waitFor(() => expect(tabIds()).toEqual(['tab-1', 'tab-2']));
-    const menu = await openTabMenu('other.md');
-    expect(
-      within(menu)
-        .getByRole('menuitem', { name: 'Close to the right' })
-        .getAttribute('aria-disabled'),
-    ).toBe('true');
-    await user.click(within(menu).getByRole('menuitem', { name: 'Close others' }));
-    await waitFor(() => expect(tabIds()).toEqual(['tab-2']));
-
-    // The keyboard reaches the same menu, and closing hands focus on.
-    screen.getByRole('tab', { name: 'other.md' }).focus();
-    await user.keyboard('{Shift>}{F10}{/Shift}');
-    const keyboardMenu = await screen.findByRole('menu', { name: 'other.md tab actions' });
-    expect(
-      within(keyboardMenu)
-        .getByRole('menuitem', { name: 'Close others' })
-        .getAttribute('aria-disabled'),
-    ).toBe('true');
-    await user.click(within(keyboardMenu).getByRole('menuitem', { name: 'Close all' }));
-    await waitFor(() => expect(tabIds()).toEqual([]));
-  });
-
-  it('stops closing several tabs at the first one that stays open', async () => {
-    const runtime = createRuntime();
-    runtimes.push(runtime);
-    const user = userEvent.setup();
-    // A tab stays open when its save fails or its draft needs the reader's
-    // answer; the tabs after it must wait for that rather than close behind it.
-    const close = vi.spyOn(runtime, 'close').mockResolvedValueOnce(false);
-    withQueryClient(<DocumentTabs runtime={runtime} />);
-
-    fireEvent.contextMenu(screen.getByRole('tab', { name: 'plan.md' }));
-    const menu = await screen.findByRole('menu', { name: 'plan.md tab actions' });
-    expect(within(menu).queryByRole('menuitem', { name: 'Copy path' })).toBeNull();
-    await user.click(within(menu).getByRole('menuitem', { name: 'Close all' }));
-
-    await waitFor(() => expect(close).toHaveBeenCalledTimes(1));
-    expect(close).toHaveBeenCalledWith('tab-1');
-    expect(runtime.store.getState().tabs.map((tab) => tab.id)).toEqual(['tab-1', 'tab-2']);
   });
 
   it('keeps a newly opened active tab visible in an overflowing tab list', async () => {

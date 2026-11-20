@@ -40,7 +40,7 @@ interface MenuAction {
   disabled?: boolean;
   icon: LucideIcon;
   label: string;
-  run(): void;
+  onSelect(): void;
 }
 
 type MenuRow = MenuAction | 'separator';
@@ -51,33 +51,33 @@ function tabMenuRows(
   actions: DocumentTabMenuActions | undefined,
 ): MenuRow[] {
   const rows: MenuRow[] = [
-    { icon: X, label: 'Close', run: commands.close },
+    { icon: X, label: 'Close', onSelect: commands.close },
     {
       disabled: !commands.closeOthers,
       icon: X,
       label: 'Close others',
-      run: () => commands.closeOthers?.(),
+      onSelect: () => commands.closeOthers?.(),
     },
     {
       disabled: !commands.closeToRight,
       icon: X,
       label: 'Close to the right',
-      run: () => commands.closeToRight?.(),
+      onSelect: () => commands.closeToRight?.(),
     },
-    { icon: X, label: 'Close all', run: commands.closeAll },
+    { icon: X, label: 'Close all', onSelect: commands.closeAll },
   ];
   if (!actions) return rows;
   rows.push(
     'separator',
-    { icon: ExternalLink, label: actions.revealLabel, run: () => actions.onReveal(source) },
-    { icon: Copy, label: 'Copy path', run: () => actions.onCopyPath(source, 'absolute') },
+    { icon: ExternalLink, label: actions.revealLabel, onSelect: () => actions.onReveal(source) },
+    { icon: Copy, label: 'Copy path', onSelect: () => actions.onCopyPath(source, 'absolute') },
   );
   // A file opened from outside the project has no project-relative path.
   if (!isExternalSource(source)) {
     rows.push({
       icon: Copy,
       label: 'Copy relative path',
-      run: () => actions.onCopyPath(source, 'relative'),
+      onSelect: () => actions.onCopyPath(source, 'relative'),
     });
   }
   return rows;
@@ -85,12 +85,19 @@ function tabMenuRows(
 
 /** The tab the menu is showing for, kept through the close so its rows do not
  *  change under the exit. */
-export interface ShownTabMenu {
+interface ShownTabMenu {
   anchor: DropdownAnchor;
   tabId: string;
 }
 
-export function useTabMenu() {
+interface TabMenuState {
+  open: boolean;
+  setOpen(open: boolean): void;
+  shown: ShownTabMenu | null;
+  show(next: ShownTabMenu): void;
+}
+
+export function useTabMenu(): TabMenuState {
   const [open, setOpen] = useState(false);
   const [shown, setShown] = useState<ShownTabMenu | null>(null);
   return {
@@ -114,7 +121,7 @@ export function DocumentTabMenu({
 }: {
   actions: DocumentTabMenuActions | undefined;
   commands: DocumentTabCloseCommands;
-  menu: ReturnType<typeof useTabMenu>;
+  menu: TabMenuState;
   name: string;
   source: SourceReference;
 }) {
@@ -131,13 +138,7 @@ export function DocumentTabMenu({
           row === 'separator' ? (
             <DropdownSeparator key={`after-${(rows[index - 1] as MenuAction).label}`} />
           ) : (
-            <MenuItem
-              disabled={row.disabled ?? false}
-              icon={row.icon}
-              key={row.label}
-              label={row.label}
-              onSelect={row.run}
-            />
+            <MenuItem key={row.label} {...row} />
           ),
         )}
       </DropdownContent>

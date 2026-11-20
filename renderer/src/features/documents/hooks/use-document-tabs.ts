@@ -24,7 +24,8 @@ export function useDocumentTabs(runtime: DocumentTabsRuntime) {
    *  save that failed) stops the rest so nothing closes behind its question. */
   const closeTabs = useCallback(
     async (tabIds: readonly string[]) => {
-      for (const tabId of tabIds) if (!(await runtime.close(tabId))) return;
+      for (const tabId of tabIds) if (!(await runtime.close(tabId))) return false;
+      return true;
     },
     [runtime],
   );

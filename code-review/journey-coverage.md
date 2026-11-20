@@ -1049,6 +1049,11 @@ Host/services: `server/folder.ts`, `server/github-import.ts`, `server/project-fi
 
 ## J03: Documents
 
+**Office lock classification (2026-11-17):** `file-listing.test.ts` covers
+Office lock extensions beside ordinary `~$`-prefixed Markdown, text, JSON and
+HTML sources. These sources remain visible with either hidden-file preference;
+the Markdown source also remains in the turn-change walk.
+
 **Tab menu (2026-11-18):** `ui/workspace/tab-menu.tsx` builds the menu that
 `tabs.tsx` opens from a right click (at the pointer) or the menu key/Shift+F10
 (under the tab). Close, Close others, Close to the right and Close all run through
@@ -1056,17 +1061,18 @@ Host/services: `server/folder.ts`, `server/github-import.ts`, `server/project-fi
 runtime's `close` and stops at the first one that stays open. App composition's
 `use-tab-menu-actions.ts` lends the file-manager reveal and Copy path / Copy
 relative path (`systemEntryPath`); an external file offers no relative path.
-`tabs.test.tsx` covers the right-click and keyboard menus, disabled entries,
+`tab-menu.test.tsx` covers the right-click and keyboard menus, disabled entries,
 the copy and reveal calls, and the stop at a tab that stays open. A failed copy
 or reveal raises a dismissible floating notice through `use-workspace-notices.ts`,
 using the file tree's clipboard sentence and the file viewer's reveal sentence;
 the next successful copy or reveal clears it (`use-tab-menu-actions.test.ts`,
-`use-workspace-notices.test.ts`). The menu has not been driven in the built app.
-
-**Office lock classification (2026-11-17):** `file-listing.test.ts` covers
-Office lock extensions beside ordinary `~$`-prefixed Markdown, text, JSON and
-HTML sources. These sources remain visible with either hidden-file preference;
-the Markdown source also remains in the turn-change walk.
+`use-workspace-notices.test.ts`). `tab-menu.test.tsx` also drives a bulk close
+through a real delayed dirty save
+and checks final focus; `use-tab-menu-actions.test.ts` covers stale completion,
+dismissal and disposal. An isolated macOS built-renderer run on 2026-11-20
+opened three fixture files, displayed the right-click menu and chose Close others;
+the target alone remained and received keyboard focus. Actual system clipboard
+and file-manager integration were not exercised in that run.
 
 Host text saves now start the same restricted write diagnostic trace described in
 [J07](#j07-converge). This observes the existing source/version transaction and
