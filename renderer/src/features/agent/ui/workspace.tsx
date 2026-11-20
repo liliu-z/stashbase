@@ -28,7 +28,7 @@ import { useAgentPersona } from '@/features/agent/hooks/use-agent-persona';
 import { useAgentRuntimeUpdate } from '@/features/agent/hooks/use-agent-runtime-update';
 import { useAgentSignInRecovered } from '@/features/agent/hooks/use-agent-sign-in-recovery';
 import { useAttentionFocus } from '@/features/agent/hooks/use-attention-focus';
-import { useChangedSource } from '@/features/agent/hooks/use-changed-source';
+import { useChangedSource, useProjectPathFor } from '@/features/agent/hooks/use-changed-source';
 import { useRenameConversation } from '@/features/agent/hooks/use-conversation-history';
 import { cn } from '@/lib/utils';
 import { useStickToBottom } from '@/shared/runtime/use-stick-to-bottom';
@@ -150,6 +150,7 @@ function ChatWorkspace({
   }, [active, rememberedModels, unstarted]);
   const promptPlaceholder = empty && armedSkill === undefined ? EMPTY_CHAT_PROMPT : null;
   const sourceFor = useChangedSource(runtime, state.scope);
+  const projectPathFor = useProjectPathFor(state.scope);
   const composerRef = useRef<HTMLDivElement>(null);
   const composerShown = state.connection.kind !== 'retired' && state.connection.kind !== 'disposed';
   const editPrompt = useCallback(
@@ -232,6 +233,7 @@ function ChatWorkspace({
               onSignIn={onOpenAgentSettings}
               onUpdateApp={onOpenAppSettings}
               onReviewTurnChange={onReviewTurnChange}
+              projectPathFor={projectPathFor}
               pending={
                 state.preparingPrompt ? [state.preparingPrompt, ...state.steers] : state.steers
               }

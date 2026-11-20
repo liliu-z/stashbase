@@ -49,6 +49,26 @@ describe('the changed-in-this-turn card', () => {
     expect(onOpenSource).toHaveBeenCalledWith({ folderPath, path: 'summary.md' }, null);
   });
 
+  it('names a deleted file by its project folder although it is no longer listed', () => {
+    render(
+      <AgentTurnChangesCard
+        files={[
+          { additions: 0, change: 'deleted', deletions: 4, path: `${folderPath}/old/plan.md` },
+        ]}
+        projectPathFor={(path) => path.slice(folderPath.length + 1)}
+        sourceFor={() => null}
+        turnId="turn-1"
+      />,
+    );
+
+    expect(screen.getByText('old/').closest('[title]')?.getAttribute('title')).toBe(
+      `${folderPath}/old/plan.md`,
+    );
+    expect(screen.getByRole('region', { name: 'Changed 1 file' }).textContent).not.toContain(
+      folderPath,
+    );
+  });
+
   it('previews three files, expands the remaining files, and collapses without losing actions', async () => {
     const onReviewTurnChange = vi.fn();
     render(

@@ -80,7 +80,15 @@ function iconFor(tool: AgentToolBlock): ToolIcon {
 /** The payload a tool surface renders once, shared by the row and the
  *  permission card so the ladder cannot drift: the diff when the call is a
  *  file change with evidence, the bounded inert text otherwise. */
-function AgentToolPayload({ indent = true, tool }: { indent?: boolean; tool: AgentToolBlock }) {
+function AgentToolPayload({
+  indent = true,
+  projectPathFor,
+  tool,
+}: {
+  indent?: boolean;
+  projectPathFor?: ((path: string) => string | null) | undefined;
+  tool: AgentToolBlock;
+}) {
   const changes = fileChangesForTool(tool.name, tool.input).filter(
     (change) => change.text !== undefined || change.patch !== undefined,
   );
@@ -95,7 +103,11 @@ function AgentToolPayload({ indent = true, tool }: { indent?: boolean; tool: Age
       )}
     >
       {changes.map((change) => (
-        <AgentFileChangeView change={change} key={fileChangeKey(change)} />
+        <AgentFileChangeView
+          change={change}
+          key={fileChangeKey(change)}
+          projectPathFor={projectPathFor}
+        />
       ))}
       {questions && (
         <AgentQuestionSummary answers={agentQuestionAnswers(tool.input)} questions={questions} />
@@ -123,7 +135,13 @@ function AgentToolPayload({ indent = true, tool }: { indent?: boolean; tool: Age
   );
 }
 
-function AgentToolRow({ tool }: { tool: AgentToolBlock }) {
+function AgentToolRow({
+  projectPathFor,
+  tool,
+}: {
+  projectPathFor?: ((path: string) => string | null) | undefined;
+  tool: AgentToolBlock;
+}) {
   const shape = useShape();
   const [open, setOpen] = useState(false);
   // The payload stays unmounted until the row is opened and leaves again once
@@ -201,7 +219,7 @@ function AgentToolRow({ tool }: { tool: AgentToolBlock }) {
       </button>
       {hasDetails && (
         <Disclosure id={panelId} open={open}>
-          <AgentToolPayload tool={tool} />
+          <AgentToolPayload projectPathFor={projectPathFor} tool={tool} />
         </Disclosure>
       )}
     </div>
@@ -223,6 +241,7 @@ export function AgentActivityGroup({
   focusToolId = null,
   live = false,
   onOpenSource,
+  projectPathFor,
   sourceFor,
   steps,
 }: {
@@ -234,6 +253,7 @@ export function AgentActivityGroup({
    *  what makes the group live, not a single call's status. */
   live?: boolean;
   onOpenSource?: ((source: SourceReference, phrase: string | null) => void) | undefined;
+  projectPathFor?: ((path: string) => string | null) | undefined;
   sourceFor?: ((path: string) => SourceReference | null) | undefined;
   steps: AgentActivityStep[];
 }) {
@@ -270,7 +290,7 @@ export function AgentActivityGroup({
                   {step.text}
                 </p>
               ) : (
-                <AgentToolRow key={step.id} tool={step} />
+                <AgentToolRow key={step.id} projectPathFor={projectPathFor} tool={step} />
               ),
             )}
         </ThinkingStepsContent>
@@ -278,9 +298,14 @@ export function AgentActivityGroup({
       {tools
         .filter((tool) => tool.status === 'denied')
         .map((tool) => (
-          <AgentToolRow key={tool.id} tool={tool} />
+          <AgentToolRow key={tool.id} projectPathFor={projectPathFor} tool={tool} />
         ))}
-      <AgentChangedFiles changes={changes} onOpenSource={onOpenSource} sourceFor={sourceFor} />
+      <AgentChangedFiles
+        changes={changes}
+        onOpenSource={onOpenSource}
+        projectPathFor={projectPathFor}
+        sourceFor={sourceFor}
+      />
     </div>
   );
 }
@@ -288,8 +313,10 @@ export function AgentActivityGroup({
 export function AgentPermissionCard({
   tool,
   onReply,
+  projectPathFor,
 }: {
   tool: AgentToolBlock;
+  projectPathFor?: ((path: string) => string | null) | undefined;
   onReply(
     toolUseId: string,
     permissionId: string,
@@ -313,7 +340,7 @@ export function AgentPermissionCard({
       headingRef={headingRef}
       icon={CircleAlert}
     >
-      <AgentToolPayload indent={false} tool={tool} />
+      <AgentToolPayload indent={false} projectPathFor={projectPathFor} tool={tool} />
       {permissionId && tool.approvalScopes?.includes('always') && (
         <p className="text-sm text-muted-foreground">
           Applies to this permission. Individual actions can still require approval.

@@ -226,7 +226,15 @@ export function Counts({ additions, deletions }: { additions: number; deletions:
 }
 
 /** One change as evidence: the file strip, then its diff or patch. */
-export function AgentFileChangeView({ change }: { change: AgentFileChange }) {
+export function AgentFileChangeView({
+  change,
+  projectPathFor,
+}: {
+  change: AgentFileChange;
+  /** Names a change inside the project by its project path, as the turn's
+   *  Changed files card does; the absolute path stays in the tooltip. */
+  projectPathFor?: ((path: string) => string | null) | undefined;
+}) {
   const shape = useShape();
   const name = basePathName(change.path);
   const counts = useMemo(
@@ -243,7 +251,11 @@ export function AgentFileChangeView({ change }: { change: AgentFileChange }) {
       className={cn('overflow-hidden border border-border/50', shape.panel)}
     >
       <header className="flex h-7 items-center gap-1.5 border-b border-border/50 px-2.5 text-ui-12">
-        <ChangedFileLabel iconSize={12} path={change.path} />
+        <ChangedFileLabel
+          iconSize={12}
+          path={change.path}
+          shownPath={projectPathFor?.(change.path) ?? undefined}
+        />
         <span className="shrink-0 text-muted-foreground">
           {FILE_CHANGE_ACTION_LABEL[change.action]}
         </span>
@@ -273,10 +285,12 @@ export function AgentFileChangeView({ change }: { change: AgentFileChange }) {
 export function AgentChangedFiles({
   changes,
   onOpenSource,
+  projectPathFor,
   sourceFor,
 }: {
   changes: readonly AgentFileChange[];
   onOpenSource?: ((source: SourceReference, phrase: string | null) => void) | undefined;
+  projectPathFor?: ((path: string) => string | null) | undefined;
   sourceFor?: ((path: string) => SourceReference | null) | undefined;
 }) {
   const shape = useShape();
@@ -285,17 +299,21 @@ export function AgentChangedFiles({
     <ul aria-label="Changed files" className="m-0 flex list-none flex-col gap-0.5 p-0">
       {changes.map((change) => {
         const name = basePathName(change.path);
-        const source = onOpenSource && sourceFor ? sourceFor(change.path) : null;
+        const source = sourceFor?.(change.path) ?? null;
         return (
           <li
             className={cn('flex min-h-8 items-center gap-2 px-2 text-ui-12', shape.item)}
             key={change.path}
           >
-            <ChangedFileLabel iconSize={14} path={change.path} />
+            <ChangedFileLabel
+              iconSize={14}
+              path={change.path}
+              shownPath={projectPathFor?.(change.path) ?? source?.path}
+            />
             <span className="ml-auto shrink-0 text-muted-foreground">
               {FILE_CHANGE_ACTION_LABEL[change.action]}
             </span>
-            {source && (
+            {source && onOpenSource && (
               <Button
                 aria-label={`Open ${name}`}
                 onClick={() => onOpenSource?.(source, null)}
