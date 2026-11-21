@@ -337,6 +337,12 @@ evaluate that path as shell code or share a mutable temporary constraint copy.
   taskkill or a dedicated POSIX process group. A 3.5-second close deadline
   rejects without allowing replacement; actual late closure releases the fence.
   A retired or timed-out generation cannot publish late readiness or replies.
+- The daemon and its source-mode Python dependency probe both override the
+  host's `OPENBLAS_NUM_THREADS` with `1`. OpenBLAS's per-thread buffer pool
+  otherwise commits about 1.1 GB on the measured 8-thread Windows machine.
+  The daemon keeps the pool for the whole session, with or without an
+  embedding key. Either import can fail when commit is short.
+  Other native thread pools keep their defaults; the extractor pins its own.
 - Resource ceilings must stay finite and aligned across Node/Python. No-op reconcile
   spends no embeddings but still transfers text for MFS revision classification.
   A rename is not a zero-reembedding guarantee. Ranking-quality evidence and

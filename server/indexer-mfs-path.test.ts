@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { promisify } from 'node:util';
 import { createFilesystemPath } from './filesystem-path.ts';
 import { isMfsDaemonRetiringError, MfsDaemon } from './mfs-daemon.ts';
 import { errorDiagnostic } from './error-diagnostics.ts';
@@ -91,6 +93,53 @@ test('a daemon close deadline fences replacement until the old process actually 
   await new Promise(resolve => timeout(resolve, 300));
   await daemon.ensureReady();
   assert.equal(daemon.currentGeneration(), 2);
+});
+
+test('source daemon startup caps OpenBLAS in the dependency probe and daemon', async () => {
+  // Set source mode before importing the launcher. Substitute the Python code
+  // at the process boundary so both real children run without a Python venv.
+  await promisify(execFile)(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', `
+    import assert from 'node:assert/strict';
+    import childProcess from 'node:child_process';
+    import { syncBuiltinESMExports } from 'node:module';
+
+    const checkThreads = "if (process.env.OPENBLAS_NUM_THREADS !== '1') { " +
+      "console.error('Expected one OpenBLAS thread, received ' + process.env.OPENBLAS_NUM_THREADS); process.exit(1); }";
+    const { execFile, spawn } = childProcess;
+    let probed = false;
+    childProcess.execFile = (command, args, options, callback) => {
+      assert.equal(command, process.execPath);
+      assert.equal(args[0], '-c');
+      probed = true;
+      return execFile(command, ['-e', checkThreads], options, callback);
+    };
+    childProcess.spawn = (command, args, options) => {
+      if (command !== process.execPath) return spawn(command, args, options);
+      assert.equal(args[0], '-u');
+      return spawn(command, ['-e', checkThreads +
+        "console.log(JSON.stringify({ event: 'ready' })); process.stdin.resume();"], options);
+    };
+    syncBuiltinESMExports();
+
+    const { MfsDaemon } = await import('./server/mfs-daemon.ts');
+    const daemon = new MfsDaemon();
+    try {
+      await daemon.ensureReady();
+      assert.ok(probed, 'source startup must exercise the dependency probe');
+    } finally {
+      await daemon.close();
+    }
+  `], {
+    cwd: path.join(import.meta.dirname, '..'),
+    env: {
+      ...process.env,
+      STASHBASE_DAEMON_BIN: '',
+      STASHBASE_DEV_RUNTIME: '1',
+      STASHBASE_PYTHON: process.execPath,
+      OPENBLAS_NUM_THREADS: '8',
+    },
+    timeout: 15_000,
+  });
 });
 
 test('retirement between readiness and dispatch does not write to the closing stdin', async (t) => {

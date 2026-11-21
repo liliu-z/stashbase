@@ -35,6 +35,10 @@ const log = logger('mfs');
 
 const DEVELOPMENT_RUNTIME = isDevelopmentRuntime();
 
+// NumPy can initialize OpenBLAS in both the source dependency probe and the
+// daemon. Cap both to avoid committing a buffer pool per CPU thread.
+const MFS_OPENBLAS_ENV = { OPENBLAS_NUM_THREADS: '1' };
+
 interface Pending {
   resolve: (v: unknown) => void;
   reject: (e: Error) => void;
@@ -225,6 +229,7 @@ export class MfsDaemon extends EventEmitter {
         cwd: daemon.cwd,
         env: {
           ...process.env,
+          ...MFS_OPENBLAS_ENV,
           PYTHONUNBUFFERED: '1',
           // JSON-RPC is UTF-8 in both directions, independent of Windows ANSI locale.
           PYTHONIOENCODING: 'utf-8',
@@ -463,7 +468,12 @@ function probePythonDeps(bin: string): Promise<void> {
     execFile(
       bin,
       ['-c', PYTHON_PROBE_IMPORTS],
-      { encoding: 'utf8', timeout: PYTHON_PROBE_TIMEOUT_MS, killSignal: 'SIGKILL' },
+      {
+        env: { ...process.env, ...MFS_OPENBLAS_ENV },
+        encoding: 'utf8',
+        timeout: PYTHON_PROBE_TIMEOUT_MS,
+        killSignal: 'SIGKILL',
+      },
       (error, _stdout, stderr) => {
         if (!error) return resolve();
         const reason = error.killed
