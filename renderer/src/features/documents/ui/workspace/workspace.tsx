@@ -32,6 +32,7 @@ import type {
 import type { SourceReference } from '@/shared/domain/source-reference';
 import { FloatingNotice, FloatingNotices, NoticeStrip } from '@/shared/ui/notice';
 
+import { DocumentBreadcrumb } from './breadcrumb';
 import { DiscardDraftDialog } from './discard-draft-dialog';
 import { DocumentFind } from './find';
 import { DocumentReadingSurface } from './reading-surface';
@@ -56,6 +57,9 @@ export interface DocumentWorkspaceProps {
    *  queued at interactive priority. Fire-and-forget. */
   onOpenPrepared?: ((source: SourceReference, format: PreparedOnOpenFormat) => void) | undefined;
   onReveal(source: SourceReference, signal: AbortSignal): Promise<void>;
+  /** Shows a project-relative folder of the document in front in Files, from
+   *  the breadcrumb above it. Absent, the breadcrumb only reads. */
+  onRevealFolder?: ((folder: string) => void) | undefined;
   /** Composes a preparation status row above PDF, image, and DOCX viewers. */
   renderPreparation?:
     | ((source: SourceReference, format: PreparationSlotFormat) => ReactNode)
@@ -80,6 +84,7 @@ export function DocumentWorkspace({
   onOpenExternal = rejectExternalNavigation,
   onOpenPrepared,
   onReveal,
+  onRevealFolder,
   renderPreparation,
   renderReadingControl,
   revealLabel,
@@ -211,6 +216,9 @@ export function DocumentWorkspace({
         <NoticeStrip onDismiss={runtime.navigation.dismissSearchNotice} role="status">
           {activeFindable ? searchNotice : SEARCH_NOTICES[searchPurpose].unavailable}
         </NoticeStrip>
+      )}
+      {activeTab && (
+        <DocumentBreadcrumb onRevealFolder={onRevealFolder} source={activeTab.source} />
       )}
       {retainedIds.map((tabId) => renderDocument(tabId, tabId !== activeTabId))}
       {activeTab &&
