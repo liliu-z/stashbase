@@ -149,4 +149,38 @@ describe('document commands composition', () => {
     unmount();
     tabs.dispose();
   });
+
+  it('opens a tab by its number with Cmd/Ctrl+1–8, and the last with Cmd/Ctrl+9', async () => {
+    const tabs = createDocumentTabsRuntime(
+      documentTabsRuntimeOptions({
+        restored: {
+          activeTabId: 'tab-1',
+          tabs: ['a.md', 'b.md', 'c.md'].map((path, index) => ({
+            id: `tab-${index + 1}`,
+            source: { folderPath: '/project/notes', path },
+          })),
+        },
+      }),
+    );
+    const active = () => tabs.store.getState().activeTabId;
+    const { unmount } = renderHook(() => useDocumentCommands(tabs.navigation, tabs));
+
+    expect(dispatchCommand('2').defaultPrevented).toBe(true);
+    await vi.waitFor(() => expect(active()).toBe('tab-2'));
+    // Nine is the last tab however many are open.
+    dispatchCommand('9');
+    await vi.waitFor(() => expect(active()).toBe('tab-3'));
+    dispatchCommand('1', { ctrlKey: false, metaKey: true });
+    await vi.waitFor(() => expect(active()).toBe('tab-1'));
+
+    // No fourth tab, so the chord is left to the page; Alt+digit is the
+    // editor's heading shortcut, and Shift+digit is a symbol.
+    expect(dispatchCommand('4').defaultPrevented).toBe(false);
+    expect(dispatchCommand('2', { altKey: true }).defaultPrevented).toBe(false);
+    expect(dispatchCommand('2', { shiftKey: true }).defaultPrevented).toBe(false);
+    expect(active()).toBe('tab-1');
+
+    unmount();
+    tabs.dispose();
+  });
 });

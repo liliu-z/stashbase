@@ -17,7 +17,8 @@ function tabStep(event: KeyboardEvent): -1 | 0 | 1 {
 
 /** The Documents keyboard contract: Cmd/Ctrl+W closes the active tab, Ctrl+Tab
  *  and Ctrl+Shift+Tab (or Ctrl+PageDown/PageUp) move to the next or previous
- *  tab, wrapping at the ends, Cmd/Ctrl+F
+ *  tab, wrapping at the ends, Cmd/Ctrl+1–8 open that tab and Cmd/Ctrl+9 the
+ *  last, Cmd/Ctrl+F
  *  opens Find, Cmd/Ctrl+G steps through it, Escape closes it. It lives with the
  *  feature that owns those verbs rather than in the shell, and every chord asks
  *  the runtime to act and reads back whether it did, so nothing inspects
@@ -64,6 +65,16 @@ export function useDocumentCommands(
       }
       if ((!event.metaKey && !event.ctrlKey) || event.altKey) return;
       const key = event.key.toLowerCase();
+      if (/^[1-9]$/u.test(key) && !event.shiftKey && tabs) {
+        // Cmd/Ctrl+1–8 open that tab and Cmd/Ctrl+9 the last one, as in
+        // browsers. A number past the open tabs leaves the chord to the page.
+        const open = tabs.store.getState().tabs;
+        const numbered = key === '9' ? open.at(-1) : open[Number(key) - 1];
+        if (!numbered) return;
+        event.preventDefault();
+        void tabs.activate(numbered.id);
+        return;
+      }
       if (key === 'w' && !event.shiftKey) {
         // Cmd/Ctrl+W closes the active document tab. The chord is always
         // taken, so with nothing open it can never fall through to a

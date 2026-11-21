@@ -17,7 +17,8 @@ source mutations, saving, and release guarantees.
    panel covers Files, the row is brought into view when Files is shown.
 2. Keep a preview or start editing to retain its tab. Ctrl+Tab and
    Ctrl+Shift+Tab (or Ctrl+PageDown and Ctrl+PageUp) move to the next or
-   previous tab, wrapping at the ends. A tab's menu (right click,
+   previous tab, wrapping at the ends; Cmd/Ctrl+1 to 8 open that tab and
+   Cmd/Ctrl+9 the last. A tab's menu (right click,
    the menu key or Shift+F10) closes it, the others, those to its right, or all,
    each saving as Close does; the first tab that stays open for a draft question
    or a failed save stops the rest. It also shows the file in the system file
