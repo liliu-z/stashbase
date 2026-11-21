@@ -137,12 +137,12 @@ function ThinkingPanel({
               : 'Thinking is set by the runtime'}
           </span>
           {models && modelLocked && (
-            <span
+            <Popover.Description
               className={cn('text-center text-muted-foreground', sizeClasses.caption)}
               id={lockReason}
             >
               Kept for this chat · Start a new chat to switch
-            </span>
+            </Popover.Description>
           )}
         </div>
         {levels ? (
@@ -204,8 +204,10 @@ export function AgentThinkingControl({
 }: AgentThinkingControlProps) {
   const { effort, models } = activeAgent.abilities;
   const disabled = state.activeTurn;
-  // A populated Claude conversation keeps its model for the rest of its run.
-  const modelLocked = activeAgent.id === 'claude' && state.transcript.length > 0;
+  // Catalog notices and startup errors can appear before any conversation content.
+  const modelLocked =
+    activeAgent.id === 'claude' &&
+    state.transcript.some((block) => block.kind !== 'notice' && block.kind !== 'error');
   const choice = modelChoice(state);
   const [open, setOpen] = useState(false);
   const panel = useRef<HTMLDivElement>(null);
