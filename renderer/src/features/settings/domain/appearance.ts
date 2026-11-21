@@ -256,7 +256,8 @@ export const EDITOR_TOGGLES = [
     title: 'Typewriter scrolling',
   },
   {
-    detail: "Show the document's word count in the corner.",
+    detail:
+      "Show the document's word and character counts in the corner, and the selection's while text is selected.",
     field: 'wordCount',
     title: 'Word count',
   },
