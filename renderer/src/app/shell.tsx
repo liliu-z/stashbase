@@ -239,6 +239,13 @@ function WorkspaceWindow() {
     chrome.navigator.select('files');
     workspace?.requestCreate('draft');
   };
+  // A folder named in the document's breadcrumb is shown where folders live:
+  // the Files panel comes on screen with the folder opened to and selected.
+  const revealFolder = (treeFolder: string) => {
+    session.runtime.setSidebarOpen(true);
+    chrome.navigator.select('files');
+    workspace?.revealPath(treeFolder);
+  };
   const newInteractiveNote = () => {
     session.runtime.setSidebarOpen(true);
     chrome.navigator.select('files');
@@ -313,6 +320,7 @@ function WorkspaceWindow() {
             onCreateInteractiveNote={newInteractiveNote}
             onPrepare={preparation.prepare}
             onReprocess={refresh.reprocess}
+            onRevealFolder={revealFolder}
             onReviewTurnChange={revisions.reviewTurnChange}
             onShowDocuments={() => chrome.navigator.selectMode('documents')}
             session={session}
