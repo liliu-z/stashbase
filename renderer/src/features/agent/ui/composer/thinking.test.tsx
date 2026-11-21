@@ -296,8 +296,25 @@ describe('agent composer model-and-thinking control', () => {
     });
 
     await user.click(screen.getByRole('button', { name: 'Model and thinking: Opus, High' }));
-    expect(screen.getByRole('button', { name: 'Model: Opus' }).hasAttribute('disabled')).toBe(true);
+    const model = screen.getByRole('button', {
+      description: 'Kept for this chat · Start a new chat to switch',
+      name: 'Model: Opus',
+    });
+    expect(model.hasAttribute('disabled')).toBe(true);
     expect(slider().hasAttribute('disabled')).toBe(false);
+  });
+
+  it('gives no lock reason while a Claude conversation is still empty', async () => {
+    const { user } = renderControl({
+      activeAgent: CLAUDE_AGENT,
+      state: sessionState({ effort: 'high', model: 'opus', models: [OPUS] }),
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Model and thinking: Opus, High' }));
+    expect(screen.getByRole('button', { name: 'Model: Opus' }).hasAttribute('disabled')).toBe(
+      false,
+    );
+    expect(screen.queryByText(/Kept for this chat/u)).toBeNull();
   });
 
   it('opens straight on the model list for a runtime with no level to choose', async () => {

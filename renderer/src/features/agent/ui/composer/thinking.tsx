@@ -6,7 +6,7 @@
  *  before sending. */
 import { Popover } from '@base-ui/react/popover';
 import { Brain, ChevronRight, RotateCcw } from 'lucide-react';
-import { useRef, useState, type RefObject } from 'react';
+import { useId, useRef, useState, type RefObject } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownTrigger } from '@/components/ui/dropdown';
@@ -45,7 +45,8 @@ export interface AgentThinkingControlProps {
 
 /** The panel: the model leads, centred at the top with Reset at the corner,
  *  and opens one step deeper to a menu of its own; the level it thinks at
- *  reads under it, quieter, live while the slider below moves. */
+ *  reads under it, quieter, live while the slider below moves. A locked model
+ *  says why in visible text: a disabled control cannot show a tooltip. */
 function ThinkingPanel({
   choice,
   modelLocked,
@@ -82,6 +83,7 @@ function ThinkingPanel({
   const levels = choice.efforts.length > 0;
   const shownLevel = (position >= 0 ? ranked[position] : choice.effort) ?? null;
   const modelText = cn('px-1.5 py-0.5 font-medium text-foreground', sizeClasses.text);
+  const lockReason = useId();
   return (
     <div className="flex flex-col gap-2 px-3 pt-2.5 pb-3">
       {/* Reset's width mirrored on the left, so the model centres on the panel. */}
@@ -93,6 +95,7 @@ function ThinkingPanel({
               <DropdownTrigger
                 render={
                   <button
+                    aria-describedby={modelLocked ? lockReason : undefined}
                     aria-label={`Model: ${modelName}`}
                     className={cn(
                       'flex max-w-full cursor-pointer items-center gap-0.5 outline-none',
@@ -133,6 +136,14 @@ function ThinkingPanel({
                 : effortLabel(shownLevel)
               : 'Thinking is set by the runtime'}
           </span>
+          {models && modelLocked && (
+            <span
+              className={cn('text-center text-muted-foreground', sizeClasses.caption)}
+              id={lockReason}
+            >
+              Kept for this chat · Start a new chat to switch
+            </span>
+          )}
         </div>
         {levels ? (
           <Tooltip content="Reset to default" side="top">

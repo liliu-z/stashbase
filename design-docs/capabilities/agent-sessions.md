@@ -225,7 +225,10 @@ for unsent text.
   did not choose. A model named by an alias shows the release that alias
   resolves to, in the runtime's own words, so the reader can tell which model
   the choice actually runs. A model chosen while a session is still starting applies
-  before its first turn. Default's composer control offers no model; it reads Crew,
+  before its first turn. Claude changes its model only before a conversation has
+  content; a populated or restored Claude chat keeps its model and says so,
+  pointing to a new chat, rather than only disabling the choice. Its thinking
+  level stays adjustable. Default's composer control offers no model; it reads Crew,
   and its tooltip names the crew members that are on.
 - Default discovers user skills only in the bound project's `.agents/skills`,
   `.claude/skills`, `.opencode/skills`, and `.opencode/skill` directories. It does
