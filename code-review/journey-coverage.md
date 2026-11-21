@@ -3347,6 +3347,14 @@ untouched runtime, the held pick, and the name mapping; the renderer transport
 re-sends a model picked while the socket was still opening. The reproduction was
 a scratch SDK script against the live CLI, not the packaged application.
 
+**Claude model lock in the composer:** a workspace test drives a catalog fallback
+through an unsent chat and checks that the model picker can still send a new
+selection. The composer tests open the populated chat's panel by keyboard and
+check that the dialog describes the lock, the model stays disabled, and the
+thinking slider remains available. An isolated Electron fixture checked the
+rendered panel and its accessibility description at the first keyboard focus,
+then confirmed empty and notice-only chats still offered model selection.
+
 **Runtime update (2026-10-09):** `server/agent-turn-failure.ts` classifies a
 runtime too old for its model as `runtime-outdated` (observed live: Claude
 2.1.220 refusing Fable 5.1 with a 400 naming 2.1.251 as required).

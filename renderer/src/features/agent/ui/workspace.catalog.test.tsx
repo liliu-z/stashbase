@@ -1,9 +1,15 @@
 /** Startup readiness must reach a mounted composer without another user action. */
 import { act, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { expect, it, vi } from 'vite-plus/test';
 
 import type { Agent } from '@/features/agent/domain/agent-catalog';
-import { CLAUDE_AGENT, CODEX_AGENT, idleAgentSessionPort } from '@/test/fakes/agent';
+import {
+  agentSessionPort,
+  CLAUDE_AGENT,
+  CODEX_AGENT,
+  idleAgentSessionPort,
+} from '@/test/fakes/agent';
 
 import { registerWorkspaceCleanup, renderWorkspace } from './workspace.harness';
 
@@ -21,6 +27,35 @@ const readyClaude: Agent = {
     },
   ],
 };
+
+it('lets a draft Claude chat switch models after a catalog fallback notice', async () => {
+  const { listeners, port, sent } = agentSessionPort();
+  const { runtime } = renderWorkspace(port, [readyClaude]);
+  const user = userEvent.setup();
+  await act(async () => {
+    await runtime.chooseAgent('claude');
+  });
+  await user.click(await screen.findByRole('button', { name: 'Model and thinking: Opus, High' }));
+
+  const fallback = 'The requested model is unavailable. Claude is using its default.';
+  act(() => {
+    listeners[0]?.onEvent({
+      activeModel: 'opus',
+      fallback,
+      kind: 'models',
+      models: [
+        ...readyClaude.models,
+        { id: 'sonnet', label: 'Sonnet', supportedEfforts: ['high'] },
+      ],
+    });
+    listeners[0]?.onEvent({ kind: 'ready' });
+  });
+  expect(screen.getByText(fallback)).not.toBeNull();
+  expect(screen.queryByText(/Kept for this chat/u)).toBeNull();
+  await user.click(screen.getByRole('button', { name: 'Model: Opus' }));
+  await user.click(screen.getByRole('menuitemradio', { name: 'Sonnet' }));
+  expect(sent).toContainEqual({ kind: 'select-model', model: 'sonnet' });
+});
 
 it('restores model, thinking and permissions after startup without losing the draft or sending it', async () => {
   vi.useFakeTimers();
