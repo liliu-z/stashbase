@@ -317,11 +317,13 @@ export const MentionEditor = forwardRef<MentionEditorHandle, MentionEditorProps>
               minHeight: `calc(${lineHeight * ctx.minRows}px * var(--ui-scale, 1) + ${paddingY * 2}px)`,
             },
             '&.cm-focused': { outline: 'none' },
+            // The focus colour, as in the document editors, so the caret
+            // stands apart from the message being typed.
             '.cm-content': {
-              caretColor: 'var(--foreground)',
+              caretColor: 'var(--focus-ring)',
               padding: `${paddingY}px ${paddingX}px`,
             },
-            '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--foreground)' },
+            '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--focus-ring)' },
             '.cm-line': { padding: '0' },
             '.cm-placeholder': { color: 'var(--muted-foreground)' },
             '.cm-scroller': {
