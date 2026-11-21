@@ -150,6 +150,34 @@ describe('Agent file changes', () => {
     });
   });
 
+  it('matches a Windows project folder in any letter case, keeping the file spelling', () => {
+    const scope = { kind: 'folder' as const, path: 'C:\\Users\\Me\\Research' };
+    // Agents report `c:\…` for a project opened as `C:\…`; both name one folder.
+    for (const reported of [
+      'c:\\Users\\Me\\Research\\notes\\Plan.md',
+      'C:\\users\\me\\research\\notes\\Plan.md',
+      'c:/Users/Me/Research/notes/Plan.md',
+    ]) {
+      expect(changedSource(scope, reported), reported).toEqual({
+        folderPath: 'C:\\Users\\Me\\Research',
+        path: 'notes/Plan.md',
+      });
+    }
+    expect(changedSource(scope, 'c:\\Users\\Me\\Research')).toBeNull();
+    expect(changedSource(scope, 'c:\\Users\\Me\\Research-old\\a.md')).toBeNull();
+    expect(changedSource(scope, 'd:\\Users\\Me\\Research\\a.md')).toBeNull();
+    expect(
+      changedSource(
+        { kind: 'folder', path: '\\\\server\\share\\Notes' },
+        '\\\\SERVER\\share\\notes\\a.md',
+      ),
+    ).toEqual({ folderPath: '\\\\server\\share\\Notes', path: 'a.md' });
+    // POSIX folders stay exact: a case-sensitive volume may hold both spellings.
+    expect(
+      changedSource({ kind: 'folder', path: '/project/Research' }, '/project/research/a.md'),
+    ).toBeNull();
+  });
+
   it('tells a turn that may have written unseen from one that only read or reported', () => {
     const prompt: AgentTranscriptBlock = { id: 'u2', kind: 'user', text: 'Draft the intro' };
     const earlier = [
