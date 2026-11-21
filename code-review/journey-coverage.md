@@ -1817,9 +1817,10 @@ the v2.18.12 frozen daemon committed about 1.2 GB from its first bind (400
 Markdown notes, keyword only) and held it until quit; a real 13-project profile
 held 1.35 GB at launch and 2.19 GB with search by meaning. With commit nearly
 exhausted it failed startup twice with `OpenBLAS error: Memory allocation still
-failed after 10 retries`. `mfs-daemon.ts` now pins `OPENBLAS_NUM_THREADS=1`;
-`indexer-mfs-path.test.ts` shows a real spawned child receives it even when the
-host environment asks for eight. Isolated source-host passes using that frozen
+failed after 10 retries`. `mfs-daemon.ts` pins `OPENBLAS_NUM_THREADS=1` for both
+the daemon and the source-mode Python dependency probe. The default startup
+test in `indexer-mfs-path.test.ts` shows both fixture children receive one when
+the host asks for eight. Isolated source-host passes using that frozen
 daemon (`STASHBASE_DAEMON_BIN`) measured 1,231 → 107 MB committed by the daemon
 (StashBase total 1,807 → 645 MB), 400 notes indexed in 18.1 / 18.5 s, and five
 MFS keyword searches returning the same hits before and after (5, 0, 5, 0, 0)

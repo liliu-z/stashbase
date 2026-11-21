@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { promisify } from 'node:util';
 import { createFilesystemPath } from './filesystem-path.ts';
 import { isMfsDaemonRetiringError, MfsDaemon } from './mfs-daemon.ts';
 import { errorDiagnostic } from './error-diagnostics.ts';
@@ -93,22 +95,51 @@ test('a daemon close deadline fences replacement until the old process actually 
   assert.equal(daemon.currentGeneration(), 2);
 });
 
-test('the daemon runs OpenBLAS on one thread even when the host environment asks for more', async (t) => {
-  const inherited = process.env.OPENBLAS_NUM_THREADS;
-  process.env.OPENBLAS_NUM_THREADS = '8';
-  t.after(() => {
-    if (inherited === undefined) delete process.env.OPENBLAS_NUM_THREADS;
-    else process.env.OPENBLAS_NUM_THREADS = inherited;
+test('source daemon startup caps OpenBLAS in the dependency probe and daemon', async () => {
+  // Set source mode before importing the launcher. Substitute the Python code
+  // at the process boundary so both real children run without a Python venv.
+  await promisify(execFile)(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', `
+    import assert from 'node:assert/strict';
+    import childProcess from 'node:child_process';
+    import { syncBuiltinESMExports } from 'node:module';
+
+    const checkThreads = "if (process.env.OPENBLAS_NUM_THREADS !== '1') { " +
+      "console.error('Expected one OpenBLAS thread, received ' + process.env.OPENBLAS_NUM_THREADS); process.exit(1); }";
+    const { execFile, spawn } = childProcess;
+    let probed = false;
+    childProcess.execFile = (command, args, options, callback) => {
+      assert.equal(command, process.execPath);
+      assert.equal(args[0], '-c');
+      probed = true;
+      return execFile(command, ['-e', checkThreads], options, callback);
+    };
+    childProcess.spawn = (command, args, options) => {
+      if (command !== process.execPath) return spawn(command, args, options);
+      assert.equal(args[0], '-u');
+      return spawn(command, ['-e', checkThreads +
+        "console.log(JSON.stringify({ event: 'ready' })); process.stdin.resume();"], options);
+    };
+    syncBuiltinESMExports();
+
+    const { MfsDaemon } = await import('./server/mfs-daemon.ts');
+    const daemon = new MfsDaemon();
+    try {
+      await daemon.ensureReady();
+      assert.ok(probed, 'source startup must exercise the dependency probe');
+    } finally {
+      await daemon.close();
+    }
+  `], {
+    cwd: path.join(import.meta.dirname, '..'),
+    env: {
+      ...process.env,
+      STASHBASE_DAEMON_BIN: '',
+      STASHBASE_DEV_RUNTIME: '1',
+      STASHBASE_PYTHON: process.execPath,
+      OPENBLAS_NUM_THREADS: '8',
+    },
+    timeout: 15_000,
   });
-  const daemon = new MfsDaemon(() => ({ command: process.execPath, cwd: os.tmpdir(), args: ['-e', `
-    process.stdout.write(JSON.stringify({ event: 'fixture-env', threads: process.env.OPENBLAS_NUM_THREADS }) + '\\n');
-    process.stdout.write(JSON.stringify({ event: 'ready' }) + '\\n');
-    process.stdin.resume();
-  `] }));
-  t.after(() => daemon.close());
-  const reported = new Promise<{ threads?: string }>(resolve => daemon.once('daemon:fixture-env', resolve));
-  await daemon.ensureReady();
-  assert.equal((await reported).threads, '1', 'per-thread OpenBLAS buffers commit ~1.1 GB on an 8-thread machine');
 });
 
 test('retirement between readiness and dispatch does not write to the closing stdin', async (t) => {
