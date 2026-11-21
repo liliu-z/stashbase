@@ -95,4 +95,58 @@ describe('document commands composition', () => {
     unmount();
     tabs.dispose();
   });
+
+  it('moves to the next or previous tab with Ctrl+Tab or Ctrl+PageDown, wrapping at the ends', async () => {
+    const tabs = createDocumentTabsRuntime(
+      documentTabsRuntimeOptions({
+        restored: {
+          activeTabId: 'tab-1',
+          tabs: ['a.md', 'b.md', 'c.md'].map((path, index) => ({
+            id: `tab-${index + 1}`,
+            source: { folderPath: '/project/notes', path },
+          })),
+        },
+      }),
+    );
+    const active = () => tabs.store.getState().activeTabId;
+    const { unmount } = renderHook(() => useDocumentCommands(tabs.navigation, tabs));
+
+    expect(dispatchCommand('Tab').defaultPrevented).toBe(true);
+    await vi.waitFor(() => expect(active()).toBe('tab-2'));
+    dispatchCommand('PageDown');
+    await vi.waitFor(() => expect(active()).toBe('tab-3'));
+    // Past the last tab comes the first, and before the first, the last.
+    dispatchCommand('Tab');
+    await vi.waitFor(() => expect(active()).toBe('tab-1'));
+    dispatchCommand('Tab', { shiftKey: true });
+    await vi.waitFor(() => expect(active()).toBe('tab-3'));
+    dispatchCommand('PageUp');
+    await vi.waitFor(() => expect(active()).toBe('tab-2'));
+
+    // Cmd+Tab is the system's on macOS, and Alt changes the chord.
+    expect(dispatchCommand('Tab', { metaKey: true }).defaultPrevented).toBe(false);
+    expect(dispatchCommand('Tab', { altKey: true }).defaultPrevented).toBe(false);
+    expect(active()).toBe('tab-2');
+
+    unmount();
+    tabs.dispose();
+  });
+
+  it('leaves Ctrl+Tab to the page while only one tab is open', () => {
+    const tabs = createDocumentTabsRuntime(
+      documentTabsRuntimeOptions({
+        restored: {
+          activeTabId: 'tab-1',
+          tabs: [{ id: 'tab-1', source: { folderPath: '/project/notes', path: 'plan.md' } }],
+        },
+      }),
+    );
+    const { unmount } = renderHook(() => useDocumentCommands(tabs.navigation, tabs));
+
+    expect(dispatchCommand('Tab').defaultPrevented).toBe(false);
+    expect(tabs.store.getState().activeTabId).toBe('tab-1');
+
+    unmount();
+    tabs.dispose();
+  });
 });
