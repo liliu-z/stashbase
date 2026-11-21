@@ -57,7 +57,9 @@ platform capabilities stay named and disabled in navigation.
     mode.
   - **Writing:** what helps while writing: spellcheck and its language (where
     the system offers a choice), focus mode, typewriter scrolling, and word
-    count.
+    count. The count shows words and characters, as post limits count them,
+    and while text is selected it shows the selection's counts out of the
+    document's.
 
   Every appearance value is a preset or a step except the two font names, which are
   validated as names before they are stored. An installed font becomes the
