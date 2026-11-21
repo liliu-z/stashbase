@@ -217,6 +217,18 @@ function normalizeSeparators(path: string): string {
   return path.replace(/\\/g, '/');
 }
 
+/** The part of `path` under `folder`, or null when it lies elsewhere. Windows
+ *  paths (a drive letter or a UNC share) name one file in any letter case, and
+ *  agents do report `c:\…` for a project opened as `C:\…`, so their folder
+ *  prefix is matched without case. POSIX paths keep an exact match. */
+function pathUnderFolder(path: string, folder: string): string | null {
+  const windows = /^([a-z]:\/|\/\/)/iu.test(folder);
+  const prefix = path.slice(0, folder.length + 1);
+  const expected = `${folder}/`;
+  const inside = windows ? prefix.toLowerCase() === expected.toLowerCase() : prefix === expected;
+  return inside ? path.slice(folder.length + 1) : null;
+}
+
 /** The workspace source behind a changed path: a path already relative to
  *  the folder, or an absolute one inside it. A path outside the scoped
  *  folder has no openable source. */
@@ -225,8 +237,8 @@ export function changedSource(scope: AgentScope, rawPath: string): SourceReferen
   const folder = normalizeSeparators(scope.path).replace(/\/+$/u, '');
   const path = normalizeSeparators(rawPath);
   let relative: string;
-  if (path === folder) return null;
-  if (path.startsWith(`${folder}/`)) relative = path.slice(folder.length + 1);
+  const under = pathUnderFolder(path, folder);
+  if (under !== null) relative = under;
   else if (/^([a-z]:)?\//iu.test(path)) return null;
   else relative = path.replace(/^\.\//u, '');
   if (relative === '' || relative.split('/').some((part) => part === '' || part === '..')) {
