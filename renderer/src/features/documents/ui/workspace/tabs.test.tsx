@@ -36,6 +36,15 @@ const documentWorkspaceProps = {
 
 const runtimes: ReturnType<typeof createRuntime>[] = [];
 
+/** The test DOM lays nothing out, so a tab list's width is given here while
+ *  every other element keeps its own. */
+function stubTabListWidth(name: 'clientWidth' | 'scrollWidth', width: () => number) {
+  const real = Object.getOwnPropertyDescriptor(Element.prototype, name)?.get;
+  vi.spyOn(HTMLElement.prototype, name, 'get').mockImplementation(function (this: HTMLElement) {
+    return this.getAttribute('role') === 'tablist' ? width() : (real?.call(this) as number);
+  });
+}
+
 // Mode retention exercises the real editor, but cold chunk transformation is
 // fixture setup and must not consume the interaction assertion's deadline.
 beforeAll(async () => {
@@ -169,6 +178,62 @@ describe('document tabs', () => {
     if (!closeGlyph) throw new Error('The active tab must expose a close control.');
     await user.click(closeGlyph);
     expect(screen.queryByRole('region', { name: 'Document workspace' })).toBeNull();
+  });
+
+  it('closes a tab with a middle click without starting autoscroll', async () => {
+    const runtime = createRuntime();
+    runtimes.push(runtime);
+    const user = userEvent.setup();
+    withQueryClient(<DocumentTabs runtime={runtime} />);
+
+    const other = screen.getByRole('tab', { name: 'other.md' });
+    // Pressing the wheel alone is refused, so Windows has no autoscroll to start.
+    expect(fireEvent.mouseDown(other, { button: 1 })).toBe(false);
+    expect(runtime.store.getState().tabs.map((tab) => tab.id)).toEqual(['tab-1', 'tab-2']);
+
+    await user.pointer({ keys: '[MouseMiddle]', target: other });
+    expect(runtime.store.getState().tabs.map((tab) => tab.id)).toEqual(['tab-1']);
+
+    // A primary click still only activates.
+    await user.click(screen.getByRole('tab', { name: 'plan.md' }));
+    expect(runtime.store.getState().tabs.map((tab) => tab.id)).toEqual(['tab-1']);
+  });
+
+  it('lists every open tab while the strip overflows, and brings the chosen one in front', async () => {
+    const runtime = createRuntime();
+    runtimes.push(runtime);
+    const user = userEvent.setup();
+    // Wider content than box once the third tab is open.
+    let content = 300;
+    stubTabListWidth('clientWidth', () => 400);
+    stubTabListWidth('scrollWidth', () => content);
+    render(<DocumentTabs runtime={runtime} />);
+
+    // Everything fits, so there is nothing to list.
+    expect(screen.queryByRole('button', { name: /^All open tabs/u })).toBeNull();
+
+    content = 600;
+    await act(async () => {
+      await runtime.open({ folderPath: '/project/notes', path: 'later/third.md' });
+    });
+
+    await user.click(screen.getByRole('button', { name: 'All open tabs (3)' }));
+    const list = await screen.findByRole('menu', { name: 'All open tabs (3)' });
+    const rows = within(list).getAllByRole('menuitemradio');
+    // Each row names its folder, so files that share a name stay apart.
+    expect(rows.map((row) => row.getAttribute('aria-label'))).toEqual([
+      'plan.md',
+      'other.md. drafts',
+      'third.md. later',
+    ]);
+    expect(
+      within(list).getByRole('menuitemradio', { checked: true }).getAttribute('aria-label'),
+    ).toBe('third.md. later');
+
+    await user.click(within(list).getByRole('menuitemradio', { name: /plan\.md/u }));
+    expect(runtime.store.getState().activeTabId).toBe('tab-1');
+    expect(runtime.store.getState().tabs).toHaveLength(3);
+    vi.restoreAllMocks();
   });
 
   it('keeps a newly opened active tab visible in an overflowing tab list', async () => {

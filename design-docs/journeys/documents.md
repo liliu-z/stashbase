@@ -15,7 +15,9 @@ source mutations, saving, and release guarantees.
    and scrolls the row fully into view. A folder the reader folds
    stays folded until a document inside it comes in front again. While another
    panel covers Files, the row is brought into view when Files is shown.
-2. Keep a preview or start editing to retain its tab. A tab's menu (right click,
+2. Keep a preview or start editing to retain its tab. A middle click closes a
+   tab as Close does. While the tabs overflow the strip, a list beside it names
+   every open document with its folder and brings the chosen one in front. A tab's menu (right click,
    the menu key or Shift+F10) closes it, the others, those to its right, or all,
    each saving as Close does; the first tab that stays open for a draft question
    or a failed save stops the rest. It also shows the file in the system file

@@ -1,15 +1,18 @@
 /**
  * The open documents' tab strip. A preview tab wears its name in italics and
  * says so in its label; a double click, or Enter on the focused tab, keeps
- * it. Delete closes the focused tab, and every tab is a drag source for its
- * file. A right click, the menu key or Shift+F10 opens the tab's menu. Given a `newTab`, the strip ends in a plus that opens the New tab,
+ * it. Delete or a middle click closes a tab, and every tab is a drag source
+ * for its file. A right click, the menu key or Shift+F10 opens the tab's menu. Given a `newTab`, the strip ends in a plus that opens the New tab,
  * a tab holding no document whose page offers the first moves; the New tab
- * sits last and selected, and choosing a document closes it.
+ * sits last and selected, and choosing a document closes it. While the tabs
+ * overflow the strip, a list of every open document sits beside the plus.
  */
 import { Circle, Plus, X } from 'lucide-react';
 import {
+  useCallback,
   useLayoutEffect,
   useRef,
+  useState,
   type KeyboardEvent,
   type MouseEvent,
   type ReactNode,
@@ -34,6 +37,7 @@ import type { SourceReference } from '@/shared/domain/source-reference';
 import { useRequestSignals } from '@/shared/runtime/use-request-signals';
 import { writeSourceDrag } from '@/shared/utils/source-drag';
 
+import { OpenTabsMenu } from './open-tabs-menu';
 import { DocumentTabMenu, useTabMenu, type DocumentTabMenuActions } from './tab-menu';
 
 export interface DocumentTabsProps {
@@ -60,6 +64,50 @@ function UnsavedIndicator({ className, ...props }: IconComponentProps) {
       size={8}
     />
   );
+}
+
+/** Middle-click closing, as browsers and editors do. Pressing the wheel is
+ *  refused so Windows does not start autoscroll over the strip; the close
+ *  itself waits for the release, like a click. */
+function middleClickCloses(close: () => void) {
+  return {
+    onAuxClick: (event: MouseEvent<HTMLButtonElement>) => {
+      if (event.button !== 1) return;
+      event.preventDefault();
+      close();
+    },
+    onMouseDown: (event: MouseEvent<HTMLButtonElement>) => {
+      if (event.button === 1) event.preventDefault();
+    },
+  };
+}
+
+/** Whether the list scrolls sideways because its tabs no longer fit. Read
+ *  when the strip resizes and when the tabs change, since a tab added to a
+ *  list already at its widest changes what it holds, not its box. */
+function useOverflowing(watch: unknown) {
+  const [overflowing, setOverflowing] = useState(false);
+  const list = useRef<HTMLDivElement | null>(null);
+  const observer = useRef<ResizeObserver | null>(null);
+  const measure = useCallback(() => {
+    const node = list.current;
+    setOverflowing(node ? node.scrollWidth > node.clientWidth + 1 : false);
+  }, []);
+  const ref = useCallback(
+    (node: HTMLDivElement | null) => {
+      observer.current?.disconnect();
+      observer.current = null;
+      list.current = node;
+      if (!node) return;
+      measure();
+      if (typeof ResizeObserver === 'undefined') return;
+      observer.current = new ResizeObserver(measure);
+      observer.current.observe(node);
+    },
+    [measure],
+  );
+  useLayoutEffect(measure, [measure, watch]);
+  return { overflowing, ref };
 }
 
 function tabLabel(name: string, dirty: boolean, preview: boolean): string {
@@ -109,6 +157,7 @@ function DocumentTab({
       // A double click is the reader asking for the tab to stay; a kept tab
       // has nothing further to give.
       onDoubleClick={preview ? () => onKeep(value) : undefined}
+      {...middleClickCloses(() => onClose(value))}
       // The open document is a source the user can hand to another surface —
       // dropping a tab on the Agent composer binds it as explicit context.
       onContextMenu={(event) => onContextMenu(event, value)}
@@ -139,6 +188,11 @@ export function DocumentTabs({
   const size = 'icon-compact' as const;
   const focusAfterClose = useRef(false);
   const tabElements = useRef(new Map<string, HTMLButtonElement>());
+  const newTabOpen = newTab?.open ?? false;
+  // A rename can widen a tab as much as opening one can.
+  const strip = useOverflowing(
+    `${newTabOpen}:${tabs.map((tab) => sourceName(tab.source)).join('/')}`,
+  );
 
   useLayoutEffect(() => {
     if (!focusAfterClose.current || !activeTabId) return;
@@ -151,7 +205,6 @@ export function DocumentTabs({
     tabElements.current.get(activeTabId)?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
   }, [activeTabId]);
 
-  const newTabOpen = newTab?.open ?? false;
   const plus = newTab && (
     <Tooltip content="New tab" side="bottom">
       <Button
@@ -229,7 +282,11 @@ export function DocumentTabs({
         }}
         value={newTabOpen ? NEW_TAB_ID : (activeTabId ?? '')}
       >
-        <TabsList aria-label="Open documents" className="scrollbar-hide max-w-full overflow-x-auto">
+        <TabsList
+          aria-label="Open documents"
+          className="scrollbar-hide max-w-full overflow-x-auto"
+          ref={strip.ref}
+        >
           {tabs.map((tab) => {
             const document = runtime.getDocument(tab.id);
             if (!document) return null;
@@ -252,6 +309,7 @@ export function DocumentTabs({
             <TabItem
               aria-keyshortcuts="Delete"
               label="New tab"
+              {...middleClickCloses(newTab.close)}
               onKeyDown={(event) => {
                 if (event.key !== 'Delete') return;
                 event.preventDefault();
@@ -264,6 +322,16 @@ export function DocumentTabs({
           )}
         </TabsList>
       </Tabs>
+      {strip.overflowing && (
+        <OpenTabsMenu
+          activeTabId={newTabOpen ? null : activeTabId}
+          onSelect={(tabId) => {
+            newTab?.close();
+            activate(tabId);
+          }}
+          tabs={tabs}
+        />
+      )}
       {plus}
       {menuTab && (
         <DocumentTabMenu
