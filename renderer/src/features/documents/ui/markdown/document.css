@@ -283,6 +283,10 @@ html[data-focus-mode='on'] .markdown-crepe:focus-within .ProseMirror > :not(.is-
   margin: 0 auto;
   padding: 32px clamp(28px, 6cqi, 52px) 96px;
   color: var(--foreground);
+  /* The caret otherwise takes the text's colour, a hairline that disappears
+     among the letters it sits between. The focus colour marks where the reader
+     is everywhere else in the app, and stands apart from prose in every theme. */
+  caret-color: var(--focus-ring);
   font-family: var(--writing-font, var(--font-reading));
   font-size: var(--reading-font-size, 16px);
   line-height: var(--reading-line-height, 1.65);
