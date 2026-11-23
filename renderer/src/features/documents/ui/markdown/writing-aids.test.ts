@@ -48,11 +48,17 @@ describe('countWords', () => {
 });
 
 describe('countCharacters', () => {
-  it('counts what a post limit counts: spaces and punctuation, an emoji as one, not breaks', () => {
+  it('counts each character as it is seen once: spaces and punctuation, not paragraph breaks', () => {
     expect(countCharacters('')).toBe(0);
     expect(countCharacters('Hi, you!')).toBe(8);
-    expect(countCharacters('café 👍')).toBe(6);
     expect(countCharacters('one\ntwo')).toBe(6);
+    // A decomposed accent, a family emoji, a flag and a skin tone are each
+    // several code points but one character on screen.
+    expect(countCharacters('café 👍')).toBe(6);
+    expect(countCharacters('👨‍👩‍👧 🇮🇳 👍🏽')).toBe(5);
+    // The writer's rule, not a site's: X would count these as 4 and 23.
+    expect(countCharacters('你好')).toBe(2);
+    expect(countCharacters('https://example.com/a-long-path')).toBe(31);
   });
 });
 

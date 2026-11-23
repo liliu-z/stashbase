@@ -1,3 +1,14 @@
+/**
+ * The Markdown editor's side of the writing settings: focus mode's current
+ * block, typewriter scrolling, spellcheck kept off inline code, and the word
+ * and character count in the corner.
+ *
+ * The character rule is a writer's, not a site's: every character as it is
+ * seen counts once, spaces and punctuation included, and the breaks between
+ * paragraphs do not. Sites with post limits weigh characters their own way
+ * (X counts each Chinese character and emoji as two, and every link as 23),
+ * so the count is a draft's length, not a promise that a post fits.
+ */
 import type { CrepeBuilder } from '@milkdown/crepe/builder';
 import { inlineCodeAttr } from '@milkdown/kit/preset/commonmark';
 import type { Node as ProseMirrorNode } from '@milkdown/kit/prose/model';
@@ -20,12 +31,14 @@ export function countWords(text: string): number {
   return unspaced + (spaced?.length ?? 0);
 }
 
-/** Characters as a post limit counts them: every letter, digit, space and
- *  mark of punctuation, with an emoji or accented letter as one, but not the
- *  breaks between paragraphs. */
+/** Characters as they are seen: a grapheme cluster each, so an accented
+ *  letter, a flag or a family emoji built from several code points still
+ *  counts once. Spaces and punctuation count; paragraph breaks do not. */
+const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+
 export function countCharacters(text: string): number {
   let count = 0;
-  for (const character of text) if (character !== '\n') count += 1;
+  for (const { segment } of graphemes.segment(text)) if (segment !== '\n') count += 1;
   return count;
 }
 
@@ -35,7 +48,7 @@ export interface TextCount {
 }
 
 /** The document's counts, and the selection's while text is selected. */
-export interface WritingCount {
+interface WritingCount {
   document: TextCount;
   selection: TextCount | null;
 }

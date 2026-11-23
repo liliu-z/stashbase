@@ -257,7 +257,7 @@ export const EDITOR_TOGGLES = [
   },
   {
     detail:
-      "Show the document's word and character counts in the corner, and the selection's while text is selected.",
+      "Show the document's word and character counts in the corner, and the selection's while text is selected. Each character counts once, spaces included; paragraph breaks don't. Sites such as X may count differently.",
     field: 'wordCount',
     title: 'Word count',
   },

@@ -57,9 +57,12 @@ platform capabilities stay named and disabled in navigation.
     mode.
   - **Writing:** what helps while writing: spellcheck and its language (where
     the system offers a choice), focus mode, typewriter scrolling, and word
-    count. The count shows words and characters, as post limits count them,
-    and while text is selected it shows the selection's counts out of the
-    document's.
+    count. The count shows words and characters, and while text is selected
+    it shows the selection's counts out of the document's. A character is one
+    as it is seen (a grapheme cluster, so an accented letter or a composed
+    emoji counts once); spaces and punctuation count and paragraph breaks do
+    not. This is a draft's length, not a site's post limit: X, for example,
+    counts each Chinese character and emoji as two and every link as 23.
 
   Every appearance value is a preset or a step except the two font names, which are
   validated as names before they are stored. An installed font becomes the
