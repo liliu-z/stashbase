@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { agentCrewCallSchema } from '../http/agent-tools';
 
 import { agentIdSchema } from "../http/agent-runtime";
 
@@ -113,7 +112,6 @@ export const agentServerEventSchema = z.union([
       id: boundedText(512),
       name: boundedText(512),
       input: recordSchema,
-      crew: agentCrewCallSchema.optional(),
     })
     .strict(),
   z
@@ -190,7 +188,6 @@ const agentSessionConnectFields = {
   effort: boundedText(64).optional(),
   model: boundedText(200).optional(),
   resume: boundedText(512).optional(),
-  crew: z.string().regex(/^[a-zA-Z0-9_-]{1,512}$/u).optional(),
 };
 
 export const agentSessionConnectSchema = z.object({

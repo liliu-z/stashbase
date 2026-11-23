@@ -76,7 +76,6 @@ import { mount as mountAgentSessionsRoutes } from './routes/agent-sessions.ts';
 import { mount as mountAntigravityHookRoutes } from './routes/antigravity-hook.ts';
 import { mount as mountAgentPreferencesRoutes } from './routes/agent-preferences.ts';
 import { mount as mountScheduledTaskRoutes } from './routes/scheduled-tasks.ts';
-import { mount as mountAgentToolRoutes } from './routes/agent-tools.ts';
 import { createRendererOriginPolicy } from './middleware/renderer-origin.ts';
 import { mount as mountAccountRoutes } from './routes/account.ts';
 import { BUILT_IN_AGENT_ADAPTERS } from './agent-adapters.ts';
@@ -327,7 +326,6 @@ mountFoldersRoutes(app);
 mountUploadRoutes(app);
 mountAttachRoutes(app);
 mountProjectFileRoutes(app);
-mountAgentToolRoutes(app); // after the project scope it reads files under
 mountTurnChangeRoutes(app);
 mountTerminalRoutes(app);
 mountMcpRoutes(app, mcpHttpService);
@@ -465,9 +463,8 @@ function agentIdOf(req: import('node:http').IncomingMessage): string {
 
 function connectionOptionsOf(req: import('node:http').IncomingMessage): AgentConnectionOptions {
   const query = new URL(req.url ?? '', 'http://localhost').searchParams;
-  const crew = query.get('crew');
   const connectionId = query.get('telemetryConnectionId');
-  return { ...(connectionId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(connectionId) ? { telemetryConnectionId: connectionId } : {}), windowId: windowIdOf(req), effort: effortOf(req), resume: resumeOf(req), access: accessOf(req), model: modelOf(req), ...(crew && /^[a-zA-Z0-9_-]{1,512}$/.test(crew) ? { crew } : {}) };
+  return { ...(connectionId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(connectionId) ? { telemetryConnectionId: connectionId } : {}), windowId: windowIdOf(req), effort: effortOf(req), resume: resumeOf(req), access: accessOf(req), model: modelOf(req) };
 }
 
 /** Model ids are opaque native identifiers. Keep only a small URL safety bound;

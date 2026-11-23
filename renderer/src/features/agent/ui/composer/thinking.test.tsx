@@ -4,7 +4,7 @@ import type { ComponentProps } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
 
 import type { AgentModel } from '@/features/agent/domain/runtime-catalog';
-import { agentToolsApi, BUILT_IN_AGENT, CLAUDE_AGENT, CODEX_AGENT } from '@/test/fakes/agent';
+import { BUILT_IN_AGENT, CLAUDE_AGENT, CODEX_AGENT } from '@/test/fakes/agent';
 
 import { AgentThinkingControl } from './thinking';
 
@@ -47,7 +47,6 @@ function renderControl(overrides: Partial<ControlProps> = {}) {
       {...spies}
       activeAgent={overrides.activeAgent ?? CODEX_AGENT}
       state={overrides.state ?? sessionState()}
-      tools={{ chat: 'test-chat', api: agentToolsApi(), onChanged: vi.fn() }}
     />,
   );
   return { ...spies, user: userEvent.setup() };
@@ -75,8 +74,8 @@ function optionNames(): string[] {
 afterEach(cleanup);
 
 describe('agent composer model-and-thinking control', () => {
-  it('renders nothing for a runtime that advertises no model or level choice', () => {
-    renderControl({ activeAgent: { ...BUILT_IN_AGENT, id: 'codex' } });
+  it('renders no model and thinking control for Default', () => {
+    renderControl({ activeAgent: BUILT_IN_AGENT });
 
     expect(screen.queryByRole('button', { name: /^Model and thinking:/u })).toBeNull();
   });

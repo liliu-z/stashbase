@@ -3,7 +3,7 @@ import { vi } from 'vite-plus/test';
 import type { AppDependencies } from '@/app/dependencies';
 import type { GalleryPort } from '@/features/gallery/public';
 
-import { agentCatalogPort, agentContextPort, agentToolsApi, agentSessionPort } from './agent';
+import { agentCatalogPort, agentContextPort, agentSessionPort } from './agent';
 import { documentsApi } from './documents';
 import { preparationControlApi, preparationStatusApi } from './preparation';
 import { exactSearchApi, indexDecisionApi, semanticSearchApi } from './retrieval';
@@ -37,7 +37,6 @@ export function appDependencies(overrides: Partial<AppDependencies> = {}): AppDe
     agent: {
       catalog: agentCatalogPort(),
       context: agentContextPort(),
-      tools: agentToolsApi(),
       session: agentSessionPort().port,
     },
     documents: documentsApi(),

@@ -1,5 +1,5 @@
 /** The agent feature's ports: the services a conversation, its catalog,
- *  tools and context reach through, each implemented in
+ *  and context reach through, each implemented in
  *  `infrastructure/`. */
 import type {
   AgentContextExtra,
@@ -25,53 +25,6 @@ import type {
 import type { AgentSessionCommand } from '@/features/agent/domain/session-command';
 import { featureErrorClass, type FeatureError } from '@/shared/domain/feature-error';
 import type { SourceReference } from '@/shared/domain/source-reference';
-
-/** A Default Agent tool from the service's catalog, which the main agent
- *  may call once the user turns it on, on a model from the tool model pool. */
-export interface AgentTool {
-  readonly id: string;
-  readonly label: string;
-  /** The function name the main agent calls it by. */
-  readonly toolName: string;
-  /** The short line the tools list shows. */
-  readonly summary: string;
-  /** A generic icon name; an unknown one falls back. */
-  readonly icon: string;
-  /** Whether the user turned it on. Every tool starts off. */
-  readonly enabled: boolean;
-  /** Why it cannot be used at all right now, or null. */
-  readonly unavailable: string | null;
-  /** The model it runs on, or would once on; null when none can be used. */
-  readonly model: string | null;
-  /** Why the user must choose a model first, or null. */
-  readonly modelProblem: string | null;
-  /** The model it runs on until the user picks another. */
-  readonly defaultModel: string | null;
-  readonly options: readonly {
-    readonly id: string;
-    readonly label: string;
-    readonly available: boolean;
-    readonly reason: string | null;
-  }[];
-}
-
-/** One change to a tool: turn it on or off, pick its model, or both. */
-export interface AgentToolChange {
-  readonly enabled?: boolean;
-  readonly model?: string;
-}
-
-/** Which tools Default's main agent has. A change answers every tool as the
- *  service now resolves it, and applies to chats started or reconnected. */
-export interface AgentToolsPort {
-  list(signal: AbortSignal, chat: string): Promise<readonly AgentTool[]>;
-  set(
-    tool: AgentTool['id'],
-    change: AgentToolChange,
-    signal: AbortSignal,
-    chat: string,
-  ): Promise<readonly AgentTool[]>;
-}
 
 export interface AgentCatalogPort {
   listAgents(signal: AbortSignal): Promise<AgentCatalog>;
@@ -111,7 +64,6 @@ export interface AgentConnectRequest {
   effort?: string | undefined;
   model?: string | undefined;
   access?: AgentAccessMode | undefined;
-  crew?: string | undefined;
 }
 
 export interface AgentSessionPort {

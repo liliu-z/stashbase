@@ -6,6 +6,7 @@ import test from 'node:test';
 import { clearCurrentFolder, openProjectFolder } from './folder.ts';
 import { decodeGenericText, readGenericFilePreview } from './generic-file-preview.ts';
 import { MAX_TEXT_READ_BYTES } from './active-file-operations.ts';
+import { fileSymlink } from './__tests__/filesystem-links.ts';
 
 test('generic preview strictly distinguishes readable text from binary and oversized files', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-generic-preview-'));
@@ -47,11 +48,16 @@ test('generic UTF-8 admission permits normal whitespace but rejects binary contr
   assert.equal(decodeGenericText(Buffer.from([0xff, 0xfe, 0x61])), null);
 });
 
-test('generic preview reports symlinks without following them', { skip: process.platform === 'win32' }, async () => {
+// Windows creates file symlinks only with Developer Mode or administrator
+// rights; without them the case reports that it was not exercised.
+test('generic preview reports symlinks without following them', async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-generic-symlink-'));
   try {
     fs.writeFileSync(path.join(root, 'target.ts'), 'secret');
-    fs.symlinkSync('target.ts', path.join(root, 'alias.ts'));
+    if (!fileSymlink('target.ts', path.join(root, 'alias.ts'), t)) {
+      t.skip('file symlinks need Windows Developer Mode');
+      return;
+    }
     await openProjectFolder(root);
     assert.equal((await readGenericFilePreview('alias.ts')).kind, 'symlink');
   } finally {

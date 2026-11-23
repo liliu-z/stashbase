@@ -24,8 +24,6 @@ import { modelStream, INTERRUPTED_MODEL_RESPONSE } from './hosted-agent-stream.t
 const log = logger('hosted-agent-broker');
 const MAX_BODY_BYTES = 16 * 1024 * 1024;
 const AGENT_GATEWAY_PATH = '/v1/agent/chat/completions';
-/** Tool calls have their own endpoint and their own model pool. */
-const AGENT_TOOL_GATEWAY_PATH = '/v2/agent/chat/completions';
 const UUID_PATTERN = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
 /** The hosted model profile one turn runs on. `version` is the configuration
@@ -33,33 +31,6 @@ const UUID_PATTERN = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 export interface HostedAgentTurnModel {
   profile: string;
   version?: number;
-}
-
-/** The tool and tool model one tool call runs on, each with the version the
- * turn's catalog snapshot gave it. */
-export interface HostedAgentToolSelection {
-  tool: string;
-  toolVersion: number;
-  model: string;
-  modelVersion: number;
-}
-
-/** Tool-call refusals, each with what the user can do about it. None of them
- * moves the call to another model. */
-const TOOL_REFUSALS: Record<string, string> = {
-  agent_tool_version_changed: 'This crew member changed while the turn was running. Send the message again.',
-  agent_tool_selection_required: 'StashBase sent an incomplete crew request. Update StashBase and try again.',
-  agent_tool_selection_ambiguous: 'StashBase sent an incomplete crew request. Update StashBase and try again.',
-  agent_tool_unavailable: 'This crew member or its model is not available right now.',
-  agent_disabled: 'The crew is not available right now.',
-};
-
-/** A refused tool call, with the service's code so a caller can tell a
- * changed catalog from every other refusal. */
-export class HostedAgentToolError extends Error {
-  constructor(message: string, readonly status: number, readonly code: string | undefined) {
-    super(message);
-  }
 }
 
 /** Hosted refusals that a fresh model list resolves, and nothing else does.
@@ -83,8 +54,6 @@ export interface HostedAgentBrokerDependencies {
   accessToken(options?: { forceRefresh?: boolean }): Promise<string>;
   fetch(input: string | URL | Request, init?: RequestInit): Promise<Response>;
   upstreamUrl: string;
-  /** Where tool calls go; derived from `upstreamUrl` when not given. */
-  toolUpstreamUrl?: string;
   clientVersion(): string;
 }
 
@@ -151,11 +120,7 @@ function hasMedia(body: Buffer): boolean {
 
 /** The text of a streamed completion, read whole. A stream error or an empty
  * answer fails with the caller's own error. */
-function completionText(
-  stream: string,
-  streamError: (error: { message?: string; code?: string }) => Error,
-  empty: () => Error,
-): string {
+function completionText(stream: string): string {
   let text = '';
   let done = false;
   let finish: string | undefined;
@@ -163,19 +128,16 @@ function completionText(
     const data = line.startsWith('data:') ? line.slice(5).trim() : '';
     if (!data) continue;
     if (data === '[DONE]') { done = true; continue; }
-    const chunk = JSON.parse(data) as { error?: { message?: string; code?: string }; choices?: Array<{ delta?: { content?: unknown }; finish_reason?: string | null }> };
-    if (chunk.error) throw streamError(chunk.error);
+    const chunk = JSON.parse(data) as { error?: { message?: string }; choices?: Array<{ delta?: { content?: unknown }; finish_reason?: string | null }> };
+    if (chunk.error) throw new Error(chunk.error.message ?? 'The agent model failed.');
     if (chunk.choices?.[0]?.finish_reason) finish = chunk.choices[0].finish_reason;
     const content = chunk.choices?.[0]?.delta?.content;
     if (typeof content === 'string') text += content;
   }
-  if (!text.trim()) throw empty();
-  if (!done || finish !== 'stop') throw streamError({
-    code: 'agent_tool_incomplete',
-    message: finish === 'length'
-      ? 'The model reached its output limit before finishing. Ask for a shorter passage and try again.'
-      : 'The model response did not finish completely. Try again before using it as finished work.',
-  });
+  if (!text.trim()) throw new Error('The agent model returned an empty response.');
+  if (!done || finish !== 'stop') throw new Error(finish === 'length'
+    ? 'The model reached its output limit before finishing. Ask for a shorter passage and try again.'
+    : 'The model response did not finish completely. Try again before using it as finished work.');
   return text;
 }
 
@@ -289,7 +251,7 @@ export class HostedAgentBroker {
    * caller's signal gates dispatch and the approval decision, not an already
    * dispatched read-only classification. Drain that response under a bounded
    * lifetime so manual fallback does not turn successful work into unknown fees.
-   * Tool calls use `completeTool`. Answers the generated text.
+   * Returns the generated classification text.
    */
   async complete(
     agentSessionId: string,
@@ -299,7 +261,7 @@ export class HostedAgentBroker {
   ): Promise<string> {
     const apiKey = this.channelBySession.get(agentSessionId);
     const channel = apiKey ? this.channels.get(apiKey) : undefined;
-    if (!channel?.turnId) throw new Error('The agent tool call is not bound to an active turn.');
+    if (!channel?.turnId) throw new Error('The permission review is not bound to an active turn.');
     const turnId = channel.turnId;
     const admissionSignal = signal ? AbortSignal.any([signal, channel.turnAbort.signal]) : channel.turnAbort.signal;
     const lifetime = new AbortController();
@@ -341,82 +303,10 @@ export class HostedAgentBroker {
         throw new Error((code && MODEL_REFUSALS[code])
           ?? payload?.error?.message ?? payload?.message ?? `The agent gateway failed (HTTP ${upstream.status}).`);
       }
-      return completionText(await upstream.text(), (chunk) => new Error(chunk.message ?? 'The agent model failed.'), () => new Error('The agent model returned an empty response.'));
+      return completionText(await upstream.text());
     } finally {
       this.permissionReviews.delete(lifetime);
     }
-  }
-
-  /**
-   * One model call on behalf of a Default Agent tool, inside the session's
-   * running turn and accounted under its root turn id, so every role shares
-   * that turn's allowance. The tool and model are selected by headers, never
-   * by the body's `model`, and never together with a main Agent profile.
-   * Answers the generated text.
-   */
-  async completeTool(
-    agentSessionId: string,
-    selection: HostedAgentToolSelection,
-    messages: ReadonlyArray<{ role: 'system' | 'user'; content: string }>,
-    signal?: AbortSignal,
-  ): Promise<string> {
-    const apiKey = this.channelBySession.get(agentSessionId);
-    const channel = apiKey ? this.channels.get(apiKey) : undefined;
-    if (!channel?.turnId) throw new Error('The agent tool call is not bound to an active turn.');
-    const turnId = channel.turnId;
-    const callSignal = signal ? AbortSignal.any([signal, channel.turnAbort.signal]) : channel.turnAbort.signal;
-    const body = JSON.stringify({ model: selection.model, messages, stream: true });
-    // One logical request: a retry for a refreshed sign-in keeps this key
-    // and this body; a new model call makes a new key.
-    const idempotencyKey = crypto.randomUUID();
-    const upstreamUrl = this.dependencies.toolUpstreamUrl
-      ?? this.dependencies.upstreamUrl.replace(AGENT_GATEWAY_PATH, AGENT_TOOL_GATEWAY_PATH);
-    let attempt = 0;
-    const call = async (forceRefresh: boolean) => {
-      const diagnostic = new HostedAgentRequestDiagnostic(idempotencyKey, ++attempt, { profile: selection.model, turnId });
-      try {
-        callSignal.throwIfAborted();
-        const token = await this.dependencies.accessToken({ forceRefresh });
-        callSignal.throwIfAborted();
-        return diagnostic.response(await this.dependencies.fetch(upstreamUrl, {
-          method: 'POST',
-          headers: {
-            authorization: `Bearer ${token}`,
-            'content-type': 'application/json',
-            accept: 'text/event-stream',
-            'idempotency-key': idempotencyKey,
-            'x-stashbase-agent-turn-id': turnId,
-            'x-stashbase-agent-tool': selection.tool,
-            'x-stashbase-agent-tool-version': String(selection.toolVersion),
-            'x-stashbase-agent-tool-model': selection.model,
-            'x-stashbase-agent-tool-model-version': String(selection.modelVersion),
-            'x-stashbase-client-version': this.dependencies.clientVersion(),
-          },
-          body,
-          signal: callSignal,
-        }));
-      } catch (error) { if (!callSignal.aborted) diagnostic.fail(error); throw error; }
-    };
-    let upstream = await call(false);
-    if (upstream.status === 401) {
-      await upstream.body?.cancel();
-      upstream = await call(true);
-    }
-    if (!upstream.ok) {
-      const payload = await upstream.json().catch(() => null) as GatewayError | null;
-      const code = payload?.error?.code ?? payload?.code;
-      const message = upstream.status === 426
-        ? 'Update StashBase to keep using the crew.'
-        : upstream.status === 401
-          ? 'Sign in again to keep using the crew.'
-          : (code && TOOL_REFUSALS[code]) ?? payload?.error?.message ?? payload?.message ?? `The crew member's call failed (HTTP ${upstream.status}).`;
-      throw new HostedAgentToolError(message, upstream.status, code);
-    }
-    return completionText(
-      await upstream.text(),
-      (chunk) => new HostedAgentToolError((chunk.code && TOOL_REFUSALS[chunk.code]) ?? chunk.message ?? 'The crew member\'s model failed.', 502, chunk.code),
-      () => new HostedAgentToolError('The crew member\'s model returned an empty response.', 502, undefined),
-    );
   }
 
   private gatewayHeaders(
@@ -630,7 +520,6 @@ export const hostedAgentRuntime = (agentSessionId?: string) => broker.runtime(ag
 export const beginHostedAgentTurn = (agentSessionId: string, turnId: string, model?: HostedAgentTurnModel) =>
   broker.beginTurn(agentSessionId, turnId, model);
 export const completeHostedAgentModel = (...args: Parameters<HostedAgentBroker['complete']>) => broker.complete(...args);
-export const completeHostedAgentTool = (...args: Parameters<HostedAgentBroker['completeTool']>) => broker.completeTool(...args);
 export const hostedAgentDiagnostic = (agentSessionId: string) => broker.diagnostic(agentSessionId);
 export const endHostedAgentTurn = (agentSessionId: string) => broker.endTurn(agentSessionId);
 export const releaseHostedAgentChannel = (agentSessionId: string) => broker.releaseChannel(agentSessionId);

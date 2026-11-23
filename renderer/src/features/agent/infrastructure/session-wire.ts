@@ -98,7 +98,6 @@ export function sessionEvent(event: AgentServerEvent): AgentSessionEvent | null 
         input: event.input,
         kind: 'tool-started',
         name: event.name,
-        ...(event.crew ? { crew: event.crew } : {}),
       };
     case 'tool-delta':
       return { delta: event.delta, id: event.id, kind: 'tool-output' };
@@ -166,7 +165,6 @@ export function socketUrl(
     access: ACCESS_MODE_WIRE[request.access ?? 'auto'],
     effort: request.effort,
     model: request.model,
-    crew: request.crew,
     resume: request.resume,
     folder: request.scope.path,
   });

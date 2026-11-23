@@ -92,17 +92,6 @@ Its words are sent with the request; it is not a file attachment or a revision.
 A reply's link to a passage in a project file, carrying a short quoted phrase
 that Documents locates on open. A plain file link is not a citation.
 
-## Crew
-
-The Default Agent's optional specialists, such as Writer and Reviewer. Turning a
-member on assigns matching work to it in this chat on the selected model. New
-chats inherit the last choices; existing chats keep their own. The current request
-still governs the work. With none selected, the main agent handles the task.
-Each member performs a separate text generation. Code and service identifiers may
-call this
-a tool because MCP carries the invocation; the product calls it Crew to make the
-user's explicit choice clear.
-
 ## OpenQuill
 
 The included agent runtime, named **Default** in the app. It uses StashBase

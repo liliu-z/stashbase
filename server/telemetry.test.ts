@@ -1187,8 +1187,8 @@ test('window retirement cancels each runtime turn while an unexpected socket los
         : runtime === 'antigravity' ? new AntigravitySession(ws, windowId, undefined, undefined, undefined, undefined, undefined)
         : new OpenCodePanelSession(ws, { windowId, folder: '/workspace' }, {
           models: async () => [], client: async () => new Promise<never>(() => {}),
-          beginTurn() {}, endTurn() {}, tools: () => [], complete: async () => '',
-          runTool: async () => ({ text: '', tool: '', model: '' }), onExit: () => () => {}, close: async () => {},
+          beginTurn() {}, endTurn() {}, complete: async () => '',
+          onExit: () => () => {}, close: async () => {},
         });
       const turn_id = crypto.randomUUID();
       f.service.capture({ event: 'agent_turn_started', runtime, turn_id });

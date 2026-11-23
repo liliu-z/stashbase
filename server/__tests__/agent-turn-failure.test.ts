@@ -73,7 +73,6 @@ test('hosted prerequisites and native signed-out messages name the actual repair
   for (const message of [
     'client_upgrade_required',
     'StashBase 2.18.0 or newer is required.',
-    'Update StashBase to keep using the crew.',
   ]) assert.equal(classifyAgentTurnFailure(message), 'app-outdated', message);
 });
 
