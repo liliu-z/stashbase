@@ -9,10 +9,8 @@
  */
 import { Circle, Plus, X } from 'lucide-react';
 import {
-  useCallback,
   useLayoutEffect,
   useRef,
-  useState,
   type KeyboardEvent,
   type MouseEvent,
   type ReactNode,
@@ -39,6 +37,7 @@ import { writeSourceDrag } from '@/shared/utils/source-drag';
 
 import { OpenTabsMenu } from './open-tabs-menu';
 import { DocumentTabMenu, useTabMenu, type DocumentTabMenuActions } from './tab-menu';
+import { useTabOverflow } from './use-tab-overflow';
 
 export interface DocumentTabsProps {
   className?: string;
@@ -80,34 +79,6 @@ function middleClickCloses(close: () => void) {
       if (event.button === 1) event.preventDefault();
     },
   };
-}
-
-/** Whether the list scrolls sideways because its tabs no longer fit. Read
- *  when the strip resizes and when the tabs change, since a tab added to a
- *  list already at its widest changes what it holds, not its box. */
-function useOverflowing(watch: unknown) {
-  const [overflowing, setOverflowing] = useState(false);
-  const list = useRef<HTMLDivElement | null>(null);
-  const observer = useRef<ResizeObserver | null>(null);
-  const measure = useCallback(() => {
-    const node = list.current;
-    setOverflowing(node ? node.scrollWidth > node.clientWidth + 1 : false);
-  }, []);
-  const ref = useCallback(
-    (node: HTMLDivElement | null) => {
-      observer.current?.disconnect();
-      observer.current = null;
-      list.current = node;
-      if (!node) return;
-      measure();
-      if (typeof ResizeObserver === 'undefined') return;
-      observer.current = new ResizeObserver(measure);
-      observer.current.observe(node);
-    },
-    [measure],
-  );
-  useLayoutEffect(measure, [measure, watch]);
-  return { overflowing, ref };
 }
 
 function tabLabel(name: string, dirty: boolean, preview: boolean): string {
@@ -190,7 +161,7 @@ export function DocumentTabs({
   const tabElements = useRef(new Map<string, HTMLButtonElement>());
   const newTabOpen = newTab?.open ?? false;
   // A rename can widen a tab as much as opening one can.
-  const strip = useOverflowing(
+  const strip = useTabOverflow(
     `${newTabOpen}:${tabs.map((tab) => sourceName(tab.source)).join('/')}`,
   );
 
@@ -285,7 +256,7 @@ export function DocumentTabs({
         <TabsList
           aria-label="Open documents"
           className="scrollbar-hide max-w-full overflow-x-auto"
-          ref={strip.ref}
+          ref={strip.listRef}
         >
           {tabs.map((tab) => {
             const document = runtime.getDocument(tab.id);
@@ -323,14 +294,25 @@ export function DocumentTabs({
         </TabsList>
       </Tabs>
       {strip.overflowing && (
-        <OpenTabsMenu
-          activeTabId={newTabOpen ? null : activeTabId}
-          onSelect={(tabId) => {
-            newTab?.close();
-            activate(tabId);
-          }}
-          tabs={tabs}
-        />
+        // The wrapper is what the overflow reading counts as the list's share
+        // of the row while it shows.
+        <div className="flex shrink-0" ref={strip.triggerRef}>
+          <OpenTabsMenu
+            activeTabId={newTabOpen ? null : activeTabId}
+            onSelect={(tabId) => {
+              newTab?.close();
+              // Activating the tab already in front changes nothing, so the
+              // effect that scrolls the active tab into view does not run.
+              if (tabId === activeTabId) {
+                tabElements.current
+                  .get(tabId)
+                  ?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+              }
+              activate(tabId);
+            }}
+            tabs={tabs}
+          />
+        </div>
       )}
       {plus}
       {menuTab && (
