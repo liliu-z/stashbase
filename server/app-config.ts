@@ -20,7 +20,6 @@ import type {
 import { normalizeAppearancePreferences } from '../shared/protocols/http/appearance.ts';
 import type { EmbedderProvider } from '../shared/embedding.ts';
 import type { HostedAccountOffer } from '../shared/account.ts';
-import type { DefaultAgentToolChoice } from '../shared/protocols/http/agent-tools.ts';
 import { normalizeHostedDisplayName, parseGoogleAvatarUrl } from './hosted-account-profile.ts';
 
 export type {
@@ -141,11 +140,6 @@ export interface AppConfigFile {
    * one runtime-level read, and no route accepts it from a request body. See
    * `agent-model-catalog.ts`. */
   agentModelCatalogs?: Partial<Record<'claude' | 'codex' | 'antigravity', AgentModelCatalog>>;
-  /** The Default Agent tools the reader attached, each with its hosted
-   * profile. Read through `default-agent-tools.ts`, which ignores a profile
-   * outside a tool's own list. */
-  defaultAgentTools?: Partial<Record<string, DefaultAgentToolChoice>>;
-  agentCrewChats?: Record<string, Partial<Record<string, DefaultAgentToolChoice>>>;
   /** Per project, whether each scheduled task is switched on and how its last
    *  run went. The tasks themselves live in the project's `.schedules.json`;
    *  `scheduled-tasks.ts` owns this record's shape. */

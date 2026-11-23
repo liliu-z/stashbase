@@ -134,7 +134,6 @@ export function WorkspacePanes({
             accountSignedIn={account.account?.signedIn ?? false}
             header={mode === 'documents'}
             scheduledTasks={dependencies.agent.scheduledTasks}
-            tools={dependencies.agent.tools}
             onOpenAgentSettings={() => settings.openSettings('agents')}
             onOpenAppSettings={() => settings.openSettings('general')}
             onOpenExternal={openExternal}

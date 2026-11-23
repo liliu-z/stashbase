@@ -25,10 +25,6 @@ import { errorDiagnostic } from '../error-diagnostics.ts';
 import { agentCliPath } from '../agent-cli.ts';
 import type { HostedAgentTurnModel } from '../hosted-agent-broker.ts';
 import type { HostedAgentProfile } from '../hosted-agent-models.ts';
-import { enabledAgentTools, setDefaultAgentTool, type EnabledAgentTool } from '../default-agent-tools.ts';
-import { parseToolCatalog } from '../agent-tool-catalog.ts';
-import { readAppConfigStrict, writeAppConfigStrict } from '../app-config.ts';
-import { crewCallHistory, forgetCrewCalls } from '../agent-crew-history.ts';
 import type { AgentAccessMode } from '../../shared/agent-runtime.ts';
 import { DIRECTORY_LINK } from './filesystem-links.ts';
 
@@ -63,9 +59,8 @@ function modeHarness(access: AgentAccessMode, folder = '/workspace', nativeStart
     },
     models: async () => [],
     ...(diagnostic ? { diagnostic } : {}),
-    beginTurn: () => {}, endTurn: () => {}, tools: () => [],
+    beginTurn: () => {}, endTurn: () => {},
     complete: async (model, messages, signal) => { reviews.push({ model, messages }); return review ? review(signal) : 'ASK'; },
-    runTool: async () => ({ text: '', tool: '', model: '' }),
     onExit: () => () => {}, close: async () => {},
   });
   return { ws, feed, session, prompts, replies, reviews,
@@ -217,17 +212,17 @@ test('a failed Stop reports its cause and releases the Default turn for retry', 
   assert.equal(harness.prompts.length, 2);
 });
 
-test('Stop keeps an aborted Crew call pending until acknowledgement and preserves cancellation in history', async (t) => {
+test('Stop keeps an aborted project tool call pending until acknowledgement and preserves cancellation in history', async (t) => {
   let acknowledge!: () => void;
   const acknowledgement = new Promise<void>(resolve => { acknowledge = resolve; });
   const h = modeHarness('default', '/workspace', true, false, undefined, undefined, () => acknowledgement);
   t.after(() => h.session.dispose());
   await settle();
-  h.send({ t: 'prompt', text: 'Draft with Writer' });
+  h.send({ t: 'prompt', text: 'Read the draft' });
   await settle();
   const part = { id: 'part', sessionID: 'mode-session', messageID: 'message', type: 'tool',
-    callID: 'crew-call', tool: 'stashbase_write_draft',
-    state: { status: 'running', input: { task: 'Draft' }, time: { start: 1 } } };
+    callID: 'read-call', tool: 'stashbase_read_file',
+    state: { status: 'running', input: { path: '/workspace/draft.md' }, time: { start: 1 } } };
   h.feed.emit('event', { type: 'message.part.updated', properties: { part } });
   await settle();
   h.send({ t: 'interrupt' });
@@ -621,7 +616,7 @@ test('the Default Agent publishes scope retirement once and contains a later nat
   }, {
     models: async () => [],
     client: async () => new Promise<never>(() => {}),
-    beginTurn: () => {}, endTurn: () => {}, tools: () => [], complete: async () => '', runTool: async () => ({ text: '', tool: '', model: '' }), onExit: () => () => {},
+    beginTurn: () => {}, endTurn: () => {}, complete: async () => '', onExit: () => () => {},
     close: () => { closed += 1; return closing; },
   });
   const termination = { kind: 'scope-removed' as const, folder: '/workspace' };
@@ -735,9 +730,7 @@ test('an unexpected bundled runtime exit terminates the panel with one diagnosti
     },
     beginTurn: () => {},
     endTurn: () => {},
-    tools: () => [],
     complete: async () => '',
-    runTool: async () => ({ text: '', tool: '', model: '' }),
     onExit(listener) {
       exitListener = listener;
       return () => { exitListener = null; };
@@ -998,7 +991,6 @@ const PROFILES: HostedAgentProfile[] = [
 
 function modelHarness(options: {
   profiles?: HostedAgentProfile[] | Error;
-  tools?: EnabledAgentTool[];
   resume?: string;
   model?: string;
   storedModel?: string;
@@ -1008,7 +1000,6 @@ function modelHarness(options: {
   const feed = new EventEmitter();
   const prompts: Array<{ model: { providerID: string; modelID: string } }> = [];
   const turns: Array<HostedAgentTurnModel | undefined> = [];
-  const toolCalls: Array<{ id: string; task: string }> = [];
   const session = new OpenCodePanelSession(ws as unknown as WebSocket, {
     windowId: 'model-window', folder: '/workspace', access: 'acceptEdits',
     ...(options.resume ? { resume: options.resume } : {}),
@@ -1050,11 +1041,9 @@ function modelHarness(options: {
     },
     beginTurn: (_turnId, model) => { turns.push(model); },
     endTurn: () => {}, onExit: () => () => {}, close: async () => {},
-    tools: () => options.tools ?? [],
     complete: async () => '',
-    runTool: async (id, task) => { toolCalls.push({ id, task: typeof task === 'string' ? task : await task() }); return { text: 'Drafted text.', tool: 'Writer', model: 'Writer Pro' }; },
   });
-  return { ws, feed, session, prompts, turns, toolCalls,
+  return { ws, feed, session, prompts, turns,
     send: (event: unknown) => ws.emit('message', Buffer.from(JSON.stringify(event))),
     finishTurn: () => feed.emit('event', { type: 'session.status', properties: { sessionID: 'model-session', status: { type: 'idle' } } }),
     events: () => ws.sent.map(value => JSON.parse(value) as { t: string; [key: string]: unknown }),
@@ -1149,55 +1138,6 @@ test('OpenCode config lists one model per hosted profile with its own limits', (
   assert.deepEqual(Object.keys(legacy.provider!.stashbase!.models!), ['stashbase-agent-default']);
 });
 
-function fixtureWriter(): EnabledAgentTool {
-  const catalog = parseToolCatalog({
-    schemaVersion: 2,
-    revision: 'r',
-    models: [{ id: 'opus', version: 9, name: 'Opus', relativeCost: 5, contextTokenLimit: 200_000, outputTokenLimit: 32_000, availability: { status: 'available' } }],
-    tools: [{ id: 'writer', kind: 'agent-role', version: 3, name: 'Writer', summary: 'Drafts', icon: 'pen-line', availability: { status: 'available' },
-      modelIds: ['opus'], defaultModelId: 'opus', agent: { toolName: 'write_draft', description: 'Writes the draft.' } }],
-  });
-  setDefaultAgentTool(catalog, 'writer', { enabled: true });
-  const [writer] = enabledAgentTools(catalog);
-  writeAppConfigStrict({ ...readAppConfigStrict(), defaultAgentTools: {} });
-  return writer!;
-}
-
-test('an enabled tool is exposed to the main agent with its description, and nothing can start a sub-agent', () => {
-  const writer = fixtureWriter();
-  const config = buildOpenCodeConfig({ apiKey: 'k', baseUrl: 'http://127.0.0.1:1/v1', model: 'stashbase-agent-default' },
-    '/mcp', { STASHBASE_WINDOW_ID: 'w' }, PROFILES, undefined, [writer]);
-  const agents = config.agent as Record<string, Record<string, unknown>>;
-  const permission = config.permission as Record<string, unknown>;
-  assert.equal(permission.task, 'deny');
-  assert.equal(permission.stashbase_write_draft, 'allow');
-  assert.equal((agents['stashbase-plan']!.permission as Record<string, string>).stashbase_write_draft, 'allow');
-  const prompt = String(agents['stashbase-folder']!.prompt);
-  assert.match(prompt, /<stashbase_crew>[\s\S]*Writer: `write_draft`/);
-  assert.doesNotMatch(prompt, /review_draft/, 'only the tools that are on are described');
-  const environment = (config.mcp!.stashbase as { environment?: Record<string, string> }).environment!;
-  assert.equal(environment.STASHBASE_WINDOW_ID, 'w');
-  assert.deepEqual(JSON.parse(environment.STASHBASE_AGENT_TOOLS!),
-    [{ id: 'writer', name: 'Writer', toolName: 'write_draft', description: 'Writes the draft.' }]);
-  assert.ok(!Object.values(agents).some((agent) => agent.mode === 'subagent'));
-
-  const plain = buildOpenCodeConfig({ apiKey: 'k', baseUrl: 'http://127.0.0.1:1/v1', model: 'stashbase-agent-default' }, '/mcp');
-  assert.equal((plain.permission as Record<string, unknown>).stashbase_write_draft, undefined);
-  assert.doesNotMatch(String((plain.agent as Record<string, { prompt?: string }>)['stashbase-folder']!.prompt), /write_draft|stashbase_tools/);
-});
-
-test('an enabled tool runs only inside the chat\'s turn, through the turn\'s own runtime', async (t) => {
-  const harness = modelHarness({ tools: [fixtureWriter()] });
-  t.after(() => harness.session.dispose());
-  await settle();
-  await assert.rejects(harness.session.runTool('writer', 'Draft it.'), /only inside an agent turn/);
-  assert.deepEqual(harness.toolCalls, []);
-  harness.send({ t: 'prompt', text: 'Write a post.' });
-  await settle();
-  assert.deepEqual(await harness.session.runTool('writer', 'Draft it.'), { text: 'Drafted text.', tool: 'Writer', model: 'Writer Pro' });
-  assert.deepEqual(harness.toolCalls, [{ id: 'writer', task: 'Draft it.' }]);
-});
-
 test('unknown model completion retains native finish evidence and the upstream stream failure on its turn', async (t) => {
   const { telemetry } = await import('../telemetry.ts');
   const captured: any[] = [];
@@ -1224,23 +1164,4 @@ test('unknown model completion retains native finish evidence and the upstream s
   assert.match(JSON.stringify(failure.diagnostic), /gateway-request-42/);
   assert.match(JSON.stringify(failure.diagnostic), /UND_ERR_SOCKET/);
   assert.doesNotMatch(JSON.stringify(failure.diagnostic), /PRIVATE PROMPT/);
-});
-
-
-test('crew attribution is captured on a call and retained independently of later choices', async (t) => {
-  const selected = fixtureWriter();
-  const harness = modelHarness({ tools: [selected] });
-  t.after(() => { harness.session.dispose(); forgetCrewCalls('model-session'); });
-  await settle();
-  harness.send({ t: 'prompt', text: 'Write the draft' });
-  await settle();
-  harness.feed.emit('event', { type: 'message.part.updated', properties: { part: {
-    type: 'tool', id: 'part-crew', sessionID: 'model-session', messageID: 'assistant-crew', callID: 'crew-1',
-    tool: 'stashbase_write_draft', state: { status: 'running', input: { task: 'Write the draft' }, time: { start: Date.now() } },
-  } } });
-  await settle();
-  const expected = { id: 'writer', label: 'Writer', icon: 'pen-line', model: 'Opus' };
-  assert.deepEqual(harness.events().find(event => event.t === 'tool')?.crew, expected);
-  selected.model.name = 'A later catalog name';
-  assert.deepEqual(crewCallHistory('model-session')['crew-1'], expected);
 });

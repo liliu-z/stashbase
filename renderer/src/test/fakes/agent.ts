@@ -8,9 +8,6 @@ import type {
   AgentCatalogPort,
   AgentConnectionListener,
   AgentContextPort,
-  AgentTool,
-  AgentToolChange,
-  AgentToolsPort,
   AgentSessionPort,
 } from '@/features/agent/application/ports';
 import type { Agent, AgentAbilities } from '@/features/agent/domain/agent-catalog';
@@ -104,47 +101,6 @@ export function idleAgentSessionPort(overrides: Partial<AgentSessionPort> = {}):
     connect: vi.fn(() => ({ close: vi.fn(), send: vi.fn(() => true) })),
     ...overrides,
   }).port;
-}
-
-const FAKE_TOOLS = [
-  { id: 'writer', label: 'Writer', icon: 'pen-line' },
-  { id: 'reviewer', label: 'Reviewer', icon: 'search-check' },
-  { id: 'reader', label: 'Reader', icon: 'book-open' },
-  { id: 'humanizer', label: 'Humanizer', icon: 'sparkle' },
-] as const;
-
-const TOOL_OPTIONS = [
-  { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5', available: true, reason: null },
-  { id: 'claude-opus-5-5', label: 'Claude Opus 5.5', available: true, reason: null },
-];
-
-/** Default's tools, every one off on its default model until a test
- *  changes it. */
-export function agentToolsApi(
-  initial: Partial<Record<string, AgentToolChange>> = {},
-): AgentToolsPort {
-  let choices = { ...initial };
-  const tools = (): AgentTool[] =>
-    FAKE_TOOLS.map(({ id, label, icon }) => ({
-      id,
-      label,
-      toolName: `${id}_draft`,
-      summary: `${label} summary`,
-      icon,
-      enabled: choices[id]?.enabled ?? false,
-      unavailable: null,
-      model: choices[id]?.model ?? 'claude-sonnet-5-5',
-      modelProblem: null,
-      defaultModel: 'claude-sonnet-5-5',
-      options: TOOL_OPTIONS,
-    }));
-  return {
-    list: vi.fn(async () => tools()),
-    set: vi.fn(async (id: AgentTool['id'], change: AgentToolChange) => {
-      choices = { ...choices, [id]: { ...choices[id], ...change } };
-      return tools();
-    }),
-  };
 }
 
 export function agentCatalogPort(

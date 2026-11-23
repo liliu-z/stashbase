@@ -98,36 +98,3 @@ export function createHttpProjectOperations(
     delete: (path) => json(`${webBase}/api/project/file?${pathQuery(path)}`, { method: 'DELETE', headers: headers() }),
   };
 }
-
-/** A Default Agent tool call, attributed to the chat that attached it. The
- * host reads the files within that chat's project and runs the model. */
-export async function callAgentTool(
-  webBase: string,
-  tool: string,
-  args: Record<string, unknown>,
-  windowId?: string,
-  agentSessionId?: string,
-  signal?: AbortSignal,
-): Promise<{ text: string; model: string; tool?: string }> {
-  const response = await fetch(`${webBase}/api/project/agent-tools/${tool}`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      ...(windowId != null ? { 'x-stashbase-window-id': windowId } : {}),
-      ...(agentSessionId != null ? { [AGENT_SESSION_ID_HEADER]: agentSessionId } : {}),
-    },
-    body: JSON.stringify(args),
-    // A stopped turn cancels the MCP request, and with it the generation:
-    // the host aborts the model call when this connection closes.
-    ...(signal ? { signal } : {}),
-  });
-  const payload = await response.json().catch(() => ({})) as { text?: unknown; model?: unknown; tool?: unknown; error?: unknown };
-  if (!response.ok || typeof payload.text !== 'string') {
-    throw new Error(typeof payload.error === 'string' ? payload.error : `StashBase request failed: ${response.status}`);
-  }
-  return {
-    text: payload.text,
-    model: typeof payload.model === 'string' ? payload.model : 'the tool model',
-    ...(typeof payload.tool === 'string' ? { tool: payload.tool } : {}),
-  };
-}

@@ -295,7 +295,6 @@ export function createAgentSessionRuntime({
       }
     },
     setAccessMode: controls.setAccessMode,
-    refreshTools: controls.refreshTools,
     setEffort: controls.setEffort,
     setModel: controls.setModel,
     setSkill(skill) {

@@ -79,8 +79,6 @@ export interface AgentSessionRuntime {
   steer(text: string): void;
   setAccessMode(mode: AgentAccessMode): void;
   setEffort(effort: string | null): void;
-  /** Reloads tool configuration on the same started conversation after Crew changes. */
-  refreshTools(): void;
   setModel(model: string | null): void;
   /** Arms a catalog skill for the next turn, or disarms with null. */
   setSkill(skill: string | null): void;

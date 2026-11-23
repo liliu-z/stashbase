@@ -1716,6 +1716,12 @@ Host/services: `server/file-save.ts`, `server/text-file-transaction.ts`,
   to prose and between two code blocks. Computed line and gutter backgrounds
   were the hover color only in the focused editor and transparent otherwise;
   refocusing restored the highlight. The light composition was inspected by eye.
+
+  A macOS arm64 built-app pass (2026-11-23) clicked within text and typed at
+  the caret in the shared composer, plain text, and JSON Source. In the default
+  light theme the painted darker caret measured 6.17:1 in the composer and
+  5.52:1 against the highlighted line in both source editors. The computed dark
+  caret kept the focus color.
 - **JSON views and Find focus (2026-10-28):** JSON shows one view at a time, a
   read-only outline or the editable source, behind one Preview/Source control;
   both stay mounted. Find leaves focus in its field in either view: the code
@@ -2810,45 +2816,15 @@ completion, malformed/error frames, broken streams and turn isolation without
 capturing prompt or generated text. These controlled streams do not establish a
 live provider's error shape or packaged delivery.
 
-- **Default Crew (2026-10-13):** The main model comes from `/v1/agent/models`;
-  selected members come from `/v2/agent/tools`. `agent-tool-catalog.ts` owns the
-  account-scoped ETag cache; `default-agent-tools.ts` owns chat choices, new-chat
-  defaults, briefing, and catalog/turn snapshots. `/api/agent-tools` requires a
-  chat identity. `opencode-runtime.ts` registers selected members through MCP,
-  disables native sub-agents, and permits text-only Crew work in Plan. Published
-  descriptions define responsibilities; common prompt rules honor the current
-  request and avoid unsolicited rewrite cycles. `agent-crew-history.ts` persists
-  call attribution, carried by socket/history protocols to `role-call.tsx`.
-  `use-agent-tools.ts` owns optimistic per-chat choices, serialized saves,
-  rollback and visible errors; saving blocks Send.
-
-  Catalog/MCP tests cover availability, model selection, chat isolation, defaults,
-  removed members, ETag/account isolation and immutable turn snapshots. Broker
-  tests cover v2 selection headers, root budgets, sign-in retry, refusal codes,
-  and rejecting length-limited or incomplete SSE output. Panel tests cover
-  selected MCP registration, Plan, active-turn ownership and persisted attribution.
-  The reproduced Stop/version-refresh race is fixed by capturing cancellation and
-  turn identity before preparation; a regression proves no old-call retry after
-  Stop. Renderer hook tests cover failed-save rollback, retry, overlap prevention,
-  and late responses after changing chats. Transcript tests/Stories cover running,
-  successful and failed Crew cards with complete results and fixed model labels.
-  A built macOS desktop with an isolated empty project and the live deployed
-  gateway was driven through discussion (no member call), one Writer draft
-  (Opus: 563 input/757 output tokens), and Plan review of that unsaved draft
-  (one Reviewer call, GPT-6.1 Sol: 443 input/460 output tokens; no rewrite).
-  Writer and Reviewer cards and complete results were inspected by eye.
-  A subsequent live Writer call was stopped: the card showed Stopped, history
-  reopening retained its model/status, and the next turn replied successfully.
-  Changing a new chat to Reviewer alone left the old chat's Writer/Reviewer
-  choice intact. Native abort events now settle as cancellation after the abort
-  acknowledgement, with a focused regression for the error/idle ordering.
-  This pass also exposed and fixed the MCP launcher's lost custom host port;
-  the live round trip succeeded on port 8196 after the fix. The live gateway
-  still served catalog 1; service migration 23 for responsibility-only member
-  descriptions is committed separately but deployment remains unverified.
-  These examples establish the exercised routing and handoff, not general
-  writing quality, pricing, or provider cache efficiency.
-  A root snapshot lives only for its turn; process restart does not resume a turn.
+- **Crew retirement (2026-11-23):** Default's composer and host no longer
+  configure specialist calls. `opencode-runtime.ts` reads only the main model
+  catalog and the stdio MCP host exposes built-in project operations.
+  Existing native conversations still reopen with their stored messages and
+  ordinary tool activity. The bundled-runtime prewarm test exercises an existing
+  installation with retired settings, native session reopening, and a changed
+  main model catalog. The composer test covers Default's available options.
+  Broker tests exercise incomplete Auto permission reviews and the regular
+  hosted turn. These fixtures do not exercise a live gateway or provider login.
 
 - **Low-credit calls (2026-10-11):** the hosted API's account-locked reservation
   reduces output to fit account/monthly and turn capacity while retaining input
@@ -3657,10 +3633,9 @@ Project choice and first Send: `renderer/src/features/agent/application/project-
   change strategy.
   Persona was retired on 2026-11-20: composer controls, library, Gallery entries,
   preferences, replay metadata, and runtime injection are removed. Default role,
-  project instructions, model/effort choices, and Crew remain.
-  `agent.test.ts` and `codex-agent.test.ts` verify shared role/policy composition;
-  `session-runtime.test.ts` verifies tool refresh retains the native conversation
-  and does not start an untouched draft. An isolated built-app pass on 2026-11-20
+  project instructions, and model/effort choices remain.
+  `agent.test.ts` and `codex-agent.test.ts` verify shared role/policy composition.
+  An isolated built-app pass on 2026-11-20
   confirmed the composer has no Persona control, attachment-to-provider Tab focus
   remains visible, and voice and Send controls remain available. No external
   provider login was exercised for this retirement. The controlled bundled-runtime

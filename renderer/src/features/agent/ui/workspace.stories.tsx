@@ -3,7 +3,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useMemo } from 'react';
 import { expect, screen, userEvent, waitFor } from 'storybook/test';
 
-import type { AgentToolChange, AgentToolsPort } from '@/features/agent/application/ports';
 import { AgentHistoryError } from '@/features/agent/application/ports';
 import { createAgentWorkspaceRuntime } from '@/features/agent/application/workspace-runtime';
 import type {
@@ -14,66 +13,6 @@ import type {
 import { cn } from '@/lib/utils';
 
 import ManagedAgentWorkspace from './workspace';
-
-/** Default with every tool off, the state a new reader starts in. A change
- *  is kept for the story's life so the menu can be walked through. */
-const STORY_TOOLS = [
-  {
-    id: 'writer',
-    label: 'Writer',
-    summary: 'Drafts and revises prose',
-    icon: 'pen-line',
-    model: 'claude-opus-5-5',
-  },
-  {
-    id: 'reviewer',
-    label: 'Reviewer',
-    summary: 'Suggests fixes to a draft',
-    icon: 'search-check',
-    model: 'gpt-6-1-sol',
-  },
-  {
-    id: 'reader',
-    label: 'Reader',
-    summary: 'Reads a draft as its audience would',
-    icon: 'book-open',
-    model: 'gpt-6-1-sol',
-  },
-  {
-    id: 'humanizer',
-    label: 'Humanizer',
-    summary: 'Makes prose read naturally',
-    icon: 'sparkle',
-    model: 'claude-sonnet-5-5',
-  },
-] as const;
-
-const storyToolChoices: Partial<Record<string, AgentToolChange>> = {};
-const storyToolList = () =>
-  STORY_TOOLS.map(({ id, label, summary, icon, model }) => ({
-    id,
-    label,
-    toolName: `${id}_draft`,
-    summary,
-    icon,
-    enabled: storyToolChoices[id]?.enabled ?? false,
-    unavailable: null,
-    model: storyToolChoices[id]?.model ?? model,
-    modelProblem: null,
-    defaultModel: model,
-    options: [
-      { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5', available: true, reason: null },
-      { id: 'gpt-6-1-sol', label: 'GPT-6.1 Sol', available: true, reason: null },
-      { id: 'claude-opus-5-5', label: 'Claude Opus 5.5', available: true, reason: null },
-    ],
-  }));
-const storyTools: AgentToolsPort = {
-  list: async () => storyToolList(),
-  set: async (id, change) => {
-    storyToolChoices[id] = { ...storyToolChoices[id], ...change };
-    return storyToolList();
-  },
-};
 
 const abilities: Agent['abilities'] = {
   attachments: true,
@@ -109,7 +48,14 @@ const agents: Agent[] = [
     availableVersion: '0.163.0',
   },
   { abilities, id: 'claude', label: 'Claude', models: [], needsSignIn: false, ready: true },
-  { abilities, id: 'stashbase', label: 'Default', models: [], needsSignIn: false, ready: true },
+  {
+    abilities: { ...abilities, effort: false, models: false, skills: false, steering: false },
+    id: 'stashbase',
+    label: 'Default',
+    models: [],
+    needsSignIn: false,
+    ready: true,
+  },
 ];
 
 /** The same runtimes before any of them can carry a turn: one waiting on
@@ -494,7 +440,6 @@ function WorkspacePreview({
                 };
               },
             }}
-            tools={storyTools}
             onOpenExternal={() => undefined}
             onOpenAgentSettings={() => undefined}
             onSignIn={() => undefined}

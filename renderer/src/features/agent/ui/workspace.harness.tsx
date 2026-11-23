@@ -19,20 +19,13 @@ import type {
   AgentCatalogPort,
   AgentContextPort,
   AgentSessionPort,
-  AgentToolsPort,
 } from '@/features/agent/application/ports';
 import {
   createAgentWorkspaceRuntime,
   type AgentWorkspaceRuntime,
 } from '@/features/agent/application/workspace-runtime';
 import type { Agent } from '@/features/agent/domain/agent-catalog';
-import {
-  agentCatalogPort,
-  agentToolsApi,
-  BUILT_IN_AGENT,
-  CLAUDE_AGENT,
-  CODEX_AGENT,
-} from '@/test/fakes/agent';
+import { agentCatalogPort, BUILT_IN_AGENT, CLAUDE_AGENT, CODEX_AGENT } from '@/test/fakes/agent';
 import { createTestQueryClient, withQueryClient } from '@/test/query';
 
 import AgentChats from './chats/chats';
@@ -65,7 +58,6 @@ export function renderWorkspace(
   onReprocess?: (source: { folderPath: string; path: string }) => void,
   catalogOverrides: Partial<AgentCatalogPort> = {},
   onSignIn: (signal?: AbortSignal) => void | Promise<boolean> = vi.fn(),
-  tools: AgentToolsPort = agentToolsApi(),
 ) {
   let id = 0;
   const runtime = createAgentWorkspaceRuntime({
@@ -95,7 +87,6 @@ export function renderWorkspace(
         <ManagedAgentWorkspace
           onOpenAppSettings={onOpenAppSettings}
           catalog={catalog}
-          tools={tools}
           onOpenAgentSettings={onOpenAgentSettings}
           onOpenExternal={vi.fn()}
           onSignIn={onSignIn}
