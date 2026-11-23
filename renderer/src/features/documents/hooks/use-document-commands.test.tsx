@@ -174,6 +174,37 @@ describe('document commands composition', () => {
     tabs.dispose();
   });
 
+  it('opens a numbered document from New tab and closes New tab', async () => {
+    for (const [key, expected] of [
+      ['2', 'tab-2'],
+      ['9', 'tab-3'],
+    ] as const) {
+      const tabs = threeTabs('tab-1');
+      const newTab = { close: vi.fn(), open: true };
+      const { unmount } = renderHook(() => useDocumentCommands(tabs.navigation, tabs, { newTab }));
+
+      // Unmounted even when an expectation fails, so its listener cannot
+      // answer the chords of the tests after it.
+      try {
+        expect(dispatchCommand(key).defaultPrevented).toBe(true);
+        expect(newTab.close).toHaveBeenCalledOnce();
+        await vi.waitFor(() => expect(tabs.store.getState().activeTabId).toBe(expected));
+      } finally {
+        unmount();
+        tabs.dispose();
+      }
+    }
+
+    // A number past the open documents names nothing, so New tab stays.
+    const tabs = threeTabs('tab-1');
+    const newTab = { close: vi.fn(), open: true };
+    const { unmount } = renderHook(() => useDocumentCommands(tabs.navigation, tabs, { newTab }));
+    expect(dispatchCommand('4').defaultPrevented).toBe(false);
+    expect(newTab.close).not.toHaveBeenCalled();
+    unmount();
+    tabs.dispose();
+  });
+
   it('steps from New tab, which sits last, to the first or last document and closes it', async () => {
     for (const [options, expected] of [
       [{}, 'tab-1'],

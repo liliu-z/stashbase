@@ -15,6 +15,16 @@ function tabStep(event: KeyboardEvent): -1 | 0 | 1 {
   return 0;
 }
 
+/** The tab a Cmd/Ctrl+number chord names, or null when it names none:
+ *  1–8 are that tab and 9 the last, as in browsers. A number past the open
+ *  tabs names nothing, so the chord is left to the page. Alt+digit is the
+ *  editor's heading shortcut and Shift+digit a symbol. */
+function numberedTab<T>(event: KeyboardEvent, open: readonly T[]): T | null {
+  if ((!event.metaKey && !event.ctrlKey) || event.altKey || event.shiftKey) return null;
+  if (!/^[1-9]$/u.test(event.key)) return null;
+  return (event.key === '9' ? open.at(-1) : open[Number(event.key) - 1]) ?? null;
+}
+
 /** The Documents keyboard contract: Cmd/Ctrl+W closes the active tab, Ctrl+Tab
  *  and Ctrl+Shift+Tab (or Ctrl+PageDown/PageUp) move to the next or previous
  *  tab, wrapping at the ends, Cmd/Ctrl+1–8 open that tab and Cmd/Ctrl+9 the
@@ -40,13 +50,17 @@ export function useDocumentCommands(
         // The New tab sits after every document, so the next tab is the
         // first document and the previous one the last; choosing either
         // closes the New tab, as a click on a document tab does.
+        // A numbered chord names its document directly, and closes the New
+        // tab the same way.
         const fromNewTab = tabStep(event);
         const open = tabs?.store.getState().tabs ?? [];
-        if (fromNewTab !== 0 && tabs && open.length > 0) {
+        const landing =
+          numberedTab(event, open) ??
+          (fromNewTab === 0 ? null : fromNewTab === 1 ? open[0] : open.at(-1));
+        if (landing && tabs) {
           event.preventDefault();
-          const landing = fromNewTab === 1 ? open[0] : open.at(-1);
           newTab.close();
-          if (landing) void tabs.activate(landing.id);
+          void tabs.activate(landing.id);
           return;
         }
         if (
@@ -76,12 +90,8 @@ export function useDocumentCommands(
       }
       if ((!event.metaKey && !event.ctrlKey) || event.altKey) return;
       const key = event.key.toLowerCase();
-      if (/^[1-9]$/u.test(key) && !event.shiftKey && tabs) {
-        // Cmd/Ctrl+1–8 open that tab and Cmd/Ctrl+9 the last one, as in
-        // browsers. A number past the open tabs leaves the chord to the page.
-        const open = tabs.store.getState().tabs;
-        const numbered = key === '9' ? open.at(-1) : open[Number(key) - 1];
-        if (!numbered) return;
+      const numbered = tabs ? numberedTab(event, tabs.store.getState().tabs) : null;
+      if (numbered && tabs) {
         event.preventDefault();
         void tabs.activate(numbered.id);
         return;
