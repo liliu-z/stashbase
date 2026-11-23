@@ -26,12 +26,12 @@ const codeSurfaceTheme = EditorView.theme({
     backgroundColor: 'var(--hover)',
   },
   '.cm-content': {
-    caretColor: 'var(--foreground)',
+    caretColor: 'var(--editor-caret)',
     fontFamily: 'var(--code-font, var(--font-mono))',
     lineHeight: '1.55',
     padding: '12px 0 64px',
   },
-  '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--foreground)' },
+  '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--editor-caret)' },
   '.cm-gutters': {
     backgroundColor: 'transparent',
     borderRight: '0',

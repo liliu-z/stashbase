@@ -1716,6 +1716,12 @@ Host/services: `server/file-save.ts`, `server/text-file-transaction.ts`,
   to prose and between two code blocks. Computed line and gutter backgrounds
   were the hover color only in the focused editor and transparent otherwise;
   refocusing restored the highlight. The light composition was inspected by eye.
+
+  A macOS arm64 built-app pass (2026-11-23) clicked within text and typed at
+  the caret in the shared composer, plain text, and JSON Source. In the default
+  light theme the painted darker caret measured 6.17:1 in the composer and
+  5.52:1 against the highlighted line in both source editors. The computed dark
+  caret kept the focus color.
 - **JSON views and Find focus (2026-10-28):** JSON shows one view at a time, a
   read-only outline or the editable source, behind one Preview/Source control;
   both stay mounted. Find leaves focus in its field in either view: the code
