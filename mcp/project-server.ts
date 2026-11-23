@@ -19,9 +19,7 @@ import {
 import type { ProjectOperations } from '../server/project-operations/index.ts';
 import { writeDiagnosticErrorIds } from '../server/write-diagnostic-context.ts';
 import { parseProjectFileLineBound } from '../server/project-file-reader.ts';
-import type { McpAgentTool } from '../server/default-agent-tools.ts';
-import { AGENT_TOOL_MAX_FILES } from '../shared/protocols/http/agent-tools.ts';
-import { callAgentTool, createHttpProjectOperations } from './project-operations-http.ts';
+import { createHttpProjectOperations } from './project-operations-http.ts';
 import {
   parseSearchMode,
   toRetrievalMode,
@@ -43,17 +41,9 @@ export interface ProjectMcpServerOptions {
   agentSessionId?: string;
   /** Direct in-process adapter used by the app's HTTP MCP transport. */
   operations?: ProjectOperations;
-  /** The Default Agent tools its chat enabled, by the catalog's function
-   * names and descriptions. Only the stdio host a Default chat spawns lists
-   * them. */
-  agentTools?: readonly McpAgentTool[];
-  /** How often a running crew call reports progress; tests shorten it. */
-  agentToolProgressMs?: number;
 }
 
 const DEFAULT_TOP_K = 8;
-/** Well inside the runtime's per-request MCP timeout. */
-const AGENT_TOOL_PROGRESS_MS = 5_000;
 const MAX_TOP_K = 25;
 
 export function createProjectMcpServer(opts: ProjectMcpServerOptions): Server {
@@ -73,43 +63,14 @@ export function createProjectMcpServer(opts: ProjectMcpServerOptions): Server {
     },
   );
 
-  // A catalog name that collides with a built-in tool is not registered, so
-  // a published tool can never shadow a project operation.
-  const agentTools = (opts.agentTools ?? [])
-    .filter((tool) => !BUILTIN_TOOLS.some((builtin) => builtin.name === tool.toolName))
-    .map((tool) => ({ id: tool.id, label: tool.name, name: tool.toolName, description: tool.description, inputSchema: AGENT_TOOL_INPUT }));
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: [...BUILTIN_TOOLS, ...agentTools.map(({ id: _id, label: _label, ...tool }) => tool)],
+    tools: BUILTIN_TOOLS,
   }));
 
-  server.setRequestHandler(CallToolRequestSchema, async (req, extra) => {
+  server.setRequestHandler(CallToolRequestSchema, async (req) => {
     try {
     const args = (req.params.arguments ?? {}) as Record<string, unknown>;
     const folder = typeof args.folder === 'string' && args.folder.trim() ? args.folder : undefined;
-
-    const agentTool = agentTools.find((tool) => tool.name === req.params.name);
-    if (agentTool) {
-      // A crew member's call is a whole model generation, far longer than
-      // the runtime's per-request MCP timeout. The runtime restarts that
-      // timeout on each progress notification, so the call reports progress
-      // while it runs instead of every tool getting a long timeout.
-      const progressToken = req.params._meta?.progressToken;
-      let progress = 0;
-      const heartbeat = progressToken === undefined ? undefined : setInterval(() => {
-        progress += 1;
-        void extra.sendNotification({
-          method: 'notifications/progress',
-          params: { progressToken, progress, message: `${agentTool.label} is working` },
-        }).catch(() => {});
-      }, opts.agentToolProgressMs ?? AGENT_TOOL_PROGRESS_MS);
-      let result;
-      try {
-        result = await callAgentTool(webBase, agentTool.id, args, windowId, agentSessionId, extra.signal);
-      } finally {
-        if (heartbeat) clearInterval(heartbeat);
-      }
-      return { content: [{ type: 'text', text: result.text }] };
-    }
 
     if (req.params.name === 'list_projects') {
       const info = await operations.info();
@@ -278,48 +239,6 @@ function annotateSearchHitsForMcp(hits: unknown[]): unknown[] {
       ...obj,
       read_hint: 'Use read_file on this PDF path; StashBase returns extracted Markdown when conversion has completed.',
     };
-  });
-}
-
-/** The brief every Default tool takes, the same for all of them; what a
- * tool needs in its context is said in its description. The server
- * validates the same shape (`agentToolBriefSchema`). */
-const AGENT_TOOL_INPUT = {
-  type: 'object',
-  properties: {
-    task: {
-      type: 'string',
-      description: 'The job, stated so it stands on its own.',
-    },
-    context: {
-      type: 'string',
-      description: 'What the job depends on that is not in the files, as the tool\'s description asks: decisions settled with the user, constraints, and anything that changes the result.',
-    },
-    files: {
-      type: 'array',
-      items: { type: 'string' },
-      maxItems: AGENT_TOOL_MAX_FILES,
-      description: 'Absolute paths of the project files the job uses, included in full. List only those.',
-    },
-  },
-  required: ['task'],
-  additionalProperties: false,
-} as const;
-
-/** The enabled tools a Default chat hands its MCP host, as JSON in
- * `STASHBASE_AGENT_TOOLS`. Anything unreadable registers nothing. */
-export function parseMcpAgentTools(raw: string | undefined): McpAgentTool[] {
-  if (!raw) return [];
-  let parsed: unknown;
-  try { parsed = JSON.parse(raw); } catch { return []; }
-  if (!Array.isArray(parsed)) return [];
-  return parsed.flatMap((entry) => {
-    const tool = entry as Partial<McpAgentTool> | null;
-    return tool && typeof tool.id === 'string' && typeof tool.name === 'string'
-      && typeof tool.toolName === 'string' && /^[a-z][a-z0-9_]{0,63}$/.test(tool.toolName)
-      && typeof tool.description === 'string' && tool.description
-      ? [{ id: tool.id, name: tool.name, toolName: tool.toolName, description: tool.description }]
-      : [];
   });
 }
 

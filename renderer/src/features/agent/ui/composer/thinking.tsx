@@ -25,7 +25,6 @@ import { ComposerMenuTrigger } from './menu-trigger';
 import { NARROWEST_LABEL } from './narrow';
 import { ModelMenu, modelDisplayName, type ThinkingState } from './thinking-models';
 import { effortLabel, rankedLevels, ThinkingSlider } from './thinking-slider';
-import { AgentToolsControl, type AgentToolsControlProps } from './tools';
 
 export interface AgentThinkingControlProps {
   activeAgent: Agent;
@@ -36,8 +35,6 @@ export interface AgentThinkingControlProps {
     };
   onEffortChange(effort: string | null): void;
   onModelChange(model: string | null): void;
-  /** Default's tools, which take the place of its model choice. */
-  tools: Pick<AgentToolsControlProps, 'api' | 'chat' | 'onChanged' | 'onSaving'>;
   /** Called when the trigger is pressed, so the catalog can be re-read. */
   onRequestCatalog(): void;
   runtimeUpdate?: AgentRuntimeUpdateView | undefined;
@@ -200,7 +197,6 @@ export function AgentThinkingControl({
   onRequestCatalog,
   runtimeUpdate,
   state,
-  tools,
 }: AgentThinkingControlProps) {
   const { effort, models } = activeAgent.abilities;
   const disabled = state.activeTurn;
@@ -217,9 +213,6 @@ export function AgentThinkingControl({
   const reading = effortName === null ? name : `${name}, ${effortName}`;
   const label = `Model and thinking: ${reading}`;
 
-  if (activeAgent.id === 'stashbase') {
-    return <AgentToolsControl key={tools.chat} {...tools} disabled={disabled} />;
-  }
   if (!effort && !models) return null;
 
   const trigger = (

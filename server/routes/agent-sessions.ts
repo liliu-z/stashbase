@@ -8,7 +8,6 @@ import {
   agentSessionReplaySchema,
 } from '../../shared/protocols/http/agent-sessions.ts';
 import { agentAdapter, resolveAgentSessionScope } from '../agent-contract.ts';
-import { forgetCrewChat } from '../default-agent-tools.ts';
 import { registeredFolderRoots } from '../folder.ts';
 import { sendError } from '../http.ts';
 
@@ -77,7 +76,6 @@ export function mount(app: express.Express): void {
   app.delete('/api/agents/:agent/sessions/:id', async (req, res) => {
     try {
       await historyFor(req.params.agent).remove(req.params.id, historyFolderOf(req));
-      if (req.params.agent === 'stashbase') forgetCrewChat(req.params.id);
       res.json(agentSessionEmptyResponseSchema.parse({}));
     } catch (err) {
       sendError(res, err);

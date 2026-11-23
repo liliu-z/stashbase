@@ -946,8 +946,8 @@ The updater re-enables the window and can be retried after the draft is resolved
   the tool-free classification with a 256-token output cap and a 30-second
   transport deadline, retaining its original turn for accounting. The five-second
   decision deadline never aborts that active request. Broker shutdown cancels
-  remaining drains; late answers cannot approve a later turn's action. Main agent
-  and Crew requests still abort when their turn ends.
+  remaining drains; late answers cannot approve a later turn's action. The main
+  agent's requests abort when their turn ends.
   Approval replies grant once, require a pending request id, and never persist
   an `always` grant across modes. Options stay frozen while a turn runs.
   The bundled runtime filters inherited credentials and injection flags while
@@ -1164,7 +1164,7 @@ data migration is not required by [maintenance policy](../MAINTENANCE.md#previou
 - OpenQuill receives a random session-local model broker credential, not
   account secrets. Model calls require an active submitted turn, retain its
   id/idempotency across the one auth-refresh retry, and cannot expose account
-  tokens in history. Turn/channel retirement cancels main agent/Crew body reads
+  tokens in history. Turn/channel retirement cancels main agent body reads
   and pending upstream work. Already dispatched Auto classifications drain under
   the bounded permission-review lifecycle above; awaited credential acquisition cannot forward a request after
   retirement. The broker buffers a bounded empty SSE prefix and retries an
@@ -1186,47 +1186,12 @@ data migration is not required by [maintenance policy](../MAINTENANCE.md#previou
   the native runtime message boundary. `server/hosted-agent-models.ts` reads
   the approved model profiles. Each OpenQuill chat reads them once at start
   and configures its OpenCode process with the same list, so stored prompts
-  name their profile and compaction uses that profile's limits. The main agent
-  always runs on the service's default profile. `server/agent-tool-catalog.ts`
-  reads the tool catalog (`GET /v2/agent/tools`): the tools, their published
-  names and descriptions, and a tool model pool independent of the main
-  agent's profiles, cached per account with the service's ETag (304 reuses it,
-  a failed refresh keeps a valid copy, sign-out clears it; without a copy,
-  selected Crew blocks startup and a chat without Crew can proceed). `server/default-agent-tools.ts` holds no tool of
-  its own: it resolves the chat's choices in app config `agentCrewChats` against a catalog.
-  `defaultAgentTools` seeds new chats only; a draft key transfers to the native
-  session id before it is announced. Deletion removes the chat's choices. It never
-  replaces an unusable pick or disabled default with another model, and owns
-  the rules every tool shares (the briefing, the brief format, and the tool
-  prompt, which uses the published responsibility and output description).
-  Shared instructions express the selected division of work, current-task
-  precedence, and necessary context, including unsaved drafts and evidence. Each chat takes a
-  catalog snapshot at start; each root turn copies it, so every role shares
-  one catalog version, and only a turn not yet bound by an accepted call may
-  move to a newer catalog, for the same tool on the same model, after
-  `agent_tool_version_changed`. An enabled tool reaches the main agent as a
-  StashBase MCP tool registered by the stdio host its chat spawns
-  (`STASHBASE_AGENT_TOOLS`, the catalog's function names and descriptions; a
-  name that collides with a built-in tool is not registered), with the shared
-  briefing added to the main agent's instructions; `task` is denied, so
-  OpenCode starts no sub-agent. A call goes to
-  `/api/project/agent-tools/:tool` under the chat's project scope; it runs far
-  longer than the runtime's per-request MCP timeout, so the MCP host sends a
-  progress notification every few seconds, which the runtime takes as a reason
-  to restart that timeout, and a cancelled request aborts the call. Turn identity and its abort signal
-  are captured before file reads and retained through catalog refresh/retry;
-  the host reads the named files there and the broker sends one completion to
-  `/v2/agent/chat/completions` under the root turn id, selected by the tool,
-  tool version, tool model, and tool model version headers and never by a main
-  profile. Direct completion requires a stop finish reason and the SSE DONE
-  marker; truncated and interrupted output fails instead of becoming a draft.
-  `server/agent-crew-history.ts` persists member/model attribution by native
-  session and call id in app data, independent of the mutable catalog. The
-  WebSocket and history protocols carry that metadata to standalone Crew cards.
-  Deleting the native chat removes its attribution. OpenCode's own requests and the Auto permission review run on the
-  turn's main profile over v1. Changed or withdrawn main profiles leave the
-  broker as 422, outside native retries, and classify as `model-changed`; tool
-  refusals keep the service code and never fall back to another model.
+  name their profile and compaction uses that profile's limits. Default uses the
+  service's default profile for its own requests and Auto permission review over
+  v1. OpenCode keeps native sub-agents disabled. The chat's stdio MCP host
+  exposes the same built-in project operations as the HTTP transport, bounded
+  by the chat's project scope. Changed or withdrawn model profiles leave the
+  broker as 422, outside native retries, and classify as `model-changed`.
   Versions, limits, and upstream identity stay in the host; the listing keeps
   the hosted catalog in memory only. Hosted quota/accounting and Stripe
   billing stay external; the API owns monthly credit grants and first-subscription

@@ -62,7 +62,6 @@ export function mount(container: HTMLElement, startupMs: number) {
           }),
           prepareAgent: async () => ({ agents: [] }),
         }}
-        tools={{ list: async () => [], set: async () => [] }}
         onOpenAgentSettings={() => {}}
         onOpenAppSettings={() => {}}
         onOpenExternal={() => {}}

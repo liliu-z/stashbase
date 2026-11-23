@@ -13,7 +13,6 @@ import type { ComponentProps } from 'react';
 import { createAgentPreferencesAdapter, type AgentPreferencesPort } from '@/features/agent/public';
 import {
   createAgentCatalogAdapter,
-  createAgentToolsAdapter,
   createAgentContextAdapter,
   createAgentSessionAdapter,
   createSpeechAdapter,
@@ -21,7 +20,6 @@ import {
   createScheduledRunsAdapter,
   createScheduledTasksAdapter,
   type AgentCatalogPort,
-  type AgentToolsPort,
   type AgentContextPort,
   type AgentSessionPort,
   type ScheduledRunsPort,
@@ -108,7 +106,6 @@ export interface AppDependencies {
     preferences?: AgentPreferencesPort;
     context: AgentContextPort;
     /** Default's optional model tools. */
-    tools: AgentToolsPort;
     session: AgentSessionPort;
     /** The project's scheduled tasks, for its task list. */
     scheduledTasks?: ScheduledTasksPort;
@@ -186,7 +183,6 @@ export function createDependencies(): AppDependencies {
         : {}),
       catalog: createAgentCatalogAdapter(http),
       preferences: createAgentPreferencesAdapter(http),
-      tools: createAgentToolsAdapter(http),
       context: createAgentContextAdapter(http, bridge.runtime.serverOrigin),
       session: createAgentSessionAdapter(http, bridge.runtime.serverOrigin),
       scheduledTasks: createScheduledTasksAdapter(http, bridge.scheduledTasks),

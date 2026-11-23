@@ -28,9 +28,7 @@ import {
 } from '../opencode-runtime.ts';
 import { telemetry } from '../telemetry.ts';
 import { telemetryEventSchema, type TelemetryEvent } from '../../shared/protocols/http/telemetry.ts';
-import { setHostedAccountSession } from '../app-config.ts';
-import { setDefaultAgentTool } from '../default-agent-tools.ts';
-import { parseToolCatalog } from '../agent-tool-catalog.ts';
+import { readAppConfigStrict, setHostedAccountSession, writeAppConfigStrict } from '../app-config.ts';
 
 type Event = LegacyEvent | EventPermissionAsked;
 
@@ -459,9 +457,7 @@ test('pinned bundled OpenCode completes one SDK session against a fake compatibl
     models: async () => SMOKE_PROFILES,
     client: async () => client,
     beginTurn: (turnId, selected) => broker.beginTurn('native-smoke', turnId, selected),
-    tools: () => [],
     complete: (profile, messages, signal) => broker.complete('native-smoke', profile, messages, signal),
-    runTool: async () => { throw new Error('No tools in this smoke.'); },
     endTurn: () => broker.endTurn('native-smoke'),
     onExit: () => () => {}, close: async () => {},
   });
@@ -813,6 +809,7 @@ test('prewarmed native chats retain attribution, refresh configuration and relea
     if (event.event === 'agent_runtime_stop_result') stops.push(event);
   });
   const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-warm-native-')));
+  const previousConfig = readAppConfigStrict();
   setHostedAccountSession({
     userId: 'warm-fixture', email: 'fixture@example.invalid', accessToken: 'fixture-only', sessionToken: 'fixture-only',
     expiresAt: Math.floor(Date.now() / 1000) + 3600,
@@ -820,34 +817,20 @@ test('prewarmed native chats retain attribution, refresh configuration and relea
   let profiles = SMOKE_PROFILES.map(profile => ({ ...profile,
     id: profile.isDefault ? profile.id : 'claude-sonnet-5-5',
   }));
-  let reads = 0;
-  const toolCatalog = parseToolCatalog({
-    schemaVersion: 2,
-    revision: 'smoke',
-    models: [{ id: 'claude-sonnet-5-5', version: 1, name: 'Claude Sonnet 5.5', relativeCost: 2.7, contextTokenLimit: 200_000,
-      outputTokenLimit: 64_000, availability: { status: 'available' } }],
-    tools: [{ id: 'writer', kind: 'agent-role', version: 1, name: 'Writer', summary: 'Drafts', icon: 'pen-line',
-      availability: { status: 'available' }, modelIds: ['claude-sonnet-5-5'], defaultModelId: 'claude-sonnet-5-5',
-      agent: { toolName: 'write_draft', description: 'Writes the draft.' } }],
-  });
+  const catalogReads: string[] = [];
   const originalFetch = globalThis.fetch;
   t.mock.method(globalThis, 'fetch', async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
     const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
+    if (url.hostname !== '127.0.0.1') catalogReads.push(url.pathname);
     if (url.pathname === '/v1/agent/models') {
-      reads++;
       return Response.json({ models: profiles });
-    }
-    if (url.pathname === '/v2/agent/tools') {
-      return Response.json({ schemaVersion: 2, revision: toolCatalog.revision, models: toolCatalog.models,
-        tools: toolCatalog.tools.map(tool => ({ ...tool, kind: 'agent-role' })) });
     }
     assert.equal(url.hostname, '127.0.0.1', 'startup must not make model or other external requests');
     return originalFetch(input, init);
   });
   t.after(async () => {
     await stopOpenCodeRuntime();
-    setHostedAccountSession(undefined);
-    setDefaultAgentTool(toolCatalog, 'writer', { enabled: false });
+    writeAppConfigStrict(previousConfig);
     fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   });
   const context = { windowId: 'warm-window', directory: root };
@@ -872,13 +855,17 @@ test('prewarmed native chats retain attribution, refresh configuration and relea
   second.endTurn();
   await new Promise<void>(resolve => setImmediate(resolve));
 
-  // A saved choice made after warm-up must reach the new chat even when
-  // the service's profiles themselves did not change.
-  setDefaultAgentTool(toolCatalog, 'writer', { enabled: true });
+  // An existing installation may have enabled Crew in previous chats.
+  const retiredPreferences = {
+    defaultAgentTools: { writer: { enabled: true, model: 'claude-sonnet-5-5' } },
+    agentCrewChats: { [secondSession.id]: { writer: { enabled: true, model: 'claude-sonnet-5-5' } } },
+  };
+  writeAppConfigStrict({ ...readAppConfigStrict(), ...retiredPreferences });
   const third = createOpenCodeSessionRuntime(context);
   const thirdClient = await third.client(root);
   const thirdConfig = (await thirdClient.config.get({ throwOnError: true })).data;
-  assert.deepEqual(JSON.parse((thirdConfig.mcp!.stashbase as typeof mcp).environment.STASHBASE_AGENT_TOOLS!).map((tool: { id: string }) => tool.id), ['writer']);
+  assert.equal((thirdConfig.mcp!.stashbase as typeof mcp).environment.STASHBASE_AGENT_TOOLS, undefined);
+  assert.equal((await thirdClient.session.get({ path: { id: secondSession.id }, throwOnError: true })).data.title, 'Second chat');
   third.endTurn();
   await new Promise<void>(resolve => setImmediate(resolve));
 
@@ -887,7 +874,8 @@ test('prewarmed native chats retain attribution, refresh configuration and relea
   const fourthClient = await fourth.client(root);
   const fourthConfig = (await fourthClient.config.get({ throwOnError: true })).data;
   assert.equal(fourthConfig.provider!.stashbase!.models!['stashbase-agent-default']!.limit!.output, 4096);
-  assert.equal(reads, 4, 'a new chat must revalidate the service catalog before using a spare');
+  assert.deepEqual(catalogReads, Array(4).fill('/v1/agent/models'),
+    'each chat revalidates the main model catalog, even when Crew was enabled');
   await assert.rejects(fourth.client(path.dirname(root)), /another project/);
   // Drive the production history owner through a real native startup timeout
   // and successful retry. Readiness and retirement must have separate timings.
