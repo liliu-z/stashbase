@@ -18,7 +18,8 @@ source mutations, saving, and release guarantees.
    Above the document, a breadcrumb names its project and the folders it sits
    in, so files that share a name stay apart. Choosing a folder shows it in
    Files. A file opened from outside the project names its directory only.
-2. Keep a preview or start editing to retain its tab. A tab's menu (right click,
+2. Keep a preview or start editing to retain its tab. A middle click closes a
+   tab as Close does. A tab's menu (right click,
    the menu key or Shift+F10) closes it, the others, those to its right, or all,
    each saving as Close does; the first tab that stays open for a draft question
    or a failed save stops the rest. It also shows the file in the system file

@@ -64,7 +64,6 @@
     "shared/protocols/electron/workspace-session.ts",
     "shared/protocols/http/agent-context.ts",
     "shared/protocols/http/agent-preferences.ts",
-    "shared/protocols/http/agent-tools.ts",
     "shared/protocols/http/agent-runtime.ts",
     "shared/protocols/http/agent-sessions.ts",
     "shared/protocols/http/appearance.ts",

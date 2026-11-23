@@ -96,12 +96,6 @@ export function createSessionControls({
       if (disposed() || state().composerFocusRequested === requested) return;
       transition({ kind: 'request-composer-focus', requested });
     },
-    /** Refresh Default tool configuration on this same conversation. */
-    refreshTools() {
-      const current = state();
-      if (disposed() || agentSessionIsBusy(current) || !isStarted()) return;
-      transport.open({ resume: current.nativeSessionId ?? undefined });
-    },
     setModel(model: Parameters<AgentSessionRuntime['setModel']>[0]) {
       const current = state();
       if (

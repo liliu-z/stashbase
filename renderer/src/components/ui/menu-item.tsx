@@ -24,7 +24,6 @@
  */
 'use client';
 
-import { ChevronDown } from 'lucide-react';
 import { forwardRef, type HTMLAttributes } from 'react';
 
 import { MenuItemCheck } from '@/components/internal/menu-item-check';
@@ -86,11 +85,6 @@ interface MenuItemProps extends HTMLAttributes<HTMLDivElement> {
    *  and draws a switch at its trailing edge. Activating the row flips it
    *  through `onSelect`. Not combined with `checked`. */
   switched?: boolean;
-  /** Makes the description a compact button with its own action, for a
-   *  row whose second line names a setting the reader can change (a crew
-   *  member's model). ArrowRight on the focused row runs it too, the way it
-   *  opens a submenu. `label` is the button's accessible name. */
-  descriptionAction?: { label: string; onSelect(): void };
   /** Whether activating the row closes the surface. The primitive's default
    *  (closing) is right for a choice and an action; a row that swaps the
    *  surface's own content for a deeper list passes false. */
@@ -116,7 +110,6 @@ const MenuItem = forwardRef<HTMLDivElement, MenuItemProps>(
       trailingAction,
       trailingIcon: TrailingIcon,
       switched,
-      descriptionAction,
       closeOnClick,
       destructive = false,
       className,
@@ -155,12 +148,6 @@ const MenuItem = forwardRef<HTMLDivElement, MenuItemProps>(
     const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
       onKeyDown?.(event);
       if (event.defaultPrevented || disabled) return;
-      if (descriptionAction && event.key === 'ArrowRight') {
-        event.preventDefault();
-        event.stopPropagation();
-        descriptionAction.onSelect();
-        return;
-      }
       if (trailingAction && (event.key === 'Delete' || event.key === 'Backspace')) {
         event.preventDefault();
         event.stopPropagation();
@@ -240,43 +227,18 @@ const MenuItem = forwardRef<HTMLDivElement, MenuItemProps>(
           ) : (
             labelText
           )}
-          {description && descriptionAction ? (
-            <button
-              aria-label={descriptionAction.label}
+          {description && (
+            <span
               className={cn(
                 sizeClasses.caption,
-                // The hover pill reaches past the text by its padding while
-                // the text stays on the label's edge; see footer actions.
-                shape.chip,
-                'relative mt-0.5 -ml-1 inline-flex w-fit max-w-full items-center gap-0.5 px-1 py-0.5 leading-[17px] font-normal text-muted-foreground outline-none',
-                'transition-colors duration-fast hover:bg-hover hover:text-foreground',
+                'font-normal text-muted-foreground',
+                inlineDescription
+                  ? 'min-w-0 truncate'
+                  : 'mt-1 block leading-[17px] whitespace-normal',
               )}
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                descriptionAction.onSelect();
-              }}
-              onPointerDown={(event) => event.stopPropagation()}
-              tabIndex={-1}
-              type="button"
             >
-              <span className="min-w-0 truncate">{description}</span>
-              <ChevronDown aria-hidden="true" className="shrink-0" size={12} strokeWidth={1.75} />
-            </button>
-          ) : (
-            description && (
-              <span
-                className={cn(
-                  sizeClasses.caption,
-                  'font-normal text-muted-foreground',
-                  inlineDescription
-                    ? 'min-w-0 truncate'
-                    : 'mt-1 block leading-[17px] whitespace-normal',
-                )}
-              >
-                {description}
-              </span>
-            )
+              {description}
+            </span>
           )}
         </span>
         {trailingAction && TrailingActionIcon && (
@@ -335,7 +297,7 @@ const MenuItem = forwardRef<HTMLDivElement, MenuItemProps>(
       ref: mergeRef,
       'data-proximity-index': index,
       'aria-label': accessibleLabel,
-      'aria-keyshortcuts': trailingAction ? 'Delete' : descriptionAction ? 'ArrowRight' : undefined,
+      'aria-keyshortcuts': trailingAction ? 'Delete' : undefined,
       onClick: handleActivate,
       onKeyDown: handleKeyDown,
       className: itemClassName,

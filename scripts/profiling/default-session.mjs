@@ -34,9 +34,6 @@ globalThis.fetch = (input, init) => {
     id: 'stashbase-agent-default', version: 1, displayName: 'Fixture', isDefault: true,
     contextTokenLimit: 200000, outputTokenLimit: 16000,
   }] }));
-  if (url.pathname === '/v2/agent/tools') return Promise.resolve(Response.json({
-    schemaVersion: 2, revision: 'fixture', models: [], tools: [],
-  }));
   if (url.hostname !== '127.0.0.1') throw new Error('This scenario must not make external requests.');
   return network(input, init);
 };

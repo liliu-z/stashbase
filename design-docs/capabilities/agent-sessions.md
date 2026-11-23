@@ -229,8 +229,6 @@ for unsent text.
   including after restoration. Catalog notices and startup errors alone leave
   the choice available. When the model is locked, the composer panel describes
   the lock and points to a new chat. Thinking stays adjustable between turns.
-  Default's composer control offers no model; it reads Crew, and its tooltip
-  names the crew members that are on.
 - Default discovers user skills only in the bound project's `.agents/skills`,
   `.claude/skills`, `.opencode/skills`, and `.opencode/skill` directories. It does
   not import global or ancestor skills. This is its default behavior, without a
@@ -239,45 +237,10 @@ for unsent text.
   Codex, Claude, and Antigravity retain their own native discovery rules.
   Antigravity offers no list of its skills, so its composer has no skill picker;
   its model still uses the project's skills on its own.
-- Default's main agent handles general conversation, research, and writing on the
-  service's default model. The composer offers **Crew**, with optional Writer,
-  Reviewer, Reader, and Humanizer members from the service catalog. Initially all
-  are off. Turning a member on explicitly assigns matching work to it in this
-  chat; the user need not name it in every message. The current request takes
-  precedence. Discussion, planning, explanations, and small mechanical edits can
-  stay with the main agent. A review-only request ends with feedback; selection
-  does not authorize unsolicited revision or repeated review/rewrite cycles.
-- The Crew menu shows a toggle and chosen model for each member. The model opens
-  its description and model options, with its default marked Recommended.
-  Changing a model preserves the toggle. Choices belong to this chat and survive
-  reopening; the most recent choices seed new chats without changing other chats.
-  Changes apply to the next turn. Saving disables further changes and Send until
-  settled; failures restore the previous selection and show retry guidance.
-  Unavailable selections block startup with an explanation instead of silently
-  dropping the chosen responsibility or substituting a model. A selected member
-  removed by the service stays visible so the user can turn it off. A cached
-  catalog may survive a failed refresh; without one, chats with no selected Crew
-  can proceed, while selected Crew requires a readable catalog.
-- A Crew member performs one text generation per invocation, with no tools or
-  agent loop. The main agent supplies a task, necessary context, and optional
-  project file paths. The host reads those files within the chat's project.
-  Necessary context includes user decisions, style, exact wording, drafts,
-  feedback, and verified evidence; an unsaved draft can pass directly between
-  members. Unrelated conversation and internal reasoning are omitted. The
-  published description defines the member's work and output. Shared instructions
-  define selection and briefing, avoiding duplicate workflow rules in each role.
-  The main agent presents results, handles justified next steps, and saves files.
-  A root turn can contain multiple calls, billed under the same turn budget.
-- Every Crew call has a standalone card naming the member and selected model,
-  including while running and after failure. Opening it shows the full brief and
-  result. Attribution is fixed when the call starts and persisted with history;
-  changing choices or removing a catalog entry cannot relabel old calls. A stopped
-  call cannot retry in a later turn. Truncated or unfinished output is a failed
-  call, not a completed draft. Ordinary tools remain in collapsed activity.
-- Crew supports text work in Plan; Plan still forbids file changes and commands.
-  Each root turn retains its catalog snapshot. The service owns model availability,
-  provider, price, and reasoning configuration. Default therefore has no separate
-  main-model or thinking selector. Native OpenCode sub-agents are disabled.
+- Default handles conversation, research, and writing on the hosted service's
+  current default model. The service owns model availability, provider, price,
+  and reasoning. Default has no model or thinking selector, and native
+  OpenCode sub-agents are disabled.
 - When the desktop app is in the background or minimized, a pending approval
   or clarifying question sends a local system notification. Requests arriving
   together are grouped per window, and each pending request is announced once.

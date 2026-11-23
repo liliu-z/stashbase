@@ -117,6 +117,9 @@
      installed into projects without the variable. */
   --focus-ring: light-dark(var(--light-focus-ring, #6b97ff), var(--dark-focus-ring, #6b97ff));
 
+  /* Give the thin insertion caret more contrast on light editor surfaces. */
+  --editor-caret: light-dark(#315cbd, var(--focus-ring));
+
   /* Filled interactive control — the switch track while on. The same blue as
      the focus ring, with a darker hover step. */
   --control-on: light-dark(
