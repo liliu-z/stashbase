@@ -36,6 +36,18 @@ export function useDocumentCommands(
       if (target?.closest('[role="dialog"], [role="alertdialog"], [data-command-surface="agent"]'))
         return;
       if (newTab?.open) {
+        // The New tab sits after every document, so the next tab is the
+        // first document and the previous one the last; choosing either
+        // closes the New tab, as a click on a document tab does.
+        const fromNewTab = tabStep(event);
+        const open = tabs?.store.getState().tabs ?? [];
+        if (fromNewTab !== 0 && tabs && open.length > 0) {
+          event.preventDefault();
+          const landing = fromNewTab === 1 ? open[0] : open.at(-1);
+          newTab.close();
+          if (landing) void tabs.activate(landing.id);
+          return;
+        }
         if (
           (event.metaKey || event.ctrlKey) &&
           !event.altKey &&
@@ -53,13 +65,12 @@ export function useDocumentCommands(
       }
       const step = tabStep(event);
       if (step !== 0 && tabs) {
-        const { activeTabId, tabs: open } = tabs.store.getState();
-        const index = open.findIndex((tab) => tab.id === activeTabId);
         // A single tab has nowhere to go, so the chord stays with the page.
-        if (index < 0 || open.length < 2) return;
+        if (tabs.store.getState().tabs.length < 2) return;
         event.preventDefault();
-        const next = open[(index + step + open.length) % open.length];
-        if (next) void tabs.activate(next.id);
+        // The runtime picks the neighbour in its own queue, so a second step
+        // pressed while the first (or an open or save) is pending moves on.
+        void tabs.activateAdjacent(step);
         return;
       }
       if ((!event.metaKey && !event.ctrlKey) || event.altKey) return;

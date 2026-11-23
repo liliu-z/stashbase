@@ -5,6 +5,7 @@ import { isDocumentDirty, sourceIdentity } from '@/features/documents/domain/doc
 import type { DocumentVisit } from '@/features/documents/domain/history';
 import type { DocumentLocation } from '@/features/documents/domain/location';
 import {
+  adjacentDocumentTab,
   clearDocumentCloseDecision,
   createDocumentTabsState,
   disposeDocumentTabsState,
@@ -12,6 +13,7 @@ import {
   keepDocumentTab,
   openDocumentTab,
   previewDocumentTab,
+  type DocumentTab,
   type DocumentTabsState,
 } from '@/features/documents/domain/tabs';
 import { isExternalSource } from '@/shared/domain/external-source';
@@ -283,6 +285,9 @@ export function createDocumentTabsRuntime({
 
   const restoredActive = initialState.tabs.find((tab) => tab.id === initialState.activeTabId);
   if (restoredActive) history.record({ source: restoredActive.source });
+  /** Brings an open tab in front the way a click on it does. */
+  const bringIn = (tab: DocumentTab) =>
+    openSource(tab.source, sourceIdentity(tab.source), { preview: tab.preview }, true) !== null;
 
   const runtime: DocumentTabsRuntime = {
     history,
@@ -299,11 +304,13 @@ export function createDocumentTabsRuntime({
       return enqueueTransition(async () => {
         const tab = store.getState().tabs.find((candidate) => candidate.id === tabId);
         if (disposed || !tab) return false;
-        if (store.getState().activeTabId === tabId) return true;
-        return (
-          openSource(tab.source, sourceIdentity(tab.source), { preview: tab.preview }, true) !==
-          null
-        );
+        return store.getState().activeTabId === tabId || bringIn(tab);
+      });
+    },
+    activateAdjacent(step) {
+      return enqueueTransition(async () => {
+        const tab = adjacentDocumentTab(store.getState(), step);
+        return !disposed && tab !== null && bringIn(tab);
       });
     },
     back: () => stepHistory(history.previous, history.stepBack),
