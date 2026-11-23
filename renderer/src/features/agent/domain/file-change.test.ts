@@ -150,12 +150,11 @@ describe('Agent file changes', () => {
     });
   });
 
-  it('matches a Windows project folder in any letter case, keeping the file spelling', () => {
+  it('matches a Windows drive letter in either case and every directory exactly', () => {
     const scope = { kind: 'folder' as const, path: 'C:\\Users\\Me\\Research' };
-    // Agents report `c:\…` for a project opened as `C:\…`; both name one folder.
+    // Agents report `c:\…` for a project opened as `C:\…`; both name one drive.
     for (const reported of [
       'c:\\Users\\Me\\Research\\notes\\Plan.md',
-      'C:\\users\\me\\research\\notes\\Plan.md',
       'c:/Users/Me/Research/notes/Plan.md',
     ]) {
       expect(changedSource(scope, reported), reported).toEqual({
@@ -163,19 +162,46 @@ describe('Agent file changes', () => {
         path: 'notes/Plan.md',
       });
     }
+    // A directory can be case-sensitive on Windows, so `research` may be a
+    // different folder from the open `Research`.
+    expect(changedSource(scope, 'C:\\users\\me\\research\\notes\\Plan.md')).toBeNull();
+    expect(
+      changedSource({ kind: 'folder', path: 'C:/work/Project' }, 'C:/work/project/notes.md'),
+    ).toBeNull();
     expect(changedSource(scope, 'c:\\Users\\Me\\Research')).toBeNull();
     expect(changedSource(scope, 'c:\\Users\\Me\\Research-old\\a.md')).toBeNull();
     expect(changedSource(scope, 'd:\\Users\\Me\\Research\\a.md')).toBeNull();
+    // UNC shares and POSIX folders keep an exact match.
     expect(
       changedSource(
         { kind: 'folder', path: '\\\\server\\share\\Notes' },
         '\\\\SERVER\\share\\notes\\a.md',
       ),
-    ).toEqual({ folderPath: '\\\\server\\share\\Notes', path: 'a.md' });
-    // POSIX folders stay exact: a case-sensitive volume may hold both spellings.
+    ).toBeNull();
     expect(
       changedSource({ kind: 'folder', path: '/project/Research' }, '/project/research/a.md'),
     ).toBeNull();
+  });
+
+  it('resolves a project at a drive root from either drive-letter case', () => {
+    for (const root of ['C:\\', 'C:/', 'c:\\']) {
+      const scope = { kind: 'folder' as const, path: root };
+      expect(changedSource(scope, 'c:/notes.md'), root).toEqual({
+        folderPath: root,
+        path: 'notes.md',
+      });
+      expect(changedSource(scope, 'C:\\drafts\\a.md'), root).toEqual({
+        folderPath: root,
+        path: 'drafts/a.md',
+      });
+      expect(changedSource(scope, 'D:\\notes.md'), root).toBeNull();
+    }
+    // A relative POSIX name that merely starts with a letter and a colon keeps
+    // its spelling.
+    expect(changedSource({ kind: 'folder', path: '/project' }, 'x:notes.md')).toEqual({
+      folderPath: '/project',
+      path: 'x:notes.md',
+    });
   });
 
   it('tells a turn that may have written unseen from one that only read or reported', () => {
