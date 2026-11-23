@@ -18,7 +18,7 @@ const layout = { content: 0, row: 0 };
 const observers = new Set<() => void>();
 
 function triggerShown(): boolean {
-  return globalThis.document.querySelector('[aria-label^="All open tabs"]') !== null;
+  return globalThis.document.querySelector('[aria-label^="All open tabs"]') !== null; // dom-contract: the layout model reads this inside width getters, where a role query would re-enter layout.
 }
 
 function isTabList(element: HTMLElement): boolean {
