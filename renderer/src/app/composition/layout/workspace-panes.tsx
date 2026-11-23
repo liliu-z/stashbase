@@ -208,7 +208,11 @@ export function WorkspacePanes({
                       systemTextApi={dependencies.settings.systemTextApi}
                     />
                   )}
-                  onRevealFolder={onRevealFolder}
+                  folderReveal={
+                    workspace
+                      ? { folderPath: workspace.scope.folder.path, reveal: onRevealFolder }
+                      : undefined
+                  }
                   revealLabel={dependencies.workspace.revealLabel}
                   runtime={documents}
                   sourceApi={dependencies.documents.adapters.source}

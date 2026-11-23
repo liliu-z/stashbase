@@ -27,7 +27,7 @@ function lastSegment(path: string): string {
 }
 
 /** The project and each folder above the document, outermost first. */
-export function breadcrumbTrail(source: SourceReference): Crumb[] {
+function breadcrumbTrail(source: SourceReference): Crumb[] {
   const path = source.path.replace(/\\/gu, '/');
   const cut = path.lastIndexOf('/');
   // An absolute path keeps the separators the system wrote it with.

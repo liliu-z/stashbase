@@ -57,9 +57,11 @@ export interface DocumentWorkspaceProps {
    *  queued at interactive priority. Fire-and-forget. */
   onOpenPrepared?: ((source: SourceReference, format: PreparedOnOpenFormat) => void) | undefined;
   onReveal(source: SourceReference, signal: AbortSignal): Promise<void>;
-  /** Shows a project-relative folder of the document in front in Files, from
-   *  the breadcrumb above it. Absent, the breadcrumb only reads. */
-  onRevealFolder?: ((folder: string) => void) | undefined;
+  /** The Files tree's project and how to show one of its folders there, for
+   *  the breadcrumb's folder buttons. Only a document from that project gets
+   *  them: another project's folder path would select a namesake in this
+   *  tree. Absent, the breadcrumb only reads. */
+  folderReveal?: { folderPath: string; reveal(folder: string): void } | undefined;
   /** Composes a preparation status row above PDF, image, and DOCX viewers. */
   renderPreparation?:
     | ((source: SourceReference, format: PreparationSlotFormat) => ReactNode)
@@ -84,7 +86,7 @@ export function DocumentWorkspace({
   onOpenExternal = rejectExternalNavigation,
   onOpenPrepared,
   onReveal,
-  onRevealFolder,
+  folderReveal,
   renderPreparation,
   renderReadingControl,
   revealLabel,
@@ -218,7 +220,15 @@ export function DocumentWorkspace({
         </NoticeStrip>
       )}
       {activeTab && (
-        <DocumentBreadcrumb onRevealFolder={onRevealFolder} source={activeTab.source} />
+        <DocumentBreadcrumb
+          onRevealFolder={
+            // The same scope rule as the tree following the document in front.
+            folderReveal?.folderPath === activeTab.source.folderPath
+              ? folderReveal.reveal
+              : undefined
+          }
+          source={activeTab.source}
+        />
       )}
       {retainedIds.map((tabId) => renderDocument(tabId, tabId !== activeTabId))}
       {activeTab &&

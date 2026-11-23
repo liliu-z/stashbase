@@ -62,26 +62,43 @@ describe('document breadcrumb', () => {
   });
 
   it('follows the document in front of the workspace', async () => {
-    const runtime = createRuntime();
-    withQueryClient(
-      <DocumentWorkspace
-        assetApi={assetApi({ load: vi.fn(pending()) })}
-        docxPreviewApi={docxPreviewApi({ load: vi.fn(pending()) })}
-        genericPreviewApi={genericPreviewApi({ load: vi.fn(pending()) })}
-        onReveal={vi.fn(async () => undefined)}
-        onRevealFolder={vi.fn()}
-        revealLabel="Show in file manager"
-        runtime={runtime}
-        sourceApi={loadedSourceApi}
-        tableApi={tableApi()}
-      />,
-    );
+    // The restored front tab is drafts/other.md in /project/notes.
+    const runtime = renderWorkspace({ folderPath: '/project/notes', reveal: vi.fn() });
 
-    // The restored front tab is drafts/other.md in the notes project.
     expect(within(location()).getByRole('button', { name: 'drafts' })).not.toBeNull();
     await act(async () => runtime.activate('tab-1'));
     expect(within(location()).queryByRole('button')).toBeNull();
     expect(within(location()).getByText('plan.md').getAttribute('aria-current')).toBe('page');
     runtime.dispose();
   });
+
+  it('offers no reveal for a document from a project other than the Files tree', () => {
+    // Files shows /project/other, which may hold a `drafts` folder of its own;
+    // revealing this document's `drafts` there would select the wrong one.
+    const reveal = vi.fn<(folder: string) => void>();
+    const runtime = renderWorkspace({ folderPath: '/project/other', reveal });
+
+    expect(within(location()).getByText('drafts')).not.toBeNull();
+    expect(within(location()).queryByRole('button')).toBeNull();
+    expect(reveal).not.toHaveBeenCalled();
+    runtime.dispose();
+  });
 });
+
+function renderWorkspace(folderReveal: { folderPath: string; reveal(folder: string): void }) {
+  const runtime = createRuntime();
+  withQueryClient(
+    <DocumentWorkspace
+      assetApi={assetApi({ load: vi.fn(pending()) })}
+      docxPreviewApi={docxPreviewApi({ load: vi.fn(pending()) })}
+      folderReveal={folderReveal}
+      genericPreviewApi={genericPreviewApi({ load: vi.fn(pending()) })}
+      onReveal={vi.fn(async () => undefined)}
+      revealLabel="Show in file manager"
+      runtime={runtime}
+      sourceApi={loadedSourceApi}
+      tableApi={tableApi()}
+    />,
+  );
+  return runtime;
+}
