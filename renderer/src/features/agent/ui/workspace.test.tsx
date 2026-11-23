@@ -71,6 +71,7 @@ describe('Agent workspace', () => {
     await agentGateLifted();
     expect(screen.queryByText('No Agent is ready yet.')).toBeNull();
     expect(await screen.findByRole('button', { name: 'Provider: Default' })).not.toBeNull();
+    expect(screen.queryByRole('button', { name: /^Crew\b/u })).toBeNull();
   });
 
   it('cycles the blank composer through the three requests, and Tab takes the one showing', async () => {

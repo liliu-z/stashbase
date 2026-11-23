@@ -12,7 +12,6 @@ import {
   type AgentCatalogPort,
   type AgentContextPort,
   type AgentSessionPort,
-  type AgentToolsPort,
 } from '@/features/agent/public';
 import {
   createDocumentQueryScope,
@@ -57,7 +56,6 @@ const context: AgentContextPort = {
   resolve: unavailable,
   upload: unavailable,
 };
-const tools: AgentToolsPort = { list: async () => [], set: unavailable };
 const session: AgentSessionPort = {
   connect: (_request, listener) => {
     let closed = false;
@@ -187,7 +185,6 @@ function MathWorkflowSession({ onReset }: { onReset(): void }) {
                 onOpenExternal={ignore}
                 onSignIn={ignore}
                 runtime={agent}
-                tools={tools}
               />
             </div>
           </section>

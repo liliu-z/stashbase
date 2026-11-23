@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import http from 'node:http';
 import { reviewDefaultAgentPermission } from '../default-agent-permissions.ts';
-import { HostedAgentBroker, HostedAgentToolError } from '../hosted-agent-broker.ts';
+import { HostedAgentBroker } from '../hosted-agent-broker.ts';
 import { OpenCodeEventTranslator } from '../opencode-agent.ts';
 import { classifyAgentTurnFailure } from '../agent-turn-failure.ts';
 
@@ -124,72 +124,6 @@ test('a turn keeps the model it began with for every call, and the next turn tak
     { turn: '00000000-0000-4000-8000-000000000011', profile: 'writer-pro', version: '3' },
     { turn: '00000000-0000-4000-8000-000000000012', profile: 'writer-fast', version: '1' },
   ]);
-});
-
-test('a tool call goes to the v2 endpoint under the root turn, selected by tool headers alone', async (t) => {
-  const seen: Array<{ url: string; headers: Headers; body: { model?: string } }> = [];
-  let refuseFirst = true;
-  const broker = new HostedAgentBroker({
-    accessToken: async () => 'fixture-token',
-    fetch: async (url, init) => {
-      seen.push({ url: String(url), headers: new Headers(init?.headers), body: JSON.parse(String(init?.body)) });
-      if (refuseFirst) {
-        refuseFirst = false;
-        return new Response('{}', { status: 401 });
-      }
-      return new Response('data: {"choices":[{"delta":{"content":"Hello"}}]}\n\ndata: {"choices":[{"delta":{"content":" there"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n', {
-        headers: { 'content-type': 'text/event-stream' },
-      });
-    },
-    upstreamUrl: 'https://gateway.invalid/v1/agent/chat/completions', clientVersion: () => 'fixture',
-  });
-  await broker.start();
-  t.after(() => broker.close());
-  broker.runtime('tools');
-  const messages = [{ role: 'user' as const, content: 'Write.' }];
-  const selection = { tool: 'writer', toolVersion: 4, model: 'claude-opus-5-5', modelVersion: 9 };
-  await assert.rejects(broker.completeTool('tools', selection, messages), /active turn/);
-
-  broker.beginTurn('tools', '00000000-0000-4000-8000-000000000021', { profile: 'main', version: 2 });
-  assert.equal(await broker.completeTool('tools', selection, messages), 'Hello there');
-  assert.equal(seen.length, 2, 'a refreshed sign-in retries once');
-  for (const { url, headers, body } of seen) {
-    assert.equal(url, 'https://gateway.invalid/v2/agent/chat/completions');
-    assert.equal(headers.get('x-stashbase-agent-turn-id'), '00000000-0000-4000-8000-000000000021', 'every role shares the root turn');
-    assert.equal(headers.get('x-stashbase-agent-tool'), 'writer');
-    assert.equal(headers.get('x-stashbase-agent-tool-version'), '4');
-    assert.equal(headers.get('x-stashbase-agent-tool-model'), 'claude-opus-5-5');
-    assert.equal(headers.get('x-stashbase-agent-tool-model-version'), '9');
-    assert.equal(headers.get('x-stashbase-agent-profile'), null, 'never mixed with the main profile');
-    assert.equal(headers.get('x-stashbase-agent-profile-version'), null);
-    assert.deepEqual(body, { model: 'claude-opus-5-5', messages, stream: true });
-  }
-  assert.equal(seen[0]!.headers.get('idempotency-key'), seen[1]!.headers.get('idempotency-key'), 'a retry keeps the logical request key');
-
-  await broker.completeTool('tools', selection, messages);
-  assert.notEqual(seen[2]!.headers.get('idempotency-key'), seen[1]!.headers.get('idempotency-key'), 'a new call gets a new key');
-});
-
-test('a refused tool call keeps the service code and never moves to another model', async (t) => {
-  const bodies: string[] = [];
-  const broker = new HostedAgentBroker({
-    accessToken: async () => 'fixture-token',
-    fetch: async (_url, init) => {
-      bodies.push(String(init?.body));
-      return Response.json({ error: { code: 'agent_tool_version_changed', message: 'changed' } }, { status: 422 });
-    },
-    upstreamUrl: 'https://gateway.invalid/v1/agent/chat/completions', clientVersion: () => 'fixture',
-  });
-  await broker.start();
-  t.after(() => broker.close());
-  broker.runtime('tools');
-  broker.beginTurn('tools', '00000000-0000-4000-8000-000000000022');
-  const refused = await broker.completeTool('tools', { tool: 'reader', toolVersion: 1, model: 'gpt-6-1-sol', modelVersion: 2 }, [])
-    .catch((error: unknown) => error);
-  assert.ok(refused instanceof HostedAgentToolError);
-  assert.equal(refused.code, 'agent_tool_version_changed');
-  assert.equal(refused.status, 422);
-  assert.equal(bodies.length, 1);
 });
 
 for (const [status, code] of [[422, 'agent_model_configuration_changed'], [503, 'agent_model_unavailable']] as const) {
@@ -766,17 +700,17 @@ for (const [reason, ending] of [
   ['lost stream', 'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n'],
   ['missing finish', 'data: [DONE]\n\n'],
 ] as const) {
-  test(`a crew response ending with ${reason} cannot succeed with partial prose`, async (t) => {
+  test(`a permission review ending with ${reason} cannot authorize an action`, async (t) => {
     const broker = new HostedAgentBroker({ accessToken: async () => 'fixture',
       clientVersion: () => '2.16.0', upstreamUrl: 'https://gateway.invalid/v1/agent/chat/completions',
-      fetch: async () => new Response('data: {"choices":[{"delta":{"content":"unfinished draft"}}]}\n\n' + ending),
+      fetch: async () => new Response('data: {"choices":[{"delta":{"content":"ALLOW"}}]}\n\n' + ending),
     });
     t.after(() => broker.close());
     await broker.start();
     broker.runtime('incomplete');
     broker.beginTurn('incomplete', '00000000-0000-4000-8000-000000000111');
-    await assert.rejects(broker.completeTool('incomplete', {tool:'writer',toolVersion:1,model:'opus',modelVersion:1}, []),
-      (error: unknown) => (error as {code?: string}).code === 'agent_tool_incomplete');
+    await assert.rejects(broker.complete('incomplete', { profile: 'main' }, []),
+      /output limit|did not finish completely/);
   });
 }
 

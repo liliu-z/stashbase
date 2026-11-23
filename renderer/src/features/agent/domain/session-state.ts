@@ -195,7 +195,6 @@ type AgentSessionStateEvent =
       id: string;
       name: string;
       input: Record<string, unknown>;
-      crew?: import('./session-transcript').AgentCrewCall | undefined;
     }
   | { kind: 'tool-output'; id: string; delta: string }
   | { kind: 'tool-finished'; id: string; content: string; isError: boolean }

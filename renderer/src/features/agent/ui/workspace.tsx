@@ -1,5 +1,5 @@
 /** Conversation surface. Reads session state and invokes runtime actions. */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useStore } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -53,7 +53,6 @@ function ChatWorkspace({
   catalogPort,
   header = true,
   scheduledTasks,
-  tools: toolsApi,
   onOpenAgentSettings,
   onOpenAppSettings,
   onSignIn,
@@ -69,7 +68,6 @@ function ChatWorkspace({
   catalogPort: AgentCatalogPort;
 }) {
   const activeId = active.id;
-  const [crewSaving, setCrewSaving] = useState(false);
   const scopeEnvironment = useStore(runtime.store, (state) => state.scopeEnvironment);
   const state = useStore(
     active.store,
@@ -85,7 +83,6 @@ function ChatWorkspace({
       effort: session.effort,
       model: session.model,
       models: session.models,
-      nativeSessionId: session.nativeSessionId,
       queuedPrompts: session.queuedPrompts,
       scope: session.scope,
       skill: session.skill,
@@ -321,18 +318,11 @@ function ChatWorkspace({
                         offersRuntimeUpdate(readyAgent, runtimeUpdate) ? runtimeUpdate : undefined
                       }
                       state={{ ...state, activeTurn: busy || preferencesUnavailable }}
-                      tools={{
-                        api: toolsApi,
-                        chat: state.nativeSessionId ?? activeId,
-                        onChanged: active.refreshTools,
-                        onSaving: setCrewSaving,
-                      }}
                     />
                   )}
                 </>
               }
               sendable={
-                !crewSaving &&
                 !catalog.loading &&
                 !catalog.error &&
                 !runtimeUpdate.busy &&

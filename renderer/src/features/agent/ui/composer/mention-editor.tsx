@@ -318,10 +318,10 @@ export const MentionEditor = forwardRef<MentionEditorHandle, MentionEditorProps>
             },
             '&.cm-focused': { outline: 'none' },
             '.cm-content': {
-              caretColor: 'var(--foreground)',
+              caretColor: 'var(--editor-caret)',
               padding: `${paddingY}px ${paddingX}px`,
             },
-            '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--foreground)' },
+            '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--editor-caret)' },
             '.cm-line': { padding: '0' },
             '.cm-placeholder': { color: 'var(--muted-foreground)' },
             '.cm-scroller': {

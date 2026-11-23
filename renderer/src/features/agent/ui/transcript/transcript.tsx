@@ -5,7 +5,6 @@ import { Fragment, memo, useCallback, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChatMessage } from '@/components/ui/chat-message';
 import { ThinkingIndicator } from '@/components/ui/thinking-indicator';
-import { agentRoleCallView } from '@/features/agent/domain/agent-role-call';
 import type { AgentContextItem } from '@/features/agent/domain/context';
 import { agentQuestions } from '@/features/agent/domain/question';
 import { latestUserBlock, type AgentTranscriptBlock } from '@/features/agent/domain/session';
@@ -20,7 +19,6 @@ import { CopyAction } from './copy-action';
 import { DayDivider } from './day-divider';
 import { AgentMarkdown } from './markdown';
 import { AgentQuestionCard } from './question-card';
-import { AgentRoleCall } from './role-call';
 import {
   closingReplies,
   transcriptGroups,
@@ -272,18 +270,9 @@ export const AgentTranscript = memo(function AgentTranscript({
       ? tailGroup
       : null;
   const tail = blocks.at(-1);
-  const narrated =
-    liveGroup !== null ||
-    (tail?.kind === 'tool' && tail.status === 'awaiting') ||
-    (tailGroup?.kind === 'role-call' && tailGroup.tool.status === 'running');
+  const narrated = liveGroup !== null || (tail?.kind === 'tool' && tail.status === 'awaiting');
   const renderGroup = (group: TranscriptGroup) =>
-    group.kind === 'role-call' ? (
-      <AgentRoleCall
-        key={group.id}
-        status={group.tool.status}
-        view={agentRoleCallView(group.tool, group.role)}
-      />
-    ) : group.kind === 'activity' ? (
+    group.kind === 'activity' ? (
       <AgentActivityGroup
         focusToolId={decidedToolId}
         key={group.id}

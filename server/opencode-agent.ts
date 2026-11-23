@@ -25,7 +25,6 @@ import {
   type AgentSessionTermination,
 } from './agent-contract.ts';
 import {
-  attributedAgentSession,
   liveSessionSet,
   registerAttributedAgentSession,
   unregisterAttributedAgentSession,
@@ -42,7 +41,6 @@ import {
   discardWarmOpenCodeForWindow,
   discardWarmOpenCodeForFolder,
   openCodeClient,
-  type AgentToolResult,
   type OpenCodeSessionRuntime,
 } from './opencode-runtime.ts';
 import type { SessionBlock, SessionInfo } from '../shared/agent-sessions.ts';
@@ -52,9 +50,7 @@ import {
   hostedAgentCatalogModels,
 } from './hosted-agent-models.ts';
 import { reviewDefaultAgentPermission } from './default-agent-permissions.ts';
-import { rememberCrewChat } from './default-agent-tools.ts';
 import { INTERRUPTED_MODEL_RESPONSE } from './hosted-agent-stream.ts';
-import { crewCallHistory, recordCrewCall, forgetCrewCalls } from './agent-crew-history.ts';
 
 const log = logger('opencode-agent');
 const DATA_REQUEST = { throwOnError: true as const };
@@ -378,8 +374,7 @@ export class OpenCodePanelSession {
   private preparingAttachments: AbortController | null = null;
   private attachmentPreparation: Promise<FilePartInput[]> | null = null;
   /** The main agent's profile, as the service listed it when this session
-   * started; undefined runs the unversioned default. Roles carry their own
-   * profiles in the runtime's configuration. */
+   * started. Undefined runs the unversioned default. */
   private model: { profile: string; version: number } | undefined;
 
   constructor(
@@ -398,7 +393,6 @@ export class OpenCodePanelSession {
     this.runtime = runtime ?? createOpenCodeSessionRuntime({
       windowId: this.windowId,
       directory: this.cwd,
-      ...(options.crew || options.resume ? { crew: options.crew ?? options.resume! } : {}),
     });
     this.attributionId = this.runtime.attributionId ?? randomUUID();
     this.stopRuntimeExitListener = this.runtime.onExit((error) => {
@@ -414,13 +408,6 @@ export class OpenCodePanelSession {
   diagnosticContext() { return agentWriteDiagnosticContext(this.ws); }
 
   turnInFlight(): boolean { return this.translator.isTurnActive(); }
-
-  /** Runs an enabled tool for the main agent, inside its running turn: one
-   * call on the tool's model, on the turn's catalog snapshot. */
-  async runTool(id: string, task: string | (() => Promise<string>), signal?: AbortSignal): Promise<AgentToolResult> {
-    if (!this.turnInFlight()) throw Object.assign(new Error('Tools run only inside an agent turn.'), { status: 409 });
-    return this.runtime.runTool(id, task, signal);
-  }
 
   dispose(termination?: AgentSessionTermination): void {
     if (this.disposed) return;
@@ -474,12 +461,10 @@ export class OpenCodePanelSession {
         throw new Error('The OpenCode session does not belong to this Chat scope.');
       }
       this.sessionId = native.id;
-      if (this.options.crew) rememberCrewChat(this.options.crew, native.id);
       this.translator.bindSession(native.id);
       send(this.ws, { t: 'session-id', id: native.id });
       if (native.title) send(this.ws, { t: 'session-title', title: native.title });
-      // The main agent always runs on the service's default; the reader
-      // chooses each member's model in the Crew menu.
+      // The main agent always runs on the service's default profile.
       send(this.ws, main
         ? { t: 'models', models: hostedAgentCatalogModels([main]), activeModel: main.id }
         : { t: 'models', models: [] });
@@ -513,13 +498,6 @@ export class OpenCodePanelSession {
           const nativeError = event.type === 'session.error' ? event.properties.error
             : event.type === 'message.updated' && event.properties.info.role === 'assistant' ? event.properties.info.error : undefined;
           const cause = item.t === 'error' ? this.translator.diagnostic(this.runtime.diagnostic?.()) : undefined;
-          if (item.t === 'tool' && this.sessionId) {
-            const selected = this.runtime.tools().find(({ tool }) => item.name === `stashbase_${tool.agent.toolName}` || item.name === tool.agent.toolName);
-            if (selected) {
-              item.crew = { id: selected.tool.id, label: selected.tool.name, icon: selected.tool.icon, model: selected.model.name };
-              recordCrewCall(this.sessionId, item.id, item.crew);
-            }
-          }
           send(this.ws, item, nativeError
             ? { ...providerErrorDiagnostic(nativeError) as object, cause }
             : cause);
@@ -711,12 +689,6 @@ export class OpenCodePanelSession {
 
 const sessions = liveSessionSet<OpenCodePanelSession>();
 
-/** The live Default chat a tool call is attributed to, if any. */
-export function openCodeToolSession(attributionId: string | undefined): OpenCodePanelSession | null {
-  const session = attributedAgentSession(attributionId);
-  return session instanceof OpenCodePanelSession ? session : null;
-}
-
 export function attachOpenCodeWebSocket(ws: WebSocket, options: AgentConnectionOptions): void {
   sessions.add(new OpenCodePanelSession(ws, options));
 }
@@ -822,10 +794,8 @@ async function sessionBlocks(
     client.session.messages({ ...DATA_REQUEST, path: { id } }),
     client.session.diff({ ...DATA_REQUEST, path: { id } }),
   ]);
-  const crew = crewCallHistory(id);
   return [
-    ...messages.data.flatMap((message) => blocksForMessage(message.info, message.parts))
-      .map((block) => block.kind === 'tool' && crew[block.id] ? { ...block, crew: crew[block.id] } : block),
+    ...messages.data.flatMap((message) => blocksForMessage(message.info, message.parts)),
     ...blocksForDiffs(diffs.data),
   ];
 }
@@ -899,7 +869,6 @@ export function openCodeHistoryActions(): AgentHistoryActions {
       const { client, cwd } = await clientFor(folder);
       await assertSessionInScope(client, id, cwd);
       await client.session.delete({ ...DATA_REQUEST, path: { id } });
-      forgetCrewCalls(id);
     },
   };
 }

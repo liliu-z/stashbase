@@ -32,12 +32,10 @@ import {
   hostedAgentDiagnostic,
   beginHostedAgentTurn,
   completeHostedAgentModel,
-  completeHostedAgentTool,
   endHostedAgentTurn,
   releaseHostedAgentChannel,
   startHostedAgentBroker,
   stopHostedAgentBroker,
-  HostedAgentToolError,
   type HostedAgentTurnModel,
 } from './hosted-agent-broker.ts';
 import {
@@ -46,20 +44,6 @@ import {
   type HostedAgentProfile,
 } from './hosted-agent-models.ts';
 import type { AgentRuntimeDescriptor } from './agent-contract.ts';
-import {
-  agentToolPrompt,
-  agentToolSelection,
-  defaultAgentToolInstructions,
-  defaultAgentToolViews,
-  crewChatChoices,
-  enabledAgentTools,
-  mcpAgentTools,
-  runToolInTurn,
-  type AgentToolResult,
-  type EnabledAgentTool,
-  type TurnToolSnapshot,
-} from './default-agent-tools.ts';
-import { latestToolCatalog, type ToolCatalog } from './agent-tool-catalog.ts';
 import { OpenCodeWarmSlot } from './opencode-warm-slot.ts';
 import { filesystemPath } from './filesystem-path.ts';
 import { telemetry } from './telemetry.ts';
@@ -221,16 +205,8 @@ export function buildOpenCodeConfig(
   mcpEnvironment: Record<string, string> = {},
   profiles: readonly HostedAgentProfile[] = [],
   directory?: string,
-  tools: readonly EnabledAgentTool[] = [],
 ): Config & Pick<NativeConfig, 'skills'> {
-  // The tools that are on add how to brief them and each one's standing
-  // rule to the main agent's instructions; the tools' own models never see
-  // them.
-  const runtimeInstructions = [
-    composeAgentRuntimeInstructions(),
-    defaultAgentToolInstructions(tools),
-  ].filter(Boolean).join('\n\n');
-  const toolPermissions = Object.fromEntries(tools.map(({ tool }) => [`stashbase_${tool.agent.toolName}`, 'allow']));
+  const runtimeInstructions = composeAgentRuntimeInstructions();
   // Disabling native upward config discovery also disables its instruction-file
   // lookup. Preserve the native filename precedence inside this project, passing
   // the path so OpenCode still owns reading and presenting the instructions.
@@ -251,10 +227,8 @@ export function buildOpenCodeConfig(
     stashbase_delete_file: 'ask',
     stashbase_create_project: 'ask',
     stashbase_create_interactive_note: 'ask',
-    // OpenCode's own sub-agents would rerun the main model with the whole
-    // runtime context; Default's other models are tools instead.
+    // Keep Default on one native agent for the project.
     task: 'deny',
-    ...toolPermissions,
   } as NonNullable<Config['permission']> & Record<string, 'ask' | 'allow' | 'deny'>;
   return {
     autoupdate: false,
@@ -280,14 +254,7 @@ export function buildOpenCodeConfig(
       stashbase: {
         type: 'local',
         command: [mcp],
-        ...(Object.keys(mcpEnvironment).length || tools.length ? {
-          environment: {
-            ...mcpEnvironment,
-            // The MCP host registers only the tools enabled for this
-            // session, by the catalog's names and descriptions.
-            ...(tools.length ? { STASHBASE_AGENT_TOOLS: JSON.stringify(mcpAgentTools(tools)) } : {}),
-          },
-        } : {}),
+        ...(Object.keys(mcpEnvironment).length ? { environment: mcpEnvironment } : {}),
         enabled: true,
         timeout: 10_000,
       },
@@ -306,15 +273,13 @@ export function buildOpenCodeConfig(
       'stashbase-plan': {
         description: 'Explore the project without changing files or running commands.',
         mode: 'primary',
-        prompt: `${runtimeInstructions}\n\nPlan mode: read, discuss, and show proposed text in chat. Selected crew members may return text. Do not write files or run commands.`,
+        prompt: `${runtimeInstructions}\n\nPlan mode: read, discuss, and show proposed text in chat. Do not write files or run commands.`,
         permission: {
           '*': 'deny',
           read: 'allow', glob: 'allow', grep: 'allow', list: 'allow',
           webfetch: 'ask', websearch: 'allow', external_directory: 'ask', question: 'allow',
           stashbase_list_projects: 'allow', stashbase_list_directory: 'allow',
           stashbase_read_file: 'allow', stashbase_search_project: 'allow',
-          // A tool only returns text, which Plan shows in chat.
-          ...toolPermissions,
         } as typeof permission,
       },
     },
@@ -327,9 +292,8 @@ function openCodeConfig(
   mcpEnvironment: Record<string, string>,
   profiles: readonly HostedAgentProfile[],
   directory: string,
-  tools: readonly EnabledAgentTool[],
 ): Config {
-  return buildOpenCodeConfig(model, ensureMcpLauncher(), mcpEnvironment, profiles, directory, tools);
+  return buildOpenCodeConfig(model, ensureMcpLauncher(), mcpEnvironment, profiles, directory);
 }
 
 class OpenCodeRuntime {
@@ -346,7 +310,6 @@ class OpenCodeRuntime {
     private readonly requireAccount = true,
     private readonly agentSessionId = 'history',
     private readonly profiles: () => readonly HostedAgentProfile[] = () => [],
-    private readonly tools: () => readonly EnabledAgentTool[] = () => [],
     private readonly purpose: 'history' | 'chat' | 'prewarm' = 'chat',
   ) {
     runtimes.add(this);
@@ -487,7 +450,7 @@ class OpenCodeRuntime {
       if (!model) throw new Error('The agent model broker is not running.');
       // Private-directory/config preparation can be slow independently of the
       // native spawn call. Neither belongs to the ready-announcement deadline.
-      const env = openCodeRuntimeEnvironment(openCodeConfig(model, this.mcpEnvironment, this.profiles(), directory, this.tools()), username, password);
+      const env = openCodeRuntimeEnvironment(openCodeConfig(model, this.mcpEnvironment, this.profiles(), directory), username, password);
       stage = 'spawn';
       advanceTiming('spawn_ms');
       const child = ownAgentProcess(spawn(executable, [
@@ -562,7 +525,7 @@ const runtimes = new Set<OpenCodeRuntime>();
 // History is local OpenCode state and remains readable while signed out. The
 // loopback model broker is configured so the pinned server can start, but it
 // cannot reach the hosted gateway without a later authenticated model call.
-const historyRuntime = new OpenCodeRuntime({}, false, 'history', undefined, undefined, 'history');
+const historyRuntime = new OpenCodeRuntime({}, false, 'history', undefined, 'history');
 
 export interface OpenCodeSessionRuntime {
   /** A prewarmed process already has its own private MCP/broker identity. */
@@ -572,8 +535,6 @@ export interface OpenCodeSessionRuntime {
   models(): Promise<readonly HostedAgentProfile[]>;
   client(directory: string): Promise<OpencodeClient>;
   beginTurn(turnId: string, model?: HostedAgentTurnModel): void;
-  /** The tools enabled when the runtime was configured. */
-  tools(): readonly EnabledAgentTool[];
   /** One call on the main Agent's own profile inside the running turn (the
    * Auto permission review); answers its text. */
   complete(
@@ -581,21 +542,15 @@ export interface OpenCodeSessionRuntime {
     messages: ReadonlyArray<{ role: 'system' | 'user'; content: string }>,
     signal?: AbortSignal,
   ): Promise<string>;
-  /** One tool call inside the running turn, on the turn's catalog snapshot;
-   * answers its text, the tool's name, and the model that ran it. */
-  runTool(id: string, task: string | (() => Promise<string>), signal?: AbortSignal): Promise<AgentToolResult>;
   endTurn(): void;
   diagnostic?(): unknown;
   onExit(listener: (error: Error) => void): () => void;
   close(reason?: AgentStopReason): Promise<void>;
 }
 
-export type { AgentToolResult } from './default-agent-tools.ts';
-
 interface OpenCodeContext {
   windowId: string;
   directory: string;
-  crew?: string;
 }
 
 interface PreparedOpenCode {
@@ -604,7 +559,6 @@ interface PreparedOpenCode {
   directory: string;
   attributionId: string;
   profiles: readonly HostedAgentProfile[];
-  tools: readonly EnabledAgentTool[];
   runtime: OpenCodeRuntime;
   ready: Promise<void>;
   close(reason?: AgentStopReason): Promise<void>;
@@ -625,55 +579,31 @@ function startupKey(context: OpenCodeContext): string {
  * never run a session or a model request; only that unused server can move
  * to the next chat. Read the catalog afresh before accepting its config. */
 export function createOpenCodeSessionRuntime(context: OpenCodeContext): OpenCodeSessionRuntime {
-  const choices = context.crew ? crewChatChoices(context.crew) : undefined;
   const key = startupKey(context);
   const prepared = warmSlot.take(key);
   const attributionId = prepared?.attributionId ?? crypto.randomUUID();
   let profiles: readonly HostedAgentProfile[] = [];
-  let tools: readonly EnabledAgentTool[] = [];
-  let catalog: ToolCatalog | null = null;
-  let turn: TurnToolSnapshot | null = null;
-  let turnAbort = new AbortController();
   let reading: Promise<readonly HostedAgentProfile[]> | null = null;
   let closed = false;
   const listeners = new Set<(error: Error) => void>();
   const makeRuntime = () => new OpenCodeRuntime({
     STASHBASE_WINDOW_ID: context.windowId,
     STASHBASE_AGENT_SESSION_ID: attributionId,
-  }, true, attributionId, () => profiles, () => tools);
+  }, true, attributionId, () => profiles);
   let sessionRuntime = prepared?.runtime ?? makeRuntime();
   const relayExit = (error: Error) => { for (const listener of listeners) listener(error); };
   let stopExitListener = () => {};
 
   const models = () => reading ??= (async () => {
     const started = performance.now();
-    let list: readonly HostedAgentProfile[] = [];
-    let toolCatalog: ToolCatalog | null = null;
-    // The two catalogs are independent: the main Agent's profiles and the
-    // tools' own model pool. Without a tool catalog the chat runs without
-    // tools rather than on a guessed configuration.
-    await Promise.all([
-      fetchHostedAgentProfiles().then((read) => { list = read; })
-        .catch((error: unknown) => { log.warn('could not read the agent model list', error); }),
-      latestToolCatalog().then((read) => { toolCatalog = read; })
-        .catch((error: unknown) => { log.warn('could not read the tool catalog', error); }),
-    ]);
+    const list = await fetchHostedAgentProfiles().catch((error: unknown) => {
+      log.warn('could not read the agent model list', error);
+      return [];
+    });
     const catalogMs = Math.round(performance.now() - started);
     profiles = list;
-    catalog = toolCatalog;
-    if (!toolCatalog && Object.values(choices ?? {}).some((choice) => choice?.enabled)) {
-      throw new Error('Your selected crew could not be loaded. Retry the connection or turn those members off.');
-    }
-    if (toolCatalog) {
-      const unavailable = defaultAgentToolViews(toolCatalog, choices)
-        .filter((view) => view.enabled && (view.unavailable || view.modelProblem));
-      const missing = Object.entries(choices ?? {}).find(([id, choice]) => choice?.enabled && !toolCatalog!.tools.some((tool) => tool.id === id));
-      if (unavailable.length || missing) throw new Error(`Your selected crew cannot run: ${unavailable.map((view) => `${view.label}: ${view.unavailable ?? view.modelProblem}`).join('; ') || missing?.[0]}. Update Crew before sending again.`);
-    }
-    tools = toolCatalog ? enabledAgentTools(toolCatalog, choices) : [];
     if (closed) throw new Error('OpenCode startup was cancelled.');
-    if (prepared && (!isDeepStrictEqual(list, prepared.profiles)
-      || !isDeepStrictEqual(tools, prepared.tools))) {
+    if (prepared && !isDeepStrictEqual(list, prepared.profiles)) {
       stopExitListener();
       await sessionRuntime.close('configuration_changed');
       if (closed) throw new Error('OpenCode startup was cancelled.');
@@ -692,10 +622,10 @@ export function createOpenCodeSessionRuntime(context: OpenCodeContext): OpenCode
     const nextId = crypto.randomUUID();
     const nextRuntime = new OpenCodeRuntime({
       STASHBASE_WINDOW_ID: context.windowId, STASHBASE_AGENT_SESSION_ID: nextId,
-    }, true, nextId, () => profiles, () => tools, 'prewarm');
+    }, true, nextId, () => profiles, 'prewarm');
     const next: PreparedOpenCode = {
       key, windowId: context.windowId, directory: context.directory,
-      attributionId: nextId, profiles, tools, runtime: nextRuntime,
+      attributionId: nextId, profiles, runtime: nextRuntime,
       ready: Promise.resolve(), close: (reason) => nextRuntime.close(reason),
     };
     warmSlot.put(next);
@@ -727,33 +657,9 @@ export function createOpenCodeSessionRuntime(context: OpenCodeContext): OpenCode
       log.debug('startup native connection', { session_id: attributionId, elapsed_ms: Math.round(performance.now() - started) });
       return client;
     },
-    beginTurn: (turnId, model) => {
-      turnAbort.abort();
-      turnAbort = new AbortController();
-      beginHostedAgentTurn(attributionId, turnId, model);
-      turn = { catalog, tools: [...tools], bound: false };
-    },
-    tools: () => tools,
+    beginTurn: (turnId, model) => beginHostedAgentTurn(attributionId, turnId, model),
     complete: (model, messages, signal) => completeHostedAgentModel(attributionId, model, messages, signal),
-    runTool: async (id, task, signal) => {
-      const snapshot = turn;
-      const lifetime = AbortSignal.any([turnAbort.signal, ...(signal ? [signal] : [])]);
-      lifetime.throwIfAborted();
-      if (!snapshot) throw new Error('Crew members work only inside an agent turn.');
-      const brief = typeof task === 'string' ? task : await task();
-      lifetime.throwIfAborted();
-      return runToolInTurn(snapshot, id, (on) => {
-        lifetime.throwIfAborted();
-        return completeHostedAgentTool(attributionId, agentToolSelection(on), [
-          { role: 'system', content: agentToolPrompt(on.tool) },
-          { role: 'user', content: brief },
-        ], lifetime);
-      }, latestToolCatalog,
-      (error) => error instanceof HostedAgentToolError && error.code === 'agent_tool_version_changed', lifetime);
-    },
     endTurn: () => {
-      turnAbort.abort();
-      turn = null;
       endHostedAgentTurn(attributionId);
       // Avoid competing with the first reply. Disposal closes the owner in
       // this same stack, so its queued warm-up sees `closed` and does nothing.
@@ -761,7 +667,7 @@ export function createOpenCodeSessionRuntime(context: OpenCodeContext): OpenCode
     },
     diagnostic: () => hostedAgentDiagnostic(attributionId),
     onExit: (listener) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
-    close: (reason) => { closed = true; turnAbort.abort(); stopExitListener(); return sessionRuntime.close(reason); },
+    close: (reason) => { closed = true; stopExitListener(); return sessionRuntime.close(reason); },
   };
 }
 

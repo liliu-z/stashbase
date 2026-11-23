@@ -138,9 +138,6 @@ describe('AgentSessionRuntime', () => {
     test.listeners[0]?.onEvent({ kind: 'identified', id: 'native-astra' });
     test.listeners[0]?.onEvent({ kind: 'ready' });
     expect(modelChoice(runtime.store.getState()).effort).toBe('high');
-    runtime.refreshTools();
-    expect(test.requests().at(-1)).toMatchObject({ effort: 'high', resume: 'native-astra' });
-    test.listeners.at(-1)?.onEvent({ kind: 'ready' });
     runtime.setEffort(null);
     expect(test.requests().at(-1)).toMatchObject({ effort: 'medium', resume: 'native-astra' });
     test.listeners.at(-1)?.onEvent({
@@ -168,34 +165,6 @@ describe('AgentSessionRuntime', () => {
       resume: 'native-astra',
     });
     runtime.dispose();
-  });
-
-  it('refreshes tools on the same conversation without starting an unstarted draft', () => {
-    const test = harness();
-    const runtime = createAgentSessionRuntime({
-      agent: 'stashbase',
-      id: 'chat-1',
-      port: test.port,
-      scheduler: test.scheduler,
-      scope: { kind: 'folder', path: '/project/Research' },
-    });
-    test.listeners[0]?.onEvent({ kind: 'ready' });
-    test.listeners[0]?.onEvent({ id: 'native-1', kind: 'identified' });
-    runtime.refreshTools();
-    expect(test.requests()).toHaveLength(2);
-    expect(test.requests().at(-1)).toMatchObject({ resume: 'native-1' });
-    const draft = createAgentSessionRuntime({
-      agent: 'stashbase',
-      autostart: false,
-      id: 'chat-2',
-      port: test.port,
-      scheduler: test.scheduler,
-      scope: { kind: 'folder', path: '/project/Research' },
-    });
-    draft.refreshTools();
-    expect(test.requests()).toHaveLength(2);
-    draft.start();
-    expect(test.requests()).toHaveLength(3);
   });
 
   it('loads replay before reconnecting exactly that native session', async () => {

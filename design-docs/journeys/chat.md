@@ -12,9 +12,7 @@ Chat, Documents assistance, and runtimes.
    its scope; conversation navigation follows actual visits.
 2. Type or [dictate an idea](../capabilities/agent-sessions.md#voice-typing),
    optionally attach context and choose supported agent options.
-   The action clearly sends, queues, or stops work. Default also offers
-   Crew: select who handles matching work in this chat and choose each member's
-   model. Existing chats keep their choices; new chats inherit the last selection.
+   The action clearly sends, queues, or stops work.
 3. Follow replies and useful progress. Routine tools and provided thinking are
    grouped per turn and collapsed. The group holding a running turn names the
    step in hand so long work visibly advances; a settled group states what it
@@ -23,14 +21,13 @@ Chat, Documents assistance, and runtimes.
    options and a line for the reader's own answer; answering continues the
    turn, and skipping tells the agent no answer was given. Ordinary tool-call failures
    do not appear in activity summaries or expanded details; the agent explains
-   task outcomes and native history retains the failed attempts. Selected Crew
-   calls have their own cards, including failed calls and their explanations.
+   task outcomes and native history retains the failed attempts.
    After a turn completes successfully, more than eight visible process
    messages fold behind a counted row. Intermediate replies, notices, and
    routine activity groups count once each, independent of raw tool-event
    count. One click reveals the entire process and can fold it again; a manual
    choice lasts while that chat remains open, including switches to other chats.
-   Prompts, accepted follow-ups, the final reply, file results, Crew calls,
+   Prompts, accepted follow-ups, the final reply, file results,
    pending decisions, and denied or cancelled actions stay visible in order.
    Running, failed, stopped, and history turns without a confirmed outcome
    stay expanded. Completion never folds underneath a reader who has scrolled

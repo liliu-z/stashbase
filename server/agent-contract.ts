@@ -93,8 +93,6 @@ export interface AgentConnectionOptions {
   model?: string;
   /** Registered project folder captured at connection time. */
   folder?: string;
-  /** The Default chat's crew choices, before or after native identification. */
-  crew?: string;
 }
 
 export type AgentSessionFolderResolution =

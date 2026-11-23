@@ -1,11 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { SURFACE_FAILED } from '@/features/agent/application/failure-messages';
-import type {
-  AgentCatalogPort,
-  AgentToolsPort,
-  ScheduledTasksPort,
-} from '@/features/agent/application/ports';
+import type { AgentCatalogPort, ScheduledTasksPort } from '@/features/agent/application/ports';
 import type { AgentWorkspaceRuntime } from '@/features/agent/application/workspace-runtime';
 import type { AgentScope } from '@/features/agent/domain/session';
 import type { AgentTurnChangeReview } from '@/features/agent/ui/transcript/turn-changes-card';
@@ -23,8 +19,6 @@ export interface AgentWorkspaceProps {
   header?: boolean | undefined;
   /** The project's scheduled tasks, shown in the chat's place on request. */
   scheduledTasks?: ScheduledTasksPort | undefined;
-  /** Default's optional model tools. */
-  tools: AgentToolsPort;
   /** Opens General settings, which own application updates. */
   onOpenAppSettings(): void;
   onOpenExternal(href: string): void;
