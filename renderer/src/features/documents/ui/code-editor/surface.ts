@@ -25,15 +25,13 @@ const codeSurfaceTheme = EditorView.theme({
   '&.cm-focused .cm-activeLine, &.cm-focused .cm-activeLineGutter': {
     backgroundColor: 'var(--hover)',
   },
-  // The caret wears the focus colour, as in the Markdown editor: in the text's
-  // own colour it is a hairline lost among the characters around it.
   '.cm-content': {
-    caretColor: 'var(--focus-ring)',
+    caretColor: 'var(--editor-caret)',
     fontFamily: 'var(--code-font, var(--font-mono))',
     lineHeight: '1.55',
     padding: '12px 0 64px',
   },
-  '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--focus-ring)' },
+  '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--editor-caret)' },
   '.cm-gutters': {
     backgroundColor: 'transparent',
     borderRight: '0',
