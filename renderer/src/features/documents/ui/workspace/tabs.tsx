@@ -1,8 +1,8 @@
 /**
  * The open documents' tab strip. A preview tab wears its name in italics and
  * says so in its label; a double click, or Enter on the focused tab, keeps
- * it. Delete closes the focused tab, and every tab is a drag source for its
- * file. A right click, the menu key or Shift+F10 opens the tab's menu. Given a `newTab`, the strip ends in a plus that opens the New tab,
+ * it. Delete or a middle click closes a tab, and every tab is a drag source
+ * for its file. A right click, the menu key or Shift+F10 opens the tab's menu. Given a `newTab`, the strip ends in a plus that opens the New tab,
  * a tab holding no document whose page offers the first moves; the New tab
  * sits last and selected, and choosing a document closes it.
  */
@@ -62,6 +62,22 @@ function UnsavedIndicator({ className, ...props }: IconComponentProps) {
   );
 }
 
+/** Middle-click closing, as browsers and editors do. Pressing the wheel is
+ *  refused so Windows does not start autoscroll over the strip; the close
+ *  itself waits for the release, like a click. */
+function middleClickCloses(close: () => void) {
+  return {
+    onAuxClick: (event: MouseEvent<HTMLButtonElement>) => {
+      if (event.button !== 1) return;
+      event.preventDefault();
+      close();
+    },
+    onMouseDown: (event: MouseEvent<HTMLButtonElement>) => {
+      if (event.button === 1) event.preventDefault();
+    },
+  };
+}
+
 function tabLabel(name: string, dirty: boolean, preview: boolean): string {
   if (dirty) return `${name}, unsaved changes`;
   return preview ? `${name}, preview` : name;
@@ -109,6 +125,7 @@ function DocumentTab({
       // A double click is the reader asking for the tab to stay; a kept tab
       // has nothing further to give.
       onDoubleClick={preview ? () => onKeep(value) : undefined}
+      {...middleClickCloses(() => onClose(value))}
       // The open document is a source the user can hand to another surface —
       // dropping a tab on the Agent composer binds it as explicit context.
       onContextMenu={(event) => onContextMenu(event, value)}
@@ -252,6 +269,7 @@ export function DocumentTabs({
             <TabItem
               aria-keyshortcuts="Delete"
               label="New tab"
+              {...middleClickCloses(newTab.close)}
               onKeyDown={(event) => {
                 if (event.key !== 'Delete') return;
                 event.preventDefault();

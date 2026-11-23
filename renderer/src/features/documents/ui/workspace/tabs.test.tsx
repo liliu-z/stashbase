@@ -171,6 +171,25 @@ describe('document tabs', () => {
     expect(screen.queryByRole('region', { name: 'Document workspace' })).toBeNull();
   });
 
+  it('closes a tab with a middle click without starting autoscroll', async () => {
+    const runtime = createRuntime();
+    runtimes.push(runtime);
+    const user = userEvent.setup();
+    withQueryClient(<DocumentTabs runtime={runtime} />);
+
+    const other = screen.getByRole('tab', { name: 'other.md' });
+    // Pressing the wheel alone is refused, so Windows has no autoscroll to start.
+    expect(fireEvent.mouseDown(other, { button: 1 })).toBe(false);
+    expect(runtime.store.getState().tabs.map((tab) => tab.id)).toEqual(['tab-1', 'tab-2']);
+
+    await user.pointer({ keys: '[MouseMiddle]', target: other });
+    expect(runtime.store.getState().tabs.map((tab) => tab.id)).toEqual(['tab-1']);
+
+    // A primary click still only activates.
+    await user.click(screen.getByRole('tab', { name: 'plan.md' }));
+    expect(runtime.store.getState().tabs.map((tab) => tab.id)).toEqual(['tab-1']);
+  });
+
   it('keeps a newly opened active tab visible in an overflowing tab list', async () => {
     const runtime = createRuntime();
     runtimes.push(runtime);
