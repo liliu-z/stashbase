@@ -3170,7 +3170,30 @@ gates, host types, account contracts, documentation checks, Electron boundary
 tests and the built native smoke. The built scheduled-downgrade Story was
 inspected and its confirmation/back flow driven; no live payment was initiated.
 
-**Default Agent billing:** Settings -> Agents shows the subscription, reached also
+**Desktop invitations and rewards (D1):** Settings → Account reads the
+current invitation, anonymous history, credit grants and recent personal
+entitlement activity through the account
+adapter and `server/routes/referrals.ts`, independently of Agent installation.
+`server/referral-account.ts` guards claim and Checkout with the signed-in session
+generation, the accepted code and campaign version, and the current referral
+revision. Closing Settings leaves the Node attempt recoverable. A browser return
+refreshes subscription and referral state. The Account tests cover a binding
+that completes later, explicit skip, the campaign-pinned Checkout price, and
+consent to paying immediately. The host tests cover a competing Checkout during
+claim, same-choice retry, same-price benefit switching, and rejection of an old
+session after a same-account re-sign-in. A renderer test withdraws the old
+account view while a peer-window identity change is being read. J01's controlled
+Default Agent flow uses a zero-base positive-bonus fixture and completes a
+reply. A Chromium pass at 460 px drove the Account Story through invitation
+acceptance, immediate-payment consent, dismissal, and a switch back to rewards.
+The Story and focused Account tests verify recent activity and stable ID
+deduplication alongside grant balance and expiry.
+The built Node host passed guarded Checkout and folder-free referral reads
+against a controlled API. The built native Auth smoke verified the credits-v1
+request through the system proxy. Live billing, reward settlement, and a
+real-provider bonus-funded desktop reply remain external verification.
+
+**Default Agent billing:** Settings → Account shows the subscription, reached also
 from the sidebar account menu, through
 `settings/hooks/use-billing.ts` and `settings/ui/agents/subscription-rows.tsx`.
 `server/hosted-account.ts` calls the hosted billing plans, status, Checkout, and

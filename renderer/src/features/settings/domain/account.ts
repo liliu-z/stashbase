@@ -11,6 +11,8 @@
 export type AccountOffer = 'sign-in';
 
 export interface HostedAccount {
+  /** Non-secret host fence, stable through an access-token refresh. */
+  readonly generation?: string;
   /** The server's own route for the provider's picture, or null when the
    *  provider gave none. The picture itself is fetched as bytes. */
   readonly avatarUrl: string | null;

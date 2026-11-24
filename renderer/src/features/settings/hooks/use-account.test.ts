@@ -29,6 +29,31 @@ function mount(port = accountPort(), openExternal = vi.fn()) {
 }
 
 describe('useAccount', () => {
+  it('withdraws a peer window’s old identity until the host confirms the replacement', async () => {
+    const port = accountPort(SIGNED_IN_ACCOUNT);
+    const { hook } = mount(port);
+    await waitFor(() => expect(hook.result.current.account).toEqual(SIGNED_IN_ACCOUNT));
+    let finish!: (account: typeof SIGNED_IN_ACCOUNT) => void;
+    vi.mocked(port.load).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const channel = new BroadcastChannel('stashbase-account');
+    try {
+      // BroadcastChannel is same-origin and has no targetOrigin argument.
+      // oxlint-disable-next-line unicorn/require-post-message-target-origin
+      channel.postMessage('identity');
+      await waitFor(() => expect(hook.result.current.account).toBeNull());
+      const replacement = { ...SIGNED_IN_ACCOUNT, generation: 'b'.repeat(43) };
+      await act(async () => finish(replacement));
+      await waitFor(() => expect(hook.result.current.account).toEqual(replacement));
+    } finally {
+      channel.close();
+    }
+  });
+
   it('replaces an account read begun before authentication failed, sharing concurrent recovery', async () => {
     const port = accountPort(SIGNED_IN_ACCOUNT);
     const { hook, queryClient } = mount(port);

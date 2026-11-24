@@ -32,7 +32,7 @@ Notifications, General, and Advanced. Each section opens at its top. Unavailable
 platform capabilities stay named and disabled in navigation.
 
 - **Account:** signed-in identity, primary email and Google connection status,
-  connection/disconnection, credits and subscription, and sign-out. The account
+  connection/disconnection, credits and subscription, invitations and rewards, and sign-out. The account
   menu's Sign-in methods and Plans and billing entries both open this page.
   Account and billing remain available independently of agent runtime readiness.
 - **Appearance:** user-wide theme and interface preferences:
@@ -421,6 +421,16 @@ is Stripe-hosted; the renderer receives only that page, and no desktop session
 token travels in a link. Promotion codes are entered on the Checkout page, which
 shows the discount and renewal terms. Opening billing never sends a draft.
 
+An account with a live invitation offer chooses a benefit for the listed plan
+before opening Checkout. Keeping the invitation reward disables promotion-code
+entry. Choosing a discount shows the price due immediately before any discount
+and requires consent to skip the automatic Plus trial for this attempt. An applied
+discount on the qualifying first invoice replaces both rewards. A failed or
+abandoned Checkout leaves the invitation recoverable. When the reader returns or
+changes the choice at the same price, the API checks the earlier session before
+allowing a replacement. Returning to the desktop refreshes account data and
+cannot confirm a payment or reward by itself.
+
 After Checkout opens, Settings shows that it is waiting for payment and polls
 subscription rights, also re-reading them when the window regains focus. It stops
 polling after two minutes and keeps the purchase buttons hidden until the reader
@@ -471,3 +481,27 @@ the background recovery worker is delayed. Refunds are permanent for the user;
 late provider accounting changes platform cost only. Normal active generations
 do not become free just because execution lasts five minutes. Service safety
 limits still apply to repeated failures and platform-paid waivers.
+
+
+### Invitations and rewards
+
+Settings → Account can show an eligible inviter's share link and code. Both copy
+actions use the normal clipboard. The reader can check a code by hand and see
+the campaign's terms, reward amounts, enrollment end, and payment and credit
+windows. Accept invitation binds the displayed code and terms to the signed-in
+account. A pending code must bind successfully or the reader must choose
+Continue without invitation before starting Checkout, including a trial.
+Invitation lookup, acceptance and history are available before local Default
+Agent setup and do not activate a free allowance period.
+
+Accepted invitations show the payment deadline, any expected trial charge, and
+payment confirmation status. Outbound activity uses anonymous friend labels.
+Reward grants display the current entitlement, available balance, status and
+expiry for each grant. Recent reward activity shows the account's own issuance,
+refunds, disputes, restorations and corrections when supplied by the API.
+Entries show the time and public entitlement amounts and use the operation ID
+to avoid duplicates across refreshes. The sidebar and account view show the API's total
+available Agent credits, base and bonus balances, reservations and provisional
+fees. Monthly refill applies to base credits. Bonus credits have individual
+expiry dates and can fund a Default Agent reply with no base credits left.
+Local work and external Agents continue independently.

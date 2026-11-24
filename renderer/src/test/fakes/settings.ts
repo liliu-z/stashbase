@@ -33,7 +33,9 @@ export const SIGNED_OUT_ACCOUNT: HostedAccount = {
 };
 
 /** A signed-in account with the profile Google reported. */
+export const TEST_GENERATION = 'a'.repeat(43);
 export const SIGNED_IN_ACCOUNT: HostedAccount = {
+  generation: TEST_GENERATION,
   avatarUrl: null,
   displayName: 'Ada Lovelace',
   email: 'ada@example.com',
@@ -47,7 +49,28 @@ export function accountPort(
   account: HostedAccount = SIGNED_OUT_ACCOUNT,
   overrides: Partial<AccountPort> = {},
 ): AccountPort {
+  const empty = { creditUnit: 'credits-v1', items: [], nextCursor: null } as const;
   return {
+    referrals: {
+      load: async () => ({
+        binding: null,
+        invitation: null,
+        draft: null,
+        checkoutStarted: false,
+        referralRevision: '0',
+        claimEligibility: 'eligible',
+        summary: {
+          registered: 0,
+          confirming: 0,
+          rewarded: 0,
+        },
+      }),
+      preview: async () => ({ available: false, reason: 'code_unavailable' }),
+      accept: async () => {},
+      skip: async () => {},
+      history: async () => ({ ...empty, items: [] }),
+      grants: async () => ({ ...empty, items: [] }),
+    },
     sendEmail: vi.fn(async () => ({ flowId: 'email-flow' })),
     verifyEmail: vi.fn(async () => SIGNED_IN_ACCOUNT),
     cancelEmail: vi.fn(async () => {}),

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { accountGenerationSchema } from './referrals';
 
 const embedderProviderSchema = z.enum(['openai', 'openrouter']);
 
@@ -8,6 +9,7 @@ export const hostedAccountStateSchema = z
     avatarUrl: z.string().max(4096).optional(),
     displayName: z.string().max(240).optional(),
     email: z.string().max(320).optional(),
+    generation: accountGenerationSchema.optional(),
     offers: z.array(z.string().max(64)).max(8).optional(),
     signedIn: z.boolean(),
   })

@@ -37,6 +37,8 @@ import {
   type HostedOAuthStatusWire,
 } from '@/protocols/http/embedder';
 
+import { createReferralAdapter } from './referral-api';
+
 function accessRequest(path: string, signal: AbortSignal) {
   return {
     ...settingsRequest({ path, signal, failureSchema: embedderFailureSchema }),
@@ -49,6 +51,7 @@ function toAccount(wire: HostedAccountStateWire): HostedAccount {
     avatarUrl: wire.avatarUrl ?? null,
     displayName: wire.displayName ?? null,
     email: wire.email ?? null,
+    ...(wire.generation ? { generation: wire.generation } : {}),
     // An offer this build does not know is not shown.
     offers: (wire.offers ?? []).filter((offer): offer is AccountOffer => offer === 'sign-in'),
     signedIn: wire.signedIn,
@@ -82,6 +85,7 @@ export function createAccountAdapter(
 ): AccountPort {
   const avatarTarget = new URL('/api/account/avatar', serverOrigin);
   return {
+    referrals: createReferralAdapter(client),
     async sendEmail(email, signal) {
       return request(client, {
         ...accessRequest('/api/account/email/send', signal),

@@ -35,7 +35,11 @@ import { SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar-menu
 import type { AgentRuntimePort } from '@/features/settings/application/ports';
 import { agentAllowanceQuery } from '@/features/settings/application/queries';
 import { accountLabel } from '@/features/settings/domain/account';
-import { reservedCreditsDetail } from '@/features/settings/domain/agent-allowance';
+import {
+  creditHoldDetail,
+  formatCredits,
+  reservedCreditsDetail,
+} from '@/features/settings/domain/agent-allowance';
 import { useAccountView } from '@/features/settings/hooks/account-context';
 import { ProgressBar } from '@/features/settings/ui/rows';
 import type { IconComponentProps } from '@/lib/icon-context';
@@ -81,7 +85,10 @@ export function SidebarAccountRow({
   const sizeClasses = useSize();
   const person = account.account;
   const signedIn = person?.signedIn ?? false;
-  const credits = useQuery({ ...agentAllowanceQuery(agentRuntimeApi), enabled: signedIn });
+  const credits = useQuery({
+    ...agentAllowanceQuery(agentRuntimeApi, person?.generation),
+    enabled: signedIn,
+  });
 
   useWindowFocus(credits.refetch, signedIn);
 
@@ -116,8 +123,9 @@ export function SidebarAccountRow({
   }
 
   const label = accountLabel(person);
+  const breakdown = credits.isError ? undefined : credits.data?.creditBreakdown;
   const percent =
-    credits.isError || credits.data === undefined
+    breakdown || credits.isError || credits.data === undefined
       ? null
       : clamp(Math.round(credits.data.remainingPercent), 0, 100);
   const reserved = percent !== null && credits.data ? reservedCreditsDetail(credits.data) : null;
@@ -170,10 +178,24 @@ export function SidebarAccountRow({
                 Agent credits
               </span>
               <span className="text-muted-foreground">
-                {percent !== null ? `${percent}%` : credits.isError ? 'Unavailable' : '…'}
+                {breakdown
+                  ? formatCredits(breakdown.agentAvailableCredits)
+                  : percent !== null
+                    ? `${percent}%`
+                    : credits.isError
+                      ? 'Unavailable'
+                      : '…'}
               </span>
             </span>
             {percent !== null && <ProgressBar className="mt-1.5" value={percent} />}
+            {breakdown && (
+              <span className="mt-1.5 block text-muted-foreground">
+                {formatCredits(breakdown.base.availableCredits)} base ·{' '}
+                {formatCredits(breakdown.bonus.availableCredits)} bonus
+                <br />
+                {creditHoldDetail(breakdown)}
+              </span>
+            )}
             {reserved && (
               <span
                 className="mt-1.5 block text-muted-foreground"

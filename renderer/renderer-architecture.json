@@ -76,6 +76,7 @@
     "shared/protocols/http/github-import.ts",
     "shared/protocols/http/index-status.ts",
     "shared/protocols/http/project.ts",
+    "shared/protocols/http/referrals.ts",
     "shared/protocols/http/request-diagnostics.ts",
     "shared/protocols/http/scheduled-tasks.ts",
     "shared/protocols/http/mcp.ts",

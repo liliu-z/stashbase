@@ -11,7 +11,8 @@ import { App } from '@/app/shell';
 import { typeInto } from '@/test/dom';
 import { agentDefinition, agentSessionPort, CODEX_AGENT } from '@/test/fakes/agent';
 import { appDependencies } from '@/test/fakes/app';
-import { SIGNED_IN_ACCOUNT, SIGNED_OUT_ACCOUNT } from '@/test/fakes/settings';
+import { BONUS_ONLY_CREDITS } from '@/test/fakes/credits';
+import { IDLE_ALLOWANCE, SIGNED_IN_ACCOUNT, SIGNED_OUT_ACCOUNT } from '@/test/fakes/settings';
 import { projectRegistrySnapshot } from '@/test/fakes/workspace';
 
 const providers = [
@@ -141,6 +142,13 @@ function onboarding(provider: Provider) {
       };
     },
   };
+  if (provider.id === 'stashbase') {
+    dependencies.settings.agentRuntimeApi.getAllowance = async () => ({
+      ...IDLE_ALLOWANCE,
+      remainingPercent: 0,
+      creditBreakdown: BONUS_ONLY_CREDITS,
+    });
+  }
   dependencies.settings.accountApi.load = vi.fn(async () =>
     signedIn ? SIGNED_IN_ACCOUNT : SIGNED_OUT_ACCOUNT,
   );
@@ -321,6 +329,11 @@ it.each(providers)(
     await act(async () => fixture.signIn());
     await screen.findByText(`${provider.label} reply: ${request}`, {}, { timeout: 5000 });
     expect(fixture.prompts).toEqual([request]);
+    if (provider.id === 'stashbase') {
+      await user.click(await screen.findByRole('button', { name: 'Account: Ada Lovelace' }));
+      await screen.findByText(/0 base · 0\.5 bonus/);
+      await user.keyboard('{Escape}');
+    }
     expect(screen.queryByRole('button', { name: 'Stop' })).toBeNull();
 
     if (provider.id !== 'stashbase') {

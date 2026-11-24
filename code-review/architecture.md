@@ -1110,7 +1110,9 @@ data migration is not required by [maintenance policy](../MAINTENANCE.md#previou
   may clear matching saved credentials. Malformed successful responses are not
   evidence of revocation. Network, timeout, rate-limit, and server failures preserve them.
   Credits and billing return 401 when authentication is lost during their request,
-  as they do for a request begun signed out; other upstream failures remain 502.
+  as they do for a request begun signed out. A replaced signed-in session returns
+  an account conflict. Referral and guarded Checkout requests preserve the
+  allowlisted business codes and retry timing.
   Their renderer request owner re-reads the authoritative account query after a
   typed authentication refusal, only while its initiating cached identity remains
   current. Confirmed identity changes invalidate Agent readiness. A new email
@@ -1118,6 +1120,19 @@ data migration is not required by [maintenance policy](../MAINTENANCE.md#previou
   retain sign-in and Retry; recovery does not replay billing mutations.
   Unreadable Auth responses retain upstream status, content type, request ID and
   safe parse/transport causes. Parser body excerpts never enter diagnostics.
+- Host account transport owns referral preview, binding, history, grant reads,
+  the account's recent reward activity, and versioned Checkout. Shared HTTP schemas validate the cloud and loopback
+  payloads. Loopback requests use an opaque Node-owned generation that stays
+  stable through access-token refresh. Node checks it before sending, after
+  reading, and before retrying on 401. Only Node handles the canonical auth
+  subject and cloud bearer token. Renderer caches and command lifetimes follow
+  the generation. A cross-window notification carries only a refresh hint.
+- Node keeps the pending code and current request identity for the signed-in host
+  session. Another window sees the same Checkout readiness. Claim and Checkout
+  cannot run simultaneously in the desktop host, and the API remains responsible
+  for cross-client serialization, eligibility, and durable payment recovery.
+  The renderer must re-read the host identity before handing a result to the
+  browser. OAuth and billing return links carry no invitation or credential data.
 - `server/hosted-auth-transport.ts` sends desktop Auth exchange, refresh, profile
   and logout requests through `electron/account/auth-network.ts`. Electron owns
   an in-memory Chromium session in system-proxy mode; Node retains PKCE, session
@@ -1199,7 +1214,9 @@ data migration is not required by [maintenance policy](../MAINTENANCE.md#previou
   the monthly ledger; the existing `paidThrough` field is the confirmed access
   end for either. The API keeps trials recognizable as `active` in the legacy
   `status` field and supplies their actual state in `subscriptionStatus`; the
-  renderer prefers the latter and falls back for older servers. Ledger decisions
+  renderer prefers the latter and falls back for older servers. Available Agent
+  credits come from the published `credits-v1` total, with fixed-point source
+  amounts for display. A base balance alone cannot gate an Agent turn. Ledger decisions
   remain server-owned. The desktop displays the published monthly amount and terms
   without deciding eligibility; it exposes bounded usage, plans, and
   subscription status. The host requests Checkout and Portal pages with the

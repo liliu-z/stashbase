@@ -1,3 +1,4 @@
+import type { ReferralPort } from '@/features/settings/application/referral-port';
 import type {
   AccountOffer,
   HostedAccount,
@@ -17,6 +18,7 @@ import type {
 import type { BillingChange, BillingPlan, BillingStatus } from '@/features/settings/domain/billing';
 import type { LocalComponentStatus } from '@/features/settings/domain/local-component';
 import type { McpAccess, McpHttpAccess } from '@/features/settings/domain/mcp-access';
+import type { ReferralCheckoutInput } from '@/features/settings/domain/referrals';
 import type { AgentId } from '@/shared/domain/agent-id';
 import {
   featureErrorClass,
@@ -35,16 +37,15 @@ export interface AgentRuntimePort {
     signal: AbortSignal,
   ): Promise<AgentCatalog>;
   updateDebug(patch: AgentDebugPatch, signal: AbortSignal): Promise<AgentCatalog>;
-  getAllowance(signal: AbortSignal): Promise<AgentAllowance>;
+  getAllowance(signal: AbortSignal, generation?: string): Promise<AgentAllowance>;
   /** The public plan catalog. */
   getBillingPlans(signal: AbortSignal): Promise<readonly BillingPlan[]>;
-  getBillingStatus(signal: AbortSignal): Promise<BillingStatus>;
-  changeBilling(input: BillingChange, signal: AbortSignal): Promise<void>;
-  /** A Stripe Checkout page for this account and plan; promotion codes are
-   *  entered there. */
-  startCheckout(priceId: string, signal: AbortSignal): Promise<string>;
+  getBillingStatus(signal: AbortSignal, generation?: string): Promise<BillingStatus>;
+  changeBilling(input: BillingChange, signal: AbortSignal, generation?: string): Promise<void>;
+  /** A Stripe page offered for this account’s explicit Checkout choice. */
+  startCheckout(input: ReferralCheckoutInput, signal: AbortSignal): Promise<string>;
   /** The Stripe Customer Portal for an existing subscription. */
-  openBillingPortal(signal: AbortSignal): Promise<string>;
+  openBillingPortal(signal: AbortSignal, generation?: string): Promise<string>;
 }
 
 export type AgentRuntimeFailureKind = TransportFailureKind;
@@ -72,6 +73,7 @@ export interface SystemTextPort {
  *  hands the URL to the browser, and polls until the server says the flow
  *  finished. Sign-out answers with the signed-out account. */
 export interface AccountPort {
+  readonly referrals: ReferralPort;
   /** The provider's picture as bytes, or null when there is none to show.
    *  Optional throughout: a missing picture is an initials fallback, never a
    *  failure. */

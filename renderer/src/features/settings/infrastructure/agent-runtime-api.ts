@@ -32,7 +32,6 @@ import {
   agentRuntimeFailureSchema,
   agentsResponseSchema,
   hostedAgentAllowanceSchema,
-  hostedBillingCheckoutRequestSchema,
   hostedBillingPlansSchema,
   hostedBillingRedirectSchema,
   hostedBillingStatusSchema,
@@ -47,6 +46,9 @@ import {
   type HostedBillingPlanWire,
   type HostedBillingStatusWire,
 } from '@/protocols/http/agent-runtime';
+import { referralCheckoutInputSchema } from '@/protocols/http/referrals';
+
+import { referralRequest } from './referral-api';
 
 /** The service names a step after the mechanism that runs it; the track names
  *  it after what the reader is waiting for. */
@@ -156,6 +158,7 @@ function toAllowance(wire: HostedAgentAllowanceWire): AgentAllowance {
     inputTokens: wire.inputTokens,
     outputTokens: wire.outputTokens,
     remainingPercent: wire.remainingPercent,
+    ...(wire.creditBreakdown ? { creditBreakdown: wire.creditBreakdown } : {}),
     ...(wire.reservedPercent !== undefined ? { reservedPercent: wire.reservedPercent } : {}),
     windowEndsAt: wire.windowEndsAt,
   };
@@ -217,6 +220,10 @@ async function catalog(
   );
 }
 
+function accountPath(path: string, generation?: string): string {
+  return generation ? `${path}?${new URLSearchParams({ generation })}` : path;
+}
+
 export function createAgentRuntimeAdapter(client: HttpClient): AgentRuntimePort {
   return {
     listAgents(signal) {
@@ -234,10 +241,12 @@ export function createAgentRuntimeAdapter(client: HttpClient): AgentRuntimePort 
         method: 'PUT',
       });
     },
-    async getAllowance(signal) {
+    async getAllowance(signal, generation) {
       return toAllowance(
         await request(client, {
-          ...runtime('/api/account/agent-usage', signal, { method: 'GET' }),
+          ...runtime(accountPath('/api/account/agent-usage', generation), signal, {
+            method: 'GET',
+          }),
           schema: hostedAgentAllowanceSchema,
         }),
       );
@@ -249,36 +258,38 @@ export function createAgentRuntimeAdapter(client: HttpClient): AgentRuntimePort 
       });
       return answer.plans.map(toBillingPlan);
     },
-    async getBillingStatus(signal) {
+    async getBillingStatus(signal, generation) {
       return toBillingStatus(
         await request(client, {
-          ...runtime('/api/account/billing/status', signal, { method: 'GET' }),
+          ...runtime(accountPath('/api/account/billing/status', generation), signal, {
+            method: 'GET',
+          }),
           schema: hostedBillingStatusSchema,
         }),
       );
     },
-    async changeBilling(input, signal) {
+    async changeBilling(input, signal, generation) {
       await request(client, {
-        ...runtime('/api/account/billing/change', signal, {
-          body: hostedBillingChangeRequestSchema.parse(input),
-          method: 'POST',
-        }),
+        ...referralRequest(accountPath('/api/account/billing/change', generation), signal),
+        body: hostedBillingChangeRequestSchema.parse(input),
+        method: 'POST',
         schema: hostedBillingChangeResponseSchema,
       });
     },
-    async startCheckout(priceId, signal) {
+    async startCheckout(input, signal) {
       const answer = await request(client, {
-        ...runtime('/api/account/billing/checkout', signal, {
-          body: hostedBillingCheckoutRequestSchema.parse({ priceId }),
-          method: 'POST',
-        }),
+        ...referralRequest('/api/account/billing/checkout', signal),
+        body: referralCheckoutInputSchema.parse(input),
+        method: 'POST',
         schema: hostedBillingRedirectSchema,
       });
       return answer.url;
     },
-    async openBillingPortal(signal) {
+    async openBillingPortal(signal, generation) {
       const answer = await request(client, {
-        ...runtime('/api/account/billing/portal', signal, { method: 'POST' }),
+        ...runtime(accountPath('/api/account/billing/portal', generation), signal, {
+          method: 'POST',
+        }),
         schema: hostedBillingRedirectSchema,
       });
       return answer.url;

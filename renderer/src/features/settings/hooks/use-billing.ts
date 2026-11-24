@@ -12,7 +12,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 
-import type { AgentRuntimePort } from '@/features/settings/application/ports';
+import { checkoutFailure } from '@/features/settings/application/failure-messages';
+import type { AccountPort, AgentRuntimePort } from '@/features/settings/application/ports';
 import {
   accountRequest,
   billingPlansQuery,
@@ -26,6 +27,11 @@ import {
   type BillingChange,
   type BillingStatus,
 } from '@/features/settings/domain/billing';
+import {
+  ReferralRequestError,
+  type ReferralCheckoutInput,
+} from '@/features/settings/domain/referrals';
+import { broadcastAccountChange } from '@/features/settings/hooks/account-signals';
 import { anyBusy, useSettingsCommand } from '@/features/settings/hooks/use-settings-command';
 import type { FailureView } from '@/shared/domain/feature-error';
 import { useWindowFocus } from '@/shared/runtime/use-window-focus';
@@ -55,7 +61,7 @@ export interface BillingViewModel {
   readonly opening: BillingOpening | null;
   readonly browserPage: 'checkout' | 'portal' | null;
   readonly failure: FailureView | null;
-  subscribe(priceId: string): void;
+  subscribe(input: ReferralCheckoutInput): void;
   manage(): void;
   change(input: BillingChange): void;
   refresh(): void;
@@ -67,6 +73,9 @@ export function useBilling(
   port: AgentRuntimePort,
   openExternal: (href: string) => Promise<boolean> | void,
   signedIn: boolean,
+  accountPort?: Pick<AccountPort, 'load'>,
+  generation?: string,
+  onCheckoutChanged?: (error?: unknown) => void,
 ): BillingViewModel {
   const queryClient = useQueryClient();
   const [confirmingSince, setConfirmingSince] = useState<number | null>(null);
@@ -80,7 +89,7 @@ export function useBilling(
 
   const plans = useQuery({ ...billingPlansQuery(port), enabled: signedIn });
   const status = useQuery({
-    ...billingStatusQuery(port),
+    ...billingStatusQuery(port, generation),
     enabled: signedIn,
     refetchInterval: (query) =>
       waiting || query.state.data?.changePending ? CONFIRM_POLL_MS : false,
@@ -124,8 +133,17 @@ export function useBilling(
     void queryClient.invalidateQueries({ queryKey: settingsQueryKeys.agentCatalog });
   }, [confirmingSince, flow, queryClient, status.data]);
 
-  const openPage = async (url: string, kind: 'checkout' | 'portal') => {
+  const openPage = async (url: string, kind: 'checkout' | 'portal', signal: AbortSignal) => {
+    if (accountPort && generation) {
+      const current = await accountPort.load(signal);
+      signal.throwIfAborted();
+      if (current.generation !== generation || !current.signedIn) {
+        void queryClient.invalidateQueries({ queryKey: settingsQueryKeys.account, exact: true });
+        throw new ReferralRequestError('referral_account_changed', 409);
+      }
+    }
     if ((await openExternal(url)) === false) throw new Error('The browser did not open.');
+    signal.throwIfAborted();
     setFlow((current) => (current === 'checkout' ? current : kind));
     setSlow(false);
     setConfirmingSince(Date.now());
@@ -133,30 +151,42 @@ export function useBilling(
 
   const checkout = useSettingsCommand(
     'billingCheckout',
-    (priceId: string, signal) =>
-      accountRequest(queryClient, signal, () => port.startCheckout(priceId, signal)),
+    (input: ReferralCheckoutInput, signal) =>
+      accountRequest(queryClient, signal, () => port.startCheckout(input, signal)),
     {
-      onStart: (priceId) => {
+      readFailure: checkoutFailure,
+      onStart: ({ priceId }) => {
         setBrowserPage('checkout');
         setCheckoutPrice(priceId);
       },
-      onDone: (url) => openPage(url, 'checkout'),
+      onDone: (url, _input, signal) => openPage(url, 'checkout', signal),
       // A refusal such as an existing subscription changes what the panel
       // should offer, so the rights are read again.
-      onFailed: refreshStatus,
+      onFailed: (_input, error) => {
+        void plans.refetch();
+        refreshStatus();
+        onCheckoutChanged?.(error);
+      },
+      onSettled: () => {
+        void queryClient.invalidateQueries({ queryKey: settingsQueryKeys.referrals });
+        broadcastAccountChange('referrals');
+      },
     },
   );
   const portal = useSettingsCommand(
     'billingPortal',
     (_input: void, signal) =>
-      accountRequest(queryClient, signal, () => port.openBillingPortal(signal)),
-    { onStart: () => setBrowserPage('portal'), onDone: (url) => openPage(url, 'portal') },
+      accountRequest(queryClient, signal, () => port.openBillingPortal(signal, generation)),
+    {
+      onStart: () => setBrowserPage('portal'),
+      onDone: (url, _input, signal) => openPage(url, 'portal', signal),
+    },
   );
 
   const change = useSettingsCommand(
     'billingChange',
     (input: BillingChange, signal) =>
-      accountRequest(queryClient, signal, () => port.changeBilling(input, signal)),
+      accountRequest(queryClient, signal, () => port.changeBilling(input, signal, generation)),
     { onSettled: refreshStatus },
   );
 
@@ -175,7 +205,7 @@ export function useBilling(
     failure:
       change.failure ??
       (browserPage === 'checkout' && checkout.failure
-        ? { message: 'Could not open the payment page. Try again.', tone: checkout.failure.tone }
+        ? checkout.failure
         : browserPage === 'portal' && portal.failure
           ? {
               message:
@@ -202,6 +232,6 @@ export function useBilling(
       setConfirmingSince(null);
       setSlow(false);
     },
-    subscribe: (priceId) => checkout.run(priceId),
+    subscribe: (input) => checkout.run(input),
   };
 }

@@ -3,12 +3,12 @@ import express from 'express';
 import { emailProofSchema, emailSendSchema, emailVerifySchema, emailCancelSchema, accountLinkActionSchema } from '../../shared/protocols/http/embedder.ts';
 import { getHostedAccountSession, markAccountOfferSeen, resetAccountOffers } from '../app-config.ts';
 import {
+  assertHostedGeneration,
   beginHostedOAuth,
   sendHostedEmail, verifyHostedEmail, cancelHostedEmail, hostedSignInMethods, accountOperation,
   createFailedHostedOAuthFlow,
   createHostedBillingPortal,
   changeHostedBilling,
-  createHostedCheckout,
   exchangeHostedOAuthCode,
   failHostedOAuth,
   finishHostedOAuth,
@@ -31,11 +31,13 @@ import { processPrivateTokenMatches } from '../process-private-token.ts';
 import { currentWindowId } from '../folder.ts';
 import { stopAgentRuntime } from '../agent-contract.ts';
 import { stopOpenCodeRuntime } from '../opencode-runtime.ts';
+import { hostedAccountFailure, mountReferralRoutes } from './referrals.ts';
+import { referralScopeSchema } from '../../shared/protocols/http/referrals.ts';
+import { HostedApiError } from '../hosted-account.ts';
 
 const log = logger('routes/account');
 const OAUTH_PROVIDERS = new Set<HostedOAuthProvider>(['google']);
 const OAUTH_PURPOSES = new Set<HostedOAuthPurpose>(['account']);
-const PRICE_ID = /^price_[A-Za-z0-9]+$/;
 const OAUTH_RETURN_TOKEN_HEADER = 'x-stashbase-oauth-return-token';
 
 interface AccountRouteOptions {
@@ -59,8 +61,16 @@ function callbackOrigin(req: express.Request): string {
 }
 
 function hostedServiceFailure(res: express.Response, error: unknown): void {
+  if (error instanceof HostedApiError) return hostedAccountFailure(res, error);
   res.locals.diagnosticError = error;
   res.status(isHostedSignInRequired(error) ? 401 : 502).json({ error: errorMessage(error) });
+}
+
+function checkAccountGeneration(req: express.Request): void {
+  if (req.query.generation === undefined) return;
+  const input = referralScopeSchema.safeParse(req.query);
+  if (!input.success) throw new HostedApiError(400, 'invalid_request');
+  assertHostedGeneration(input.data.generation);
 }
 
 export function mount(app: express.Express, { appReturnToken }: AccountRouteOptions): void {
@@ -105,8 +115,9 @@ export function mount(app: express.Express, { appReturnToken }: AccountRouteOpti
     }
   });
 
-  app.get('/api/account/agent-usage', async (_req, res) => {
+  app.get('/api/account/agent-usage', async (req, res) => {
     try {
+      checkAccountGeneration(req);
       if (!getHostedAccountSession()) return res.status(401).json({ error: 'Sign in first.' });
       res.json(await fetchHostedAgentAllowance());
     } catch (error: unknown) {
@@ -122,8 +133,9 @@ export function mount(app: express.Express, { appReturnToken }: AccountRouteOpti
     }
   });
 
-  app.get('/api/account/billing/status', async (_req, res) => {
+  app.get('/api/account/billing/status', async (req, res) => {
     try {
+      checkAccountGeneration(req);
       if (!getHostedAccountSession()) return res.status(401).json({ error: 'Sign in first.' });
       res.json(await fetchHostedBillingStatus());
     } catch (error: unknown) {
@@ -131,32 +143,23 @@ export function mount(app: express.Express, { appReturnToken }: AccountRouteOpti
     }
   });
 
-  app.post('/api/account/billing/checkout', async (req, res) => {
-    const priceId = req.body?.priceId;
-    if (typeof priceId !== 'string' || !PRICE_ID.test(priceId)) {
-      return res.status(400).json({ error: 'Choose a plan to subscribe to.' });
-    }
-    try {
-      if (!getHostedAccountSession()) return res.status(401).json({ error: 'Sign in first.' });
-      res.json(await createHostedCheckout(priceId));
-    } catch (error: unknown) {
-      hostedServiceFailure(res, error);
-    }
-  });
+  mountReferralRoutes(app);
 
   app.post('/api/account/billing/change', async (req, res) => {
     const input = hostedBillingChangeRequestSchema.safeParse(req.body);
     if (!input.success) return res.status(400).json({ error: 'Choose a valid subscription change.' });
     try {
       if (!getHostedAccountSession()) return res.status(401).json({ error: 'Sign in first.' });
+      checkAccountGeneration(req);
       res.json(await changeHostedBilling(input.data));
     } catch (error: unknown) {
       hostedServiceFailure(res, error);
     }
   });
 
-  app.post('/api/account/billing/portal', async (_req, res) => {
+  app.post('/api/account/billing/portal', async (req, res) => {
     try {
+      checkAccountGeneration(req);
       if (!getHostedAccountSession()) return res.status(401).json({ error: 'Sign in first.' });
       res.json(await createHostedBillingPortal());
     } catch (error: unknown) {
@@ -281,8 +284,9 @@ export function mount(app: express.Express, { appReturnToken }: AccountRouteOpti
 
   app.delete('/api/account', async (_req, res) => {
     stopAgentRuntime('stashbase');
+    const signingOut = signOutHostedAccount();
     await stopOpenCodeRuntime();
-    await signOutHostedAccount();
+    await signingOut;
     // The tool catalog is per account; a later sign-in reads its own.
     res.json(await hostedAccountState());
   });

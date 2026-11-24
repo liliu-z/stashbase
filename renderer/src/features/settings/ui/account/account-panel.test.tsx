@@ -10,6 +10,7 @@ import {
 import type { AgentCatalog, AgentRuntime } from '@/features/settings/domain/agent-catalog';
 import type { BillingStatus } from '@/features/settings/domain/billing';
 import { AccountProvider } from '@/features/settings/ui/account/account-provider';
+import { BONUS_ONLY_CREDITS } from '@/test/fakes/credits';
 import {
   accountPort,
   agentRuntime,
@@ -18,10 +19,12 @@ import {
   IDLE_ALLOWANCE,
   SIGNED_IN_ACCOUNT,
   SIGNED_OUT_ACCOUNT,
+  TEST_GENERATION,
 } from '@/test/fakes/settings';
 import { withQueryClient } from '@/test/query';
 
 import { AccountPanel } from './account-panel';
+import { invitationDemo, STORY_INVITE_CODE } from './account-story-fixtures';
 
 function catalog(runtimes: AgentRuntime[], debug?: AgentCatalog['debug']): AgentCatalog {
   return { runtimes, debug: debug ?? null };
@@ -145,6 +148,7 @@ describe('AccountPanel', () => {
     expect(port.changeBilling).toHaveBeenCalledWith(
       { action: 'downgrade', priceId: 'price_plus' },
       expect.anything(),
+      TEST_GENERATION,
     );
     await user.click(screen.getByRole('button', { name: 'Keep current plan' }));
     await user.click(screen.getByRole('button', { name: 'Confirm change' }));
@@ -172,7 +176,15 @@ describe('AccountPanel', () => {
     expect(subscribe).toHaveLength(2);
     await user.click(subscribe[1] as HTMLElement);
 
-    expect(port.startCheckout).toHaveBeenCalledWith('price_pro', expect.anything());
+    expect(port.startCheckout).toHaveBeenCalledWith(
+      {
+        priceId: 'price_pro',
+        generation: TEST_GENERATION,
+        benefit: 'standard',
+        referralRevision: '0',
+      },
+      expect.anything(),
+    );
     expect(rendered.onOpenExternal).toHaveBeenCalledWith(
       'https://checkout.stripe.com/c/pay/cs_test',
     );
@@ -364,5 +376,106 @@ describe('AccountPanel', () => {
     const calls = vi.mocked(port.getAllowance).mock.calls.length;
     window.dispatchEvent(new Event('focus'));
     expect(port.getAllowance).toHaveBeenCalledTimes(calls);
+  });
+
+  it('reviews terms, waits for binding, and requires explicit immediate-payment consent for the pinned offer', async () => {
+    const referrals = invitationDemo();
+    const claim = referrals.accept;
+    let finishClaim!: () => void;
+    referrals.accept = vi.fn(async (input, signal) => {
+      await new Promise<void>((resolve) => {
+        finishClaim = resolve;
+      });
+      return claim(input, signal);
+    });
+    const port = agentRuntimePort({
+      getAllowance: vi.fn(async () => ({
+        ...IDLE_ALLOWANCE,
+        remainingPercent: 0,
+        creditBreakdown: BONUS_ONLY_CREDITS,
+      })),
+    });
+    const user = userEvent.setup();
+    const { onOpenExternal } = renderPanel(port, accountPort(SIGNED_IN_ACCOUNT, { referrals }));
+    await screen.findByText('0.5 Agent credits available');
+    await screen.findByText(/Reward entitlement restored · Entitlement 0.25 → 0.5 credits/);
+    expect(screen.getAllByText(/Reward entitlement restored/)).toHaveLength(1);
+    await screen.findByText(/Friend 1 · Awaiting first payment/);
+    await screen.findByText(/0.5 of 0.5 credits/);
+    await user.type(
+      await screen.findByRole('textbox', { name: 'Invitation code' }),
+      STORY_INVITE_CODE,
+    );
+    await user.click(screen.getByRole('button', { name: 'Check code' }));
+    const accept = await screen.findByRole('button', { name: 'Accept invitation' });
+    expect(
+      screen
+        .getAllByRole<HTMLButtonElement>('button', { name: 'Subscribe' })
+        .every((button) => button.disabled),
+    ).toBe(true);
+    expect(referrals.accept).not.toHaveBeenCalled();
+    await user.click(accept);
+    await waitFor(() => expect(referrals.accept).toHaveBeenCalledOnce());
+    expect(port.startCheckout).not.toHaveBeenCalled();
+    finishClaim();
+    await user.click(await screen.findByRole('button', { name: 'Review Checkout' }));
+    const open = screen.getByRole<HTMLButtonElement>('button', { name: 'Open Checkout' });
+    expect(open.disabled).toBe(true);
+    await user.click(screen.getByRole('radio', { name: /Use a discount/ }));
+    expect(open.disabled).toBe(true);
+    await user.click(screen.getByRole('checkbox', { name: /I agree to pay \$5\.00 immediately/ }));
+    await user.click(open);
+    await waitFor(() =>
+      expect(port.startCheckout).toHaveBeenCalledWith(
+        {
+          generation: TEST_GENERATION,
+          priceId: 'price_campaign_plus',
+          referralRevision: '1',
+          benefit: 'discount',
+          confirmImmediatePayment: true,
+        },
+        expect.any(AbortSignal),
+      ),
+    );
+    await waitFor(() => expect(onOpenExternal).toHaveBeenCalledOnce());
+    await user.click(await screen.findByRole('button', { name: 'Dismiss' }));
+    await user.click(screen.getByRole('radio', { name: /Keep invitation rewards/ }));
+    await user.click(screen.getByRole('button', { name: 'Open Checkout' }));
+    await waitFor(() =>
+      expect(port.startCheckout).toHaveBeenLastCalledWith(
+        {
+          generation: TEST_GENERATION,
+          priceId: 'price_campaign_plus',
+          referralRevision: '1',
+          benefit: 'referral',
+        },
+        expect.any(AbortSignal),
+      ),
+    );
+  });
+
+  it('can explicitly continue without an unavailable invitation', async () => {
+    const user = userEvent.setup();
+    const port = agentRuntimePort();
+    const referrals = invitationDemo();
+    renderPanel(port, accountPort(SIGNED_IN_ACCOUNT, { referrals }));
+    await user.type(
+      await screen.findByRole('textbox', { name: 'Invitation code' }),
+      'invalid-code',
+    );
+    await user.click(screen.getByRole('button', { name: 'Check code' }));
+    await screen.findByText('This invitation code is unavailable.');
+    const [subscribe] = screen.getAllByRole<HTMLButtonElement>('button', { name: 'Subscribe' });
+    if (!subscribe) throw new Error('Expected a plan to subscribe to.');
+    expect(subscribe.disabled).toBe(true);
+    await user.click(screen.getByRole('button', { name: 'Continue without invitation' }));
+    await waitFor(() => expect(subscribe.disabled).toBe(false));
+    await user.click(subscribe);
+    await waitFor(() =>
+      expect(port.startCheckout).toHaveBeenCalledWith(
+        expect.objectContaining({ benefit: 'standard' }),
+        expect.any(AbortSignal),
+      ),
+    );
   });
 });
