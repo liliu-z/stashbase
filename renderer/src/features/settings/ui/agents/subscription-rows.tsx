@@ -134,6 +134,10 @@ export function SubscriptionRows({
     );
   }
 
+  const plusMonthlyGrant = billing.plans.find(
+    (plan) => plan.planKey === 'plus' && plan.interval === 'month' && plan.available,
+  )?.monthlyGrantPicodollars;
+
   return (
     <>
       <SettingsRow
@@ -179,6 +183,10 @@ export function SubscriptionRows({
         />
       )}
       {referrals.plans(billing.plans).map((plan) => {
+        const creditRatio =
+          plan.planKey === 'pro' && plan.interval === 'month' && plusMonthlyGrant
+            ? (plan.monthlyGrantPicodollars ?? 0) / plusMonthlyGrant
+            : 0;
         const reviewing = referrals.hasOffer && referrals.reviewedPriceId === plan.priceId;
         const needsReview = referrals.hasOffer && !reviewing;
         const checkout = referrals.checkout(plan);
@@ -196,7 +204,7 @@ export function SubscriptionRows({
             detail={
               opening
                 ? 'Opening the payment page in your browser.'
-                : `${billingPrice(plan)}${plan.planKey === 'pro' ? ' · 10× the Plus credits' : ''}`
+                : `${billingPrice(plan)}${creditRatio > 1 && Number.isInteger(creditRatio) ? ` · ${creditRatio}× the Plus credits` : ''}`
             }
             key={plan.priceId}
             title={plan.name}

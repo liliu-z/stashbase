@@ -91,7 +91,7 @@ export function accountRuntimePort(): AgentRuntimePort {
       {
         amount: 500,
         planKey: 'plus',
-        monthlyGrantPicodollars: 5e12,
+        monthlyGrantPicodollars: 4e12,
         available: true,
         currency: 'usd',
         interval: 'month',

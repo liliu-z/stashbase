@@ -172,6 +172,7 @@ describe('AccountPanel', () => {
     const user = userEvent.setup();
 
     expect(await screen.findByText('Free · Credits refresh each month.')).not.toBeNull();
+    expect(await screen.findByText(/5× the Plus credits/)).not.toBeNull();
     const subscribe = await screen.findAllByRole('button', { name: 'Subscribe' });
     expect(subscribe).toHaveLength(2);
     await user.click(subscribe[1] as HTMLElement);
