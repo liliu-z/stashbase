@@ -1,5 +1,5 @@
 /**
- * The hosted Default Agent's model profiles, as the StashBase API approves them.
+ * The hosted StashBase Agent's model profiles, as the StashBase API approves them.
  *
  * A profile is the hosted service's name for one configured model: the
  * service owns its upstream model, price, and reasoning level, and the client

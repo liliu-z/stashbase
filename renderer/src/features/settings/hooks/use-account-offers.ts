@@ -34,7 +34,7 @@ export function useAccountOffers(): readonly WorkspaceNotice[] {
     {
       action: { label: 'Sign in', onAct: account.signIn },
       dismissLabel: 'Not now',
-      // What signing in gives, not a commitment to the Default Agent nor the
+      // What signing in gives, not a commitment to the StashBase Agent nor the
       // allowance's terms, which Settings → Account shows.
       message: 'Sign in for free agent credits every month.',
       offer: 'invitation',

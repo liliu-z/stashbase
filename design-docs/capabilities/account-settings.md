@@ -8,7 +8,7 @@ no account.
 
 | Capability | Access source |
 |---|---|
-| Default Agent | StashBase account with free or subscribed agent credits |
+| StashBase Agent | StashBase account with free or subscribed agent credits |
 | Codex / Claude / Antigravity | The native runtime's installation and authentication |
 | Search by meaning | User-supplied embedding key in Settings, billed independently |
 | External HTTP MCP | Current Settings token; separate opt-in for Docker access |
@@ -19,7 +19,7 @@ agent history; supplied environment variables do not configure BYOK access.
 
 When credits or billing reports lost authentication, account surfaces refresh
 the host-owned account state. Confirmed expiry restores Sign in and refreshes
-Default Agent readiness. Network failures keep the signed-in identity and Retry.
+StashBase Agent readiness. Network failures keep the signed-in identity and Retry.
 An old refusal or pending account read cannot replace a newer login; recovery
 never repeats a billing action or a message automatically.
 
@@ -105,7 +105,7 @@ platform capabilities stay named and disabled in navigation.
   application shutdown clear the corresponding marks. System permissions may
   suppress OS badges, and Linux desktops without a tray/launcher host may omit
   these surfaces without interrupting work.
-- **Agents:** runtime installation, connection, and updates for Default, Codex,
+- **Agents:** runtime installation, connection, and updates for StashBase Agent, Codex,
   Claude, and Antigravity. An Open account shortcut leads to account settings. An installed runtime shows its
   version and offers Update when StashBase can select the resulting installation.
   Install and Update both use the provider's official native installer, without
@@ -279,7 +279,7 @@ simulators use a separate development-only entry. Neither belongs in normal Sett
 - External MCP rotation invalidates the old token. Disable retires exposed access
   promptly, including unfinished requests, while ordinary local work remains usable.
 
-Default Agent reduces each model call's output budget to fit the remaining
+StashBase Agent reduces each model call's output budget to fit the remaining
 credits. If a conservative UTF-8 input estimate leaves too little output, the
 service can buffer up to half that input estimate at platform risk, while retaining
 the full supplier reservation. User charges never exceed their reserved credits;
@@ -290,7 +290,7 @@ without claiming the balance is zero. A shorter conversation can reduce input
 cost; otherwise the user can wait for refill or manage their plan.
 
 The sidebar and Settings read the same available-credit snapshot. Refresh it when
-opening the account menu, returning to the window, and finishing a Default Agent
+opening the account menu, returning to the window, and finishing a StashBase Agent
 turn (including failures and cancellations); poll while the signed-in surface is
 mounted so other-device usage and settlement become visible. A stalled credit
 refresh has a bounded wait, preserves sign-in, and can recover on a later read.
@@ -397,17 +397,17 @@ reader to current credits rather than claiming all credits are spent.
 [reporting](../../code-review/architecture.md#bug-report).
 
 
-## Default Agent Subscriptions
+## StashBase Agent Subscriptions
 
 A window that is signed out shows a banner in the notice strip, with or
 without a folder open: "Sign in for free agent credits every month." with Sign in
 and Not now. It states what signing in gives, neither a commitment to use the
-Default Agent nor the allowance's terms, which Settings → Account shows. A completed sign-in or Not now answers it for
+StashBase Agent nor the allowance's terms, which Settings → Account shows. A completed sign-in or Not now answers it for
 the installation until the next sign-out, which brings it back: signed out, the
 reader is where the banner first found them. The sidebar account row
 opens account access, and the banner starts the same sign-in.
 
-Plus and Pro add hosted Default Agent capacity; local files, writing tools,
+Plus and Pro add hosted StashBase Agent capacity; local files, writing tools,
 Claude, Codex, and Antigravity access, and BYOK search remain independent. Settings → Account shows
 the signed-in account's plan, beside its credits; Plans and billing in the
 sidebar account menu opens it there. A Free account sees each tier with its price and
@@ -459,9 +459,11 @@ A paid upgrade preserves consumption and adds the allowance difference in propor
 to the settled payment over the monthly price difference, capped by the new tier.
 Free credits use a separate calendar-month window anchored by first hosted use,
 with month-end clamping and no rollover; there is no first-week grant. Paid
-allowances replace the free ceiling: Plus costs $5/month, and Pro costs $20/month
-with ten times the Plus allowance. Customer-facing copy states no credit amounts
-in dollars. Canceling during the trial keeps Plus until it ends without a charge;
+allowances replace the free ceiling. For new subscriptions, Plus costs $5/month
+with a $4 monthly AI cost allowance, and Pro costs $20/month with a $20 monthly
+AI cost allowance. Existing subscriptions keep the allowance tied to their
+Stripe Price. Customer-facing copy states no credit amounts in dollars.
+Canceling during the trial keeps Plus until it ends without a charge;
 upgrading to Pro during it ends the trial, charges Pro's full monthly price and
 starts a new paid month with its full allowance after payment confirmation.
 Paid upgrades use Stripe prorations. Downgrades take effect at the next renewal:
@@ -491,7 +493,7 @@ the campaign's terms, reward amounts, enrollment end, and payment and credit
 windows. Accept invitation binds the displayed code and terms to the signed-in
 account. A pending code must bind successfully or the reader must choose
 Continue without invitation before starting Checkout, including a trial.
-Invitation lookup, acceptance and history are available before local Default
+Invitation lookup, acceptance and history are available before local StashBase
 Agent setup and do not activate a free allowance period.
 
 Accepted invitations show the payment deadline, any expected trial charge, and
@@ -503,5 +505,5 @@ Entries show the time and public entitlement amounts and use the operation ID
 to avoid duplicates across refreshes. The sidebar and account view show the API's total
 available Agent credits, base and bonus balances, reservations and provisional
 fees. Monthly refill applies to base credits. Bonus credits have individual
-expiry dates and can fund a Default Agent reply with no base credits left.
+expiry dates and can fund a StashBase Agent reply with no base credits left.
 Local work and external Agents continue independently.

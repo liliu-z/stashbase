@@ -11,7 +11,7 @@ import { retireAgentProcess } from './agent-process.ts';
  * running with nothing chosen is remembered as the runtime's default for a
  * runtime that flags none. Claude's read lives in `claude-model-catalog.ts`,
  * because its default comes from the CLI's own settings rather than from the
- * handshake. The Default Agent's catalog is the hosted service's list of
+ * handshake. The StashBase Agent's catalog is the hosted service's list of
  * approved profiles: it belongs to the account rather than this machine, so
  * it is kept in memory only and read again once it is a few minutes old. */
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
@@ -152,7 +152,7 @@ export async function readCodexModelCatalog(
   }
 }
 
-/** The Default Agent's approved profiles, as the picker names them. */
+/** The StashBase Agent's approved profiles, as the picker names them. */
 export async function readHostedAgentModelCatalog(): Promise<CatalogReading> {
   return { models: hostedAgentCatalogModels(await fetchHostedAgentProfiles()) };
 }

@@ -51,7 +51,7 @@ const agents: Agent[] = [
   {
     abilities: { ...abilities, effort: false, models: false, skills: false, steering: false },
     id: 'stashbase',
-    label: 'Default',
+    label: 'StashBase Agent',
     models: [],
     needsSignIn: false,
     ready: true,

@@ -16,7 +16,7 @@ import { IDLE_ALLOWANCE, SIGNED_IN_ACCOUNT, SIGNED_OUT_ACCOUNT } from '@/test/fa
 import { projectRegistrySnapshot } from '@/test/fakes/workspace';
 
 const providers = [
-  { id: 'stashbase', label: 'Default' },
+  { id: 'stashbase', label: 'StashBase Agent' },
   { id: 'claude', label: 'Claude' },
   { id: 'codex', label: 'Codex' },
   { id: 'antigravity', label: 'Antigravity' },
@@ -296,7 +296,7 @@ it.each(providers)(
     // The first provider also loads the lazy workspace module on a cold CI worker.
     await screen.findByRole('textbox', { name: 'Message' }, { timeout: COLD_SURFACE_TIMEOUT_MS });
     if (provider.id !== 'stashbase') {
-      await user.click(screen.getByRole('button', { name: 'Provider: Default' }));
+      await user.click(screen.getByRole('button', { name: 'Provider: StashBase Agent' }));
       await user.click(await screen.findByRole('menuitemradio', { name: provider.label }));
     }
     const request = 'Help me outline an essay';
@@ -404,7 +404,7 @@ it.each(providers)(
       await user.click(await screen.findByRole('menuitemradio', { name: provider.label }));
       await screen.findByRole('button', { name: 'Model and thinking: Writer, High' });
     } else {
-      await screen.findByRole('button', { name: 'Provider: Default' });
+      await screen.findByRole('button', { name: 'Provider: StashBase Agent' });
     }
     typeInto(screen.getByRole('textbox', { name: 'Message' }), 'Start my next essay');
     await user.click(screen.getByRole('button', { name: 'Send' }));

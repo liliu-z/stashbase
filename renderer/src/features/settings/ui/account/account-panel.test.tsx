@@ -57,10 +57,10 @@ describe('AccountPanel', () => {
           agentRuntime({
             id: 'stashbase',
             installed: true,
-            label: 'Default',
+            label: 'StashBase Agent',
             preparation: {
               failure: {
-                note: 'An account is required to use the Default Agent.',
+                note: 'An account is required to use the StashBase Agent.',
                 refusal: 'account-required',
                 stage: 'install',
               },

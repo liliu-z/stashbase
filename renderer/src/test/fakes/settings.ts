@@ -170,7 +170,7 @@ export function agentRuntime(overrides: Partial<AgentRuntime> = {}): AgentRuntim
   return {
     id: 'stashbase',
     installed: true,
-    label: 'Default',
+    label: 'StashBase Agent',
     ownership: 'bundled',
     preparation: { kind: 'ready' },
     upgrade: null,

@@ -4,7 +4,7 @@
  * take minutes, so the step the service reports and when the answer started
  * travel with it for the prompt to show.
  *
- * Only one dialog is ever open. The Default Agent's answer is the account's
+ * Only one dialog is ever open. The StashBase Agent's answer is the account's
  * own sign-in dialog, so the prompt hands over to it and steps aside, still
  * holding the send; it comes back only to say the sign-in did not finish.
  */

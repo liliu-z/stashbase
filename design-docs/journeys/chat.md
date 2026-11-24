@@ -63,7 +63,7 @@ inheriting the user's choice from other projects when this project has none.
 If the selected agent is unavailable, Send presents its access prompt before
 starting login, installation, or a session:
 
-- Default offers Sign in for free agent credits.
+- StashBase Agent offers Sign in for free agent credits.
 - A native agent offers Connect Codex, Connect Claude, or Connect Antigravity
   when it may need installing, and Sign in when only its own sign-in is
   missing, such as an expired one.
@@ -74,7 +74,7 @@ The prompt is about the selected agent. On explicit confirmation, keep the reque
 while access is prepared. Readiness may continue only this same submission once.
 Changing the request, project, conversation, or agent, or cancelling the prompt,
 retires that continuation. Standalone Settings setup never sends a draft.
-Only one dialog is open at a time: Default's Sign in hands over to the
+Only one dialog is open at a time: StashBase Agent's Sign in hands over to the
 account's sign-in dialog instead of staying open beneath it, still holding the
 send, which goes once the account is signed in. If the reader leaves that
 dialog without signing in, the prompt returns saying the message was kept,

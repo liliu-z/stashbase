@@ -1,5 +1,5 @@
 /**
- * The Default Agent subscription: the plan catalog, the account's confirmed
+ * The StashBase Agent subscription: the plan catalog, the account's confirmed
  * rights, and the two Stripe pages the browser opens from here.
  *
  * Checkout opens in the system browser with the desktop account already

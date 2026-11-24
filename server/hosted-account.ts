@@ -87,7 +87,7 @@ export function isHostedSignInRequired(error: unknown): boolean {
 
 function requireHostedAccountSession(): HostedAccountSession {
   const session = getHostedAccountSession();
-  if (!session) throw new HostedAuthError('Sign in to StashBase to use the Default Agent and its free credits.', true);
+  if (!session) throw new HostedAuthError('Sign in to StashBase to use the StashBase Agent and its free credits.', true);
   return session;
 }
 

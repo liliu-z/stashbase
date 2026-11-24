@@ -18,7 +18,7 @@ registerWorkspaceCleanup();
 
 /** The gate asks about the Agent the chat is already on, so the panel it opens
  *  is named after that one. */
-async function requestAccess(name = 'Sign in to use the Default Agent') {
+async function requestAccess(name = 'Sign in to use the StashBase Agent') {
   await agentGateLifted();
   typeInto(screen.getByRole('textbox', { name: 'Message' }), 'Help me write an introduction');
   await userEvent.click(screen.getByRole('button', { name: 'Send' }));
@@ -109,7 +109,7 @@ describe('first-send Agent access', () => {
     const dialog = await requestAccess();
     await userEvent.click(dialog.getByRole('button', { name: 'Sign in' }));
     const back = within(
-      await screen.findByRole('dialog', { name: 'Sign in to use the Default Agent' }),
+      await screen.findByRole('dialog', { name: 'Sign in to use the StashBase Agent' }),
     );
     expect((await back.findByRole('status')).textContent).toBe(
       'Sign-in was not completed.\n\nYour message was kept.',
@@ -180,7 +180,7 @@ describe('first-send Agent access', () => {
       { prepareAgent },
     );
     await agentGateLifted();
-    await userEvent.click(screen.getByRole('button', { name: 'Provider: Default' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Provider: StashBase Agent' }));
     await userEvent.click(await screen.findByRole('menuitemradio', { name: 'Codex' }));
     const dialog = await requestAccess('Connect Codex');
     await userEvent.click(dialog.getByRole('button', { name: 'Connect Codex' }));
@@ -219,7 +219,7 @@ describe('first-send Agent access', () => {
       }),
     });
     await agentGateLifted();
-    await userEvent.click(screen.getByRole('button', { name: 'Provider: Default' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Provider: StashBase Agent' }));
     await userEvent.click(await screen.findByRole('menuitemradio', { name: 'Codex' }));
     const dialog = await requestAccess('Connect Codex');
     await userEvent.click(dialog.getByRole('button', { name: 'Connect Codex' }));
@@ -258,7 +258,7 @@ describe('first-send Agent access', () => {
       prepareAgent,
     });
     await agentGateLifted();
-    await userEvent.click(screen.getByRole('button', { name: 'Provider: Default' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Provider: StashBase Agent' }));
     await userEvent.click(await screen.findByRole('menuitemradio', { name: 'Codex' }));
     // Only the sign-in lapsed, so the gate asks for that and not a setup.
     const dialog = await requestAccess('Sign in to use Codex');

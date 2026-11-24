@@ -1,4 +1,4 @@
-/** The Default Agent's plan rows: the account's plan, the tiers it can buy,
+/** The StashBase Agent's plan rows: the account's plan, the tiers it can buy,
  *  or the wait for a browser payment to confirm. */
 import { Button } from '@/components/ui/button';
 import {

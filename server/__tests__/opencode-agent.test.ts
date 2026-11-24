@@ -404,7 +404,7 @@ test('accounting recovery refusal settles as a rate limit after native retries f
   assert.equal(translator.isTurnActive(), false);
 });
 
-test('Default Agent applies the selected mode to each turn and freezes it while working', async () => {
+test('StashBase Agent applies the selected mode to each turn and freezes it while working', async () => {
   const { session, prompts, send, feed } = modeHarness('plan');
   try {
     await settle();
@@ -606,7 +606,7 @@ test('a trailing native idle event cannot finish the next submitted Default turn
   assert.deepEqual(translator.translate({ type: 'session.idle', properties: { sessionID: 'session-1' } }), [{ t: 'turn-end', isError: false }]);
 });
 
-test('the Default Agent publishes scope retirement once and contains a later native cleanup failure', async () => {
+test('the StashBase Agent publishes scope retirement once and contains a later native cleanup failure', async () => {
   const ws = new FakeWebSocket();
   let closed = 0;
   let fail!: (error: Error) => void;
@@ -657,7 +657,7 @@ test('bundled OpenCode inherits launch plumbing but no ambient credentials or in
   });
 });
 
-test('Default Agent commands find installed Node from a macOS desktop PATH', { skip: process.platform !== 'darwin' }, () => {
+test('StashBase Agent commands find installed Node from a macOS desktop PATH', { skip: process.platform !== 'darwin' }, () => {
   const result = spawnSync('/bin/zsh', ['-c', 'node -p process.versions.node'], {
     encoding: 'utf8',
     env: safeOpenCodeInheritedEnvironment({ PATH: '/usr/bin:/bin:/usr/sbin:/sbin', SHELL: '/bin/zsh' }),
@@ -1116,7 +1116,7 @@ test('a resumed Default chat that last ran on another model continues on the ser
   assert.deepEqual(harness.turns, [{ profile: 'writer-fast', version: 3 }]);
 });
 
-test('an unreadable model list leaves the Default Agent on its unversioned default', async (t) => {
+test('an unreadable model list leaves the StashBase Agent on its unversioned default', async (t) => {
   const harness = modelHarness({ profiles: new Error('offline') });
   t.after(() => harness.session.dispose());
   await settle();

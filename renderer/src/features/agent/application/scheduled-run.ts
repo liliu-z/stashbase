@@ -75,16 +75,15 @@ function when<S, T>(
   });
 }
 
-/** A signed-out account reads as a sign-in the Default Agent needs, the same
+/** A signed-out account reads as a sign-in the StashBase Agent needs, the same
  *  as an expired native sign-in; only what is still missing after that is
- *  setup. In a sentence the bundled runtime is the Default Agent, never the
- *  picker's bare Default. */
+ *  setup. */
 function notReady(agent: Agent | undefined, id: AgentId): string {
   const label = agent?.label ?? agentLabel(id);
   const bundled = id === DEFAULT_AGENT_ID;
   return agent?.needsSignIn
-    ? `Sign in to use ${bundled ? 'the Default Agent' : label}, then run this task again.`
-    : `${bundled ? 'The Default Agent' : label} is not ready on this computer. Set it up in Chat, then run this task again.`;
+    ? `Sign in to use ${bundled ? 'the StashBase Agent' : label}, then run this task again.`
+    : `${bundled ? 'The StashBase Agent' : label} is not ready on this computer. Set it up in Chat, then run this task again.`;
 }
 
 function refusal(result: Exclude<AgentSendResult, { ok: true }>, state: AgentSessionState): string {

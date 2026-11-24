@@ -42,7 +42,7 @@ const claude: AgentRuntime = {
 
 const stashbase: AgentRuntime = {
   id: 'stashbase',
-  label: 'Default',
+  label: 'StashBase Agent',
   installed: true,
   ownership: 'bundled',
   preparation: { kind: 'ready' },

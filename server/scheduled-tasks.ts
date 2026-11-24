@@ -44,14 +44,14 @@ import { missedRuns, withMissedRun } from '../shared/scheduled-task-timing.ts';
 
 const log = logger('scheduled-tasks');
 
-/** The file names Agents by what a reader calls them; `default` is the
- *  built-in runtime. Its implementation id is accepted as well. */
+/** Task files accept display names alongside the existing file values. */
 const FILE_AGENTS: Readonly<Record<string, AgentId>> = {
   antigravity: 'antigravity',
   claude: 'claude',
   codex: 'codex',
   default: 'stashbase',
   stashbase: 'stashbase',
+  'stashbase agent': 'stashbase',
 };
 const FILE_AGENT_NAMES: Readonly<Record<AgentId, string>> = {
   antigravity: 'antigravity',
@@ -153,7 +153,7 @@ function parseTask(raw: unknown, index: number, taken: Set<string>): ParsedSched
           : !time
             ? 'Set a time like 08:00.'
             : agentProblem
-              ? 'Choose Default, Claude, Codex or Antigravity to run this task.'
+              ? 'Choose StashBase Agent, Claude, Codex or Antigravity to run this task.'
               : !files || files.some((file) => file === null) || files.length > SCHEDULED_TASK_LIMITS.files
                 ? 'List each file by its path inside this project.'
                 : record.prompt !== undefined && typeof record.prompt !== 'string'

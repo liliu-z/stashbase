@@ -9,7 +9,7 @@ const catalogBody = {
   clis: [
     {
       id: 'stashbase',
-      label: 'Default',
+      label: 'StashBase Agent',
       vendor: 'StashBase',
       installHint: '',
       installed: true,
@@ -61,7 +61,7 @@ describe('agent runtime API', () => {
         {
           id: 'stashbase',
           installed: true,
-          label: 'Default',
+          label: 'StashBase Agent',
           ownership: 'bundled',
           preparation: { kind: 'ready' },
           updatable: false,

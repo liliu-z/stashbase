@@ -30,7 +30,7 @@ describe('Agent workspace runtime updates', () => {
     };
     const { runtime } = renderWorkspace(port, [claude]);
     await agentGateLifted();
-    await userEvent.click(screen.getByRole('button', { name: 'Provider: Default' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Provider: StashBase Agent' }));
     await userEvent.click(await screen.findByRole('menuitemradio', { name: 'Claude' }));
     expect(screen.queryByRole('button', { name: 'Update Claude' })).toBeNull();
     const session = runtime.activeSession();
@@ -51,7 +51,7 @@ describe('Agent workspace runtime updates', () => {
   it('offers no runtime update in the model picker until a newer release is known', async () => {
     const { listeners, port } = agentSessionPort();
     renderWorkspace(port, [{ ...CODEX_AGENT, updatable: true }]);
-    await userEvent.click(await screen.findByRole('button', { name: 'Provider: Default' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Provider: StashBase Agent' }));
     await userEvent.click(await screen.findByRole('menuitemradio', { name: 'Codex' }));
     await userEvent.click(screen.getByRole('button', { name: 'Model and thinking: Default' }));
     act(() => {
@@ -73,7 +73,7 @@ describe('Agent workspace runtime updates', () => {
     let codex: Agent = { ...CODEX_AGENT, updatable: true };
     const listAgents = vi.fn(async () => ({ agents: [BUILT_IN_AGENT, codex] }));
     renderWorkspace(port, [BUILT_IN_AGENT, codex], undefined, undefined, { listAgents });
-    await userEvent.click(await screen.findByRole('button', { name: 'Provider: Default' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Provider: StashBase Agent' }));
     await userEvent.click(await screen.findByRole('menuitemradio', { name: 'Codex' }));
     await waitFor(() => expect(listAgents).toHaveBeenCalled());
     // The host's release reading lands after every read the chat has made.
@@ -102,7 +102,7 @@ describe('Agent workspace runtime updates', () => {
     };
     const prepareAgent = vi.fn(async () => ({ agents: [installing] }));
     renderWorkspace(port, [codex], undefined, undefined, { prepareAgent });
-    await userEvent.click(await screen.findByRole('button', { name: 'Provider: Default' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Provider: StashBase Agent' }));
     await userEvent.click(await screen.findByRole('menuitemradio', { name: 'Codex' }));
     await userEvent.click(screen.getByRole('button', { name: 'Model and thinking: Default' }));
     act(() => {
@@ -143,7 +143,9 @@ describe('Agent workspace runtime updates', () => {
         };
       });
       const { runtime } = renderWorkspace(port, [codex], undefined, undefined, { prepareAgent });
-      await userEvent.click(await screen.findByRole('button', { name: 'Provider: Default' }));
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Provider: StashBase Agent' }),
+      );
       await userEvent.click(await screen.findByRole('menuitemradio', { name: 'Codex' }));
       await userEvent.type(screen.getByRole('textbox', { name: 'Message' }), 'Keep this draft');
       await userEvent.click(screen.getByRole('button', { name: 'Model and thinking: Default' }));

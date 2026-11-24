@@ -1,5 +1,5 @@
 /**
- * Default Agent subscriptions as the Agents panel reasons about them.
+ * StashBase Agent subscriptions as the Agents panel reasons about them.
  *
  * Stripe owns prices, promotion codes, and payment; the hosted API owns the
  * rights from a confirmed payment or native trial. A browser return is never evidence of payment, so a

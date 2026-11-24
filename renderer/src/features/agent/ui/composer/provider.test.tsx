@@ -21,7 +21,7 @@ describe('agent composer provider control', () => {
       />,
     );
 
-    const trigger = screen.getByRole('button', { name: 'Provider: Default' });
+    const trigger = screen.getByRole('button', { name: 'Provider: StashBase Agent' });
     await user.click(trigger);
 
     expect(await screen.findAllByRole('menuitemradio')).toHaveLength(3);
@@ -29,7 +29,7 @@ describe('agent composer provider control', () => {
       screen
         .getAllByRole('menuitemradio', { checked: true })
         .map((option) => option.getAttribute('aria-label')),
-    ).toEqual(['Default']);
+    ).toEqual(['StashBase Agent']);
     for (const name of ['Codex', 'Claude']) {
       expect(screen.getByRole('menuitemradio', { name })).not.toBeNull();
     }
@@ -49,7 +49,7 @@ describe('agent composer provider control', () => {
       />,
     );
     await user.click(screen.getByRole('button', { name: 'Provider: Codex' }));
-    await user.click(await screen.findByRole('menuitemradio', { name: 'Default' }));
+    await user.click(await screen.findByRole('menuitemradio', { name: 'StashBase Agent' }));
     expect(onAgentChange).toHaveBeenCalledWith('stashbase');
   });
 

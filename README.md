@@ -55,7 +55,7 @@ troubleshooting.
 1. **Enter a project.** Open or create a local folder.
 2. **Choose an agent.** Select Claude, Codex, or Antigravity and complete its
    setup with your provider account. If you can't use any of them, the built-in
-   **Default Agent** is available as a fallback. Sign in to StashBase for its
+   **StashBase Agent** is available as a fallback. Sign in to StashBase for its
    free monthly credits; [Plus and Pro](https://stashbase.ai/pricing/) add more.
 3. **Talk it through.** Try: “I want to write a LinkedIn post about what I
    shipped this week. Interview me before drafting.”
@@ -87,13 +87,13 @@ without an account. PDF and Word text extraction and OCR run locally, with requi
 components downloaded on first use.
 
 Agent conversations send your prompts and relevant context to model services.
-Claude, Codex, and Antigravity use your provider accounts; the Default Agent connects
+Claude, Codex, and Antigravity use your provider accounts; the StashBase Agent connects
 through StashBase's hosted model gateway, which sends requests through OpenRouter
 to Claude Haiku 5.5 by default.
 
 **Search by meaning** requires your own OpenAI or OpenRouter key in
 `Settings → Advanced → Search by meaning`. It sends source text and search
-queries to your chosen embedding provider. Default Agent credits don't cover
+queries to your chosen embedding provider. StashBase Agent credits don't cover
 this service.
 
 Packaged builds and source runs share usage statistics and error diagnostics by default, excluding document

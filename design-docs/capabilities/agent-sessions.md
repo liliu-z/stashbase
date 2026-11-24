@@ -3,7 +3,7 @@
 ## Scope
 
 Chat mode and the agent pane in Documents share conversation identity, execution,
-and unfinished requests. Default, Codex, Claude, and Antigravity expose their
+and unfinished requests. StashBase Agent, Codex, Claude, and Antigravity expose their
 actual capabilities through this common experience.
 
 ## Identity and Continuity
@@ -33,8 +33,8 @@ actual capabilities through this common experience.
 A project keeps its explicitly selected agent. A project without its own choice
 inherits the user's latest explicit agent selection across projects, including
 after restart, so an existing native subscription remains the starting point.
-With no remembered selection, use **Default**, even when signed out. Explicitly
-choosing Default also makes it the starting point for new projects. Model and effort changes,
+With no remembered selection, use **StashBase Agent**, even when signed out. Explicitly
+choosing StashBase Agent also makes it the starting point for new projects. Model and effort changes,
 readiness, and history restoration never rewrite this choice.
 [Account and Settings](account-settings.md) owns access prerequisites and credentials.
 The [Chat journey](../journeys/chat.md#first-send) owns the first-send interaction.
@@ -46,7 +46,7 @@ An open chat follows a background readiness check until it settles. Supported
 controls appear when the agent becomes ready, preserving the draft and choices
 without starting a session or sending a message. A failed status read offers Retry.
 
-After a Default turn, the app may prepare a local runtime for the next chat to
+After a StashBase Agent turn, the app may prepare a local runtime for the next chat to
 reduce connection delay. This creates no conversation, sends no model request,
 and consumes no agent credits. Each chat still receives its own runtime and
 permissions, with current model and tool choices checked before use.
@@ -99,7 +99,7 @@ for unsent text.
 - Requested output may also live outside the project. The agent creates or
   modifies those files through native tools under the selected runtime's
   permissions, without requiring import or moving the conversation. Native
-  writes remain available; Default asks for them in Ask, Edit, and Auto, while
+  writes remain available; StashBase Agent asks for them in Ask, Edit, and Auto, while
   Plan refuses changes. Project text content changes use project file tools; Claude
   refuses a native text write whose target resolves inside the project, in every
   mode, and directs the agent to those tools. External
@@ -148,7 +148,7 @@ for unsent text.
   leaves the draft when the file's tab closes; one the reader adds by hand stays. An
   [external file](project-files.md#external-files) attaches by its absolute path,
   and each runtime reads it with its own tools under its own permissions, so
-  Default asks before reading outside the project. Project MCP tools keep
+  StashBase Agent asks before reading outside the project. Project MCP tools keep
   refusing it.
 - The agent pane beside Documents includes the readable document in front of
   the reader as visible context, including an external file. Removing it excludes
@@ -195,7 +195,7 @@ for unsent text.
   “Preview unavailable” without discarding the attachment reference.
   Attachment acceptance does not promise that every
   runtime can interpret every binary format, and a refused read must stay visible.
-- Default sends local attachments with the model request, without cloud object
+- StashBase Agent sends local attachments with the model request, without cloud object
   storage, project import, or indexing. It accepts PNG, JPEG, GIF, WebP, PDF,
   UTF-8 text, and DOCX. Images and PDFs retain their original media; DOCX supplies
   extracted text and explicitly excludes embedded images and page layout.
@@ -229,7 +229,7 @@ for unsent text.
   including after restoration. Catalog notices and startup errors alone leave
   the choice available. When the model is locked, the composer panel describes
   the lock and points to a new chat. Thinking stays adjustable between turns.
-- Default discovers user skills only in the bound project's `.agents/skills`,
+- StashBase Agent discovers user skills only in the bound project's `.agents/skills`,
   `.claude/skills`, `.opencode/skills`, and `.opencode/skill` directories. It does
   not import global or ancestor skills. This is its default behavior, without a
   setting. Skill bodies load on native invocation. Project instruction files
@@ -237,9 +237,9 @@ for unsent text.
   Codex, Claude, and Antigravity retain their own native discovery rules.
   Antigravity offers no list of its skills, so its composer has no skill picker;
   its model still uses the project's skills on its own.
-- Default handles conversation, research, and writing on the hosted service's
+- StashBase Agent handles conversation, research, and writing on the hosted service's
   current default model. The service owns model availability, provider, price,
-  and reasoning. Default has no model or thinking selector, and native
+  and reasoning. StashBase Agent has no model or thinking selector, and native
   OpenCode sub-agents are disabled.
 - When the desktop app is in the background or minimized, a pending approval
   or clarifying question sends a local system notification. Requests arriving
@@ -300,7 +300,7 @@ for unsent text.
   and a denied review retains its explanation. Stop cancels unanswered approvals,
   retires model/tool work, and preserves transcripts and completed file edits.
   Cancellation is confirmed before reporting Stopped; it does not roll back edits.
-- Default offers Auto, Ask, Edit, and Plan. Ask confirms changes and commands; Edit
+- StashBase Agent offers Auto, Ask, Edit, and Plan. Ask confirms changes and commands; Edit
   approves only ordinary project document writes and asks for other actions.
   Auto also approves those writes, then uses the default model to review routine
   commands, web fetches, and external reads against the current user request.
@@ -361,7 +361,7 @@ Application updates never substitute a native Agent update or replay uncertain w
 An unexpectedly ended native event stream is a visible connection failure even
 when the transport reports no exception. It retires the session and never
 automatically resends an already submitted turn.
-When listing Default history, a runtime startup timeout or early exit gets one
+When listing StashBase Agent history, a runtime startup timeout or early exit gets one
 automatic retry after the failed process has fully retired. This retries only
 startup, before reading history; it never replays a chat turn or a history edit.
 Exhausted recovery keeps the load error and manual retry available. Missing
@@ -381,22 +381,22 @@ Repeated identical native retry errors appear once per turn while retries contin
 a final short-term request limit or accounting-recovery refusal remains a rate-limit
 failure with manual recovery. Accounting recovery may require service-side
 reconciliation; its message must not imply exhausted credits or a guaranteed reset time.
-A text-only context overflow stays in progress while Default compacts the
+A text-only context overflow stays in progress while StashBase Agent compacts the
 conversation. A successful continuation completes normally; a failed summary or
 idle without continuation remains a visible failure. Stop still cancels recovery,
 and a later turn must not inherit its pending failure. If the refused request
-contains images or PDFs, Default stops visibly before native overflow compaction:
+contains images or PDFs, StashBase Agent stops visibly before native overflow compaction:
 that replay could discard files the model has never read. Saved history and
 attachments remain intact; the queue pauses, and the reader can start a new chat
 with the files and a shorter prompt. Upload-size refusals also stop visibly and
 never trigger lossy context recovery.
 Hosted retry responses carry the service's suggested delay to the native runtime.
-When the service changes the configuration of a Default model a chat runs on,
+When the service changes the configuration of a StashBase Agent model a chat runs on,
 or withdraws it, the refused turn offers **Refresh models**. Refreshing
 reconnects the same conversation to read the list again and keeps the
 transcript, draft, and held queue. It never resends; the failed turn offers
 a manual retry only after the refresh.
-Default retries an empty model response or a hosted stream interruption before
+StashBase Agent retries an empty model response or a hosted stream interruption before
 output once within the current turn, retaining completed tool results and file
 changes. Both failures share the same single retry. A stream interruption is not
 evidence of provider overload. Once a model response has begun producing output,

@@ -348,11 +348,11 @@ class OpenCodeRuntime {
           failure: {
             stage: 'authentication',
             code: 'account-required',
-            message: 'Sign in to StashBase to use the Default Agent and its free credits.',
+            message: 'Sign in to StashBase to use the StashBase Agent and its free credits.',
             retryable: true,
           },
         },
-        error: 'Sign in to StashBase to use the Default Agent.',
+        error: 'Sign in to StashBase to use the StashBase Agent.',
       };
     }
     return {
@@ -361,7 +361,7 @@ class OpenCodeRuntime {
       installed: true,
       source: 'bundled',
       state: 'available',
-      bootstrap: { phase: 'ready', progress: 1, message: 'The Default Agent is ready.' },
+      bootstrap: { phase: 'ready', progress: 1, message: 'The StashBase Agent is ready.' },
     };
   }
 
@@ -437,7 +437,7 @@ class OpenCodeRuntime {
       const executable = bundledOpenCodeExecutable();
       if (!executable) throw new Error('The bundled OpenCode runtime is missing.');
       if (this.requireAccount && !getHostedAccountSession()) {
-        throw new Error('Sign in to StashBase to use the Default Agent.');
+        throw new Error('Sign in to StashBase to use the StashBase Agent.');
       }
       await startHostedAgentBroker();
       if (generation !== this.generation) throw new Error('OpenCode startup was cancelled.');

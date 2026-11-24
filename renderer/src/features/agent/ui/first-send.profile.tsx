@@ -45,7 +45,7 @@ export function mount(container: HTMLElement, startupMs: number) {
             agents: [
               {
                 id: 'stashbase',
-                label: 'Default',
+                label: 'StashBase Agent',
                 ready: true,
                 needsSignIn: false,
                 models: [],

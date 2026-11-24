@@ -101,7 +101,7 @@ describe('Agent workspace recovery', () => {
   );
 
   it.each(['startup', 'turn'] as const)(
-    'opens application updates for a Default Agent %s refusal',
+    'opens application updates for a StashBase Agent %s refusal',
     async (phase) => {
       const { port, listeners, sent } = agentSessionPort();
       const { runtime, onOpenAppSettings, onOpenAgentSettings } = renderWorkspace(port);

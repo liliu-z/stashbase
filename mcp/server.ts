@@ -56,7 +56,7 @@ const diagnostics = createNativeDiagnostics({
   available: telemetryAvailable() && Boolean(configPath && process.env.STASHBASE_DIAGNOSTICS_ROOT),
   distribution: process.env.STASHBASE_PACKAGED === '1' ? 'packaged' : 'source',
   version: packageInfo.version, directory: process.env.STASHBASE_DIAGNOSTICS_ROOT,
-  // The launcher pins the host's paths, even under Default Agent's private home.
+  // The launcher pins the host's paths, even under StashBase Agent's private home.
   read: () => readAppConfigStrict(configPath),
 });
 server.onerror = (error) => diagnostics.record(error, 'mcp-connection', { process: 'mcp-stdio', stage: 'protocol' });

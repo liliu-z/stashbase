@@ -38,7 +38,7 @@ export function agentDefinition(overrides: Partial<Agent> = {}): Agent {
   return {
     abilities: plainAbilities,
     id: 'stashbase',
-    label: 'Default',
+    label: 'StashBase Agent',
     models: [],
     needsSignIn: false,
     ready: true,

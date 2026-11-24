@@ -66,7 +66,7 @@ the agent does not need to repeat the folder in each call.
 Search offers a direct setup entry when search by meaning is not configured.
 An explicit search mode is honored. Missing configuration or provider failure
 cannot silently change strategies. Removing the embedding key retains keyword
-search and prepared-file access; Default Agent credits never configure search.
+search and prepared-file access; StashBase Agent credits never configure search.
 
 ## Failure and Recovery
 

@@ -49,6 +49,11 @@ The map is navigation, not proof that every caller has been reviewed.
 
 ## J01: Onboarding
 
+**StashBase Agent name (2026-11-24):** Chat and Settings now show
+StashBase Agent for the existing `stashbase` runtime. The onboarding gate
+checks the chooser and sign-in flow, and Chromium Storybook checks showed the
+new name in the open chooser and the 460 px Agents settings layout.
+
 **Desktop startup events (2026-11-18):** main records `server_start_initiated`
 before network/server preparation and exactly one observed success or failure
 per shared readiness attempt. App-session, attempt and host-instance IDs join
@@ -3183,7 +3188,7 @@ consent to paying immediately. The host tests cover a competing Checkout during
 claim, same-choice retry, same-price benefit switching, and rejection of an old
 session after a same-account re-sign-in. A renderer test withdraws the old
 account view while a peer-window identity change is being read. J01's controlled
-Default Agent flow uses a zero-base positive-bonus fixture and completes a
+StashBase Agent flow uses a zero-base positive-bonus fixture and completes a
 reply. A Chromium pass at 460 px drove the Account Story through invitation
 acceptance, immediate-payment consent, dismissal, and a switch back to rewards.
 The Story and focused Account tests verify recent activity and stable ID
@@ -3193,7 +3198,7 @@ against a controlled API. The built native Auth smoke verified the credits-v1
 request through the system proxy. Live billing, reward settlement, and a
 real-provider bonus-funded desktop reply remain external verification.
 
-**Default Agent billing:** Settings → Account shows the subscription, reached also
+**StashBase Agent billing:** Settings → Account shows the subscription, reached also
 from the sidebar account menu, through
 `settings/hooks/use-billing.ts` and `settings/ui/agents/subscription-rows.tsx`.
 `server/hosted-account.ts` calls the hosted billing plans, status, Checkout, and
@@ -4554,6 +4559,7 @@ termination does not establish the cause of users' historical disconnects.
 **Status:** Partial.
 
 - **Contract Test:** `server/scheduled-tasks.test.ts` covers lenient parsing,
+  including both `StashBase Agent` and the saved `default` value for the bundled agent,
   single-task edits that keep unknown fields, version conflicts, unreadable files left
   untouched, at-most-once claims, enabled-time cutoff, bounded run history, forward-only
   run reports with their bounded reply excerpt, missed days recorded as one entry in
@@ -4580,7 +4586,7 @@ termination does not establish the cause of users' historical disconnects.
   refresh, recorded Run now in the history, and edited a task in the page with its
   named file as a chip. No live agent turn was driven.
 - **Driven Runtime Pass (Windows):** 2026-10-16, source build with a signed-in
-  Default Agent: a task due at 17:47 was claimed at 17:47:44, sent its chat without
+  StashBase Agent: a task due at 17:47 was claimed at 17:47:44, sent its chat without
   taking the visible chat, and settled as finished with its title. With the task's
   record set to a last run on Oct 13, launching at 20:19 recorded "Missed 2 runs"
   (Oct 14 – Oct 15) when that day's run was claimed, which wrote its brief file and
@@ -4628,7 +4634,7 @@ not the truth of a test's claims or intent metadata.
   [Visual Style](../design-docs/visual-style.md) rules for cards, buttons,
   working buttons, menus, drop targets and dots, and the
   [Glossary](../design-docs/glossary.md) terms for chat, approval and the
-  Default Agent, were applied across the renderer and host copy. Owners:
+  StashBase Agent, were applied across the renderer and host copy. Owners:
   `lib/local/drop-target.ts` (the one drop highlight), `components/ui/menu-item.tsx`
   (`destructive`), `features/workspace/ui/file-tree-menu.tsx` (the tree menu on
   the shared kit, opened by right click or a row's "…"), and

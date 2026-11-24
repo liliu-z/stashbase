@@ -58,7 +58,7 @@ directory has to be added to the script.
 
 The default acceptance is J01: open an empty folder, prepare/sign in to the
 chosen Agent, receive a completed reply, update when needed, and return without
-another login. Exercise Default, Claude, Codex, and Antigravity.
+another login. Exercise StashBase Agent, Claude, Codex, and Antigravity.
 
 Run `pnpm check` at the end of a change. It checks types and `pnpm test:core`:
 full-window onboarding scenarios, host setup and file-preservation rules, and
@@ -215,7 +215,7 @@ state database for diagnosis instead of deleting it as an automatic repair.
   `%APPDATA%\StashBase\logs\` on Windows, `~/.config/StashBase/logs/` on Linux
 - Useful env vars: `STASHBASE_LOG=debug`, `STASHBASE_PYTHON=/path/to/python`, `STASHBASE_BUILD_EXTRACT=1`
 
-With `STASHBASE_LOG=debug`, Default Agent logs model-catalog and native connection
+With `STASHBASE_LOG=debug`, StashBase Agent logs model-catalog and native connection
 times, spare-runtime readiness, and each model request's headers, first bytes,
 first visible text, and elapsed time. Requests include the profile and turn id;
 input/output and cache token counts appear when the gateway supplies them.

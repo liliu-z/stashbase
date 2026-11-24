@@ -615,7 +615,7 @@ export class OpenCodePanelSession {
           send(this.ws, { t: 'skills', skills: [], state: 'empty' });
           break;
         case 'steer':
-          send(this.ws, { t: 'steer-result', id: event.id, ok: false, message: 'The Default Agent queues follow-up prompts.' });
+          send(this.ws, { t: 'steer-result', id: event.id, ok: false, message: 'The StashBase Agent queues follow-up prompts.' });
           break;
       }
     } catch (error) {
