@@ -139,7 +139,6 @@ const BILLING_PLANS: readonly BillingPlan[] = [
   {
     amount: 500,
     planKey: 'plus',
-    monthlyGrantPicodollars: 4e12,
     available: true,
     currency: 'usd',
     interval: 'month',
@@ -149,7 +148,6 @@ const BILLING_PLANS: readonly BillingPlan[] = [
   {
     amount: 2000,
     planKey: 'pro',
-    monthlyGrantPicodollars: 20e12,
     available: true,
     currency: 'usd',
     interval: 'month',

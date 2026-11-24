@@ -24,7 +24,7 @@ import {
 import { withQueryClient } from '@/test/query';
 
 import { AccountPanel } from './account-panel';
-import { invitationDemo, STORY_INVITE_CODE } from './account-story-fixtures';
+import { accountRuntimePort, invitationDemo, STORY_INVITE_CODE } from './account-story-fixtures';
 
 function catalog(runtimes: AgentRuntime[], debug?: AgentCatalog['debug']): AgentCatalog {
   return { runtimes, debug: debug ?? null };
@@ -166,6 +166,7 @@ describe('AccountPanel', () => {
     // hosted API reports the subscription paid, then credits are read again.
     let status: BillingStatus = FREE_BILLING;
     const port = agentRuntimePort({
+      getBillingPlans: accountRuntimePort().getBillingPlans,
       getBillingStatus: vi.fn(async () => status),
     });
     const rendered = renderPanel(port, accountPort(SIGNED_IN_ACCOUNT));
