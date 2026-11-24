@@ -182,8 +182,8 @@ for unsent text.
   cannot ask the reader itself, so StashBase reviews each tool call before it
   runs. Reads pass. Edit passes ordinary changes inside the project. Auto is
   StashBase's own rule set rather than Antigravity's, whose Auto refuses
-  StashBase's tools and asks no one: it also passes commands that only read,
-  shown by the command line itself, plus web searches and page reads whose
+  StashBase's tools and asks no one: it also passes recognized read commands
+  in a restricted POSIX syntax, plus web searches and page reads whose
   address carries no query. Plan refuses changes. Anything else shows the same
   approval card the other runtimes use, and an unanswered card never becomes a
   grant. A command approval also offers to allow all commands for this open
@@ -191,6 +191,8 @@ for unsent text.
   That explicit grant lasts across turns, applies only to command tools, and
   resets when the permission mode changes or the chat reconnects. Other tools
   keep their existing rules, and Plan still refuses commands.
+  Unknown command syntax/options, Git commands that may invoke configured
+  helpers, and Windows shell commands ask unless that session grant applies.
   Antigravity's messages carry text only, so attachments reach it as
   file paths it reads with its own tools, as they do for Claude and Codex.
 - A runtime that advertises attachments accepts ordinary local files through the
@@ -320,7 +322,19 @@ for unsent text.
   Reviews have no tools and share the current turn's usage allowance. Plan reads
   and explores without writes or commands. A mode change applies between turns,
   including when a conversation resumes.
-- Codex applies a changed mode on the next turn of the current conversation.
+- The permission menu shares mode names but describes each agent's actual
+  rules. Auto does not mean allowing every tool or eliminating every approval.
+  Claude uses native rules and its own Auto reviewer. Its Ask mode can reuse
+  native grants, Edit can allow file commands as well as file tools, and Plan
+  requests outside native plan rules may still ask. Native fallback updates
+  the selected mode with a visible notice. A rejected mode change restores the
+  actual mode and explains the failure; a prompt waiting on that change does
+  not run under the old permissions.
+- Codex allows actions inside its native sandbox in both Ask and Edit. Approval
+  requests outside that authority go to the reader in Ask/Edit and to Codex's
+  reviewer in Auto when eligible. Some requests still ask; a review denial
+  remains visible. Plan uses a read-only sandbox and can request additional
+  access. Codex applies a changed mode on the next turn of the current conversation.
   Switching from Auto to Ask routes subsequent approval requests to the reader;
   it does not retry an action that was already denied.
 - A new chat starts each agent in Auto, or in Edit where Auto is not offered;

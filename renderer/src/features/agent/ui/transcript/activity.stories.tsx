@@ -287,7 +287,12 @@ function AgentActivityHarness({
         tool={decision}
       />
       <div className="flex justify-end">
-        <AgentPermissionMode mode={mode} modes={AGENT_ACCESS_MODES} onChange={setMode} />
+        <AgentPermissionMode
+          agent={sessionCommands ? 'antigravity' : 'codex'}
+          mode={mode}
+          modes={AGENT_ACCESS_MODES}
+          onChange={setMode}
+        />
       </div>
     </div>
   );

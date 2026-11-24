@@ -283,27 +283,66 @@ const READ_ONLY_PROGRAMS = new Set([
   'which', 'stat', 'du', 'df', 'sort', 'cut', 'nl', 'diff', 'cmp',
   'basename', 'dirname', 'realpath', 'readlink',
 ]);
-const READ_ONLY_GIT = new Set(['status', 'log', 'diff', 'show', 'blame', 'ls-files', 'rev-parse', 'describe', 'shortlog']);
-/** Options that make an otherwise read-only program write or run something. */
-const WRITING_OPTIONS: Readonly<Record<string, RegExp>> = {
-  find: /^-(?:delete|exec|execdir|ok|okdir|fprint0?|fprintf|fls)$/,
-  sort: /^(?:-o|--output)/,
-  rg: /^--pre/,
-  git: /^--output/,
+/** These programs have options that write or launch other programs. Unknown
+ * options ask, including combined short flags and abbreviated long flags. */
+const READ_ONLY_OPTIONS: Readonly<Record<string, RegExp>> = {
+  find: /^-(?:[HLPXsdx]|depth|maxdepth|mindepth|name|iname|path|ipath|type|size|mtime|mmin|atime|amin|ctime|cmin|newer|empty|print0?|ls|true|false|a|and|o|or|not|prune|quit|regex|iregex|regextype|xdev|mount|\d+)$/,
+  sort: /^(?:-[bcdfghinMrsuV]+|-[ktS]\S*|--(?:ignore-leading-blanks|dictionary-order|ignore-case|general-numeric-sort|human-numeric-sort|ignore-nonprinting|month-sort|numeric-sort|reverse|stable|unique|version-sort|check|key|field-separator|buffer-size)(?:=.*)?)$/,
+  rg: /^(?:-[0-9A-CEFILNPSUabcdefhilmnopqrsuvwxy]+|--(?:after-context|before-context|context|count|count-matches|files|files-with-matches|files-without-match|fixed-strings|glob|hidden|ignore-case|line-number|multiline|no-heading|no-ignore|only-matching|regexp|smart-case|type|type-not|word-regexp)(?:=.*)?)$/,
 };
+
+/** A deliberately small shell subset. Quotes are decoded before checking
+ * options, including concatenation such as -"o". Unquoted expansion could
+ * supply new options from filenames, so it must go through approval. */
+function commandWords(line: string): string[][] | null {
+  if (/[;&<>`$(){}\u0000-\u0008\u000a-\u001f\\]/.test(line)) return null;
+  const pipeline: string[][] = [[]];
+  let word = '';
+  let started = false;
+  let quote = '';
+  const flush = () => {
+    if (started) pipeline[pipeline.length - 1]!.push(word);
+    word = '';
+    started = false;
+  };
+  for (const char of line) {
+    if (quote) {
+      if (char === quote) quote = '';
+      else word += char;
+    } else if (char === "'" || char === '"') {
+      quote = char;
+      started = true;
+    } else if (char === '|') {
+      flush();
+      pipeline.push([]);
+    } else if (/\s/.test(char)) {
+      flush();
+    } else {
+      if (/[*?\[\]~#!]/.test(char)) return null;
+      word += char;
+      started = true;
+    }
+  }
+  if (quote) return null;
+  flush();
+  return pipeline;
+}
 
 /** Auto runs a shell command unasked only when the line itself shows it reads:
  * known programs, optionally piped into each other, with no chaining,
  * substitution, redirection, escapes, or backgrounding. */
 export function isReadOnlyCommand(command: string): boolean {
-  const line = command.trim();
-  if (!line || /[;&<>`$(){}\n\r\\]/.test(line) || line.includes('||')) return false;
-  return line.split('|').every((segment) => {
-    const [program, ...args] = segment.trim().split(/\s+/).filter(Boolean);
-    if (!program) return false;
-    if (WRITING_OPTIONS[program] && args.some((arg) => WRITING_OPTIONS[program]!.test(arg))) return false;
-    if (program === 'git') return READ_ONLY_GIT.has(args[0] ?? '');
-    return READ_ONLY_PROGRAMS.has(program);
+  // This parser does not establish PowerShell/cmd semantics. Git also asks:
+  // even status/diff can invoke helpers configured by the repository.
+  if (process.platform === 'win32') return false;
+  const pipeline = commandWords(command.trim());
+  if (!pipeline) return false;
+  return pipeline.every(([program, ...args]) => {
+    if (!program || !READ_ONLY_PROGRAMS.has(program)) return false;
+    // POSIX date accepts a clock-setting operand; only reading formats pass.
+    if (program === 'date') return args.every((arg) => arg === '-u' || arg.startsWith('+'));
+    const options = READ_ONLY_OPTIONS[program];
+    return !options || args.every((arg) => !arg.startsWith('-') || options.test(arg));
   });
 }
 

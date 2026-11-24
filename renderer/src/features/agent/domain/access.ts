@@ -1,13 +1,9 @@
-/** How much a turn may do on its own. The four modes are the product's own
- *  promises, worded the same for every Agent: Ask asks before every change
- *  and command, Edit edits inside the folder and asks for anything else,
- *  Plan reads and explores and changes nothing, Auto lets the runtime's own
- *  reviewer pass routine actions and pause for risky ones. A runtime declares
- *  which of them it can honor; a session carries the one in force, and the
- *  transport's spelling of them is mapped in `infrastructure/session-api`. */
+/** Shared mode choices. Each runtime owns its permission rules; the composer
+ *  describes those differences. Native mode reports reconcile the session's
+ *  selection when the runtime rejects or falls back from a requested mode. */
 export type AgentAccessMode = 'default' | 'acceptEdits' | 'plan' | 'auto';
 
-/** Every promise, in the order the composer offers them. */
+/** Every mode, in the order the composer offers them. */
 export const AGENT_ACCESS_MODES: readonly AgentAccessMode[] = [
   'default',
   'plan',

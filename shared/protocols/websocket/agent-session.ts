@@ -84,6 +84,7 @@ export const MAX_TURN_CHANGED_FILES = 500;
 
 export const agentServerEventSchema = z.union([
   z.object({ t: z.literal("ready") }).strict(),
+  z.object({ t: z.literal("access-mode"), mode: agentAccessModeSchema }).strict(),
   z.object({ t: z.literal("session-id"), id: boundedText(512) }).strict(),
   z.object({ t: z.literal("session-title"), title: boundedText(2_000) }).strict(),
   z

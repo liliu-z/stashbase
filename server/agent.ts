@@ -50,7 +50,6 @@ import {
   type SDKUserMessage,
   type PermissionResult,
   type PermissionUpdate,
-  type PermissionMode,
   type EffortLevel,
   type SpawnOptions,
   type SpawnedProcess,
@@ -113,6 +112,10 @@ function missingClaudeMessage(): string {
  * cannot turn an arbitrary WebSocket query value into a native setting. */
 export function claudePermissionMode(access?: string): AgentAccessMode {
   return isAgentAccessMode(access) ? access : 'default';
+}
+
+function claudeModeLabel(mode: AgentAccessMode): string {
+  return { default: 'Ask', acceptEdits: 'Edit', plan: 'Plan', auto: 'Auto' }[mode];
 }
 
 /** Validate and apply a requested model at the SDK boundary. The caller must
@@ -307,6 +310,9 @@ interface Pending {
 export class AgentSession implements AttributedAgentSession {
   private input = new Pushable<SDKUserMessage>();
   private q: Query | null = null;
+  private modeChanges: Promise<void> = Promise.resolve();
+  private nativeModeRevision = 0;
+  private promptWaitingForMode = false;
   private pending = new Map<string, Pending>();
   private closed = false;
   private turnActive = false;
@@ -344,7 +350,7 @@ export class AgentSession implements AttributedAgentSession {
     windowId: string,
     private effort?: EffortLevel,
     private resume?: string,
-    private access: PermissionMode = 'default',
+    private access: AgentAccessMode = 'default',
     private model?: string,
     private onDispose?: (session: AgentSession, retirement: Promise<void>) => void,
     private queryFactory: typeof query = query,
@@ -575,6 +581,18 @@ export class AgentSession implements AttributedAgentSession {
       nativeOwnership.register(sid, this);
       this.send({ t: 'session-id', id: sid });
     }
+    if (msg.type === 'system' && (msg.subtype === 'init' || msg.subtype === 'status') && msg.permissionMode) {
+      this.nativeModeRevision += 1;
+      if (!isAgentAccessMode(msg.permissionMode)) {
+        this.finish(`Claude reported unsupported permission mode: ${msg.permissionMode}. Reconnect to choose a supported mode.`);
+        return;
+      }
+      if (msg.permissionMode !== this.access) {
+        this.send({ t: 'notice', message: `Claude changed permission mode to ${claudeModeLabel(msg.permissionMode)}.` });
+      }
+      this.access = msg.permissionMode;
+      this.send({ t: 'access-mode', mode: this.access });
+    }
     if (msg.type === 'system' && msg.subtype === 'init' && msg.model) {
       // With nothing chosen, the model the SDK started is the runtime's own
       // default, which its catalog does not flag.
@@ -710,7 +728,8 @@ export class AgentSession implements AttributedAgentSession {
   /** A follow-up goes in only once the CLI has shown it reports idle and
    *  when it reads input, so Claude's reading it can be confirmed. */
   private canPushSteer(): boolean {
-    return this.turnActive && !this.interruptRequested && this.nativeSessionStateSeen && this.commandLifecycleSeen;
+    return this.turnActive && !this.promptWaitingForMode && !this.interruptRequested
+      && this.nativeSessionStateSeen && this.commandLifecycleSeen;
   }
 
   private flushEarlySteers(): void {
@@ -878,8 +897,17 @@ export class AgentSession implements AttributedAgentSession {
         this.turnGeneration += 1;
         this.interruptRequested = false;
         this.send({ t: 'turn-start' });
-        agentDiagnosticStage(this.ws, 'runtime_dispatched');
-        this.enqueuePrompt(body, skill);
+        // A prompt sent immediately after a mode pick must not start under
+        // the previous native policy while setPermissionMode is unresolved.
+        this.promptWaitingForMode = true;
+        const generation = this.turnGeneration;
+        void this.modeChanges.then(() => {
+          if (this.closed || !this.turnActive || generation !== this.turnGeneration) return;
+          this.promptWaitingForMode = false;
+          agentDiagnosticStage(this.ws, 'runtime_dispatched');
+          this.enqueuePrompt(body, skill);
+          this.flushEarlySteers();
+        });
         break;
       }
       case 'refresh-skills': void this.publishSkills(); break;
@@ -917,14 +945,17 @@ export class AgentSession implements AttributedAgentSession {
         break;
       }
       case 'set-mode': {
-        // Live permission-mode switch from the composer's Modes dropdown.
-        // 'default' = ask before edits, 'acceptEdits' = auto-apply edits
-        // (Bash still prompts via canUseTool), 'plan' = read-only planning,
-        // 'auto' = model classifier decides. We don't expose the dangerous
-        // 'bypassPermissions' / 'dontAsk'.
         if (isAgentAccessMode(msg.mode)) {
-          this.access = msg.mode;
-          void this.q?.setPermissionMode(msg.mode).catch((err) => log.debug(errorMessage(err)));
+          if (this.turnActive) {
+            this.send({ t: 'access-mode', mode: this.access });
+            break;
+          }
+          const mode = msg.mode;
+          if (!this.q) {
+            this.access = mode;
+          } else {
+            this.modeChanges = this.modeChanges.then(() => this.changePermissionMode(mode));
+          }
         }
         break;
       }
@@ -962,6 +993,13 @@ export class AgentSession implements AttributedAgentSession {
       }
       case 'interrupt': {
         if (!this.turnActive || !this.q || this.interruptRequested) break;
+        if (this.promptWaitingForMode) {
+          this.promptWaitingForMode = false;
+          this.returnSteers();
+          this.turnActive = false;
+          this.send({ t: 'turn-end', isError: false });
+          break;
+        }
         const interruptedGeneration = this.turnGeneration;
         let nativeInterrupt: Promise<void>;
         try {
@@ -993,6 +1031,33 @@ export class AgentSession implements AttributedAgentSession {
         this.dispose();
         break;
     }
+  }
+
+  private async changePermissionMode(mode: AgentAccessMode): Promise<void> {
+    const query = this.q;
+    if (this.closed || !query) return;
+    const revision = this.nativeModeRevision;
+    try {
+      await query.setPermissionMode(mode);
+      if (this.closed || query !== this.q) return;
+      // A status event may report that Auto fell back while the request was
+      // pending. That native report takes precedence over our requested mode.
+      if (revision === this.nativeModeRevision) this.access = mode;
+    } catch (err: unknown) {
+      if (this.closed || query !== this.q) return;
+      this.send({
+        t: 'notice',
+        message: `Claude could not switch to ${claudeModeLabel(mode)}. Still using ${claudeModeLabel(this.access)}. ${errorMessage(err)}`,
+      });
+      if (this.promptWaitingForMode) {
+        this.promptWaitingForMode = false;
+        this.returnSteers();
+        this.turnActive = false;
+        this.sendTurnError('The request was not sent because the permission mode could not change. Check the current mode before retrying.');
+        this.send({ t: 'turn-end', isError: true });
+      }
+    }
+    this.send({ t: 'access-mode', mode: this.access });
   }
 
   private send(obj: AgentServerEvent, cause?: unknown): void {

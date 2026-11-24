@@ -285,11 +285,17 @@ test('model variants that differ only by effort become one model with those effo
 });
 
 test('Auto runs a command unasked only when the line itself shows it only reads', () => {
-  for (const command of ['ls -la', 'git log --oneline -5', 'grep -rn TODO .', 'cat notes.md | head -20', 'find . -name "*.md"']) {
-    assert.equal(isReadOnlyCommand(command), true, command);
+  for (const command of ['ls -la', 'grep -rn TODO .', 'cat notes.md | head -20', 'find . -name "*.md"',
+    'sort -rn notes.txt', 'rg --files', 'date -u +%Y', 'cat "notes with spaces.md"', 'echo "a|b"']) {
+    assert.equal(isReadOnlyCommand(command), process.platform !== 'win32', command);
   }
   for (const command of ['rm -rf drafts', 'ls; rm x', 'ls && pwd', 'ls > out.txt', 'echo $(whoami)', 'find . -delete',
-    'git push', 'git -C . status', 'sort -o x y', 'rg --pre=sh x', 'npm install', 'python script.py', '']) {
+    'git push', 'git -C . status', 'git log --oneline -5', 'sort -o x y', 'rg --pre=sh x', 'npm install', 'python script.py', '',
+    'sort "-o" output.txt input.txt', "sort '-o' output.txt input.txt", 'sort -"o" output.txt input.txt',
+    'sort -fo output.txt input.txt', 'sort --compress-program=sh input.txt', 'sort --out=output.txt input.txt',
+    "find . '-delete'", 'find . -"exec" touch out +', 'find . "-fprint" out',
+    "rg '--pre=sh' x", 'rg --hostname-bin=sh x', 'rg -z x', 'date 112412002026', 'date --set=tomorrow',
+    'sort *', 'find . -name *.md', 'cat notes[12].md', 'ls || pwd', 'ls |', 'ls "unterminated', 'ls\nrm x']) {
     assert.equal(isReadOnlyCommand(command), false, command);
   }
 });

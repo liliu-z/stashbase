@@ -49,6 +49,14 @@ The map is navigation, not proof that every caller has been reviewed.
 
 ## J01: Onboarding
 
+**Permission changes (2026-11-24):** The core gate and focused Claude,
+Antigravity and renderer session checks pass for mode reconciliation and
+command approval. The persistent Claude and Antigravity verification profiles
+have no installed native CLI; provider sign-in, a real first reply, Auto fallback
+and a packaged pass were not completed for this change. The developer's
+installed CLIs and credentials were not substituted. Controlled permission
+evidence is recorded in [J06](#j06-agent).
+
 **Desktop startup events (2026-11-18):** main records `server_start_initiated`
 before network/server preparation and exactly one observed success or failure
 per shared readiness attempt. App-session, attempt and host-instance IDs join
@@ -2992,6 +3000,18 @@ Chat binding, asserts the SDK's returned scope, and uses file URLs for generated
 ESM imports on Windows.
 This establishes adapter/native protocol behavior, not live-model judgment,
 the owner's X script, or a released desktop build.
+
+**Permission reconciliation (2026-11-24):** `agent.test.ts` exercises Claude's
+native init/status mode reports, serialized live switches, failure notices,
+callback grants only after acceptance, prompts waiting for a switch, cancellation
+and disposal. Renderer session/transport tests cover native fallback without
+replaying a rejected mode; the composer describes the four adapters separately.
+Antigravity's command tests cover quoted and concatenated options, combined
+flags, command execution options, clock-setting operands, glob expansion and
+malformed pipelines. Unknown syntax, Git and Windows commands require approval
+unless explicitly granted for the live session. These fixtures establish host
+policy and protocol behavior, not real-provider Auto classification or fallback
+availability; native-provider and packaged verification remain open.
 
 **Requested external writes (2026-10-22):** `agent-runtime-instructions.ts` routes
 requested external output through native tools without changing the chat's

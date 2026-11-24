@@ -317,7 +317,7 @@ describe('Agent workspace', () => {
     await userEvent.click(screen.getByRole('button', { name: /Permission mode: Auto/u }));
     await userEvent.click(
       await screen.findByRole('menuitemradio', {
-        name: 'Ask. Asks before every change and command',
+        name: 'Ask. Runs within the sandbox; asks when Codex requires additional approval',
       }),
     );
     expect(sent.at(-1)).toEqual({ kind: 'set-access-mode', mode: 'default' });
@@ -367,8 +367,8 @@ describe('Agent workspace', () => {
     expect(
       (await screen.findAllByRole('menuitemradio')).map((row) => row.getAttribute('aria-label')),
     ).toEqual([
-      'Ask. Asks before every change and command',
-      'Plan. Reads and explores, changes nothing',
+      'Ask. Asks before changes, commands, web fetches and outside access',
+      'Plan. Reads and explores; refuses changes and commands',
     ]);
   });
 

@@ -173,6 +173,7 @@ export function createAgentSessionState(options: {
  */
 type AgentSessionStateEvent =
   | { kind: 'ready' }
+  | { kind: 'access-mode'; mode: AgentAccessMode }
   | { kind: 'identified'; id: string }
   | { kind: 'titled'; title: string }
   | {

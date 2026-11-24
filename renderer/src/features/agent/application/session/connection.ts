@@ -135,6 +135,7 @@ export function createAgentTransport({
       },
       onEvent(event) {
         if (!current()) return;
+        if (event.kind === 'access-mode') appliedAccessMode = event.mode;
         onEvent(event);
       },
       onInvalidResponse() {

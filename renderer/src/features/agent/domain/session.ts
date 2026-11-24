@@ -142,6 +142,7 @@ export function transitionAgentSession(
         skillCatalog: { kind: 'empty' },
       };
     case 'set-access-mode':
+    case 'access-mode':
       return { ...state, accessMode: action.mode };
     case 'set-model':
       return { ...state, model: action.model };

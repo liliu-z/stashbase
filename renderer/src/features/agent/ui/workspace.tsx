@@ -298,6 +298,7 @@ function ChatWorkspace({
                   />
                   {readyAgent && readyAgent.abilities.modes.length > 0 && (
                     <AgentPermissionMode
+                      agent={readyAgent.id}
                       disabled={busy}
                       mode={state.accessMode}
                       modes={readyAgent.abilities.modes}

@@ -917,7 +917,15 @@ The updater re-enables the window and can be retried after the draft is resolved
   on an existing thread. Reviewer-only changes preserve the native sandbox;
   leaving Plan restores the resolved workspace sandbox when available. Mode
   changes during an active turn are ignored.
-  Claude maps native modes. Headless `agy` cannot ask the reader, so Antigravity
+  Claude maps native modes. `agent.ts` serializes live mode changes, updates its
+  callback policy only after native acceptance, and publishes `access-mode`
+  events from acknowledgements and native init/status reports. Failure retains
+  the actual mode with a visible notice. A prompt arriving during a switch waits;
+  failure stops that prompt before dispatch, and Stop retires it without waiting
+  for the mode request. Native fallback reports take precedence over a pending
+  acknowledgement. The renderer reconciles both the selection and transport's
+  applied mode, so reconnect/readiness cannot replay a rejected choice.
+  Headless `agy` cannot ask the reader, so Antigravity
   runs with `--dangerously-skip-permissions` and every tool call passes the
   approval hook. `server/routes/antigravity-hook.ts` reviews a call only for the
   live Antigravity session named by the private attribution id its process
@@ -926,8 +934,14 @@ The updater re-enables the window and can be retried after the draft is resolved
   run's own rules. `server/antigravity-protocol.ts` owns the policy: reads pass,
   Edit passes ordinary writes inside the bound project through
   `agent-file-permissions.ts`, Auto adds read-only command lines
-  (`isReadOnlyCommand`: known programs, pipes only, no chaining, substitution
-  or redirection), web searches and query-free page reads, Plan denies anything
+  (`isReadOnlyCommand`: a narrow POSIX subset with decoded quoted arguments,
+  known programs/options, pipes only, no unquoted glob expansion, chaining,
+  substitution or redirection). Options that can write or run programs require
+  approval, including quoted and combined forms. Git requires approval because
+  repository configuration can invoke helpers; Windows commands ask because the
+  parser does not establish PowerShell/cmd semantics. This is a command syntax
+  policy, not process isolation or verification of executables on PATH.
+  Auto also passes web searches and query-free page reads, Plan denies anything
   that could change the project, and the rest becomes an approval card. A card
   for a command offers the distinct `session-commands` scope: an explicit reply
   to that pending command grants `run_command` and `send_command_input` across

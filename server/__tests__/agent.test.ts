@@ -5,6 +5,7 @@ import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { PassThrough } from 'node:stream';
 import test from 'node:test';
 import type { CanUseTool, Query, SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import type { WebSocket } from 'ws';
@@ -173,6 +174,116 @@ function streamingClaudeQuery(prompt: AsyncIterable<unknown>, sessionId = 'test-
   }) as unknown as Query;
 }
 
+test('Claude confirms native permission modes, reports fallback and failures, and orders prompts after mode changes', async (t) => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-claude-permissions-'));
+  const messages = new PassThrough({ objectMode: true });
+  const changes: Array<{ mode: string; resolve(): void; reject(error: Error): void }> = [];
+  const inputs: unknown[] = [];
+  let canUseTool!: CanUseTool;
+  const native = Object.assign(messages, {
+    supportedModels: async () => [], supportedCommands: async () => [], setModel: async () => {},
+    interrupt: async () => {},
+    setPermissionMode: (mode: string) => new Promise<void>((resolve, reject) => changes.push({ mode, resolve, reject })),
+  }) as unknown as Query;
+  const ws = new FakeAgentWebSocket();
+  const session = new AgentSession(ws as unknown as WebSocket, 'claude-mode-window', undefined, undefined, 'auto', undefined, undefined,
+    ((request: { prompt: AsyncIterable<unknown>; options: { canUseTool: CanUseTool } }) => {
+      canUseTool = request.options.canUseTool;
+      void (async () => { for await (const input of request.prompt) inputs.push(input); })();
+      return native;
+    }) as never, () => '/fake/claude', undefined, folder);
+  t.after(() => { messages.end(); session.dispose(); fs.rmSync(folder, { recursive: true, force: true }); });
+  const events = () => ws.sent.map((value) => JSON.parse(value));
+  const actualMode = () => events().filter((event) => event.t === 'access-mode').at(-1)?.mode;
+  const send = (event: object) => ws.emit('message', JSON.stringify(event));
+  session.begin();
+  await settle();
+  messages.write({ type: 'system', subtype: 'init', permissionMode: 'default', session_id: 'mode-session', model: 'native' });
+  await settle();
+  assert.equal(actualMode(), 'default', 'native startup fallback replaces requested Auto');
+  assert.ok(events().some((event) => event.t === 'notice' && /changed permission mode to Ask/.test(event.message)));
+
+  send({ t: 'set-mode', mode: 'acceptEdits' });
+  await settle();
+  assert.equal(actualMode(), 'default', 'a pending switch is not confirmed');
+  const controller = new AbortController();
+  const edit = canUseTool('mcp__stashbase__edit_file', { path: path.join(folder, 'draft.md') }, { signal: controller.signal, toolUseID: 'edit' });
+  await settle();
+  assert.equal(events().at(-1)?.t, 'permission', 'a pending Edit request does not grant writes');
+  controller.abort();
+  assert.equal((await edit).behavior, 'deny');
+  changes[0]!.resolve();
+  await settle();
+  assert.equal(actualMode(), 'acceptEdits');
+  assert.equal((await canUseTool('mcp__stashbase__edit_file', { path: path.join(folder, 'draft.md') }, {
+    signal: new AbortController().signal, toolUseID: 'allowed-edit',
+  })).behavior, 'allow');
+
+  send({ t: 'set-mode', mode: 'plan' });
+  send({ t: 'set-mode', mode: 'auto' });
+  await settle();
+  assert.deepEqual(changes.map((change) => change.mode), ['acceptEdits', 'plan'], 'native switches run in order');
+  changes[1]!.resolve();
+  await settle();
+  assert.equal(actualMode(), 'plan');
+  messages.write({ type: 'system', subtype: 'status', status: null, permissionMode: 'default' });
+  await settle();
+  changes[2]!.resolve();
+  await settle();
+  assert.equal(actualMode(), 'default', 'a reported fallback wins over a successful Auto request');
+
+  // The stream has advertised steering support, as it would in a returning
+  // conversation. A follow-up must still wait behind a pending mode switch.
+  messages.write(claudeSessionState('idle'));
+  messages.write({ type: 'command_lifecycle', command_uuid: 'previous-input', state: 'completed' });
+  await settle();
+
+  send({ t: 'set-mode', mode: 'plan' });
+  send({ t: 'prompt', text: 'Explore without changes' });
+  send({ t: 'steer', id: 'waiting-steer', text: 'Also inspect the outline' });
+  await settle();
+  assert.equal(inputs.length, 0, 'the prompt waits for native permissions');
+  changes[3]!.reject(new Error('mode unavailable'));
+  await settle();
+  assert.equal(actualMode(), 'default');
+  assert.equal(inputs.length, 0, 'a failed switch cannot run the queued request under old permissions');
+  assert.ok(events().some((event) => event.t === 'notice' && /could not switch to Plan.*Still using Ask.*mode unavailable/.test(event.message)));
+  assert.ok(events().some((event) => event.t === 'error' && /request was not sent/.test(event.message)));
+  assert.ok(events().some((event) => event.t === 'steer-result' && event.id === 'waiting-steer' && event.ok === false));
+
+  send({ t: 'set-mode', mode: 'acceptEdits' });
+  send({ t: 'prompt', text: 'Update the draft' });
+  await settle();
+  changes[4]!.resolve();
+  await settle();
+  assert.equal(inputs.length, 1);
+  assert.equal(actualMode(), 'acceptEdits');
+  messages.write(claudeSuccessResult());
+  messages.write(claudeSessionState('idle'));
+  await settle();
+
+  send({ t: 'set-mode', mode: 'plan' });
+  send({ t: 'prompt', text: 'Cancelled request' });
+  await settle();
+  send({ t: 'interrupt' });
+  assert.deepEqual(events().at(-1), { t: 'turn-end', isError: false });
+  send({ t: 'prompt', text: 'New request' });
+  changes[5]!.resolve();
+  await settle();
+  assert.equal(inputs.length, 2, 'Stop retires the held prompt without discarding the next one');
+  assert.match(JSON.stringify(inputs.at(-1)), /New request/);
+  messages.write(claudeSuccessResult());
+  messages.write(claudeSessionState('idle'));
+  await settle();
+  send({ t: 'set-mode', mode: 'auto' });
+  await settle();
+  session.dispose();
+  const count = events().length;
+  changes[6]!.resolve();
+  await settle();
+  assert.equal(events().length, count, 'a late switch cannot publish into a disposed session');
+});
+
 test('Claude permission callback asks for mutations and unknown tools, and settles replies or cancellation', async (t) => {
   const project = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-read-redirect-'));
   t.after(() => fs.rmSync(project, { recursive: true, force: true }));
@@ -246,6 +357,7 @@ test('Claude permission callback asks for mutations and unknown tools, and settl
     assert.equal((await result).behavior, name.endsWith('edit_file') ? 'allow' : 'deny');
   }
   ws.emit('message', JSON.stringify({ t: 'set-mode', mode: 'acceptEdits' }));
+  await settle();
   const beforeEdit = permissionEvents().length;
   for (const name of ['edit_file', 'write_file']) {
     const result = await canUseTool(`mcp__stashbase__${name}`, { path: path.join(project, 'draft.md') }, {

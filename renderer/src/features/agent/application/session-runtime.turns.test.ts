@@ -9,6 +9,33 @@ import { createAgentSessionRuntime } from './session-runtime';
 import { harness } from './session-runtime.harness';
 
 describe('AgentSessionRuntime turns', () => {
+  it('restores a native permission fallback without replaying the rejected mode', () => {
+    const test = harness();
+    const runtime = createAgentSessionRuntime({
+      agent: 'claude',
+      id: 'chat-mode',
+      port: test.port,
+      scheduler: test.scheduler,
+      scope: { kind: 'folder', path: '/project/Research' },
+    });
+    test.listeners[0]?.onEvent({ kind: 'ready' });
+    runtime.setAccessMode('plan');
+    test.listeners[0]?.onEvent({
+      kind: 'notice',
+      message: 'Claude could not switch to Plan. Still using Ask.',
+    });
+    test.listeners[0]?.onEvent({ kind: 'access-mode', mode: 'default' });
+    expect(runtime.store.getState().accessMode).toBe('default');
+    expect(runtime.store.getState().transcript.at(-1)).toMatchObject({
+      kind: 'notice',
+      text: expect.stringContaining('Still using Ask'),
+    });
+    const count = test.sent.length;
+    test.listeners[0]?.onEvent({ kind: 'ready' });
+    expect(test.sent).toHaveLength(count);
+    runtime.dispose();
+  });
+
   it('sends the retained first-use draft once readiness arrives and streams tool work', async () => {
     const test = harness();
     const runtime = createAgentSessionRuntime({

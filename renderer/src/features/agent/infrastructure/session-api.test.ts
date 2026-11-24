@@ -385,6 +385,8 @@ describe('Agent session API', () => {
           path: 'notes.md',
         },
       ]);
+      onMessage?.({ data: JSON.stringify({ t: 'access-mode', mode: 'default' }) });
+      expect(events.at(-1)).toEqual({ kind: 'access-mode', mode: 'default' });
       expect(sent).toEqual([
         JSON.stringify({ t: 'permission-reply', id: 'permission-1', allow: true, scope }),
         JSON.stringify({

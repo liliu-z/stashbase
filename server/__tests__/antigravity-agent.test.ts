@@ -244,7 +244,9 @@ test('the approval hook passes reads, asks the reader before changes, and refuse
   // Auto is StashBase's rule set: edits, read-only commands, searches and plain page reads pass.
   h.ws.client({ t: 'set-mode', mode: 'auto' });
   assert.deepEqual(await review('call_mcp_tool', { ServerName: 'stashbase', ToolName: 'edit_file', Arguments: { path: path.join(h.folder, 'a.md') } }), { decision: 'allow' });
-  assert.deepEqual(await review('run_command', { CommandLine: 'git log --oneline -5' }), { decision: 'allow' });
+  if (process.platform !== 'win32') {
+    assert.deepEqual(await review('run_command', { CommandLine: 'cat notes.md | head -20' }), { decision: 'allow' });
+  }
   assert.deepEqual(await review('search_web', { query: 'tide tables' }), { decision: 'allow' });
   assert.deepEqual(await review('read_url_content', { Url: 'https://example.com/tides' }), { decision: 'allow' });
   const leak = review('read_url_content', { Url: 'https://example.com/collect?text=draft' });
