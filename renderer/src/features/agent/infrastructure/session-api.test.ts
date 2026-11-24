@@ -270,126 +270,132 @@ describe('Agent session API', () => {
     ]);
   });
 
-  it('normalizes tool and permission events and validates permission replies', () => {
-    const events: unknown[] = [];
-    const sent: string[] = [];
-    let onMessage: ((event: { data: unknown }) => void) | undefined;
-    const socket: {
-      readyState: number;
-      addEventListener(type: 'close', listener: () => void): void;
-      addEventListener(type: 'message', listener: (event: { data: unknown }) => void): void;
-      removeEventListener(type: 'close', listener: () => void): void;
-      removeEventListener(type: 'message', listener: (event: { data: unknown }) => void): void;
-      close(): void;
-      send(data: string): void;
-    } = {
-      readyState: 1,
-      addEventListener(type, listener) {
-        if (type === 'message') onMessage = listener;
-      },
-      removeEventListener: vi.fn(),
-      close: vi.fn(),
-      send: (data: string) => {
-        sent.push(data);
-      },
-    };
-    const connection = createAgentSessionAdapter(
-      httpClient(),
-      'http://127.0.0.1:1',
-      () => socket,
-    ).connect(
-      { access: 'default', agent: 'codex', scope: { kind: 'folder', path: '/project/Research' } },
-      { onClose: vi.fn(), onEvent: (event) => events.push(event), onInvalidResponse: vi.fn() },
-    );
+  it.each([
+    { agent: 'codex', scope: 'session' },
+    { agent: 'antigravity', scope: 'session-commands' },
+  ] as const)(
+    'normalizes $agent tool and permission events and validates permission replies',
+    ({ agent, scope }) => {
+      const events: unknown[] = [];
+      const sent: string[] = [];
+      let onMessage: ((event: { data: unknown }) => void) | undefined;
+      const socket: {
+        readyState: number;
+        addEventListener(type: 'close', listener: () => void): void;
+        addEventListener(type: 'message', listener: (event: { data: unknown }) => void): void;
+        removeEventListener(type: 'close', listener: () => void): void;
+        removeEventListener(type: 'message', listener: (event: { data: unknown }) => void): void;
+        close(): void;
+        send(data: string): void;
+      } = {
+        readyState: 1,
+        addEventListener(type, listener) {
+          if (type === 'message') onMessage = listener;
+        },
+        removeEventListener: vi.fn(),
+        close: vi.fn(),
+        send: (data: string) => {
+          sent.push(data);
+        },
+      };
+      const connection = createAgentSessionAdapter(
+        httpClient(),
+        'http://127.0.0.1:1',
+        () => socket,
+      ).connect(
+        { access: 'default', agent, scope: { kind: 'folder', path: '/project/Research' } },
+        { onClose: vi.fn(), onEvent: (event) => events.push(event), onInvalidResponse: vi.fn() },
+      );
 
-    connection.send?.({
-      kind: 'prompt',
-      skill: null,
-      text: 'Read the screenshot',
-      attachments: ['/tmp/shot.png'],
-    });
-    expect(JSON.parse(sent.pop() ?? '{}')).toEqual({
-      t: 'prompt',
-      text: 'Read the screenshot',
-      attachments: ['/tmp/shot.png'],
-    });
-
-    onMessage?.({
-      data: JSON.stringify({ t: 'tool', id: 'tool-1', name: 'Bash', input: { command: 'pwd' } }),
-    });
-    onMessage?.({
-      data: JSON.stringify({
-        t: 'permission',
-        id: 'permission-1',
-        toolUseId: 'tool-1',
-        name: 'Bash',
-        title: null,
-        input: { command: 'pwd' },
-        approvalScopes: ['session'],
-      }),
-    });
-    expect(
       connection.send?.({
-        allow: true,
-        always: null,
-        scope: 'session',
-        answers: null,
-        id: 'permission-1',
-        kind: 'reply-permission',
-      }),
-    ).toBe(true);
-    expect(
-      connection.send?.({
-        allow: true,
-        always: null,
-        answers: { 'Which format?': 'Summary' },
-        id: 'permission-2',
-        kind: 'reply-permission',
-      }),
-    ).toBe(true);
-    onMessage?.({
-      data: JSON.stringify({
-        t: 'file-diff',
-        id: 'diff:1',
-        file: 'notes.md',
-        before: 'one\n',
-        after: 'one\ntwo\n',
-        additions: 1,
-        deletions: 0,
-      }),
-    });
+        kind: 'prompt',
+        skill: null,
+        text: 'Read the screenshot',
+        attachments: ['/tmp/shot.png'],
+      });
+      expect(JSON.parse(sent.pop() ?? '{}')).toEqual({
+        t: 'prompt',
+        text: 'Read the screenshot',
+        attachments: ['/tmp/shot.png'],
+      });
 
-    expect(events).toEqual([
-      { id: 'tool-1', input: { command: 'pwd' }, kind: 'tool-started', name: 'Bash' },
-      {
-        id: 'permission-1',
-        input: { command: 'pwd' },
-        kind: 'permission-requested',
-        approvalScopes: ['session'],
-        name: 'Bash',
-        title: null,
-        toolUseId: 'tool-1',
-      },
-      {
-        additions: 1,
-        after: 'one\ntwo\n',
-        before: 'one\n',
-        deletions: 0,
-        id: 'diff:1',
-        kind: 'file-changed',
-        path: 'notes.md',
-      },
-    ]);
-    expect(sent).toEqual([
-      JSON.stringify({ t: 'permission-reply', id: 'permission-1', allow: true, scope: 'session' }),
-      JSON.stringify({
-        t: 'permission-reply',
-        id: 'permission-2',
-        allow: true,
-        answers: { 'Which format?': 'Summary' },
-      }),
-    ]);
-  });
+      onMessage?.({
+        data: JSON.stringify({ t: 'tool', id: 'tool-1', name: 'Bash', input: { command: 'pwd' } }),
+      });
+      onMessage?.({
+        data: JSON.stringify({
+          t: 'permission',
+          id: 'permission-1',
+          toolUseId: 'tool-1',
+          name: 'Bash',
+          title: null,
+          input: { command: 'pwd' },
+          approvalScopes: [scope],
+        }),
+      });
+      expect(
+        connection.send?.({
+          allow: true,
+          always: null,
+          scope,
+          answers: null,
+          id: 'permission-1',
+          kind: 'reply-permission',
+        }),
+      ).toBe(true);
+      expect(
+        connection.send?.({
+          allow: true,
+          always: null,
+          answers: { 'Which format?': 'Summary' },
+          id: 'permission-2',
+          kind: 'reply-permission',
+        }),
+      ).toBe(true);
+      onMessage?.({
+        data: JSON.stringify({
+          t: 'file-diff',
+          id: 'diff:1',
+          file: 'notes.md',
+          before: 'one\n',
+          after: 'one\ntwo\n',
+          additions: 1,
+          deletions: 0,
+        }),
+      });
+
+      expect(events).toEqual([
+        { id: 'tool-1', input: { command: 'pwd' }, kind: 'tool-started', name: 'Bash' },
+        {
+          id: 'permission-1',
+          input: { command: 'pwd' },
+          kind: 'permission-requested',
+          approvalScopes: [scope],
+          name: 'Bash',
+          title: null,
+          toolUseId: 'tool-1',
+        },
+        {
+          additions: 1,
+          after: 'one\ntwo\n',
+          before: 'one\n',
+          deletions: 0,
+          id: 'diff:1',
+          kind: 'file-changed',
+          path: 'notes.md',
+        },
+      ]);
+      expect(sent).toEqual([
+        JSON.stringify({ t: 'permission-reply', id: 'permission-1', allow: true, scope }),
+        JSON.stringify({
+          t: 'permission-reply',
+          id: 'permission-2',
+          allow: true,
+          answers: { 'Which format?': 'Summary' },
+        }),
+      ]);
+    },
+  );
 });
 
 it('joins a disconnect to the new turn after an earlier server error on the same connection', () => {

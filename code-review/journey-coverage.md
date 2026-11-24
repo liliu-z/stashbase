@@ -3775,7 +3775,7 @@ and `server/antigravity-history.ts` records the conversations StashBase chats
 start. `antigravity-agent.test.ts` covers launch flags and instructions,
 streamed text and tool rows, the history record and its project scope, process
 reuse and restart on a model change, read/write/command decisions per mode,
-always-answers, withdrawn and post-Stop approvals, Stop and resume, empty
+one-off and session-command answers, withdrawn and post-Stop approvals, Stop and resume, empty
 `SUCCESS`, a crash with `AGY_ERROR`, and the hook route's refusal of unknown
 sessions. `antigravity-setup.test.ts` covers sign-in classification, reuse of an
 existing sign-in without launching an interactive login, initial check failures
@@ -3783,6 +3783,15 @@ and cancellation without launching login, the sign-in loop's retirement,
 cancellation and early exit, model-variant grouping, nested
 and flat event forms, setup that keeps the reader's own MCP servers and hooks,
 and the generated POSIX hook launcher against a real local server.
+Session command approval (2026-11-24) uses an explicit `session-commands`
+scope in the shared card. Host checks cover different commands and terminal
+input across turns, one-off approval, non-command isolation, mode reset,
+reopening, Plan, withdrawn hooks, stale replies and Stop. Renderer workspace
+and transport checks exercise the named choice and its scope on the wire;
+the Antigravity Commands Story was visually inspected in Chrome. `pnpm check`,
+26 focused host checks, 25 focused renderer checks, formatting, lint and docs
+passed. This is controlled local evidence; real-provider command execution
+and packaged behavior for this choice remain unverified.
 On macOS (2026-10-23), the sign-in entry checked the locally installed `agy`
 with its real `/usage` probe and reused the existing account without invoking
 the interactive-login launcher. An isolated macOS Electron pass through the

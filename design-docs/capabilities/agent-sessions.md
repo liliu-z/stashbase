@@ -186,7 +186,12 @@ for unsent text.
   shown by the command line itself, plus web searches and page reads whose
   address carries no query. Plan refuses changes. Anything else shows the same
   approval card the other runtimes use, and an unanswered card never becomes a
-  grant. Antigravity's messages carry text only, so attachments reach it as
+  grant. A command approval also offers to allow all commands for this open
+  chat, including terminal input, file changes and network access through commands.
+  That explicit grant lasts across turns, applies only to command tools, and
+  resets when the permission mode changes or the chat reconnects. Other tools
+  keep their existing rules, and Plan still refuses commands.
+  Antigravity's messages carry text only, so attachments reach it as
   file paths it reads with its own tools, as they do for Claude and Codex.
 - A runtime that advertises attachments accepts ordinary local files through the
   picker, drop, or paste. Images and PDFs may have visual previews; other files
@@ -296,6 +301,8 @@ for unsent text.
 - Allow applies to its pending action only. Codex also offers Allow for this session
   and Always allow when the native request supports those durations. The choice
   remembers that permission with Codex; it does not approve unrelated actions.
+  Antigravity's separate Allow all commands this session choice grants the
+  command scope described above; it never grants all tools or persists to disk.
   Computer Use app access and Auto's review of a particular action remain separate,
   and a denied review retains its explanation. Stop cancels unanswered approvals,
   retires model/tool work, and preserves transcripts and completed file edits.

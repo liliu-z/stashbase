@@ -222,11 +222,10 @@ test('the approval hook passes reads, asks the reader before changes, and refuse
   h.ws.client({ t: 'permission-reply', id: h.ws.events('permission')[1]!.id, allow: false });
   assert.equal((await declined).decision, 'deny');
 
-  const always = review('run_command', { CommandLine: 'git status' });
+  const once = review('run_command', { CommandLine: 'git status' });
   await until(() => h.ws.events('permission').length === 3, 'third card');
-  h.ws.client({ t: 'permission-reply', id: h.ws.events('permission')[2]!.id, allow: true, always: true });
-  assert.deepEqual(await always, { decision: 'allow' });
-  assert.deepEqual(await review('run_command', { CommandLine: 'git status' }), { decision: 'allow' }, 'an always answer holds for the same command');
+  h.ws.client({ t: 'permission-reply', id: h.ws.events('permission')[2]!.id, allow: true });
+  assert.deepEqual(await once, { decision: 'allow' });
 
   assert.equal((await review('view_file', {}, 'another-conversation')).decision, 'deny', 'a call from another conversation is refused');
 
@@ -239,7 +238,7 @@ test('the approval hook passes reads, asks the reader before changes, and refuse
   h.ws.client({ t: 'set-mode', mode: 'plan' });
   assert.equal((await review('write_to_file', { TargetFile: path.join(h.folder, 'a.md') })).decision, 'deny');
   assert.equal((await review('edit_file', { path: path.join(h.folder, 'a.md') })).decision, 'deny');
-  assert.equal((await review('run_command', { CommandLine: 'git status' })).decision, 'deny', 'Plan clears always answers');
+  assert.equal((await review('run_command', { CommandLine: 'git status' })).decision, 'deny');
   assert.deepEqual(await review('grep_search', { Query: 'x' }), { decision: 'allow' });
 
   // Auto is StashBase's rule set: edits, read-only commands, searches and plain page reads pass.
@@ -271,6 +270,95 @@ test('the approval hook passes reads, asks the reader before changes, and refuse
   h.ws.client({ t: 'interrupt' });
   assert.equal((await outside).decision, 'deny', 'Stop withdraws an open approval');
   assert.equal((await review('view_file', {})).decision, 'deny', 'nothing is approved after Stop');
+});
+
+test('explicit session command approval covers later commands but not other tools, chats or modes', async (t) => {
+  const h = harness(t, { access: 'auto' });
+  h.session.begin();
+  await until(() => h.ws.events('ready').length === 1, 'ready');
+  const proc = await startTurn(h, 'Work through several commands');
+  const review = (name: string, args: Record<string, unknown> = {}, conversationId = 'conv-1') =>
+    h.session.reviewToolCall({ conversationId, toolCall: { name, args } }, new AbortController().signal);
+  const command = () => review('run_command', { CommandLine: 'pwd && ls' });
+  const answer = async (pending: ReturnType<typeof review>, scope?: string, allow = true) => {
+    const card = h.ws.events('permission').at(-1)!;
+    h.ws.client({ t: 'permission-reply', id: card.id, allow, ...(scope ? { scope } : {}) });
+    return pending;
+  };
+
+  assert.equal((await answer(command())).decision, 'allow');
+  const remembered = command();
+  assert.equal(h.ws.events('permission').length, 2, 'Allow only grants one command');
+  assert.deepEqual(h.ws.events('permission').at(-1)!.approvalScopes, ['session-commands']);
+  assert.equal((await answer(remembered, 'session-commands')).decision, 'allow');
+  assert.equal((await review('run_command', { CommandLine: 'python export.py' })).decision, 'allow');
+  assert.equal((await review('send_command_input', { Input: 'continue\n' })).decision, 'allow');
+  assert.equal(h.ws.events('permission').length, 2, 'different commands and terminal input reuse the grant');
+  assert.equal((await review('run_command', {}, 'another-chat')).decision, 'deny');
+  assert.equal((await h.session.reviewToolCall({ toolCall: { name: 'run_command' } }, AbortSignal.abort())).decision, 'deny');
+
+  for (const [name, args] of [
+    ['delete_file', { path: path.join(h.folder, 'draft.md') }],
+    ['replace_file_content', { TargetFile: path.join(h.folder, '..', 'outside.md') }],
+    ['read_url_content', { Url: 'https://example.com/?draft=private' }],
+  ] as const) {
+    const pending = review(name, args);
+    assert.deepEqual(h.ws.events('permission').at(-1)!.approvalScopes, []);
+    assert.equal((await answer(pending, undefined, false)).decision, 'deny');
+  }
+
+  proc.emitEvent({ event: 'result', result: { status: 'SUCCESS', response: 'Done.' } });
+  await startTurn(h, 'Continue');
+  const before = h.ws.events('permission').length;
+  assert.equal((await command()).decision, 'allow', 'the grant survives a completed turn');
+  assert.equal(h.ws.events('permission').length, before);
+  h.ws.client({ t: 'set-mode', mode: 'plan' });
+  assert.equal((await command()).decision, 'deny', 'Plan still refuses commands');
+  h.ws.client({ t: 'set-mode', mode: 'auto' });
+  assert.equal((await answer(command(), 'session-commands')).decision, 'allow');
+  assert.equal(h.ws.events('permission').length, before + 1, 'returning to Auto needs a fresh grant');
+
+  h.session.dispose();
+  assert.equal((await command()).decision, 'deny');
+  const reopened = harness(t, { access: 'auto', resume: 'conv-1' });
+  reopened.session.begin();
+  await until(() => reopened.ws.events('ready').length === 1, 'reopened ready');
+  await startTurn(reopened, 'Reopened');
+  const pending = reopened.session.reviewToolCall({ toolCall: { name: 'run_command', args: { CommandLine: 'pwd && ls' } } }, new AbortController().signal);
+  assert.equal(reopened.ws.events('permission').length, 1, 'a new live session never inherits command authority');
+  reopened.ws.client({ t: 'permission-reply', id: reopened.ws.events('permission')[0]!.id, allow: false });
+  assert.equal((await pending).decision, 'deny');
+});
+
+test('withdrawn, stale, rejected and unsupported approval replies cannot grant session commands', async (t) => {
+  const h = harness(t, { access: 'default' });
+  h.session.begin();
+  await until(() => h.ws.events('ready').length === 1, 'ready');
+  await startTurn(h, 'Run a command');
+  const review = (signal = new AbortController().signal, name = 'run_command') =>
+    h.session.reviewToolCall({ toolCall: { name, args: { CommandLine: 'pwd && ls' } } }, signal);
+  const reply = (id: unknown, scope: string, allow = true) =>
+    h.ws.client({ t: 'permission-reply', id, allow, scope });
+
+  for (const outcome of ['withdrawn', 'mode', 'rejected', 'unsupported', 'non-command', 'stop'] as const) {
+    const controller = new AbortController();
+    const pending = review(controller.signal, outcome === 'non-command' ? 'delete_file' : 'run_command');
+    const card = h.ws.events('permission').at(-1)!;
+    const count = h.ws.events('permission').length;
+    if (outcome === 'withdrawn') controller.abort();
+    if (outcome === 'mode') h.ws.client({ t: 'set-mode', mode: 'acceptEdits' });
+    if (outcome === 'stop') h.ws.client({ t: 'interrupt' });
+    reply(card.id, outcome === 'unsupported' ? 'always' : 'session-commands', outcome !== 'rejected');
+    assert.equal((await pending).decision, 'deny', outcome);
+    const probe = review();
+    if (outcome === 'stop') {
+      assert.equal((await probe).decision, 'deny');
+    } else {
+      assert.equal(h.ws.events('permission').length, count + 1, `${outcome} did not remember a grant`);
+      reply(h.ws.events('permission').at(-1)!.id, 'session-commands', false);
+      assert.equal((await probe).decision, 'deny');
+    }
+  }
 });
 
 test('Stop interrupts agy, retires it, and the next prompt resumes the conversation', async (t) => {

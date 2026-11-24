@@ -22,6 +22,41 @@ import { registerWorkspaceCleanup, renderWorkspace } from './workspace.harness';
 registerWorkspaceCleanup();
 
 describe('Agent workspace', () => {
+  it('offers explicit approval for all Antigravity commands in the live session', async () => {
+    const { listeners, port, sent } = agentSessionPort();
+    const { runtime } = renderWorkspace(port, [
+      agentDefinition({ id: 'antigravity', label: 'Antigravity' }),
+    ]);
+    await agentGateLifted();
+    const session = runtime.activeSession();
+    await act(async () => {
+      session.start();
+      listeners[0]?.onEvent({ kind: 'ready' });
+      await session.sendPrompt('Prepare the document');
+      listeners[0]?.onEvent({ kind: 'turn-started' });
+      listeners[0]?.onEvent({
+        kind: 'permission-requested',
+        id: 'command-approval',
+        toolUseId: 'command-tool',
+        name: 'Bash',
+        title: 'Allow Antigravity to run this command?',
+        input: { command: 'pwd && ls' },
+        approvalScopes: ['session-commands'],
+      });
+    });
+    expect(screen.getByText(/Session approval allows all commands/u)).not.toBeNull();
+    expect(screen.queryByRole('button', { name: 'Always allow' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Allow all commands this session' }));
+    expect(sent.at(-1)).toEqual({
+      kind: 'reply-permission',
+      id: 'command-approval',
+      allow: true,
+      scope: 'session-commands',
+      always: null,
+      answers: null,
+    });
+  });
+
   it('shows the native exit cause when an interrupted turn has an unknown outcome', async () => {
     const { port, listeners, sent } = agentSessionPort();
     const { runtime } = renderWorkspace(port);

@@ -50,7 +50,7 @@ export interface AgentTurnChangedFile {
   readonly deletions: number;
 }
 
-export type AgentApprovalScope = 'session' | 'always';
+export type AgentApprovalScope = 'session' | 'always' | 'session-commands';
 
 export type AgentTranscriptBlock =
   | {

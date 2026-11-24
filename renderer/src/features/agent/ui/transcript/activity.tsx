@@ -341,6 +341,12 @@ export function AgentPermissionCard({
       icon={CircleAlert}
     >
       <AgentToolPayload indent={false} projectPathFor={projectPathFor} tool={tool} />
+      {permissionId && tool.approvalScopes?.includes('session-commands') && (
+        <p className="text-sm text-muted-foreground">
+          Session approval allows all commands, including file changes and network access. It resets
+          when you change permission mode or reopen this chat.
+        </p>
+      )}
       {permissionId && tool.approvalScopes?.includes('always') && (
         <p className="text-sm text-muted-foreground">
           Applies to this permission. Individual actions can still require approval.
@@ -358,7 +364,13 @@ export function AgentPermissionCard({
               size="compact"
               variant="secondary"
             >
-              {scope === 'session' ? 'Allow for this session' : 'Always allow'}
+              {
+                {
+                  session: 'Allow for this session',
+                  always: 'Always allow',
+                  'session-commands': 'Allow all commands this session',
+                }[scope]
+              }
             </Button>
           ))}
           <Button leadingIcon={Check} onClick={() => reply(true)} size="compact">

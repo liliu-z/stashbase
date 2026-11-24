@@ -246,9 +246,11 @@ function QuestionHarness() {
 function AgentActivityHarness({
   compact = false,
   computerUse = false,
+  sessionCommands = false,
 }: {
   compact?: boolean;
   computerUse?: boolean;
+  sessionCommands?: boolean;
 }) {
   const [mode, setMode] = useState<AgentAccessMode>('auto');
   const [decision, setDecision] = useState<AgentToolBlock>(
@@ -260,7 +262,15 @@ function AgentActivityHarness({
           input: { app: 'com.google.Chrome' },
           approvalScopes: ['session', 'always'],
         }
-      : permission,
+      : {
+          ...permission,
+          ...(sessionCommands
+            ? {
+                permissionTitle: 'Allow Antigravity to run this command?',
+                approvalScopes: ['session-commands'] as const,
+              }
+            : {}),
+        },
   );
   return (
     <div className={compact ? 'w-[20rem] space-y-4' : 'w-[34rem] space-y-5'}>
@@ -293,6 +303,10 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Standard: Story = {};
+
+export const AntigravityCommands: Story = {
+  args: { sessionCommands: true },
+};
 
 export const FileChanges: Story = {
   render: () => <FileChangeHarness />,

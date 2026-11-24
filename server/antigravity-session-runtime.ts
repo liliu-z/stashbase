@@ -85,7 +85,7 @@ export interface AntigravityHookDecision {
 
 interface PendingApproval {
   toolUseId: string;
-  alwaysKey: string;
+  command: boolean;
   resolve(decision: AntigravityHookDecision): void;
 }
 
@@ -161,8 +161,8 @@ export class AntigravitySession implements AttributedAgentSession {
   private approvalSequence = 0;
   private turnSequence = 0;
   private pendingApprovals = new Map<string, PendingApproval>();
-  /** "Always" answers hold for this session and mode only. */
-  private alwaysAllowed = new Set<string>();
+  /** Explicit command authority belongs to this live chat and mode only. */
+  private commandsAllowed = false;
 
   constructor(
     private ws: WebSocket,
@@ -285,7 +285,10 @@ export class AntigravitySession implements AttributedAgentSession {
         break;
       case 'set-mode': {
         const mode = antigravityAccessMode(msg.mode);
-        if (mode !== this.accessMode) this.alwaysAllowed.clear();
+        if (mode !== this.accessMode) {
+          this.commandsAllowed = false;
+          this.denyPendingApprovals('The permission mode changed.');
+        }
         this.accessMode = mode;
         break;
       }
@@ -597,6 +600,7 @@ export class AntigravitySession implements AttributedAgentSession {
    * settles what it can, and the rest waits for the reader's answer. */
   async reviewToolCall(payload: unknown, signal: AbortSignal): Promise<AntigravityHookDecision> {
     if (this.closed) return { decision: 'deny', reason: 'This StashBase chat has ended.' };
+    if (signal.aborted) return { decision: 'deny', reason: 'The approval request was withdrawn.' };
     const hook = objectValue(payload);
     const conversation = stringValue(hook.conversationId) || stringValue(hook.conversation_id);
     if (conversation && this.conversationId && conversation !== this.conversationId) {
@@ -617,8 +621,8 @@ export class AntigravitySession implements AttributedAgentSession {
       };
     }
     const display = antigravityToolDisplay({ name, args });
-    const alwaysKey = display.name === 'Bash' ? `Bash:${stringValue(display.input.command)}` : display.name;
-    if (this.alwaysAllowed.has(alwaysKey)) return { decision: 'allow' };
+    const command = classified.kind === 'command';
+    if (command && this.commandsAllowed) return { decision: 'allow' };
     const stepIndex = typeof hook.stepIdx === 'number' ? hook.stepIdx : typeof hook.step_idx === 'number' ? hook.step_idx : null;
     const approvalId = `antigravity-${++this.approvalSequence}`;
     const toolUseId = stepIndex !== null && this.turn ? toolId(this.turn, stepIndex) : approvalId;
@@ -641,7 +645,7 @@ export class AntigravitySession implements AttributedAgentSession {
       signal.addEventListener('abort', abandon, { once: true });
       this.pendingApprovals.set(approvalId, {
         toolUseId,
-        alwaysKey,
+        command,
         resolve: finish,
       });
       this.send({
@@ -651,6 +655,7 @@ export class AntigravitySession implements AttributedAgentSession {
         name: display.name,
         title: antigravityApprovalTitle(classified, display),
         input: display.input,
+        approvalScopes: command ? ['session-commands'] : [],
       });
       if (signal.aborted) abandon();
     });
@@ -661,7 +666,11 @@ export class AntigravitySession implements AttributedAgentSession {
     const pending = this.pendingApprovals.get(id);
     if (!pending) return;
     if (msg.allow === true) {
-      if (msg.always === true) this.alwaysAllowed.add(pending.alwaysKey);
+      if (msg.scope !== undefined && (msg.scope !== 'session-commands' || !pending.command)) {
+        pending.resolve({ decision: 'deny', reason: 'This action does not support that approval scope.' });
+        return;
+      }
+      if (msg.scope === 'session-commands') this.commandsAllowed = true;
       pending.resolve({ decision: 'allow' });
     } else {
       pending.resolve({ decision: 'deny', reason: 'The reader declined this action.' });
@@ -727,6 +736,7 @@ export class AntigravitySession implements AttributedAgentSession {
     }
     if (this.busy && this.turn) this.recordTurn(this.turn);
     this.closed = true;
+    this.commandsAllowed = false;
     this.busy = false;
     this.turn = null;
     if (this.interruptTimer) { clearTimeout(this.interruptTimer); this.interruptTimer = null; }

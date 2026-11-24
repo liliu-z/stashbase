@@ -890,8 +890,8 @@ The updater re-enables the window and can be retried after the draft is resolved
   Codex advertises supported approval scopes to the renderer. Session decisions
   map to native command/file decisions or permission grants; MCP persistence
   reads the request's `_meta.persist` and returns only an offered scope in response
-  metadata. Codex owns remembered grants; StashBase does not cache blanket tool
-  authorization. Native automatic-review denials remain visible and are not replayed.
+  metadata. Codex owns its remembered grants; StashBase does not cache blanket
+  tool authorization for Codex. Native automatic-review denials remain visible and are not replayed.
   Read/orientation/reindex may use the low-risk path. Document writes remain
   permissioned and Review never grants a write in advance. Edit policy grants only its
   bounded writes; move/delete/commands/network/broader access require their own
@@ -929,7 +929,14 @@ The updater re-enables the window and can be retried after the draft is resolved
   (`isReadOnlyCommand`: known programs, pipes only, no chaining, substitution
   or redirection), web searches and query-free page reads, Plan denies anything
   that could change the project, and the rest becomes an approval card. A card
-  withdrawn by the hook, Stop, turn end, or disposal denies. Auto launches
+  for a command offers the distinct `session-commands` scope: an explicit reply
+  to that pending command grants `run_command` and `send_command_input` across
+  turns of that live session. `antigravity-session-runtime.ts` owns the grant;
+  it never persists, crosses sessions, or applies to non-command tools. A mode
+  change clears it and denies pending cards. Plan, conversation attribution,
+  turn lifetime and hook cancellation are checked before any remembered grant.
+  A card withdrawn by the hook, Stop, turn end, or disposal denies; stale or
+  unsupported scopes cannot create authority. Auto launches
   `agy` like Edit; native Auto is never used, because it decides inside the CLI
   past the hook and refuses StashBase's MCP tools. Default maps Ask/Edit/Plan to OpenCode profiles;
   Auto uses the Edit profile with host-owned review. Edit and Auto share
