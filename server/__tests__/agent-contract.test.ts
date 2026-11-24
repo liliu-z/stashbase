@@ -24,7 +24,7 @@ test('every built-in runtime declares the fundamental Shared Agent Contract beha
     ['codex', 'Codex'],
     ['claude', 'Claude'],
     ['antigravity', 'Antigravity'],
-    ['stashbase', 'Default'],
+    ['stashbase', 'StashBase Agent'],
   ]);
   for (const adapter of BUILT_IN_AGENT_ADAPTERS) {
     for (const capability of REQUIRED_SHARED_CAPABILITIES) {

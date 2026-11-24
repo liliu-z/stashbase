@@ -6,6 +6,7 @@ import type { AccountPort } from '@/features/settings/application/ports';
 import { useAccount } from '@/features/settings/hooks/use-account';
 
 import { AccountAccessDialog } from './account-access-dialog';
+import { emptyReferrals } from './account-story-fixtures';
 
 const person = {
   signedIn: true,
@@ -16,6 +17,7 @@ const person = {
 };
 const anonymous = { ...person, signedIn: false, email: null };
 const port: AccountPort = {
+  referrals: emptyReferrals,
   avatar: async () => null,
   load: async () => anonymous,
   markOfferSeen: async () => anonymous,

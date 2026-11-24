@@ -31,10 +31,10 @@ describe('Chat header', () => {
     await screen.findAllByText('Inspect the workspace');
 
     const header = await screen.findByRole('button', {
-      name: /^Inspect the workspace, (Default|Codex)$/u,
+      name: /^Inspect the workspace, (StashBase Agent|Codex)$/u,
     });
     expect(
-      screen.queryByRole('heading', { name: /^Inspect the workspace, (Default|Codex)$/u }),
+      screen.queryByRole('heading', { name: /^Inspect the workspace, (StashBase Agent|Codex)$/u }),
     ).toBeNull();
     pressKey(header, 'F2');
     const field = screen.getByRole('textbox', { name: 'Rename Inspect the workspace' });
@@ -42,7 +42,7 @@ describe('Chat header', () => {
     await userEvent.type(field, 'Reading list{Enter}');
 
     expect(
-      await screen.findByRole('button', { name: /^Reading list, (Default|Codex)$/u }),
+      await screen.findByRole('button', { name: /^Reading list, (StashBase Agent|Codex)$/u }),
     ).not.toBeNull();
     expect(runtime.activeSession().store.getState().title).toBe('Reading list');
   });

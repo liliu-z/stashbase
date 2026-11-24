@@ -76,7 +76,7 @@ export const BUILT_IN_AGENT_ADAPTERS: readonly AgentAdapter[] = [
     history: antigravityHistory.actions(),
   },
   {
-    id: 'stashbase', label: 'Default', vendor: 'StashBase · OpenCode',
+    id: 'stashbase', label: 'StashBase Agent', vendor: 'StashBase · OpenCode',
     capabilities: {
       ...SHARED_PANEL_CAPABILITIES,
       modes: AGENT_ACCESS_MODES,

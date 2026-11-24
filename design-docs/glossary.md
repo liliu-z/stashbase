@@ -53,13 +53,12 @@ from agent permissions and document reading/editing controls.
 
 ## Agent
 
-A runtime that works in a chat: Claude, Codex, Antigravity, or the Default
-Agent. Write **agent** in lowercase in prose and interface copy, such as "your
-agent", "agent credits", and **Ask agent**. Capitalize it only in names
-(**Default Agent**), at the start of a sentence, label, or list item, in
+A runtime that works in a chat: Claude, Codex, Antigravity, or StashBase Agent.
+Write **agent** in lowercase in prose and interface copy, such as "your agent",
+"agent credits", and **Ask agent**. Capitalize it only in names
+(**StashBase Agent**), at the start of a sentence, label, or list item, in
 title-case headings, and in third-party product names such as Claude Agent SDK.
-In sentences the bundled runtime is **the Default Agent**; the bare
-**Default** appears only where runtimes are listed, such as a picker.
+Use **StashBase Agent** in pickers and settings as well as in prose.
 
 ## Chat
 
@@ -94,7 +93,7 @@ that Documents locates on open. A plain file link is not a citation.
 
 ## OpenQuill
 
-The included agent runtime, named **Default** in the app. It uses StashBase
+The included agent runtime, named **StashBase Agent** in the app. It uses StashBase
 account access and **free agent credits**, separate from embedding-provider billing.
 OpenQuill remains the external/runtime name; `stashbase` is its implementation
 identifier. [Agent Sessions](capabilities/agent-sessions.md) owns selection behavior.

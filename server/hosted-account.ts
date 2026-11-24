@@ -26,6 +26,8 @@ import {
 import { normalizeHostedDisplayName, parseGoogleAvatarUrl } from './hosted-account-profile.ts';
 import { hostedAuthRequest, hostedAllowanceRequest } from './hosted-auth-transport.ts';
 import { AUTH_BASE_URL } from '../shared/hosted-auth-network.ts';
+import { hostedAgentAllowanceSchema } from '../shared/protocols/http/agent-runtime.ts';
+import type { CloudReferralCheckoutInput } from '../shared/protocols/http/referrals.ts';
 
 export const STASHBASE_API_URL = 'https://api.stashbase.ai';
 const CLIENT_VERSION = packageJson.version;
@@ -85,7 +87,7 @@ export function isHostedSignInRequired(error: unknown): boolean {
 
 function requireHostedAccountSession(): HostedAccountSession {
   const session = getHostedAccountSession();
-  if (!session) throw new HostedAuthError('Sign in to StashBase to use the Default Agent and its free credits.', true);
+  if (!session) throw new HostedAuthError('Sign in to StashBase to use the StashBase Agent and its free credits.', true);
   return session;
 }
 
@@ -516,12 +518,37 @@ export async function hostedAccountAvatar(): Promise<{ contentType: string; byte
   }
 }
 
+// A per-host key makes this a renderer fence, independent of the cloud
+// credential format. It is stable through access-token refresh.
+const generationKey = crypto.randomBytes(32);
+
+export function hostedAccountGeneration(): string | undefined {
+  const session = getHostedAccountSession();
+  if (!session) return undefined;
+  return crypto.createHmac('sha256', generationKey)
+    .update(session.userId).update('\0').update(session.sessionToken).digest('base64url');
+}
+
+export class HostedApiError extends Error {
+  constructor(readonly status: number, readonly code: string, readonly retryAfterSeconds?: number) {
+    super('The StashBase account service could not complete this request.');
+  }
+}
+
+export function assertHostedGeneration(expected: string | undefined): asserts expected is string {
+  const current = hostedAccountGeneration();
+  if (!current) throw new HostedApiError(401, 'auth_required');
+  if (current !== expected) throw new HostedApiError(409, 'referral_account_changed');
+}
+
 export async function fetchHostedAgentAllowance(
-  options: { forceRefreshToken?: boolean; signal?: AbortSignal } = {},
+  options: { forceRefreshToken?: boolean; signal?: AbortSignal; generation?: string } = {},
 ): Promise<HostedAgentAllowance> {
   // One budget covers headers, body and the existing one-time auth refresh.
   // A provider that sends headers and stalls must not leave credits pending.
   const signal = options.signal ?? AbortSignal.timeout(20_000);
+  const generation = options.generation ?? hostedAccountGeneration();
+  assertHostedGeneration(generation);
   signal.throwIfAborted();
   // Refresh is shared with other callers. Stop this reader at its deadline
   // without cancelling their refresh or dispatching this reader's late request.
@@ -533,13 +560,15 @@ export async function fetchHostedAgentAllowance(
       error => { signal.removeEventListener('abort', abort); reject(error); },
     );
   });
+  assertHostedGeneration(generation);
   const response = await hostedAllowanceRequest({ accessToken: token, clientVersion: CLIENT_VERSION, signal });
   const payload = await jsonBody<HostedAgentAllowance & ErrorPayload>(response);
   // jsonBody intentionally hides unreadable upstream bodies; cancellation is
   // not an unreadable success and must reach the route's recovery path.
   signal.throwIfAborted();
+  assertHostedGeneration(generation);
   if (response.status === 401 && !options.forceRefreshToken) {
-    return fetchHostedAgentAllowance({ forceRefreshToken: true, signal });
+    return fetchHostedAgentAllowance({ forceRefreshToken: true, signal, generation });
   }
   if (!response.ok) throw Object.assign(new Error(messageOf(payload, `The agent credits service failed (HTTP ${response.status}).`)), {
     http_status: response.status,
@@ -547,7 +576,9 @@ export async function fetchHostedAgentAllowance(
     request_id: response.headers.get('x-request-id') ?? undefined,
     content_type: response.headers.get('content-type') ?? undefined,
   });
-  return payload as HostedAgentAllowance;
+  const parsed = hostedAgentAllowanceSchema.safeParse(payload);
+  if (!parsed.success) throw new Error('The agent credits service returned an unexpected response.');
+  return parsed.data;
 }
 
 // Billing pages are Stripe-hosted. Anything else in a billing answer is
@@ -565,29 +596,49 @@ function stripeBillingUrl(value: unknown): string {
 
 /** One signed-in billing call. The desktop token stays in this process: the
  * renderer receives plans, status, or a Stripe page URL, never a credential. */
-async function hostedBillingRequest<T>(
-  path: string,
-  init: { method: 'GET' | 'POST'; body?: unknown },
-  options: { forceRefreshToken?: boolean; signal?: AbortSignal } = {},
+type AccountApiPath = '/v1/billing/status' | '/v1/billing/checkout' | '/v1/billing/change'
+  | '/v1/billing/portal' | '/v1/referrals/resolve' | '/v1/referrals/me' | '/v1/referrals/claim'
+  | '/v1/referrals/history' | '/v1/credits/grants';
+
+export async function hostedAccountRequest<T>(
+  path: AccountApiPath,
+  init: { method: 'GET' | 'POST'; body?: unknown; query?: URLSearchParams },
+  options: { forceRefreshToken?: boolean; signal?: AbortSignal; generation?: string } = {},
 ): Promise<T> {
   const signal = options.signal ?? AbortSignal.timeout(20_000);
-  const token = await hostedAccessToken({ forceRefresh: options.forceRefreshToken });
+  const generation = options.generation ?? hostedAccountGeneration();
+  assertHostedGeneration(generation);
+  const anonymous = path === '/v1/referrals/resolve';
+  const token = anonymous ? undefined : await hostedAccessToken({ forceRefresh: options.forceRefreshToken });
+  assertHostedGeneration(generation);
   signal.throwIfAborted();
-  const response = await fetch(`${STASHBASE_API_URL}${path}`, {
+  const target = new URL(path, STASHBASE_API_URL);
+  if (init.query) target.search = init.query.toString();
+  const response = await fetch(target, {
     method: init.method,
     signal,
+    redirect: 'error',
     headers: {
-      authorization: `Bearer ${token}`,
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
       'x-stashbase-client-version': CLIENT_VERSION,
       ...(init.body === undefined ? {} : { 'content-type': 'application/json' }),
     },
     ...(init.body === undefined ? {} : { body: JSON.stringify(init.body) }),
   });
   const payload = await jsonBody<T & ErrorPayload>(response);
-  if (response.status === 401 && !options.forceRefreshToken) {
-    return hostedBillingRequest(path, init, { forceRefreshToken: true, signal });
+  signal.throwIfAborted();
+  assertHostedGeneration(generation);
+  if (response.status === 401 && !anonymous && !options.forceRefreshToken) {
+    return hostedAccountRequest(path, init, { forceRefreshToken: true, signal, generation });
   }
-  if (!response.ok) throw new Error(messageOf(payload, `Billing is temporarily unavailable (HTTP ${response.status}).`));
+  if (!response.ok) {
+    const retry = Number(response.headers.get('retry-after'));
+    throw new HostedApiError(
+      response.status,
+      typeof payload?.code === 'string' ? payload.code : 'service_unavailable',
+      Number.isSafeInteger(retry) && retry > 0 ? retry : undefined,
+    );
+  }
   return payload as T;
 }
 
@@ -605,7 +656,7 @@ export async function fetchHostedBillingPlans(): Promise<HostedBillingPlan[]> {
 
 export async function fetchHostedBillingStatus(): Promise<HostedBillingStatus> {
   const record = telemetry.scoped();
-  const status = await hostedBillingRequest<HostedBillingStatus>('/v1/billing/status', { method: 'GET' });
+  const status = await hostedAccountRequest<HostedBillingStatus>('/v1/billing/status', { method: 'GET' });
   const key = status.plan?.planKey;
   record({ event: 'subscription_observed',
     plan: key === 'plus' || key === 'pro' ? key : status.plan ? 'other' : 'free',
@@ -615,10 +666,10 @@ export async function fetchHostedBillingStatus(): Promise<HostedBillingStatus> {
   return status;
 }
 
-export async function createHostedCheckout(priceId: string): Promise<HostedBillingRedirect> {
+export async function createHostedCheckout(input: CloudReferralCheckoutInput, generation: string): Promise<HostedBillingRedirect> {
   const record = telemetry.scoped();
   try {
-    const answer = await hostedBillingRequest<{ url?: unknown }>('/v1/billing/checkout', { method: 'POST', body: { priceId } });
+    const answer = await hostedAccountRequest<{ url?: unknown }>('/v1/billing/checkout', { method: 'POST', body: input }, { generation });
     const url = stripeBillingUrl(answer.url);
     record({ event: 'billing_checkout_result', outcome: 'success' });
     return { url };
@@ -629,13 +680,13 @@ export async function createHostedCheckout(priceId: string): Promise<HostedBilli
 }
 
 export async function changeHostedBilling(input: HostedBillingChange): Promise<{ changed: boolean }> {
-  return hostedBillingRequest('/v1/billing/change', { method: 'POST', body: input });
+  return hostedAccountRequest('/v1/billing/change', { method: 'POST', body: input });
 }
 
 export async function createHostedBillingPortal(): Promise<HostedBillingRedirect> {
   const record = telemetry.scoped();
   try {
-    const answer = await hostedBillingRequest<{ url?: unknown }>('/v1/billing/portal', { method: 'POST' });
+    const answer = await hostedAccountRequest<{ url?: unknown }>('/v1/billing/portal', { method: 'POST' });
     const url = stripeBillingUrl(answer.url);
     record({ event: 'billing_portal_result', outcome: 'success' });
     return { url };
@@ -653,6 +704,7 @@ export async function hostedAccountState(_refresh = false): Promise<HostedAccoun
   session = getHostedAccountSession() ?? session;
   return {
     signedIn: true,
+    generation: hostedAccountGeneration(),
     offers,
     email: session.email,
     ...(session.displayName ? { displayName: session.displayName } : {}),

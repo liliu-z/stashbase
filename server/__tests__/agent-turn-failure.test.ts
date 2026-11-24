@@ -62,7 +62,7 @@ test('live provider messages classify by their vocabulary', () => {
 
 test('hosted prerequisites and native signed-out messages name the actual repair', () => {
   for (const message of [
-    'Sign in to StashBase to use the Default Agent and its free credits.',
+    'Sign in to StashBase to use the StashBase Agent and its free credits.',
     'authentication_required',
     'Unauthenticated',
     'Sign-in is required',

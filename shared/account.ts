@@ -6,12 +6,15 @@
  * without treating it as an error.
  */
 
+import type { CreditBreakdown } from './protocols/http/referrals.ts';
+
 /** Public Agent allowance intentionally exposes only the user-facing monthly
  * percentage and token detail. Picodollar accounting stays server-side. */
 export interface HostedAgentAllowance {
   profile: string;
   remainingPercent: number;
   reservedPercent?: number;
+  creditBreakdown?: CreditBreakdown;
   inputTokens: number;
   outputTokens: number;
   cacheReadTokens: number;
@@ -58,6 +61,7 @@ export interface HostedBillingRedirect {
 export type HostedAccountOffer = 'sign-in';
 
 export interface HostedAccountState {
+  generation?: string;
   signedIn: boolean;
   /** Offers this installation has not shown to completion yet. */
   offers: HostedAccountOffer[];

@@ -11,11 +11,12 @@ import { App } from '@/app/shell';
 import { typeInto } from '@/test/dom';
 import { agentDefinition, agentSessionPort, CODEX_AGENT } from '@/test/fakes/agent';
 import { appDependencies } from '@/test/fakes/app';
-import { SIGNED_IN_ACCOUNT, SIGNED_OUT_ACCOUNT } from '@/test/fakes/settings';
+import { BONUS_ONLY_CREDITS } from '@/test/fakes/credits';
+import { IDLE_ALLOWANCE, SIGNED_IN_ACCOUNT, SIGNED_OUT_ACCOUNT } from '@/test/fakes/settings';
 import { projectRegistrySnapshot } from '@/test/fakes/workspace';
 
 const providers = [
-  { id: 'stashbase', label: 'Default' },
+  { id: 'stashbase', label: 'StashBase Agent' },
   { id: 'claude', label: 'Claude' },
   { id: 'codex', label: 'Codex' },
   { id: 'antigravity', label: 'Antigravity' },
@@ -141,6 +142,13 @@ function onboarding(provider: Provider) {
       };
     },
   };
+  if (provider.id === 'stashbase') {
+    dependencies.settings.agentRuntimeApi.getAllowance = async () => ({
+      ...IDLE_ALLOWANCE,
+      remainingPercent: 0,
+      creditBreakdown: BONUS_ONLY_CREDITS,
+    });
+  }
   dependencies.settings.accountApi.load = vi.fn(async () =>
     signedIn ? SIGNED_IN_ACCOUNT : SIGNED_OUT_ACCOUNT,
   );
@@ -288,7 +296,7 @@ it.each(providers)(
     // The first provider also loads the lazy workspace module on a cold CI worker.
     await screen.findByRole('textbox', { name: 'Message' }, { timeout: COLD_SURFACE_TIMEOUT_MS });
     if (provider.id !== 'stashbase') {
-      await user.click(screen.getByRole('button', { name: 'Provider: Default' }));
+      await user.click(screen.getByRole('button', { name: 'Provider: StashBase Agent' }));
       await user.click(await screen.findByRole('menuitemradio', { name: provider.label }));
     }
     const request = 'Help me outline an essay';
@@ -321,6 +329,11 @@ it.each(providers)(
     await act(async () => fixture.signIn());
     await screen.findByText(`${provider.label} reply: ${request}`, {}, { timeout: 5000 });
     expect(fixture.prompts).toEqual([request]);
+    if (provider.id === 'stashbase') {
+      await user.click(await screen.findByRole('button', { name: 'Account: Ada Lovelace' }));
+      await screen.findByText(/0 base · 0\.5 bonus/);
+      await user.keyboard('{Escape}');
+    }
     expect(screen.queryByRole('button', { name: 'Stop' })).toBeNull();
 
     if (provider.id !== 'stashbase') {
@@ -391,7 +404,7 @@ it.each(providers)(
       await user.click(await screen.findByRole('menuitemradio', { name: provider.label }));
       await screen.findByRole('button', { name: 'Model and thinking: Writer, High' });
     } else {
-      await screen.findByRole('button', { name: 'Provider: Default' });
+      await screen.findByRole('button', { name: 'Provider: StashBase Agent' });
     }
     typeInto(screen.getByRole('textbox', { name: 'Message' }), 'Start my next essay');
     await user.click(screen.getByRole('button', { name: 'Send' }));

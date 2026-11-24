@@ -315,7 +315,8 @@
       // it posts through an optional chain, which the rule already skips.
       "files": [
         "**/renderer/src/shared/runtime/appearance-surface.test.ts",
-        "**/renderer/src/app/composition/use-appearance-surface.test.ts"
+        "**/renderer/src/app/composition/use-appearance-surface.test.ts",
+        "**/renderer/src/features/settings/hooks/use-account.test.ts"
       ],
       "rules": {
         "unicorn/require-post-message-target-origin": "off"

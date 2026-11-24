@@ -22,7 +22,7 @@ function mediaType(bytes: Buffer): string | null {
 export async function prepareAgentAttachments(
   paths: readonly string[], folder: string, signal: AbortSignal,
 ): Promise<FilePartInput[]> {
-  if (paths.length > 10) throw new Error('The Default Agent accepts up to 10 attachments per message.');
+  if (paths.length > 10) throw new Error('The StashBase Agent accepts up to 10 attachments per message.');
   const parts: FilePartInput[] = [];
   let total = 0;
   let textLength = 0;
@@ -31,7 +31,7 @@ export async function prepareAgentAttachments(
     const bytes = await readSubmittedAttachment(reference, folder, signal);
     signal.throwIfAborted();
     total += bytes.length;
-    if (total > MAX_TOTAL_BYTES) throw new Error('The Default Agent accepts up to 8 MiB of attachments per message.');
+    if (total > MAX_TOTAL_BYTES) throw new Error('The StashBase Agent accepts up to 8 MiB of attachments per message.');
     const filename = path.basename(reference);
     if (!bytes.length) throw new Error(`${filename} is empty. Choose a file with content.`);
     let mime = mediaType(bytes);
@@ -46,7 +46,7 @@ export async function prepareAgentAttachments(
           text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
           if (/[\x00-\x08\x0e-\x1f]/u.test(text) || /\.(?:png|jpe?g|gif|webp|pdf)$/i.test(filename)) throw new Error('binary');
         } catch {
-          throw new Error(`${filename}: The Default Agent supports UTF-8 text, PNG, JPEG, GIF, WebP, PDF, and DOCX attachments.`);
+          throw new Error(`${filename}: The StashBase Agent supports UTF-8 text, PNG, JPEG, GIF, WebP, PDF, and DOCX attachments.`);
         }
       }
       signal.throwIfAborted();

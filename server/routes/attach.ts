@@ -44,7 +44,7 @@ export async function readSubmittedAttachment(candidate: string, folder: string,
   const safe = transientAttachmentPreviewPath(candidate);
   if (!safe) throw new Error('Attachment unavailable. Reattach it before sending.');
   const stat = await fs.promises.stat(safe);
-  if (stat.size > 8 * 1024 * 1024) throw new Error('The Default Agent accepts up to 8 MiB of attachments per message.');
+  if (stat.size > 8 * 1024 * 1024) throw new Error('The StashBase Agent accepts up to 8 MiB of attachments per message.');
   const bytes = await fs.promises.readFile(safe, { signal });
   if (createHash('sha256').update(bytes).digest('hex') !== record.digest) {
     throw new Error('Attachment changed. Reattach it before sending.');

@@ -95,7 +95,7 @@ const busy: ProjectSchedule = {
       runs: [
         run({
           agent: null,
-          reason: 'Sign in to use the Default Agent, then run this task again.',
+          reason: 'Sign in to use the StashBase Agent, then run this task again.',
           runId: 'run-3',
           startedAt: Date.now() - 2 * HOUR,
           status: 'failed',
@@ -185,7 +185,7 @@ describe('ScheduledTasksView', () => {
     expect(within(weekly).getByText('Off. Switch it on to run every day.')).not.toBeNull();
     expect(within(weekly).getByText('Did not run')).not.toBeNull();
     expect(
-      within(weekly).getByText('Sign in to use the Default Agent, then run this task again.'),
+      within(weekly).getByText('Sign in to use the StashBase Agent, then run this task again.'),
     ).not.toBeNull();
     expect(within(broken).getByText('Set a time like 08:00.')).not.toBeNull();
     expect(within(broken).getByRole('button', { name: 'Run now' })).toHaveProperty(
@@ -307,16 +307,16 @@ describe('ScheduledTasksView', () => {
     setup({ folderPath: FOLDER, problem: null, tasks: [], version: null });
     await userEvent.click(await screen.findByRole('button', { name: 'New task' }));
     const agent = screen.getByRole('combobox', { name: 'Agent' });
-    expect(agent.textContent).toBe('Follow this project (now Default)');
+    expect(agent.textContent).toBe('Follow this project (now StashBase Agent)');
     await userEvent.click(agent);
     const options = (await screen.findAllByRole('option')).map((option) => option.textContent);
 
     expect(options).toEqual([
-      'Follow this project (now Default)',
+      'Follow this project (now StashBase Agent)',
       'Always Codex',
       'Always Claude',
       'Always Antigravity',
-      'Always Default',
+      'Always StashBase Agent',
     ]);
   });
 
@@ -328,7 +328,9 @@ describe('ScheduledTasksView', () => {
       version: 'sha256:1',
     });
     await userEvent.click(await screen.findByRole('button', { name: 'Pinned' }));
-    expect(screen.getByRole('combobox', { name: 'Agent' }).textContent).toBe('Always Default');
+    expect(screen.getByRole('combobox', { name: 'Agent' }).textContent).toBe(
+      'Always StashBase Agent',
+    );
   });
 
   it('keeps the edit when the task file changed underneath it', async () => {

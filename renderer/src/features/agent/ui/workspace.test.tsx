@@ -105,7 +105,7 @@ describe('Agent workspace', () => {
     });
     await agentGateLifted();
     expect(screen.queryByText('No Agent is ready yet.')).toBeNull();
-    expect(await screen.findByRole('button', { name: 'Provider: Default' })).not.toBeNull();
+    expect(await screen.findByRole('button', { name: 'Provider: StashBase Agent' })).not.toBeNull();
     expect(screen.queryByRole('button', { name: /^Crew\b/u })).toBeNull();
   });
 
@@ -145,14 +145,14 @@ describe('Agent workspace', () => {
     expect(port.connect).not.toHaveBeenCalled();
     expect(screen.queryByLabelText('Chat scope: Research')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Close conversation' })).toBeNull();
-    expect(screen.getAllByRole('button', { name: 'Provider: Default' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Provider: StashBase Agent' })).toHaveLength(1);
 
     const newChat = screen.getByRole('button', { name: 'Start new chat' });
     await userEvent.click(newChat);
     expect(port.connect).not.toHaveBeenCalled();
     expect(runtime.activeSession().store.getState().agent).toBe('stashbase');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Provider: Default' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Provider: StashBase Agent' }));
     const codexOption = await screen.findByRole('menuitemradio', { name: 'Codex' });
     const claudeOption = screen.getByRole('menuitemradio', { name: 'Claude' });
     // The provider marks are aria-hidden, injected third-party SVG markup (`@lobehub/icons-static-svg`);
@@ -176,7 +176,7 @@ describe('Agent workspace', () => {
     const requests = () => vi.mocked(port.connect).mock.calls.map(([request]) => request);
     renderWorkspace(port);
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Provider: Default' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Provider: StashBase Agent' }));
     await userEvent.click(await screen.findByRole('menuitemradio', { name: 'Codex' }));
     await userEvent.click(screen.getByRole('button', { name: 'Model and thinking: Default' }));
     expect(requests()).toHaveLength(1);
@@ -241,7 +241,7 @@ describe('Agent workspace', () => {
     const { runtime } = renderWorkspace(port);
     await screen.findByText('What’s on your mind?');
     await agentGateLifted();
-    await userEvent.click(screen.getByRole('button', { name: 'Provider: Default' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Provider: StashBase Agent' }));
     await userEvent.click(await screen.findByRole('menuitemradio', { name: 'Codex' }));
 
     const composer = screen.getByRole('textbox', { name: 'Message' });
@@ -377,7 +377,7 @@ describe('Agent workspace', () => {
     const { runtime } = renderWorkspace(port);
     await screen.findByText('What’s on your mind?');
     await agentGateLifted();
-    await userEvent.click(screen.getByRole('button', { name: 'Provider: Default' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Provider: StashBase Agent' }));
     await userEvent.click(await screen.findByRole('menuitemradio', { name: 'Codex' }));
 
     typeInto(screen.getByRole('textbox', { name: 'Message' }), 'Inspect the workspace');

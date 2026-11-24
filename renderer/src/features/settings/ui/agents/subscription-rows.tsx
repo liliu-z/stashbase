@@ -1,4 +1,4 @@
-/** The Default Agent's plan rows: the account's plan, the tiers it can buy,
+/** The StashBase Agent's plan rows: the account's plan, the tiers it can buy,
  *  or the wait for a browser payment to confirm. */
 import { Button } from '@/components/ui/button';
 import {
@@ -8,9 +8,11 @@ import {
   type BillingStatus,
 } from '@/features/settings/domain/billing';
 import type { BillingViewModel } from '@/features/settings/hooks/use-billing';
+import type { ReferralViewModel } from '@/features/settings/hooks/use-referrals';
 import { SettingsMessage, SettingsRow } from '@/features/settings/ui/rows';
 import { FailureNotice } from '@/shared/ui/failure-notice';
 
+import { CheckoutBenefits } from './checkout-benefits';
 import { SubscriptionChanges } from './subscription-changes';
 
 function paidDate(value: string): string {
@@ -49,7 +51,13 @@ function planDetail(billing: BillingViewModel, detail: string): string {
     : detail;
 }
 
-export function SubscriptionRows({ billing }: { billing: BillingViewModel }) {
+export function SubscriptionRows({
+  billing,
+  referrals,
+}: {
+  billing: BillingViewModel;
+  referrals: ReferralViewModel;
+}) {
   const { status } = billing;
   const failure = billing.failure && <FailureNotice className="mt-1" failure={billing.failure} />;
 
@@ -144,7 +152,41 @@ export function SubscriptionRows({ billing }: { billing: BillingViewModel }) {
           onRetry={billing.refresh}
         />
       )}
-      {billing.plans.map((plan) => {
+      {referrals.decisionNeeded && (
+        <SettingsMessage
+          as="li"
+          message="Accept your invitation or continue without it before subscribing."
+        />
+      )}
+      {referrals.data?.binding?.reviewHeld && (
+        <SettingsMessage
+          as="li"
+          message="Your invitation is under review. Check back before opening Checkout."
+          onRetry={referrals.refresh}
+        />
+      )}
+      {referrals.hasOffer && referrals.data?.checkoutOffers?.length === 0 && (
+        <SettingsMessage
+          as="li"
+          message="No qualifying plans are available right now."
+          onRetry={referrals.refresh}
+        />
+      )}
+      {referrals.data?.checkoutStarted && (
+        <SettingsMessage
+          as="li"
+          message="If you left Checkout, you can review a plan and return to payment. Availability is checked before the page opens."
+        />
+      )}
+      {referrals.plans(billing.plans).map((plan) => {
+        const reviewing = referrals.hasOffer && referrals.reviewedPriceId === plan.priceId;
+        const needsReview = referrals.hasOffer && !reviewing;
+        const checkout = referrals.checkout(plan);
+        const subscribeLabel = reviewing
+          ? 'Open Checkout'
+          : needsReview
+            ? 'Review Checkout'
+            : 'Subscribe';
         // Only the plan the reader pressed waits; the others stay still.
         const opening =
           billing.opening?.page === 'checkout' && billing.opening.priceId === plan.priceId;
@@ -161,20 +203,29 @@ export function SubscriptionRows({ billing }: { billing: BillingViewModel }) {
             titleTone={plan.available ? 'default' : 'muted'}
             trail={
               <Button
-                disabled={billing.busy || !plan.available}
+                disabled={
+                  billing.busy ||
+                  !plan.available ||
+                  !referrals.billingReady ||
+                  (!needsReview && !checkout)
+                }
                 loading={opening}
-                onClick={() => billing.subscribe(plan.priceId)}
+                onClick={() => {
+                  if (needsReview) referrals.reviewPlan(plan.priceId);
+                  else if (checkout) billing.subscribe(checkout);
+                }}
                 size="compact"
                 variant="tertiary"
               >
-                {plan.available ? 'Subscribe' : 'Coming soon'}
+                {plan.available ? subscribeLabel : 'Coming soon'}
               </Button>
             }
           >
-            {plan.planKey === 'plus' && (
+            {reviewing && <CheckoutBenefits plan={plan} referrals={referrals} />}
+            {!referrals.hasOffer && plan.planKey === 'plus' && (
               <p className="text-caption text-muted-foreground">
-                First subscription: first month free with a card and automatic renewal. Then{' '}
-                {billingPrice(plan)}. Cancel anytime.
+                Checkout shows your first payment date, including any available trial. Cancel
+                anytime.
               </p>
             )}
           </SettingsRow>

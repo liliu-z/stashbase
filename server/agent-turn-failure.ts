@@ -53,7 +53,7 @@ export function classifyAgentTurnFailure(message: string): AgentTurnFailureKind 
   if (MODEL_CHANGED_PATTERN.test(message)) return 'model-changed';
   if (AUTH_PATTERN.test(message)) return 'auth-expired';
   if (/hosted_access_restricted|hosted ai access is restricted|agent access is restricted/i.test(message)) return 'access-restricted';
-  if (/free agent credits are exhausted|remaining agent credits cannot cover|agent_allowance_(?:exhausted|reserved)|quota_exhausted|stashbase.{0,30}(agent )?allowance|(weekly|monthly) agent allowance/i.test(message)) return 'allowance-exhausted';
+  if (/free agent credits are exhausted|(?:remaining agent credits|available base and bonus credits) cannot cover|agent_allowance_(?:exhausted|reserved)|quota_exhausted|stashbase.{0,30}(agent )?allowance|(weekly|monthly) agent allowance/i.test(message)) return 'allowance-exhausted';
   if (QUOTA_PATTERN.test(message)) return 'quota';
   if (RATE_LIMIT_PATTERN.test(message)) return 'rate-limit';
   if (NETWORK_PATTERN.test(message)) return 'network';

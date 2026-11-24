@@ -101,6 +101,19 @@ test('an unavailable registered project keeps its problem without warning on eac
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
+test('a task file accepts both names for StashBase Agent', () => {
+  const { tasks } = parseScheduleFile(JSON.stringify({
+    tasks: [
+      { name: 'Current name', time: '08:00', prompt: 'Draft', agent: 'StashBase Agent' },
+      { name: 'Legacy name', time: '08:00', prompt: 'Draft', agent: 'default' },
+    ],
+  }));
+  assert.deepEqual(tasks.map(({ agent, problem }) => ({ agent, problem })), [
+    { agent: 'stashbase', problem: null },
+    { agent: 'stashbase', problem: null },
+  ]);
+});
+
 test('a task file is read leniently: each bad task says why it cannot run, the rest still run', () => {
   const parsed = parseScheduleFile(JSON.stringify({
     tasks: [
@@ -128,7 +141,7 @@ test('a task file is read leniently: each bad task says why it cannot run, the r
     ['copy', 'Another task in this project uses the same id.'],
     ['no-request', 'Say what to do, or add a file to follow.'],
     ['outside', 'List each file by its path inside this project.'],
-    ['robot', 'Choose Default, Claude, Codex or Antigravity to run this task.'],
+    ['robot', 'Choose StashBase Agent, Claude, Codex or Antigravity to run this task.'],
     ['task-7', 'This entry is not a task.'],
   ]);
   const antigravity = parseScheduleFile(JSON.stringify({ tasks: [{ name: 'Gemini', time: '09:00', prompt: 'x', agent: 'Antigravity' }] }));

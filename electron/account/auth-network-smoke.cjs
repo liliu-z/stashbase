@@ -18,6 +18,7 @@ const listen = server => new Promise(resolve => server.listen(0, '127.0.0.1', re
 
 app.whenReady().then(async () => {
   const tunnels = [];
+  const destinations = [];
   proxy = http.createServer();
   proxy.on('connect', (request, socket) => {
     tunnels.push(request.url);
@@ -33,7 +34,10 @@ app.whenReady().then(async () => {
   await listen(pac);
   const authSession = session.fromPartition('auth-network-smoke', { cache: false });
   await authSession.setProxy({ mode: 'pac_script', pacScript: `http://127.0.0.1:${pac.address().port}/proxy.pac` });
-  bridge = await createAuthNetworkBridge({ fetch: (url, init) => authSession.fetch(url, init) });
+  bridge = await createAuthNetworkBridge({ fetch: (url, init) => {
+    destinations.push(String(url));
+    return authSession.fetch(url, init);
+  } });
   const send = () => fetch(`http://127.0.0.1:${bridge.port}/`, {
     method: 'POST', headers: { 'x-stashbase-auth-network-token': bridge.token },
     body: JSON.stringify({ path: '/electron/token', body: JSON.stringify({ token: 'fixture-only', state: 'fixture-only', code_verifier: 'fixture-only' }) }),
@@ -50,6 +54,7 @@ app.whenReady().then(async () => {
     method: 'POST', headers: { 'x-stashbase-auth-network-token': bridge.token },
     body: JSON.stringify({ accessToken: 'fixture-only', clientVersion: '2.18.4' }),
   });
+  assert.equal(destinations.at(-1), 'https://api.stashbase.ai/v1/agent/usage?include=credits-v1');
   assert.equal(credits.status, 502);
   assert.equal((await credits.json()).errorCode, 'ERR_TUNNEL_CONNECTION_FAILED');
   assert.ok(tunnels.slice(beforeCredits).includes('api.stashbase.ai:443'),

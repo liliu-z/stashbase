@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { creditBreakdownSchema } from './referrals';
 
 import { agentModelSchema } from '../agent-model';
 
@@ -161,6 +162,7 @@ export const hostedAgentAllowanceSchema = z
     profile: z.string().min(1).max(200),
     remainingPercent: z.number().finite(),
     reservedPercent: z.number().min(0).max(100).optional(),
+    creditBreakdown: creditBreakdownSchema.optional(),
     inputTokens: z.number().int().nonnegative(),
     outputTokens: z.number().int().nonnegative(),
     cacheReadTokens: z.number().int().nonnegative(),
@@ -207,10 +209,6 @@ export const hostedBillingChangeRequestSchema = z.discriminatedUnion('action', [
   z.object({ action: z.enum(['keep', 'cancel', 'resume']) }).strict(),
 ]);
 export const hostedBillingChangeResponseSchema = z.object({ changed: z.boolean() });
-
-export const hostedBillingCheckoutRequestSchema = z
-  .object({ priceId: z.string().regex(/^price_[A-Za-z0-9]+$/) })
-  .strict();
 
 /** A Stripe-hosted Checkout or Customer Portal page. */
 export const hostedBillingRedirectSchema = z

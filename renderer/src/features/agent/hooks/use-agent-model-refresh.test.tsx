@@ -67,7 +67,7 @@ it('reports a reconnect that does not come back and leaves the turn as it was', 
   act(() =>
     transport.listeners[1]?.onEvent({
       kind: 'exited',
-      message: 'Sign in to StashBase to use the Default Agent.',
+      message: 'Sign in to StashBase to use the StashBase Agent.',
     }),
   );
 

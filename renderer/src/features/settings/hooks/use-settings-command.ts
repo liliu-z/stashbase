@@ -29,13 +29,16 @@ export interface SettingsCommand<Input, Output> {
 }
 
 export interface SettingsCommandOptions<Input, Output> {
+  readFailure?: ((error: unknown) => FailureView) | undefined;
   /** Runs before the call, so a panel can hold an optimistic value. The call
    *  waits for it, which is what lets a panel cancel a read in flight first. */
   onStart?: ((input: Input) => Promise<void> | void) | undefined;
   /** Runs when the call refused, so a panel can put back what it held. */
-  onFailed?: ((input: Input) => void) | undefined;
+  onFailed?: ((input: Input, error: unknown) => void) | undefined;
   /** Runs on success, before the caller's own `onDone`. */
-  onDone?: ((result: Output, input: Input) => Promise<void> | void) | undefined;
+  onDone?:
+    | ((result: Output, input: Input, signal: AbortSignal) => Promise<void> | void)
+    | undefined;
   /** Runs however the call ended. */
   onSettled?: (() => Promise<void> | void) | undefined;
 }
@@ -52,7 +55,7 @@ export function useSettingsCommand<Input = void, Output = void>(
   options: SettingsCommandOptions<Input, Output> = {},
 ): SettingsCommand<Input, Output> {
   const signalFor = useRequestSignals();
-  const { onDone, onFailed, onSettled, onStart } = options;
+  const { onDone, onFailed, onSettled, onStart, readFailure = settingsFailure } = options;
   type Attempt = { input: Input; signal: AbortSignal };
   const mutation = useMutation({
     mutationFn: async ({ input, signal }: Attempt) => {
@@ -65,11 +68,11 @@ export function useSettingsCommand<Input = void, Output = void>(
       signal.throwIfAborted();
       await onStart?.(input);
     },
-    onError: (_error, { input, signal }) => {
-      if (!signal.aborted) return onFailed?.(input);
+    onError: (error, { input, signal }) => {
+      if (!signal.aborted) return onFailed?.(input, error);
     },
     onSuccess: (result, { input, signal }) => {
-      if (!signal.aborted) return onDone?.(result, input);
+      if (!signal.aborted) return onDone?.(result, input, signal);
     },
     onSettled: (_result, _error, { signal }) => {
       if (!signal.aborted) return onSettled?.();
@@ -78,7 +81,7 @@ export function useSettingsCommand<Input = void, Output = void>(
 
   return {
     busy: mutation.isPending,
-    failure: mutation.isError ? settingsFailure(mutation.error) : null,
+    failure: mutation.isError ? readFailure(mutation.error) : null,
     result: mutation.data,
     cancel: () => {
       signalFor(lane);

@@ -107,7 +107,7 @@ interface AgentRuntimeEntry {
 }
 
 /** The runtime a project uses until the user chooses another Agent. */
-const BUILT_IN: AgentRuntimeEntry = { id: 'stashbase', label: 'Default' };
+const BUILT_IN: AgentRuntimeEntry = { id: 'stashbase', label: 'StashBase Agent' };
 
 /** Every runtime this window can hold a conversation with, in the order
  *  chats and history lists present them. */

@@ -1,6 +1,6 @@
 # MCP Configuration
 
-The Default Agent, Codex, Claude, and Antigravity connect to StashBase's tools
+The StashBase Agent, Codex, Claude, and Antigravity connect to StashBase's tools
 automatically when used in the built-in Chat.
 
 For Antigravity, StashBase also adds a `stashbase` approval hook to

@@ -133,7 +133,31 @@ export interface AgentCatalog {
 }
 
 /** The standing hosted allowance, as the allowance row presents it. */
+interface CreditBalances {
+  readonly consumedCredits: string;
+  readonly reservedCredits: string;
+  readonly provisionalCredits: string;
+  readonly availableCredits: string;
+}
+
+/** Published credits-v1 decimals. The API owns source selection and totals. */
+export interface CreditBreakdown {
+  readonly creditUnit: 'credits-v1';
+  readonly asOf: string;
+  readonly agentAvailableCredits: string;
+  readonly base: CreditBalances & {
+    readonly windowStartedAt: string | null;
+    readonly windowEndsAt: string | null;
+    readonly grantedCredits: string;
+  };
+  readonly bonus: CreditBalances & {
+    readonly entitlementCredits: string;
+    readonly nextExpiry: { at: string; availableCredits: string } | null;
+  };
+}
+
 export interface AgentAllowance {
+  readonly creditBreakdown?: CreditBreakdown;
   /** Available credits after usage and reservations, as a percentage. */
   readonly remainingPercent: number;
   readonly reservedPercent?: number;

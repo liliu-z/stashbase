@@ -89,7 +89,7 @@ const BUSY: ProjectSchedule = {
           agent: null,
           missedCount: null,
           occurrence: null,
-          reason: 'Sign in to use the Default Agent, then run this task again.',
+          reason: 'Sign in to use the StashBase Agent, then run this task again.',
           runId: 'run-1',
           sessionId: null,
           startedAt: at(2, 17, 30),

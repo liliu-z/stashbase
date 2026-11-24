@@ -54,7 +54,7 @@ in provider history; absence is not evidence of source use.
 | `agent_turn_started` | Submission preparation, or first host acceptance when the submission report is missing | `runtime`, random `turn_id`, `source`: renderer / host |
 | `agent_turn_stage` | Host observes a significant execution boundary | `runtime`, `turn_id`, `stage`, per-turn `sequence`, bounded correlation context |
 | `agent_turn_finished` | Submission completes, fails, is blocked, cancelled or interrupted | `runtime`, `turn_id`, `outcome`, `source`, optional `reason`, last stage, sequence and observation times; duration only for an observed end; host-observed `tool_summary` when available |
-| `agent_runtime_start_result` | One Default/OpenCode startup attempt settles, including history and prewarm | `purpose`, `outcome`, `stage`, `attempt_id`, optional `retry_of`, `elapsed_ms`/`first_output_ms`, phase `timings`, runtime version and optional diagnostic |
+| `agent_runtime_start_result` | One StashBase Agent/OpenCode startup attempt settles, including history and prewarm | `purpose`, `outcome`, `stage`, `attempt_id`, optional `retry_of`, `elapsed_ms`/`first_output_ms`, phase `timings`, runtime version and optional diagnostic |
 | `agent_runtime_stop_result` | Managed OpenCode/Codex/Antigravity retirement succeeds, times out, or closes after timeout | `purpose`, initiating `reason`, stop `attempt_id`, original process-start ID, elapsed/deadline, exit/pipe observations and bounded termination evidence |
 | `agent_connection_closed` | Host observes socket closure, including idle and intentional closes | `runtime`, shared `context.connection_id`, close code/initiator/reason and available process evidence |
 | `http_request_lifecycle` | Host observes a slow local JSON request or a response closing before completion | `request_id`, `state`: pending / finished / closed, `elapsed_ms`, `headers_sent`, optional `http_status`, method, route template and available host instance ID |
@@ -121,7 +121,7 @@ filtering, not a promise to remove every personal detail from diagnostic prose.
 
 HTTP response diagnostics include the status even when a 2xx response cannot
 be decoded, its content type, the shared request ID, and the original
-parsing/read cause. Requested cancellation is excluded. Default Agent failures
+parsing/read cause. Requested cancellation is excluded. StashBase Agent failures
 can include the native message ID, finish reason and token counts, plus the
 current gateway request ID, retry attempt, byte/frame counts, stream-end and
 DONE markers, finish reasons and explicit provider/transport errors. Stream
@@ -247,7 +247,7 @@ Stages are `preparing` (the initial record), `host_accepted`, `runtime_dispatche
 `tool_running`. Stages can repeat across model/tool calls; sequence numbers order
 observations. Response start can mean received model headers or native output,
 not a complete or useful answer. Claude/Codex/Antigravity expose native dispatch/output/tool
-boundaries; only Default's owned broker exposes individual model requests.
+boundaries; only StashBase Agent's owned broker exposes individual model requests.
 Stage events remain rate/capacity limited, but the pending turn's last stage is
 saved even when a stage event cannot be queued. Streamed tokens do not write
 telemetry state. The last stage establishes observation, not causation.

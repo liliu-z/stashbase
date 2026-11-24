@@ -130,7 +130,7 @@ first paint is part of the action.
 
 **Limits of the measurement**
 
-- The profile is signed out, so the Default agent never starts or pre-warms
+- The profile is signed out, so the StashBase Agent never starts or pre-warms
   OpenCode, and agent memory is not counted. Agent process startup is covered
   by the Default session scenario.
 - The host runs from source through `tsx`, so cold start includes TypeScript

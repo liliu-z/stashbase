@@ -80,7 +80,7 @@ function toPreparation(wire: AgentWire['bootstrap']): AgentPreparation | undefin
 }
 
 /** The refusals a sign-in clears: a native runtime's own, and the StashBase
- *  account the Default Agent runs on. Only the Default Agent is refused for
+ *  account the StashBase Agent runs on. Only the StashBase Agent is refused for
  *  the account, so a native runtime's login-first path is unchanged. */
 const SIGN_IN_REFUSALS: ReadonlySet<string> = new Set([
   'authentication-required',

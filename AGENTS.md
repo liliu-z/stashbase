@@ -164,7 +164,7 @@ When the user reports a bug or asks for a feature, run the full loop:
 
 The primary acceptance flow is J01: open an empty folder, prepare the chosen
 Agent, sign in, receive a completed first reply, update a native runtime when
-needed, and return without repeating login. Exercise Default, Claude, Codex,
+needed, and return without repeating login. Exercise StashBase Agent, Claude, Codex,
 and Antigravity. Ready alone is not acceptance of a conversation.
 Prioritize genuinely uninstalled/signed-out environments and broken existing
 installations. Reusing a developer's established login is returning-user

@@ -17,7 +17,7 @@ async function skillWorkspace() {
   const { runtime } = renderWorkspace(test.port, undefined, agentContextPort());
   await screen.findByText('What’s on your mind?');
   await agentGateLifted();
-  await userEvent.click(screen.getByRole('button', { name: 'Provider: Default' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Provider: StashBase Agent' }));
   await userEvent.click(await screen.findByRole('menuitemradio', { name: 'Codex' }));
   act(() => runtime.activeSession().start());
   return { ...test, runtime };

@@ -31,7 +31,7 @@ also runs commands that only read, searches the web, and reads pages, and still
 asks before other commands. Its chat list lives in StashBase: removing a chat
 there leaves the conversation in Antigravity.
 
-If you can't use any of them, the built-in **Default Agent** provides a fallback
+If you can't use any of them, the built-in **StashBase Agent** provides a fallback
 with free credits. Sign in to StashBase from the bottom of the sidebar or
 **Settings → Account**; no separate agent installation or model API key is required.
 
@@ -164,7 +164,8 @@ files are shown. A template can ship one, and an agent can write it with its fil
 ```
 
 `time` is local 24-hour time and `files` lists project-relative paths. `agent` is
-`default`, `claude`, `codex`, or `antigravity`; leave it out to use the project's agent. Fields the
+`default` (StashBase Agent), `claude`, `codex`, or `antigravity`. The file also accepts
+`StashBase Agent`. Leave it out to use the project's agent. Fields the
 list does not know are kept when you edit a task there.
 
 ## Turn On Search by Meaning
@@ -191,7 +192,7 @@ retried.
 Agents search the same way: text matching always, including prepared
 document text, plus meaning-based evidence once a key is on.
 
-Default Agent credits don't cover search by meaning. Check the account
+StashBase Agent credits don't cover search by meaning. Check the account
 menu at the bottom of the sidebar or **Settings → Account** for the remaining
 percentage and refill date.
 

@@ -18,7 +18,7 @@ export interface AgentModel {
    *  newest model; a runtime that says nothing leaves every entry unflagged. */
   isDefault?: boolean;
   /** Price relative to the runtime's default model (1). Only the hosted
-   *  Default Agent reports it; the picker flags models well above 1. */
+   *  StashBase Agent reports it; the picker flags models well above 1. */
   relativeCost?: number;
 }
 

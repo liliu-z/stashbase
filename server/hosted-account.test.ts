@@ -190,10 +190,13 @@ test('billing calls carry the desktop session, refresh once on 401, and open onl
     const started = account.beginHostedOAuth('google', 'http://127.0.0.1:8090');
     await account.exchangeHostedOAuthCode(started.flowId, 'auth-code-1');
     const status = await account.fetchHostedBillingStatus();
-    const checkout = await account.createHostedCheckout('price_plus');
+    const input = { priceId: 'price_plus', referral: { requestId: 'a', expectedAccountSubject: 'user-1',
+      expectedReferralRevision: '0', benefit: 'standard' } };
+    const generation = account.hostedAccountGeneration();
+    const checkout = await account.createHostedCheckout(input, generation);
     const portal = await account.createHostedBillingPortal().then(() => 'opened', (error) => error.message);
     checkoutUrl = 'http://checkout.stripe.com/c/pay/cs_test_2';
-    const insecure = await account.createHostedCheckout('price_plus').then(() => 'opened', (error) => error.message);
+    const insecure = await account.createHostedCheckout(input, generation).then(() => 'opened', (error) => error.message);
     await account.changeHostedBilling({ action: 'downgrade', priceId: 'price_plus' });
     process.stdout.write(JSON.stringify({ calls: calls.filter((call) => call.url.includes('/v1/billing/')), status, checkout, portal, insecure }));
   `);
@@ -201,7 +204,9 @@ test('billing calls carry the desktop session, refresh once on 401, and open onl
   const output = JSON.parse(result.stdout);
   assert.deepEqual(output.calls.slice(0, 3).map((call: { authorization: string }) => call.authorization), [`Bearer ${apiToken('access-1')}`, `Bearer ${apiToken('access-2')}`, `Bearer ${apiToken('access-2')}`]);
   assert.equal(output.status.status, 'free');
-  assert.deepEqual(output.calls[2].body, { priceId: 'price_plus' });
+  assert.deepEqual(output.calls[2].body, { priceId: 'price_plus', referral: {
+    requestId: 'a', expectedAccountSubject: 'user-1', expectedReferralRevision: '0', benefit: 'standard',
+  } });
   assert.equal(output.checkout.url, 'https://checkout.stripe.com/c/pay/cs_test_1');
   assert.equal(output.portal, 'Billing returned an unexpected page.');
   assert.equal(output.insecure, 'Billing returned an unexpected page.');
@@ -235,9 +240,12 @@ test('desktop credit refresh uses the same native transport as sign-in without a
     let creditReads = 0;
     const bridge = await createAuthNetworkBridge({ fetch: async (url, init) => {
       calls.push({ url: String(url), authorization: new Headers(init.headers).get('authorization'), version: new Headers(init.headers).get('x-stashbase-client-version') });
-      if (String(url).endsWith('/v1/agent/usage?include=reservations')) {
+      if (String(url).endsWith('/v1/agent/usage?include=credits-v1')) {
         if (++creditReads === 1) return Response.json({ code: 'auth_required' }, { status: 401 });
-        return Response.json({ remainingPercent: 75, reservedPercent: 10 });
+        return Response.json({
+          profile: 'stashbase-agent-default', remainingPercent: 75, reservedPercent: 10,
+          inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, windowStartedAt: null, windowEndsAt: null,
+        });
       }
       return authReply(url);
     } });
@@ -256,7 +264,7 @@ test('desktop credit refresh uses the same native transport as sign-in without a
   const { allowance, calls } = JSON.parse(result.stdout);
   assert.equal(allowance.remainingPercent, 75);
   assert.equal(allowance.reservedPercent, 10);
-  const usage = calls.filter((call: { url: string }) => call.url.endsWith('/v1/agent/usage?include=reservations'));
+  const usage = calls.filter((call: { url: string }) => call.url.endsWith('/v1/agent/usage?include=credits-v1'));
   assert.equal(usage.length, 2, 'one native 401 refresh retries the credit read once');
   assert.ok(usage.every((call: { authorization: string; version: string }) => call.authorization === `Bearer ${apiToken('access-1')}` && call.version));
 });
@@ -270,7 +278,7 @@ test('OAuth PKCE session persists locally and authenticates Agent allowance requ
         accessToken: 'access-1', sessionToken: 'refresh-1',
         user: { id: 'user-1', email: 'person@example.com', name: 'Ada Lovelace', image: 'https://lh3.googleusercontent.com/a/profile-photo' },
       });
-      if (String(url).endsWith('/v1/agent/usage?include=reservations')) return Response.json({
+      if (String(url).endsWith('/v1/agent/usage?include=credits-v1')) return Response.json({
         profile: 'stashbase-agent-default', remainingPercent: 75, reservedPercent: 10,
         inputTokens: 100, outputTokens: 25, cacheReadTokens: 10,
         windowStartedAt: '2026-08-01T00:00:00.000Z', windowEndsAt: '2026-08-08T00:00:00.000Z',
@@ -910,4 +918,146 @@ test('signed-in mailbox proof retains the session and the signed-out login guard
     assert.deepEqual(config.getHostedAccountSession(), session);
   `);
   assert.equal(result.status, 0, result.stderr);
+});
+
+test('referral routes fence the account, hold Checkout during claim, and recover guarded attempts', () => {
+  const result = runIsolated(`
+    const express = (await import('express')).default;
+    const { mount } = await import('./server/routes/account.ts');
+    const { setHostedAccountSession } = await import('./server/app-config.ts');
+    const { hostedAccountGeneration } = await import('./server/hosted-account.ts');
+    const localFetch = globalThis.fetch;
+    const subject = '11111111-1111-4111-8111-111111111111';
+    const campaignVersionId = '22222222-2222-4222-8222-222222222222';
+    const firstCode = '0123456789ABC';
+    const code = '1123456789ABC';
+    const at = '2026-11-23T10:00:00.000Z';
+    const session = { userId: subject, email: 'fixture@example.test', accessToken: 'private-token',
+      sessionToken: 'private-session', expiresAt: 4102444800 };
+    setHostedAccountSession(session);
+    const generation = hostedAccountGeneration();
+    const terms = { campaignVersionId, creditUnit: 'credits-v1', qualifyingPlans: ['plus', 'pro'],
+      inviterCredits: '0.250000000', inviteeCredits: '0.250000000', enrollmentOpensAt: at,
+      enrollmentClosesAt: at, hintDays: 14, claimDays: 14, paymentDays: 45,
+      confirmationDays: 7, grantDays: 30 };
+    const binding = { referralId: campaignVersionId, state: 'awaiting_payment', reason: null,
+      reviewHeld: false, boundAt: at, paymentDeadlineAt: at, paidAt: null,
+      confirmationDueAt: null, rewardedAt: null, ownGrantId: null, trial: null, terms };
+    const me = { accountSubject: subject, referralRevision: '0', creditUnit: 'credits-v1',
+      invitation: null, claimEligibility: 'eligible', binding: null,
+      activity: [{ id: '33333333-3333-4333-8333-333333333333', kind: 'refund',
+        at, beforeCredits: '0.125000000', afterCredits: '0.250000000', reason: 'payment_restored' }],
+      summary: { registered: 0, confirming: 0, rewarded: 0, bonusAvailableCredits: '0.000000000', nextBonusExpiryAt: null } };
+    const claims = [], checkouts = [], previews = [];
+    let signalClaim, unblockClaim, signalHistory, unblockHistory;
+    const claimStarted = new Promise(resolve => signalClaim = resolve);
+    const claimWait = new Promise(resolve => unblockClaim = resolve);
+    const historyStarted = new Promise(resolve => signalHistory = resolve);
+    const historyWait = new Promise(resolve => unblockHistory = resolve);
+    globalThis.fetch = async (target, init) => {
+      const url = new URL(target);
+      if (url.pathname === '/v1/referrals/me') return Response.json(me);
+      if (url.pathname === '/v1/referrals/resolve') {
+        previews.push(new Headers(init.headers).get('authorization'));
+        return Response.json({ available: true, code: url.searchParams.get('code'), terms });
+      }
+      if (url.pathname === '/v1/referrals/claim') {
+        claims.push(JSON.parse(init.body));
+        if (claims.length === 1) {
+          signalClaim();
+          await claimWait;
+          return Response.json({ code: 'service_unavailable', message: 'provider secret' }, { status: 503 });
+        }
+        Object.assign(me, { binding, claimEligibility: 'bound', referralRevision: '1' });
+        return Response.json({ accountSubject: subject, binding, referralRevision: '1' });
+      }
+      if (url.pathname === '/v1/billing/checkout') {
+        checkouts.push(JSON.parse(init.body));
+        if (checkouts.length === 1) throw new TypeError('connection lost');
+        if (checkouts.length === 3) return Response.json({ code: 'billing_checkout_closed' }, { status: 409 });
+        return Response.json({ url: 'https://checkout.stripe.com/c/pay/story' });
+      }
+      if (url.pathname === '/v1/referrals/history') {
+        signalHistory();
+        await historyWait;
+        return Response.json({ code: 'auth_required' }, { status: 401 });
+      }
+      throw new Error('unexpected upstream request ' + url.pathname);
+    };
+    const app = express();
+    app.use(express.json());
+    mount(app, { appReturnToken: 'fixture' });
+    const server = app.listen(0, '127.0.0.1');
+    await new Promise(resolve => server.once('listening', resolve));
+    const base = 'http://127.0.0.1:' + server.address().port + '/api/account';
+    const read = (path) => localFetch(base + path + '?generation=' + generation);
+    const post = (path, body) => localFetch(base + path, { method: 'POST',
+      headers: { 'content-type': 'application/json' }, body: JSON.stringify({ generation, ...body }) });
+    const claim = (code) => post('/referrals/claim', { code, campaignVersionId, referralRevision: '0' });
+    const checkout = (benefit, extras) => post('/billing/checkout', { priceId: 'price_same',
+      referralRevision: benefit === 'standard' ? '0' : '1', benefit, ...extras });
+    try {
+      const initial = await read('/referrals/me');
+      const first = await initial.json();
+      await post('/referrals/preview', { code: firstCode });
+      await post('/referrals/preview', { code });
+      const replaced = await (await claim(firstCode)).json();
+      const pending = await (await checkout('standard')).json();
+      const inFlight = claim(code);
+      await claimStarted;
+      const competing = await (await checkout('standard')).json();
+      unblockClaim();
+      const failure = await (await inFlight).json();
+      const retried = await claim(code);
+      const invalidConsent = await checkout('discount');
+      const referredFailure = await checkout('referral');
+      const referred = await checkout('referral');
+      const closed = await (await checkout('discount', { confirmImmediatePayment: true })).json();
+      const renewed = await checkout('discount', { confirmImmediatePayment: true });
+      const oldHistory = read('/referrals/history');
+      await historyStarted;
+      setHostedAccountSession({ ...session, sessionToken: 'new-session', accessToken: 'new-token' });
+      unblockHistory();
+      const stale = await (await oldHistory).json();
+      const staleMutation = await (await checkout('referral')).json();
+      process.stdout.write(JSON.stringify({ first, cache: initial.headers.get('cache-control'),
+        replaced, pending, competing, failure, ref: referred.status, referredFailure: referredFailure.status,
+        retried: retried.status, invalidConsent: invalidConsent.status, closed, renewed: renewed.status,
+        stale, staleMutation, claims, checkouts, previews }));
+    } finally { server.closeAllConnections(); server.close(); }
+  `);
+  assert.equal(result.status, 0, result.stderr);
+  const out = JSON.parse(result.stdout);
+  assert.equal(out.cache, 'private, no-store');
+  assert.equal(out.first.accountSubject, undefined);
+  assert.equal(out.first.referralRevision, '0');
+  assert.deepEqual(out.first.activity, [{
+    id: '33333333-3333-4333-8333-333333333333',
+    kind: 'refund',
+    at: '2026-11-23T10:00:00.000Z',
+    beforeCredits: '0.125000000',
+    afterCredits: '0.250000000',
+    reason: 'payment_restored',
+  }]);
+  assert.deepEqual(out.previews, [null, null]);
+  assert.equal(out.replaced.code, 'referral_preview_changed');
+  assert.equal(out.pending.code, 'referral_decision_required');
+  assert.equal(out.competing.code, 'referral_operation_in_progress');
+  assert.equal(out.failure.code, 'service_unavailable');
+  assert.doesNotMatch(out.failure.error, /provider secret/);
+  assert.equal(out.retried, 204);
+  assert.equal(out.claims.length, 2);
+  assert.deepEqual(out.claims[0], out.claims[1]);
+  assert.equal(out.invalidConsent, 400);
+  assert.equal(out.referredFailure, 502);
+  assert.equal(out.ref, 200);
+  assert.equal(out.closed.code, 'billing_checkout_closed');
+  assert.equal(out.renewed, 200);
+  assert.equal(out.checkouts.length, 4);
+  assert.deepEqual(out.checkouts[0], out.checkouts[1]);
+  assert.notEqual(out.checkouts[1].referral.requestId, out.checkouts[2].referral.requestId);
+  assert.notEqual(out.checkouts[2].referral.requestId, out.checkouts[3].referral.requestId);
+  assert.equal(out.checkouts[3].referral.confirmImmediatePayment, true);
+  assert.equal(out.stale.code, 'referral_account_changed');
+  assert.equal(out.staleMutation.code, 'referral_account_changed');
 });

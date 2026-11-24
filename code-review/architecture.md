@@ -572,7 +572,7 @@ The updater re-enables the window and can be retried after the draft is resolved
   its own console, polls readiness, and retires that run after success,
   cancellation, or the shared ten-minute deadline.
 - Each OpenQuill chat owns an authenticated loopback OpenCode process; each Codex
-  chat owns its app-server/thread. After a Default turn, the host may prepare one
+  chat owns its app-server/thread. After a StashBase Agent turn, the host may prepare one
   unused OpenCode process and its MCP connection for the next chat. Claiming that
   spare transfers exclusive ownership, including its private attribution id;
   active chats never share it. Window, project, account and instruction
@@ -686,7 +686,7 @@ The updater re-enables the window and can be retried after the draft is resolved
   An explicit agent selection atomically saves both the project choice and the
   user-wide `lastSelectedAgent`. The preferences response supplies the fallback
   for unchosen projects: that selection, an existing remembered project choice,
-  or Default when neither exists. Model and effort writes preserve it;
+  or StashBase Agent when neither exists. Model and effort writes preserve it;
   removing a project does not clear it. The renderer reads preferences on project
   entry, so an already open Welcome window sees another window's later choice.
   Failed preference reads/writes remain visible.
@@ -741,7 +741,7 @@ The updater re-enables the window and can be retried after the draft is resolved
   may have changed, and the shell reconciles it the same way. Reads, listings,
   searches, and questions report nothing.
 - Shared runtime instructions compose the role and internal conversation and
-  tool-routing policy in `server/agent-runtime-instructions.ts`. Default and native adapters use that
+  tool-routing policy in `server/agent-runtime-instructions.ts`. StashBase Agent and native adapters use that
   same composition; provider-native prompts remain in place. The policy owns
   the default to answer in Chat and the requirement for a user request or
   applicable loaded project workflow before file output. It guides model
@@ -758,7 +758,7 @@ The updater re-enables the window and can be retried after the draft is resolved
   as tight `$...$` and dollar amounts as ordinary text, matching the shared rule,
   and to put paste-ready reply text in a fenced `text` block, which the
   transcript gives its own Copy.
-- Default receives explicit transient attachment references in the prompt
+- StashBase Agent receives explicit transient attachment references in the prompt
   protocol. `server/routes/attach.ts` binds uploads to an explicit registered
   project and records their digest; `server/agent-attachments.ts` validates
   ownership and unchanged bytes, bounds preparation, and emits native file parts.
@@ -952,7 +952,7 @@ The updater re-enables the window and can be retried after the draft is resolved
   A card withdrawn by the hook, Stop, turn end, or disposal denies; stale or
   unsupported scopes cannot create authority. Auto launches
   `agy` like Edit; native Auto is never used, because it decides inside the CLI
-  past the hook and refuses StashBase's MCP tools. Default maps Ask/Edit/Plan to OpenCode profiles;
+  past the hook and refuses StashBase's MCP tools. StashBase Agent maps Ask/Edit/Plan to OpenCode profiles;
   Auto uses the Edit profile with host-owned review. Edit and Auto share
   `agent-file-permissions.ts` with the other adapters, granting only
   ordinary StashBase document writes inside the bound project (including
@@ -975,7 +975,7 @@ The updater re-enables the window and can be retried after the draft is resolved
   using `agentCliPath` to restore CLI directories omitted by desktop launchers.
   Its private home does not provide the user's interactive shell setup;
   commands still require their dependencies to be installed and discoverable.
-- `server/opencode-runtime.ts` owns Default's project-only skill discovery.
+- `server/opencode-runtime.ts` owns StashBase Agent's project-only skill discovery.
   Its private home/config and disabled native external/upward config discovery
   prevent importing user-global and ancestor skills from non-Git writing folders.
   Native skill paths are explicitly relative to the bound project. Because the
@@ -1131,7 +1131,9 @@ data migration is not required by [maintenance policy](../MAINTENANCE.md#previou
   may clear matching saved credentials. Malformed successful responses are not
   evidence of revocation. Network, timeout, rate-limit, and server failures preserve them.
   Credits and billing return 401 when authentication is lost during their request,
-  as they do for a request begun signed out; other upstream failures remain 502.
+  as they do for a request begun signed out. A replaced signed-in session returns
+  an account conflict. Referral and guarded Checkout requests preserve the
+  allowlisted business codes and retry timing.
   Their renderer request owner re-reads the authoritative account query after a
   typed authentication refusal, only while its initiating cached identity remains
   current. Confirmed identity changes invalidate Agent readiness. A new email
@@ -1139,6 +1141,19 @@ data migration is not required by [maintenance policy](../MAINTENANCE.md#previou
   retain sign-in and Retry; recovery does not replay billing mutations.
   Unreadable Auth responses retain upstream status, content type, request ID and
   safe parse/transport causes. Parser body excerpts never enter diagnostics.
+- Host account transport owns referral preview, binding, history, grant reads,
+  the account's recent reward activity, and versioned Checkout. Shared HTTP schemas validate the cloud and loopback
+  payloads. Loopback requests use an opaque Node-owned generation that stays
+  stable through access-token refresh. Node checks it before sending, after
+  reading, and before retrying on 401. Only Node handles the canonical auth
+  subject and cloud bearer token. Renderer caches and command lifetimes follow
+  the generation. A cross-window notification carries only a refresh hint.
+- Node keeps the pending code and current request identity for the signed-in host
+  session. Another window sees the same Checkout readiness. Claim and Checkout
+  cannot run simultaneously in the desktop host, and the API remains responsible
+  for cross-client serialization, eligibility, and durable payment recovery.
+  The renderer must re-read the host identity before handing a result to the
+  browser. OAuth and billing return links carry no invitation or credential data.
 - `server/hosted-auth-transport.ts` sends desktop Auth exchange, refresh, profile
   and logout requests through `electron/account/auth-network.ts`. Electron owns
   an in-memory Chromium session in system-proxy mode; Node retains PKCE, session
@@ -1207,7 +1222,7 @@ data migration is not required by [maintenance policy](../MAINTENANCE.md#previou
   the native runtime message boundary. `server/hosted-agent-models.ts` reads
   the approved model profiles. Each OpenQuill chat reads them once at start
   and configures its OpenCode process with the same list, so stored prompts
-  name their profile and compaction uses that profile's limits. Default uses the
+  name their profile and compaction uses that profile's limits. StashBase Agent uses the
   service's default profile for its own requests and Auto permission review over
   v1. OpenCode keeps native sub-agents disabled. The chat's stdio MCP host
   exposes the same built-in project operations as the HTTP transport, bounded
@@ -1220,7 +1235,9 @@ data migration is not required by [maintenance policy](../MAINTENANCE.md#previou
   the monthly ledger; the existing `paidThrough` field is the confirmed access
   end for either. The API keeps trials recognizable as `active` in the legacy
   `status` field and supplies their actual state in `subscriptionStatus`; the
-  renderer prefers the latter and falls back for older servers. Ledger decisions
+  renderer prefers the latter and falls back for older servers. Available Agent
+  credits come from the published `credits-v1` total, with fixed-point source
+  amounts for display. A base balance alone cannot gate an Agent turn. Ledger decisions
   remain server-owned. The desktop displays the published monthly amount and terms
   without deciding eligibility; it exposes bounded usage, plans, and
   subscription status. The host requests Checkout and Portal pages with the
@@ -1262,7 +1279,7 @@ billing presentation independently of the runtime catalog; moving a shortcut
 does not create another account session or credential store.
 
 Credit snapshots are shared through Settings' query owner. App composition
-invalidates that query on Default turn completion independently of telemetry
+invalidates that query on StashBase Agent turn completion independently of telemetry
 transport; account-menu opening, focus and bounded polling refresh the same key.
 The hosted usage endpoint exposes reservation percentages only with explicit
 `include=reservations`, preserving the strict response contract of installed

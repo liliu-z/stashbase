@@ -16,10 +16,12 @@ import {
   type SystemTextPort,
 } from '@/features/settings/application/ports';
 import type { HostedAccount } from '@/features/settings/domain/account';
+import { ReferralRequestError } from '@/features/settings/domain/referrals';
 
 export const settingsQueryKeys = {
   localComponent: ['settings', 'local-component'] as const,
   account: ['settings', 'account'] as const,
+  referrals: ['settings', 'referrals'] as const,
   agentAllowance: ['settings', 'agent-allowance'] as const,
   agentCatalog: ['settings', 'agent-catalog'] as const,
   billingPlans: ['settings', 'billing-plans'] as const,
@@ -75,11 +77,11 @@ export function agentCatalogQuery(port: AgentRuntimePort) {
   } as const;
 }
 
-export function agentAllowanceQuery(port: AgentRuntimePort) {
+export function agentAllowanceQuery(port: AgentRuntimePort, generation?: string) {
   return {
     queryFn: ({ client, signal }: { client: QueryClient; signal: AbortSignal }) =>
-      accountRequest(client, signal, () => port.getAllowance(signal)),
-    queryKey: settingsQueryKeys.agentAllowance,
+      accountRequest(client, signal, () => port.getAllowance(signal, generation)),
+    queryKey: [...settingsQueryKeys.agentAllowance, generation] as const,
     refetchInterval: 30_000,
     retry: false,
   } as const;
@@ -94,11 +96,11 @@ export function billingPlansQuery(port: AgentRuntimePort) {
   } as const;
 }
 
-export function billingStatusQuery(port: AgentRuntimePort) {
+export function billingStatusQuery(port: AgentRuntimePort, generation?: string) {
   return {
     queryFn: ({ client, signal }: { client: QueryClient; signal: AbortSignal }) =>
-      accountRequest(client, signal, () => port.getBillingStatus(signal)),
-    queryKey: settingsQueryKeys.billingStatus,
+      accountRequest(client, signal, () => port.getBillingStatus(signal, generation)),
+    queryKey: [...settingsQueryKeys.billingStatus, generation] as const,
     retry: false,
   } as const;
 }
@@ -136,8 +138,9 @@ export async function accountRequest<T>(
   } catch (error) {
     if (
       !signal.aborted &&
-      error instanceof AgentRuntimeError &&
-      error.kind === 'unauthorized' &&
+      ((error instanceof AgentRuntimeError && error.kind === 'unauthorized') ||
+        (error instanceof ReferralRequestError &&
+          (error.kind === 'unauthorized' || error.code === 'referral_account_changed'))) &&
       account?.signedIn &&
       client.getQueryData(settingsQueryKeys.account) === account
     ) {
@@ -146,7 +149,9 @@ export async function accountRequest<T>(
       if (
         !signal.aborted &&
         refreshed &&
-        (refreshed.signedIn !== account.signedIn || refreshed.email !== account.email)
+        (refreshed.signedIn !== account.signedIn ||
+          refreshed.email !== account.email ||
+          refreshed.generation !== account.generation)
       ) {
         void client.invalidateQueries(
           { queryKey: settingsQueryKeys.agentCatalog },

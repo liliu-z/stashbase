@@ -8,11 +8,19 @@ import {
   FREE_BILLING,
   SIGNED_IN_ACCOUNT,
   SIGNED_OUT_ACCOUNT,
+  TEST_GENERATION,
 } from '@/test/fakes/settings';
 import { createTestQueryClient, queryWrapper } from '@/test/query';
 
 import { useAccount } from './use-account';
 import { useBilling } from './use-billing';
+
+const checkout = {
+  priceId: 'price_plus',
+  generation: TEST_GENERATION,
+  referralRevision: '0',
+  benefit: 'standard',
+} as const;
 
 afterEach(() => {
   cleanup();
@@ -49,7 +57,7 @@ describe('billing browser handoff', () => {
       await waitFor(() => expect(view.result.current.billing.status).not.toBeNull());
       act(() => {
         if (action === 'portal') view.result.current.billing.manage();
-        else if (action === 'checkout') view.result.current.billing.subscribe('price_plus');
+        else if (action === 'checkout') view.result.current.billing.subscribe(checkout);
         else view.result.current.billing.change({ action: 'cancel' });
       });
       await waitFor(() => expect(view.result.current.account.account?.signedIn).toBe(false));
@@ -73,7 +81,7 @@ describe('billing browser handoff', () => {
       await waitFor(() => expect(view.result.current.status).not.toBeNull());
       vi.useFakeTimers();
       await act(async () => {
-        view.result.current.subscribe('price_plus');
+        view.result.current.subscribe(checkout);
         await vi.advanceTimersByTimeAsync(1);
       });
       await act(async () => {
@@ -116,12 +124,37 @@ describe('billing browser handoff', () => {
       },
     );
     await waitFor(() => expect(view.result.current.status).not.toBeNull());
-    act(() => view.result.current.subscribe('price_plus'));
+    act(() => view.result.current.subscribe(checkout));
     await waitFor(() => expect(view.result.current.failure?.message).toContain('payment page'));
     act(() => view.result.current.manage());
     await waitFor(() => expect(port.openBillingPortal).toHaveBeenCalledOnce());
     await waitFor(() =>
       expect(view.result.current.failure?.message).toContain('subscription management'),
     );
+  });
+
+  it('drops a late Checkout page when the same email signs in with a different session', async () => {
+    let finish!: (url: string) => void;
+    const port = agentRuntimePort({
+      startCheckout: vi.fn(
+        () =>
+          new Promise<string>((resolve) => {
+            finish = resolve;
+          }),
+      ),
+    });
+    const openExternal = vi.fn();
+    const current = accountPort(SIGNED_IN_ACCOUNT);
+    const view = renderHook(() => useBilling(port, openExternal, true, current, TEST_GENERATION), {
+      wrapper: queryWrapper(createTestQueryClient()),
+    });
+    act(() => view.result.current.subscribe(checkout));
+    await waitFor(() => expect(port.startCheckout).toHaveBeenCalledOnce());
+    vi.mocked(current.load).mockResolvedValue({ ...SIGNED_IN_ACCOUNT, generation: 'b'.repeat(43) });
+    await act(async () => finish('https://checkout.stripe.com/c/pay/stale'));
+    await waitFor(() =>
+      expect(view.result.current.failure?.message).toMatch(/signed-in account changed/),
+    );
+    expect(openExternal).not.toHaveBeenCalled();
   });
 });

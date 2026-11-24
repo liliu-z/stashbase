@@ -91,7 +91,7 @@ describe('describeRuntime', () => {
         preparation: {
           kind: 'failed',
           failure: {
-            note: 'An account is required to use the Default Agent.',
+            note: 'An account is required to use the StashBase Agent.',
             refusal: 'account-required',
             stage: 'install',
           },

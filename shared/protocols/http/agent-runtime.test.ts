@@ -152,3 +152,24 @@ test('hosted agent allowance allows a not-yet-started window', () => {
     null,
   );
 });
+
+test('hosted allowance preserves credits-v1 precision and does not use the base percentage as the total', () => {
+  const zero = '0.000000000';
+  const balances = { availableCredits: zero, consumedCredits: zero, reservedCredits: zero, provisionalCredits: zero };
+  const at = '2026-11-23T10:00:00.000Z';
+  const exact = '0.000000001';
+  const creditBreakdown = {
+    creditUnit: 'credits-v1', asOf: at, agentAvailableCredits: exact,
+    base: { ...balances, grantedCredits: zero, windowStartedAt: null, windowEndsAt: null },
+    bonus: { ...balances, availableCredits: exact, entitlementCredits: exact, nextExpiry: { at, availableCredits: exact } },
+  };
+  const usage = {
+    profile: 'stashbase-agent-default', remainingPercent: 0, reservedPercent: 0,
+    inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, windowStartedAt: null, windowEndsAt: null,
+    creditBreakdown,
+  };
+  assert.deepEqual(hostedAgentAllowanceSchema.parse(usage).creditBreakdown, creditBreakdown);
+  assert.equal(hostedAgentAllowanceSchema.safeParse({
+    ...usage, creditBreakdown: { ...creditBreakdown, agentAvailableCredits: 1e-9 },
+  }).success, false);
+});

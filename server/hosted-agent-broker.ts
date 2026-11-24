@@ -467,11 +467,11 @@ export class HostedAgentBroker {
           return;
         }
         const allowanceMessage = upstreamCode === 'agent_allowance_reserved'
-          ? 'Remaining agent credits cannot cover this request while some credits are reserved for active requests or fees awaiting confirmation. Check agent credits in Settings; wait for reservations to clear or try a shorter conversation.'
+          ? 'Available base and bonus credits cannot cover this request while credits are reserved. Try a shorter conversation or check the balance and reservations in Settings → Account.'
           : upstreamCode === 'agent_turn_budget_exhausted'
           ? 'This agent turn has insufficient spending budget for another model call.'
           : upstreamCode === 'agent_allowance_exhausted' || !upstreamCode
-            ? 'Remaining agent credits cannot cover this request. Try a shorter conversation or wait for credits to refill.'
+            ? 'Available base and bonus credits cannot cover this request. Try a shorter conversation or check your credits and refill date in Settings → Account.'
             : upstreamMessage;
         const retryAfter = upstream.status === 429 || upstream.status === 503
           ? upstream.headers.get('retry-after') : null;

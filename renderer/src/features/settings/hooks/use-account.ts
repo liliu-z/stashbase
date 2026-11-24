@@ -26,6 +26,9 @@ import {
   useSettingsCommand,
 } from '@/features/settings/hooks/use-settings-command';
 import type { FailureView } from '@/shared/domain/feature-error';
+import { useWindowFocus } from '@/shared/runtime/use-window-focus';
+
+import { broadcastAccountChange, useAccountSignals } from './account-signals';
 
 const SIGN_IN_POLL_MS = 1_500;
 
@@ -35,6 +38,7 @@ const DEPENDENT_KEYS = [
   settingsQueryKeys.agentCatalog,
   settingsQueryKeys.agentAllowance,
   settingsQueryKeys.billingStatus,
+  settingsQueryKeys.referrals,
 ] as const;
 
 export interface AccountViewModel {
@@ -85,6 +89,16 @@ export function useAccount(
 ): AccountViewModel {
   const queryClient = useQueryClient();
   const account = useQuery(accountQuery(port));
+  const refreshAccount = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: settingsQueryKeys.account, exact: true });
+  }, [queryClient]);
+  useWindowFocus(refreshAccount, true);
+  useAccountSignals((change) => {
+    if (change !== 'identity') return;
+    // Withdraw the old window view immediately while the host settles identity.
+    void queryClient.resetQueries({ queryKey: settingsQueryKeys.account, exact: true });
+  });
+
   const [signInFlow, setSignInFlow] = useState<string | null>(null);
   const [signInUrl, setSignInUrl] = useState<string | null>(null);
   const [signInError, setSignInError] = useState<FailureView | null>(null);
@@ -109,6 +123,22 @@ export function useAccount(
     for (const queryKey of DEPENDENT_KEYS) void queryClient.invalidateQueries({ queryKey });
   }, [queryClient]);
 
+  const previousIdentity = useRef<string | undefined>(undefined);
+  const identity = account.data?.generation;
+  useEffect(() => {
+    const previous = previousIdentity.current;
+    previousIdentity.current = identity;
+    if (previous === undefined || previous === identity) return;
+    // Cancel the retired scope's requests, then discard its private data.
+    for (const key of DEPENDENT_KEYS) {
+      if (key === settingsQueryKeys.agentCatalog) continue;
+      const queryKey = [...key, previous];
+      void queryClient.cancelQueries({ queryKey });
+      queryClient.removeQueries({ queryKey });
+    }
+    void queryClient.invalidateQueries({ queryKey: settingsQueryKeys.agentCatalog });
+  }, [identity, queryClient]);
+
   // A flow that fails leaves the dialog, when it is open, saying why and
   // offering the choices again, so a send waiting on it keeps waiting.
   useEffect(() => {
@@ -126,6 +156,7 @@ export function useAccount(
       return;
     }
     setAccessOpen(false);
+    broadcastAccountChange('identity');
     void queryClient.invalidateQueries({ queryKey: settingsQueryKeys.account });
     invalidateDependents();
     finishWaiters(true);
@@ -178,6 +209,7 @@ export function useAccount(
     },
     onDone: (next) => {
       queryClient.setQueryData(settingsQueryKeys.account, next);
+      broadcastAccountChange('identity');
       invalidateDependents();
     },
   });
@@ -249,6 +281,7 @@ export function useAccount(
       // before publishing the new sign-in, even if its transport answers late.
       void queryClient.cancelQueries({ queryKey: settingsQueryKeys.account, exact: true });
       writeAccount(next);
+      broadcastAccountChange('identity');
       invalidateDependents();
       finishWaiters(true);
     },

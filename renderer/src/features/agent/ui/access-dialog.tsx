@@ -17,7 +17,7 @@
  *  which step the service is on and how long the wait has lasted, so a slow
  *  step never reads as a stuck one.
  *
- *  The Default Agent's answer is the account's own sign-in dialog, which this
+ *  The StashBase Agent's answer is the account's own sign-in dialog, which this
  *  panel hands over to rather than sitting beneath; it shows again only with
  *  the reason the sign-in did not finish. */
 import { useEffect, useState } from 'react';
@@ -62,8 +62,8 @@ function gateCopy(
   if (agent === DEFAULT_AGENT_ID)
     return {
       action: 'Sign in',
-      description: 'The Default Agent runs on free agent credits.',
-      title: 'Sign in to use the Default Agent',
+      description: 'The StashBase Agent runs on free agent credits.',
+      title: 'Sign in to use the StashBase Agent',
       waiting: null,
     };
   if (needsSignIn)

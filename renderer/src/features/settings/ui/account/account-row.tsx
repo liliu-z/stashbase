@@ -5,7 +5,7 @@ import { SettingsRow } from '@/features/settings/ui/rows';
 import { FailureNotice } from '@/shared/ui/failure-notice';
 import { SignInPageLink } from '@/shared/ui/sign-in-page-link';
 
-/** The account the Default Agent runs on. A browser sign-in that waits keeps
+/** The account the StashBase Agent runs on. A browser sign-in that waits keeps
  *  Sign in's name on its spinner and says what it waits for in the detail
  *  line, with the page again and Stop waiting, as every browser wait does. */
 export function AccountRow({ account }: { account: AccountViewModel }) {

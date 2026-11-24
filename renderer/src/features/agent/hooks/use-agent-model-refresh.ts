@@ -1,7 +1,7 @@
 /**
  * A fresh hosted model list, fetched from the turn the old one was refused on.
  *
- * The Default Agent reads its approved models when its session starts, and
+ * The StashBase Agent reads its approved models when its session starts, and
  * every turn names the configuration it was shown. When the service changes
  * that configuration, the turn is refused; reconnecting starts a session that
  * reads the list again. Nothing is sent again here: the reader reviews the

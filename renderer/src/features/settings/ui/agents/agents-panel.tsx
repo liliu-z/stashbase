@@ -37,7 +37,7 @@ export function AgentRuntimesPanel({
 
   return (
     <SettingsPane title="Agents">
-      <SettingsGroup title="Default Agent">
+      <SettingsGroup title="StashBase Agent">
         <SettingsList as="ul">
           {catalog.runtimes
             .filter((runtime) => runtime.id === 'stashbase')
