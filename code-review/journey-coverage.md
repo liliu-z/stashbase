@@ -72,9 +72,11 @@ global commit status until the matching Store package is published. Focused
 fixtures cover submission interruption, receipt loss, foreign draft refusal,
 rejection, version conflicts and inconsistent channels. The Entra application,
 Partner Center association and three repository secret entries were configured
-on 2026-11-25. Live API authentication/submission and hosted scheduled execution
-remain unverified, separate from fixture evidence and installed-app update
-acceptance.
+on 2026-11-25. Hosted read-only run 45552682340 authenticated successfully and
+verified GitHub, CDN, Brew and all four live website download destinations for
+v2.19.1; Store returned Certification and aggregate completion remained pending.
+API-created submissions, scheduled execution and installed-app update acceptance
+remain unverified.
 
 **Permission changes (2026-11-24):** The core gate and focused Claude,
 Antigravity and renderer session checks pass for mode reconciliation and

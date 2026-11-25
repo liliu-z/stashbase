@@ -507,6 +507,15 @@ updates, uploads, commits or deletes a Store submission. GitHub does not reveal
 saved secret values; test authentication in this hosted job rather than trying
 to retrieve secrets into a local shell.
 
+Bootstrap evidence (2026-11-25): the hosted
+[read-only check](https://github.com/liliu-z/stashbase/actions/runs/45552682340)
+authenticated successfully and verified v2.19.1 on GitHub, the five CDN
+installers, both Homebrew architectures and all four website download buttons.
+Store submission `1152921505702500089` returned `Certification`; the aggregate
+`release/all-channels` status correctly remained pending. No Store submission
+was changed. The recurring schedule and a future API-created update still need
+their own execution evidence after the first Store publication.
+
 | Report result | Meaning and next action |
 |---|---|
 | Other channels pass; Store pending | Certification/publication is still in progress. Keep the current submission; the six-hour monitor will check again. |
