@@ -17,6 +17,7 @@ const STATUS: { readonly [Phase in UpdatePhaseName]: Extract<UpdateStatus, { pha
   installing: { phase: 'installing', version: '2.1.0' },
   ready: { phase: 'ready', version: '2.1.0' },
   unsupported: { phase: 'unsupported' },
+  store: { phase: 'store' },
 };
 
 const EVERY_STATUS: readonly UpdateStatus[] = Object.values(STATUS);
@@ -71,6 +72,7 @@ describe('updateOffer', () => {
     expect(phasesWhere((status) => updateOffer(status).action !== null)).toEqual([
       'error',
       'ready',
+      'store',
     ]);
   });
 });

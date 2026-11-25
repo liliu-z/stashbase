@@ -1838,6 +1838,15 @@ justified and bounded. Stories/axe do not prove painted contrast or composition.
 
 ## Native Lifecycle and Updates
 
+Microsoft Store installations are identified by Electron's `process.windowsStore`.
+The update manager exposes a Store-managed state without NSIS checks, downloads,
+listeners or installation. The host owns the fixed Store listing URL. MSIX owns
+protocol registration and the Windows notification identity; startup must not
+replace them with the ordinary installer registrations. Packaged runtime and
+stdio MCP remain the same full-trust processes, with data outside the read-only
+installation directory. Store package generation belongs to the
+[release pipeline](release-pipeline.md#microsoft-store-msix).
+
 Main owns launch identity, save barriers, retirement tombstones, and shutdown.
 Readiness must match the spawned instance, not merely a listener or PID.
 Each health probe uses a fresh connection and a bounded whole-response deadline.

@@ -1,4 +1,5 @@
 const DEFAULT_RELEASE_URL = 'https://github.com/liliu-z/stashbase/releases/latest';
+const STORE_RELEASE_URL = 'https://apps.microsoft.com/detail/9N1Z6TB2H2P5';
 const DEFAULT_STARTUP_DELAY_MS = 30_000;
 const DEFAULT_CHECK_INTERVAL_MS = 15 * 60 * 1000;
 const UPDATE_SIMULATIONS = new Set(['off', 'available', 'downloading', 'ready', 'installing', 'error']);
@@ -39,6 +40,7 @@ function createUpdateManager(options) {
     updater,
     currentVersion,
     isPackaged,
+    isWindowsStore = false,
     readAutoCheck,
     beforeInstall,
     installUpdate,
@@ -56,7 +58,7 @@ function createUpdateManager(options) {
   } = options;
 
   let state = {
-    phase: isPackaged ? 'idle' : 'unsupported',
+    phase: isWindowsStore ? 'store' : isPackaged ? 'idle' : 'unsupported',
     currentVersion,
     autoCheckEnabled: true,
     ...(isPackaged ? {} : { message: 'Update checks are available in packaged builds.' }),
@@ -110,7 +112,7 @@ function createUpdateManager(options) {
 
   function scheduleCheck(delayMs = checkIntervalMs) {
     cancelScheduledCheck();
-    if (disposed || !isPackaged || !state.autoCheckEnabled) return;
+    if (disposed || !isPackaged || isWindowsStore || !state.autoCheckEnabled) return;
     timer = setTimer(() => {
       timer = null;
       void check({ manual: false });
@@ -223,7 +225,9 @@ function createUpdateManager(options) {
     updater.allowPrerelease = false;
     updater.allowDowngrade = false;
     updater.disableWebInstaller = true;
-    for (const [name, listener] of listeners) updater.on(name, listener);
+    if (!isWindowsStore) {
+      for (const [name, listener] of listeners) updater.on(name, listener);
+    }
     startPromise = (async () => {
       const autoCheckEnabled = await readPreference();
       if (disposed) return snapshot();
@@ -252,6 +256,7 @@ function createUpdateManager(options) {
   async function check({ manual = true } = {}) {
     await start();
     if (disposed) return snapshot();
+    if (isWindowsStore) return snapshot();
     if (checking) return checking;
     if (!isPackaged) {
       return publish({ phase: 'unsupported', message: 'Update checks are available in packaged builds.' });
@@ -332,6 +337,10 @@ function createUpdateManager(options) {
 
   async function primaryAction() {
     await start();
+    if (isWindowsStore && !disposed) {
+      await openDownloadPage();
+      return snapshot();
+    }
     if (disposed || checking || state.phase !== 'ready') return snapshot();
     // A failed recheck already tells the reader that this installer may be
     // older. Preserve their explicit choice to install that ready download.
@@ -349,7 +358,7 @@ function createUpdateManager(options) {
   }
 
   async function openDownloadPage() {
-    await openReleasePage(DEFAULT_RELEASE_URL);
+    await openReleasePage(isWindowsStore ? STORE_RELEASE_URL : DEFAULT_RELEASE_URL);
     return true;
   }
 

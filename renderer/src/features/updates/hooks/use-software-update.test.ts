@@ -53,6 +53,15 @@ function harness(read: UpdateResult, answer: UpdateResult = read) {
 }
 
 describe('useSoftwareUpdate', () => {
+  it('opens Store updates without offering the app auto-check preference', async () => {
+    const updates = harness(accepted({ phase: 'store' }));
+    const { result } = renderHook(() => useSoftwareUpdate(updates.port));
+    await waitFor(() => expect(result.current.actionLabel).toBe('Open Microsoft Store'));
+    expect(result.current.setAutoCheck).toBeNull();
+    await act(async () => result.current.act());
+    expect(updates.port.runPrimaryAction).toHaveBeenCalledOnce();
+    expect(updates.port.check).not.toHaveBeenCalled();
+  });
   it('reports the running build, the auto-check flag, and the phase in one sentence', async () => {
     const updates = harness(accepted({ phase: 'current' }, false));
     const { result } = renderHook(() => useSoftwareUpdate(updates.port));
@@ -106,7 +115,7 @@ describe('useSoftwareUpdate', () => {
     const { result } = renderHook(() => useSoftwareUpdate(updates.port));
     await waitFor(() => expect(updates.port.read).toHaveBeenCalled());
 
-    await act(async () => result.current.setAutoCheck(false));
+    await act(async () => result.current.setAutoCheck?.(false));
     expect(updates.port.setAutoCheck).toHaveBeenCalledWith(false);
 
     await act(async () => result.current.act());
@@ -134,7 +143,7 @@ describe('useSoftwareUpdate', () => {
 
     act(() => {
       result.current.act();
-      result.current.setAutoCheck(true);
+      result.current.setAutoCheck?.(true);
     });
     expect(result.current.status).toBe('This build of StashBase does not check for updates.');
     expect(result.current.version).toBe('');

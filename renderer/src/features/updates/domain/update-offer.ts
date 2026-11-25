@@ -35,6 +35,11 @@ export interface UpdateOffer {
 }
 
 const UPDATE_OFFERS: { readonly [Phase in UpdatePhaseName]: UpdateOfferFor<Phase> } = {
+  store: {
+    action: { kind: 'primary', label: 'Open Microsoft Store' },
+    announce: false,
+    sentence: () => 'Microsoft Store manages updates for this app.',
+  },
   unsupported: {
     action: null,
     announce: false,
@@ -106,6 +111,8 @@ function resolved<Phase extends UpdatePhaseName>(
 
 export function updateOffer(status: UpdateStatus): UpdateOffer {
   switch (status.phase) {
+    case 'store':
+      return resolved(UPDATE_OFFERS.store, status);
     case 'unsupported':
       return resolved(UPDATE_OFFERS.unsupported, status);
     case 'idle':

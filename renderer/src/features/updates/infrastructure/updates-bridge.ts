@@ -28,6 +28,7 @@ const UNAVAILABLE: UpdateResult = { kind: 'unavailable', ok: false };
 function toStatus(snapshot: UpdatesSnapshot): UpdateStatus {
   switch (snapshot.phase) {
     case 'unsupported':
+    case 'store':
     case 'idle':
     case 'checking':
     case 'current':

@@ -49,6 +49,19 @@ The map is navigation, not proof that every caller has been reviewed.
 
 ## J01: Onboarding
 
+**Microsoft Store distribution (2026-11-25):** The Windows release Adapter
+produces an unsigned MSIX submission artifact through MakeAppx; the manual
+`build-msix.yml` path reuses the same Adapter after the exact-commit CI gate.
+The manifest owns package identity and OAuth/billing protocol registration.
+`electron/update-manager.cjs` prevents NSIS updates inside MSIX, and native
+notifications retain Windows' package identity. Focused tests cover staging,
+version admission, update isolation and protocol ownership. Local core checks,
+release contracts, 49 affected renderer tests, fresh builds and built Electron
+smoke passed; the Store settings Story was inspected visually. Hosted MakeAppx,
+Partner Center package acceptance, signed installation, first replies across
+all four Agents, OAuth/billing return, native notifications and Store updates
+remain unverified until the corresponding runtime passes complete.
+
 **Permission changes (2026-11-24):** The core gate and focused Claude,
 Antigravity and renderer session checks pass for mode reconciliation and
 command approval. The persistent Claude and Antigravity verification profiles

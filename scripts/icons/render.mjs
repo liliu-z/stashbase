@@ -96,6 +96,11 @@ async function main() {
   for (const size of PNG_SIZES) {
     await writeFile(path.join(buildDirectory, "icons", `${size}x${size}.png`), await pngAt(size));
   }
+  const storeAssets = path.join(buildDirectory, 'windows-store', 'Assets');
+  await mkdir(storeAssets, { recursive: true });
+  for (const [name, size] of [['StoreLogo', 50], ['Square44x44Logo', 44], ['Square150x150Logo', 150]]) {
+    await writeFile(path.join(storeAssets, `${name}.png`), await pngAt(size));
+  }
   const icoFrames = [];
   for (const size of ICO_SIZES) icoFrames.push({ png: await pngAt(size), size });
   await writeFile(path.join(buildDirectory, "icon.ico"), encodeIco(icoFrames));

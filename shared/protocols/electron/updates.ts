@@ -15,6 +15,7 @@ export const UPDATES_SET_SIMULATION_CHANNEL = 'updates:set-simulation';
  *  below is exhaustive over exactly this list. */
 export const UPDATE_PHASES = [
   'unsupported',
+  'store',
   'idle',
   'checking',
   'current',
@@ -43,6 +44,7 @@ const state = {
  */
 export const updatesSnapshotSchema = z.discriminatedUnion('phase', [
   z.object({ ...state, phase: z.literal('unsupported') }).strict(),
+  z.object({ ...state, phase: z.literal('store') }).strict(),
   z.object({ ...state, phase: z.literal('idle') }).strict(),
   z.object({ ...state, phase: z.literal('checking') }).strict(),
   z.object({ ...state, phase: z.literal('current') }).strict(),

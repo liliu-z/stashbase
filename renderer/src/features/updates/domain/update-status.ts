@@ -6,6 +6,7 @@
  *  into it in infrastructure, and no layer above that sees the schema. */
 export type UpdateStatus =
   | { readonly phase: 'unsupported' }
+  | { readonly phase: 'store' }
   | { readonly phase: 'idle' }
   | { readonly phase: 'checking' }
   | { readonly phase: 'current' }

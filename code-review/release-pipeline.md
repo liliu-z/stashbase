@@ -425,6 +425,44 @@ signing, the workflow checks every NSIS executable with
 verification contract. A build installed from that signed channel must not be
 downgraded to unsigned replacement updates.
 
+## Microsoft Store MSIX
+
+The Windows Adapter also stages the complete, smoke-tested `win-unpacked`
+directory under `app/` and runs Windows SDK MakeAppx with schema and semantic
+validation enabled. `build/windows-store/AppxManifest.xml` owns the Partner
+Center identity, desktop entry point, `runFullTrust` capability and `stashbase://`
+protocol. `scripts/packaging/windows-store.mjs` maps the stable application
+version to `major.minor.patch.0`; the Store owns the final revision segment.
+The icon generator derives the three Store assets from `build/icon.svg`.
+
+`scripts/package-windows-store.ps1` rejects a stale Windows executable and
+fails if staging or MakeAppx fails. The Windows job uploads the unsigned MSIX
+and SHA-256 as the `store-msix-package` Actions artifact, retained for 30 days.
+It does not add MSIX to the NSIS updater feed or publish it as a direct installer.
+Microsoft signs Store submissions; this artifact is not a signed sideload package.
+
+For another submission build, dispatch `.github/workflows/build-msix.yml` with
+an existing release tag containing this support. It uses the exact-commit CI
+gate and the same Windows Adapter, without uploading or modifying GitHub Release
+assets. The selected tag must already have its published extractor component.
+Ordinary releases produce the Store artifact in the coordinator run as well.
+
+Partner Center product `9N1Z6TB2H2P5` receives the extracted `.msix` through its
+Packages page. Package acceptance is separate from certification. Complete the
+listing, screenshots, privacy policy, age ratings, pricing and capability
+justification before submitting. `runFullTrust` is needed for local project
+files, the Python index daemon and native Agent subprocesses.
+
+Local staging/updater tests and unpackaged payload smoke do not establish MSIX
+installation or package-identity behavior. Verify installation and launch on
+Windows, first completed Agent replies, OAuth/billing return, native notifications,
+file persistence and Store updates in the signed/installed package. Record those
+results in J01; do not describe a successful MakeAppx run as Store approval.
+
+References: [Microsoft Store signing](https://learn.microsoft.com/en-us/windows/apps/publish/faq/get-started-with-the-microsoft-store),
+[manual MSIX manifest](https://learn.microsoft.com/en-us/windows/msix/desktop/desktop-to-uwp-manual-conversion),
+[Store versions](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/package-version-numbering?pivots=store-installer-msix).
+
 ## Release Asset Upload
 
 Every platform Adapter uploads through `scripts/upload-release-assets.mjs`, so

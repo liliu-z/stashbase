@@ -583,16 +583,16 @@ test('source launches leave the installed app protocol untouched; packaged launc
   const start = source.indexOf('function registerOAuthReturnProtocol()');
   const end = source.indexOf("app.on('open-url'", start);
   assert.ok(start >= 0 && end > start);
-  for (const isPackaged of [false, true]) {
+  for (const [isPackaged, windowsStore] of [[false, false], [true, false], [true, true]]) {
     const registrations = [];
     vm.runInNewContext(`${source.slice(start, end)}\nregisterOAuthReturnProtocol();`, {
       app: { isPackaged, setAsDefaultProtocolClient: (...args) => { registrations.push([...args]); return true; } },
-      process: { defaultApp: !isPackaged, argv: ['electron', '/dev/stashbase'], execPath: '/dev/Electron' },
+      process: { windowsStore, defaultApp: !isPackaged, argv: ['electron', '/dev/stashbase'], execPath: '/dev/Electron' },
       path, console,
     });
-    assert.equal(registrations.length, isPackaged ? 1 : 0,
-      'development must not make generic Electron the OS protocol handler');
-    if (isPackaged) assert.equal(registrations[0][0], 'stashbase');
+    assert.equal(registrations.length, isPackaged && !windowsStore ? 1 : 0,
+      'source and MSIX launches leave OS protocol registration untouched');
+    if (isPackaged && !windowsStore) assert.equal(registrations[0][0], 'stashbase');
   }
 });
 

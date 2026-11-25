@@ -678,6 +678,7 @@ const desktopUpdates = createUpdateManager({
   currentVersion: app.getVersion(),
   isPackaged: app.isPackaged,
   readAutoCheck: readAutoUpdatePreference,
+  isWindowsStore: process.windowsStore === true,
   // Every live window releases its unsaved work before an update closes it;
   // one refusal cancels the install and leaves the download ready for retry.
   beforeInstall: desktopUpdateWindows.prepare,
@@ -1313,7 +1314,7 @@ function registerOAuthReturnProtocol() {
   // macOS/Linux cannot route a URL to `electron <project>`: launch arguments
   // are a Windows-only registration option. Never replace an installed app's
   // handler with generic Electron from a source checkout.
-  if (!app.isPackaged) return;
+  if (!app.isPackaged || process.windowsStore) return;
   const registered = app.setAsDefaultProtocolClient('stashbase');
   if (!registered) console.warn('[electron] could not register the stashbase:// return protocol');
 }

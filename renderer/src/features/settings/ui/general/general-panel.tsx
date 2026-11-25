@@ -39,21 +39,23 @@ export function GeneralPanel({
           title="Software updates"
         >
           <SettingsList>
-            <SettingsRow
-              detail="StashBase checks in the background. You choose when to install."
-              title="Check for updates automatically"
-              trail={
-                <Switch
-                  checked={softwareUpdate.autoCheckEnabled}
-                  // One command reaches the updater at a time, so a toggle
-                  // offered mid-download would be silently dropped.
-                  disabled={softwareUpdate.busy}
-                  label="Check for updates automatically"
-                  labelHidden
-                  onToggle={() => softwareUpdate.setAutoCheck(!softwareUpdate.autoCheckEnabled)}
-                />
-              }
-            />
+            {softwareUpdate.setAutoCheck && (
+              <SettingsRow
+                detail="StashBase checks in the background. You choose when to install."
+                title="Check for updates automatically"
+                trail={
+                  <Switch
+                    checked={softwareUpdate.autoCheckEnabled}
+                    // One command reaches the updater at a time, so a toggle
+                    // offered mid-download would be silently dropped.
+                    disabled={softwareUpdate.busy}
+                    label="Check for updates automatically"
+                    labelHidden
+                    onToggle={() => softwareUpdate.setAutoCheck?.(!softwareUpdate.autoCheckEnabled)}
+                  />
+                }
+              />
+            )}
             <SettingsRow
               detail={softwareUpdate.status}
               title={`Version ${softwareUpdate.version}`}

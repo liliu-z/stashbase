@@ -164,6 +164,29 @@ test('development builds report unsupported and can open the release page', asyn
   );
 });
 
+test('Store installs never check, download or install NSIS updates, and open their Store listing', async () => {
+  const opened = [];
+  const { updater, manager, scheduled } = harness({
+    isWindowsStore: true,
+    openReleasePage: async (url) => opened.push(url),
+  });
+  await manager.start();
+  await manager.check();
+  await manager.checkOnActivity();
+  await manager.refreshPreference();
+  assert.equal(manager.getState().phase, 'store');
+  assert.equal(scheduled.length, 0);
+  assert.equal(updater.listenerCount('update-downloaded'), 0);
+  updater.emit('update-downloaded', { version: '9.0.0' });
+  await manager.primaryAction();
+  assert.equal(updater.checks + updater.downloads + updater.installs, 0);
+  assert.equal(updater.autoInstallOnAppQuit, false);
+  assert.deepEqual(opened, ['https://apps.microsoft.com/detail/9N1Z6TB2H2P5']);
+  manager.dispose();
+  await manager.primaryAction();
+  assert.equal(opened.length, 1);
+});
+
 test('development update simulation previews states without touching the real updater', async () => {
   const { updater, manager, states } = harness({
     isPackaged: false,

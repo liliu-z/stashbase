@@ -39,7 +39,7 @@ export function useSoftwareUpdate(port: UpdatesPort | null): SoftwareUpdateRow {
     checkAgain: state.status.phase === 'ready' ? checkAgain : null,
     actionLabel: action?.label ?? 'Check for updates',
     failure,
-    setAutoCheck,
+    setAutoCheck: state.status.phase === 'store' ? null : setAutoCheck,
     status: offer.sentence,
     version: state.currentVersion,
   };

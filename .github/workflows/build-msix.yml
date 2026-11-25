@@ -1,0 +1,32 @@
+name: Build Microsoft Store MSIX
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag containing the Microsoft Store packaging support
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: microsoft-store-package
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    uses: ./.github/workflows/release-ci-gate.yml
+    with:
+      tag: ${{ inputs.tag }}
+  package:
+    needs: gate
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release-windows.yml
+    with:
+      tag: ${{ inputs.tag }}
+      store-only: true
+    secrets: inherit

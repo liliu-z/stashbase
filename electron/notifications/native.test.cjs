@@ -36,3 +36,9 @@ test('Linux without a usable notification service reports unsupported and does n
   const driver = createNativeNotifications({ platform: 'linux', desktop: '', openExternal: async () => {}, app: {}, Notification: Unavailable });
   assert.equal(driver.supported(), false);
 });
+
+test('MSIX notifications retain the package identity supplied by Windows', () => {
+  createNativeNotifications({ platform: 'win32', windowsStore: true, desktop: '',
+    app: { setAppUserModelId() { assert.fail('MSIX must not use the NSIS identity'); } },
+    Notification: {}, openExternal: async () => {} });
+});

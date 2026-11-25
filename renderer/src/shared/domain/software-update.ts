@@ -17,5 +17,5 @@ export interface SoftwareUpdateRow {
   /** Available alongside Restart when a downloaded installer can be superseded. */
   readonly checkAgain: (() => void) | null;
   act(): void;
-  setAutoCheck(enabled: boolean): void;
+  readonly setAutoCheck: ((enabled: boolean) => void) | null;
 }

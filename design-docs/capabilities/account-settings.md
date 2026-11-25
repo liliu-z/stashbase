@@ -305,6 +305,10 @@ reader to current credits rather than claiming all credits are spent.
 
 ## Other Settings Decisions
 
+- Microsoft Store installations receive application updates through the Store.
+  General settings explains that ownership and offers Open Microsoft Store.
+  It does not offer the application's automatic update switch or an EXE download.
+  Native Agent runtime updates retain their existing owner and preferences.
 - Automatic update checks run throughout an open application, every 15 minutes
   and on foreground return or system wake, with a shared five-minute activity
   throttle. Disabling automatic checks still permits a manual check at any time.

@@ -85,6 +85,7 @@ function describePhase(state: ManagerState): UpdatesSnapshot | null {
   const availableVersion = state.availableVersion;
   switch (state.phase) {
     case 'unsupported':
+    case 'store':
     case 'idle':
     case 'checking':
     case 'current':

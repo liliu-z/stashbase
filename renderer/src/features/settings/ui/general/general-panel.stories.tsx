@@ -46,6 +46,19 @@ export const WithSoftwareUpdates: Story = {
   render: () => <GeneralHarness updates={softwareUpdate} />,
 };
 
+export const MicrosoftStore: Story = {
+  render: () => (
+    <GeneralHarness
+      updates={{
+        ...softwareUpdate,
+        actionLabel: 'Open Microsoft Store',
+        setAutoCheck: null,
+        status: 'Microsoft Store manages updates for this app.',
+      }}
+    />
+  ),
+};
+
 export const ComponentDownloadFailed: Story = {
   render: () => (
     <LocalComponentRecovery
