@@ -1,28 +1,31 @@
 # StashBase
 
-**Stash your notes and sources. Write with your agent.**
+**Keep your context in one place for recurring work.**
 
 [![Website](https://img.shields.io/badge/website-stashbase.ai-0a66c2.svg)](https://stashbase.ai)
 [![Release](https://img.shields.io/github/v/release/liliu-z/stashbase?label=release)](https://github.com/liliu-z/stashbase/releases/latest)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-support%20%26%20chat-5865F2.svg?logo=discord&logoColor=white)](https://discord.gg/zsRZH4PTq9)
 
-StashBase is an open-source, local knowledge base for writing with AI agents.
-Your notes, PDFs, and docs stay in a folder on your computer, and Claude, Codex,
-or Antigravity works inside it with you.
+StashBase is a free, open-source desktop workspace where your background, notes,
+and instructions stay in local files, ready for Claude, Codex, Antigravity, or
+StashBase Agent on every plan, post, or client project.
 
-- 📝 **Side by side with your agent.** Your docs stay open beside the
-  chat. When your agent edits one, `Review` shows each change inside the prose,
-  so you can undo or keep it.
-- 🗂️ **Your knowledge base, kept up to date.** Ask your agent to file new material,
-  update your notes, and link them back to their sources. It reads PDFs, Word
-  documents, and scans too, with the text extracted on your computer.
-- 💬 **Bring the agent you already use.** Claude, Codex, and Antigravity run on
-  your existing accounts, and StashBase charges nothing for them.
+- **See and control your context.** Keep your background, past work, and
+  instructions in ordinary local files you can review and edit, shared across
+  Claude, Codex, Antigravity, and StashBase Agent.
+- **Let your agent handle the upkeep.** Ask your agent to draft, update project
+  notes, and organize material directly in your folder. Open `Review` on any
+  edited Markdown document to `Keep` or `Undo` each change inline.
+- **Build up resources you can reuse.** Save reusable instructions, slide decks,
+  explainer videos, and project dashboards as templates so your agent builds on
+  the layout and style you already have instead of starting from scratch.
 
 ## Product Preview
 
-https://github.com/user-attachments/assets/4ba282a3-85d2-4a08-b7af-562a1e71e716
+https://github.com/user-attachments/assets/ca53d973-4c6f-422d-98af-5cb1da82537e
+
+Follow the step-by-step walkthrough: [How to Build in Public on LinkedIn](https://stashbase.ai/blog/build-in-public-on-linkedin/) · [All Tutorials →](https://stashbase.ai/tutorials/)
 
 ## Get Started
 
@@ -50,34 +53,35 @@ Or [download the latest release](https://github.com/liliu-z/stashbase/releases/l
 See [Installation](docs/installation.md) for platform steps, updates, and
 troubleshooting.
 
-### Start Writing
+### Start a Project
 
-1. **Enter a project.** Open or create a local folder.
-2. **Choose an agent.** Select Claude, Codex, or Antigravity and complete its
-   setup with your provider account. If you can't use any of them, the built-in
-   **StashBase Agent** is available as a fallback. Sign in to StashBase for its
-   free monthly credits; [Plus and Pro](https://stashbase.ai/pricing/) add more.
-3. **Talk it through.** Try: “I want to write a LinkedIn post about what I
-   shipped this week. Interview me before drafting.”
-4. **Draft and revise.** Ask your agent to draft the article, then review and
-   refine it.
+1. **Open a folder or copy a template.** Open an existing local folder, create
+   an empty project, or copy a template from the [Gallery](https://stashbase.ai/gallery/).
+2. **Choose an agent.** Select Claude, Codex, or Antigravity and complete setup
+   with your existing provider account. If you can't use any of them, the
+   built-in **StashBase Agent** is available as a fallback. Sign in to StashBase
+   for free monthly credits; [Plus and Pro](https://stashbase.ai/pricing/) add more.
+3. **Work in Chat.** Ask your agent to draft a post, plan, or client update from
+   your project context, or update your notes when details change.
+4. **Review edits inline.** Open `Review` on any edited Markdown document to
+   `Keep` or `Undo` each change.
 
-Switch between `Chat` for the conversation and `Documents`, a file tree and
-editor that works like an IDE, but for writing. Both modes share the project and
-keep unfinished work when you switch.
+Switch between `Chat` and `Documents` to browse your file tree and edit files
+directly. Both views share the same project and keep unfinished work when you
+switch.
 
 See [Using StashBase](docs/using-stashbase.md) for everyday document and search workflows.
 
-## Explore the Gallery
+## Tutorials & Gallery
 
-Explore how people organize files and write with agents. Copy a ready-made
-project or reuse its prompt to try a workflow with your own material.
-
-For example, in [Resume Builder](https://stashbase.ai/gallery/resume-builder/)
-the agent interviews you first, then writes a resume that shows what you
-actually did and tailors it to each job.
-
-[Explore the Gallery →](https://stashbase.ai/gallery/)
+- **[Tutorials](https://stashbase.ai/tutorials/)** — Step-by-step walkthroughs
+  for real workflows in StashBase, starting with
+  [Build in Public on LinkedIn](https://stashbase.ai/blog/build-in-public-on-linkedin/).
+- **[Gallery](https://stashbase.ai/gallery/)** — Explore project templates you
+  can copy into StashBase, including
+  [LinkedIn Ghostwriter](https://stashbase.ai/gallery/linkedin-ghostwriter/),
+  [Client Update Writer](https://stashbase.ai/gallery/client-update-writer/),
+  and [Resume Builder](https://stashbase.ai/gallery/resume-builder/).
 
 ## Your Files and Your Data
 
@@ -88,8 +92,8 @@ components downloaded on first use.
 
 Agent conversations send your prompts and relevant context to model services.
 Claude, Codex, and Antigravity use your provider accounts; the StashBase Agent connects
-through StashBase's hosted model gateway, which sends requests through OpenRouter
-to Claude Haiku 5.5 by default.
+through StashBase's hosted model gateway, which calls Anthropic directly for
+Claude models (default: Claude Haiku 5.5) and uses OpenRouter for other hosted models.
 
 **Search by meaning** requires your own OpenAI or OpenRouter key in
 `Settings → Advanced → Search by meaning`. It sends source text and search
