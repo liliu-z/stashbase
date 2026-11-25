@@ -331,7 +331,11 @@ it.each(providers)(
     expect(fixture.prompts).toEqual([request]);
     if (provider.id === 'stashbase') {
       await user.click(await screen.findByRole('button', { name: 'Account: Ada Lovelace' }));
-      await screen.findByText(/0 base · 0\.5 bonus/);
+      await screen.findByText('0.5 bonus credits');
+      await screen.findByRole('meter', {
+        name: 'Monthly base credits remaining',
+        value: { now: 0 },
+      });
       await user.keyboard('{Escape}');
     }
     expect(screen.queryByRole('button', { name: 'Stop' })).toBeNull();

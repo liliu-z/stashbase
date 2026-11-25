@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
 import { Providers } from '@/app/providers';
 import { App } from '@/app/shell';
 import { appDependencies } from '@/test/fakes/app';
+import { BONUS_ONLY_CREDITS } from '@/test/fakes/credits';
 import { assetApi, documentAdapters, documentsApi } from '@/test/fakes/documents';
 import {
   accountPort,
@@ -117,7 +118,29 @@ describe('account row', () => {
     let remainingPercent = 78;
     const getAllowance = vi.fn(async () => {
       if (fail) throw new Error('Offline');
-      return { ...IDLE_ALLOWANCE, remainingPercent, reservedPercent: 25 };
+      const availableCredits = (remainingPercent / 100).toFixed(9);
+      return {
+        ...IDLE_ALLOWANCE,
+        remainingPercent,
+        reservedPercent: 10,
+        creditBreakdown: {
+          ...BONUS_ONLY_CREDITS,
+          agentAvailableCredits: availableCredits,
+          base: {
+            ...BONUS_ONLY_CREDITS.base,
+            availableCredits,
+            consumedCredits: ((90 - remainingPercent) / 100).toFixed(9),
+            reservedCredits: '0.100000000',
+            provisionalCredits: '0.000000000',
+          },
+          bonus: {
+            ...BONUS_ONLY_CREDITS.bonus,
+            entitlementCredits: '0.000000000',
+            availableCredits: '0.000000000',
+            nextExpiry: null,
+          },
+        },
+      };
     });
     const base = appDependencies();
     render(
@@ -139,13 +162,16 @@ describe('account row', () => {
     remainingPercent = 15;
     await user.click(trigger);
     expect(await screen.findByText('15%')).not.toBeNull();
+    const meter = screen.getByRole('meter', { name: 'Monthly base credits remaining' });
+    expect(meter.getAttribute('aria-valuenow')).toBe('15');
     expect(screen.queryByText('78%')).toBeNull();
-    expect(screen.getByText('25% temporarily reserved')).not.toBeNull();
+    expect(screen.queryByText(/bonus|reserved|estimated fees/)).toBeNull();
     await user.keyboard('{Escape}');
     fail = true;
     await user.click(trigger);
     expect(await screen.findByText('Unavailable')).not.toBeNull();
     expect(screen.queryByText('15%')).toBeNull();
+    expect(screen.queryByRole('meter')).toBeNull();
   });
 
   it('names the signed-in person and offers credits, plans, and sign-out from a menu', async () => {
@@ -168,7 +194,7 @@ describe('account row', () => {
     // provider picture — beside the name and email.
     expect(within(menu).getByText('AL')).not.toBeNull();
     expect(within(menu).getByText('ada@example.com')).not.toBeNull();
-    expect(within(menu).getByText('Agent credits')).not.toBeNull();
+    expect(within(menu).getByText('Monthly base credits')).not.toBeNull();
     expect(await within(menu).findByText('100%')).not.toBeNull();
     expect(within(menu).getAllByRole('menuitem')).toHaveLength(4);
     expect(within(menu).getByRole('menuitem', { name: 'Settings' })).not.toBeNull();

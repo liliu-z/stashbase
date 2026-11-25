@@ -35,11 +35,7 @@ import { SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar-menu
 import type { AgentRuntimePort } from '@/features/settings/application/ports';
 import { agentAllowanceQuery } from '@/features/settings/application/queries';
 import { accountLabel } from '@/features/settings/domain/account';
-import {
-  creditHoldDetail,
-  formatCredits,
-  reservedCreditsDetail,
-} from '@/features/settings/domain/agent-allowance';
+import { formatCredits } from '@/features/settings/domain/agent-allowance';
 import { useAccountView } from '@/features/settings/hooks/account-context';
 import { ProgressBar } from '@/features/settings/ui/rows';
 import type { IconComponentProps } from '@/lib/icon-context';
@@ -123,12 +119,9 @@ export function SidebarAccountRow({
   }
 
   const label = accountLabel(person);
-  const breakdown = credits.isError ? undefined : credits.data?.creditBreakdown;
-  const percent =
-    breakdown || credits.isError || credits.data === undefined
-      ? null
-      : clamp(Math.round(credits.data.remainingPercent), 0, 100);
-  const reserved = percent !== null && credits.data ? reservedCreditsDetail(credits.data) : null;
+  const allowance = credits.isError ? undefined : credits.data;
+  const percent = allowance ? clamp(Math.round(allowance.remainingPercent), 0, 100) : null;
+  const bonus = allowance?.creditBreakdown?.bonus.availableCredits;
   return (
     <SidebarMenuItem>
       <DropdownMenu
@@ -175,33 +168,27 @@ export function SidebarAccountRow({
                   size={sizeClasses.icon}
                   strokeWidth={1.5}
                 />
-                Agent credits
+                Monthly base credits
               </span>
               <span className="text-muted-foreground">
-                {breakdown
-                  ? formatCredits(breakdown.agentAvailableCredits)
-                  : percent !== null
-                    ? `${percent}%`
-                    : credits.isError
-                      ? 'Unavailable'
-                      : '…'}
+                {percent !== null ? `${percent}%` : credits.isError ? 'Unavailable' : '…'}
               </span>
             </span>
-            {percent !== null && <ProgressBar className="mt-1.5" value={percent} />}
-            {breakdown && (
-              <span className="mt-1.5 block text-muted-foreground">
-                {formatCredits(breakdown.base.availableCredits)} base ·{' '}
-                {formatCredits(breakdown.bonus.availableCredits)} bonus
-                <br />
-                {creditHoldDetail(breakdown)}
-              </span>
-            )}
-            {reserved && (
-              <span
-                className="mt-1.5 block text-muted-foreground"
-                title="Reserved for active requests or fees awaiting confirmation. These credits are excluded from the available balance."
+            {percent !== null && (
+              <div
+                aria-label="Monthly base credits remaining"
+                aria-valuemax={100}
+                aria-valuemin={0}
+                aria-valuenow={percent}
+                className="mt-1.5"
+                role="meter"
               >
-                {reserved}
+                <ProgressBar value={percent} />
+              </div>
+            )}
+            {bonus && Number(bonus) > 0 && (
+              <span className="mt-1.5 block text-muted-foreground">
+                {formatCredits(bonus)} bonus credits
               </span>
             )}
           </DropdownLabel>

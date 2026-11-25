@@ -296,12 +296,11 @@ mounted so other-device usage and settlement become visible. A stalled credit
 refresh has a bounded wait, preserves sign-in, and can recover on a later read.
 Desktop credit refresh uses the same system proxy as sign-in, including PAC;
 it must not require a separate direct Internet connection after successful login.
-A failed refresh
-must not present an old percentage as current. Display temporarily reserved
-credits separately from available credits: active requests and unconfirmed fees
-both hold capacity, and that capacity is already excluded from the available
-percentage. A refusal involving reservations explains the hold and directs the
-reader to current credits rather than claiming all credits are spent.
+A failed refresh must not present an old percentage as current. Account Settings
+shows temporarily reserved credits separately from available credits. Active
+requests and unconfirmed fees both hold capacity, and the available percentage
+already excludes those holds. A refusal involving reservations states that
+credits are temporarily held and directs the reader to their available balance.
 
 ## Other Settings Decisions
 
@@ -506,8 +505,10 @@ Reward grants display the current entitlement, available balance, status and
 expiry for each grant. Recent reward activity shows the account's own issuance,
 refunds, disputes, restorations and corrections when supplied by the API.
 Entries show the time and public entitlement amounts and use the operation ID
-to avoid duplicates across refreshes. The sidebar and account view show the API's total
-available Agent credits, base and bonus balances, reservations and provisional
-fees. Monthly refill applies to base credits. Bonus credits have individual
-expiry dates and can fund a StashBase Agent reply with no base credits left.
+to avoid duplicates across refreshes. The sidebar account menu shows a meter for
+the monthly base credits remaining and a separate balance for available bonus
+credits when positive. Account Settings shows the total available Agent credits,
+base and bonus balances, reservations and provisional fees. Base credits refill
+monthly. Bonus credits have individual expiry dates and can fund a StashBase
+Agent reply with no base credits left.
 Local work and external Agents continue independently.
