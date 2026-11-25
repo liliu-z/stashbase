@@ -44,44 +44,69 @@ function settle(layers: PreviewLayer[], id: number, done: 'ready' | 'spun'): Pre
   });
 }
 
-export function usePreviewLayers(generation: string, url: string, active: boolean) {
-  const [layers, setLayers] = useState<PreviewLayer[]>(() => [
-    {
-      generation,
-      id: ++nextLayer,
-      ready: true,
-      replacement: false,
-      spun: true,
-      state: 'shown',
-      url,
-    },
-  ]);
-  const [requested, setRequested] = useState(generation);
-  if (requested !== generation) {
-    setRequested(generation);
-    setLayers((current) => {
-      // A newer version supersedes one still loading; returning to the page
-      // on screen needs no load at all.
-      const settled = current.filter((layer) => layer.state !== 'loading');
-      if (settled.at(-1)?.generation === generation) return settled;
-      return [
-        ...settled,
-        {
-          generation,
-          id: ++nextLayer,
-          ready: false,
-          replacement: true,
-          spun: false,
-          state: 'loading',
-          url,
-        },
-      ];
-    });
-  }
+/** The layers and the generation they were built for. They are one state so
+ *  that React can never keep one without the other: a render-phase update that
+ *  React later discards (it does when a lower-priority update to the same
+ *  state was skipped in that render) is then derived again on the next
+ *  render, instead of leaving a newer version recorded but never loaded. */
+interface PreviewLayersState {
+  layers: PreviewLayer[];
+  requested: string;
+}
 
-  const reveal = useCallback((id: number) => {
-    setLayers((current) => settle(current, id, 'ready'));
+function request(state: PreviewLayersState, generation: string, url: string): PreviewLayersState {
+  if (state.requested === generation) return state;
+  // A newer version supersedes one still loading; returning to the page on
+  // screen needs no load at all.
+  const settled = state.layers.filter((layer) => layer.state !== 'loading');
+  if (settled.at(-1)?.generation === generation) return { layers: settled, requested: generation };
+  return {
+    layers: [
+      ...settled,
+      {
+        generation,
+        id: ++nextLayer,
+        ready: false,
+        replacement: true,
+        spun: false,
+        state: 'loading',
+        url,
+      },
+    ],
+    requested: generation,
+  };
+}
+
+export function usePreviewLayers(generation: string, url: string, active: boolean) {
+  const [{ layers, requested }, setState] = useState<PreviewLayersState>(() => ({
+    layers: [
+      {
+        generation,
+        id: ++nextLayer,
+        ready: true,
+        replacement: false,
+        spun: true,
+        state: 'shown',
+        url,
+      },
+    ],
+    requested: generation,
+  }));
+  if (requested !== generation) setState((current) => request(current, generation, url));
+
+  const setLayers = useCallback((update: (layers: PreviewLayer[]) => PreviewLayer[]) => {
+    setState((current) => {
+      const next = update(current.layers);
+      return next === current.layers ? current : { ...current, layers: next };
+    });
   }, []);
+
+  const reveal = useCallback(
+    (id: number) => {
+      setLayers((current) => settle(current, id, 'ready'));
+    },
+    [setLayers],
+  );
 
   const loading = layers.find((layer) => layer.state === 'loading')?.id;
   useEffect(() => {
@@ -91,7 +116,7 @@ export function usePreviewLayers(generation: string, url: string, active: boolea
       SPIN_MS,
     );
     return () => clearTimeout(timer);
-  }, [loading]);
+  }, [loading, setLayers]);
 
   const retiring = layers.some((layer) => layer.state === 'retiring');
   useEffect(() => {
@@ -101,7 +126,7 @@ export function usePreviewLayers(generation: string, url: string, active: boolea
       RETIRE_MS,
     );
     return () => clearTimeout(timer);
-  }, [retiring]);
+  }, [retiring, setLayers]);
 
   // A replacement that lands while the document is covered is reported when
   // the reader returns to it.

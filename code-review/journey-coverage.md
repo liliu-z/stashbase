@@ -1418,6 +1418,18 @@ subresources. Route tests cover same-size writes with restored mtime, stylesheet
 changes, dependency deletion/restoration, explicit project scope, base URLs,
 entities, and refusal to follow outside-project symlinks. Dynamically loaded
 resources and transitive CSS/JS dependencies are not tracked.
+**Stale HTML after an Agent edit (2026-11-25):** a newer asset version reached
+`ui/html/preview-layers.ts` and mounted its replacement frame, which React then
+discarded about 20 ms later: the version arrives through the query's external
+store at sync priority, while the shown page's own ready signal stayed queued
+at default priority, and React does not keep a render-phase update in the base
+state of a hook with a skipped update. The recorded generation survived in a
+separate state, so the tab stayed on the old page until reopened. The generation
+and its layers are now one state and are derived again together.
+`html/document.test.tsx` reproduces the sync-priority arrival after the shown
+page settled. An isolated development-renderer Electron fixture, with in-place
+and rename writes, now shows the replacement page; before the change, the
+production renderer dropped it the same way.
 The built host also detected a data-only edit in an isolated copy of the reported
 SEO dashboard and served the updated script without changing the
 HTML bytes. The data-only update has not been visually confirmed in that built
