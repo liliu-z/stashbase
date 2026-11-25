@@ -176,6 +176,20 @@ jobs:
       tag: ${{ needs.prepare-draft.outputs.tag }}
     secrets: inherit
 
+  release-channels:
+    needs: [prepare-draft, publish-release, publish-downloads, publish-homebrew]
+    if: ${{ always() && needs.publish-release.result == 'success' }}
+    permissions:
+      contents: read
+      actions: read
+      deployments: write
+      statuses: write
+    uses: ./.github/workflows/release-channels.yml
+    with:
+      tag: ${{ needs.prepare-draft.outputs.tag }}
+      source-run: ${{ github.run_id }}
+    secrets: inherit
+
   publish-homebrew:
     needs: [prepare-draft, publish-release]
     runs-on: macos-latest

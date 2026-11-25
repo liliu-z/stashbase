@@ -124,7 +124,7 @@ jobs:
             release.nosync/*-store-x64.msix
             release.nosync/*-store-x64.msix.sha256
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 90
           compression-level: 0
 
       - name: Upload Windows assets to release

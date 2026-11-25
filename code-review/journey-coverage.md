@@ -57,10 +57,24 @@ The manifest owns package identity and OAuth/billing protocol registration.
 notifications retain Windows' package identity. Focused tests cover staging,
 version admission, update isolation and protocol ownership. Local core checks,
 release contracts, 49 affected renderer tests, fresh builds and built Electron
-smoke passed; the Store settings Story was inspected visually. Hosted MakeAppx,
-Partner Center package acceptance, signed installation, first replies across
-all four Agents, OAuth/billing return, native notifications and Store updates
-remain unverified until the corresponding runtime passes complete.
+smoke passed; the Store settings Story was inspected visually. The 2.19.1 hosted
+MakeAppx build and Partner Center acceptance passed, and submission
+1152921505702500089 entered certification. Signed Store installation, first
+replies across all four Agents, OAuth/billing return, native notifications and
+Store updates remain unverified until the corresponding runtime passes complete.
+
+**Release channel automation (2026-11-25):** The release coordinator invokes
+`release-channels.yml` after publication. Store submission/tracking belongs to
+`scripts/store-release.mjs`; durable GitHub deployment receipts isolate retries
+from unrelated drafts. `scripts/check-release-channels.mjs` checks public assets,
+updater metadata, CDN, Brew and website download destinations, with a pending
+global commit status until the matching Store package is published. Focused
+fixtures cover submission interruption, receipt loss, foreign draft refusal,
+rejection, version conflicts and inconsistent channels. The Entra application,
+Partner Center association and three repository secret entries were configured
+on 2026-11-25. Live API authentication/submission and hosted scheduled execution
+remain unverified, separate from fixture evidence and installed-app update
+acceptance.
 
 **Permission changes (2026-11-24):** The core gate and focused Claude,
 Antigravity and renderer session checks pass for mode reconciliation and

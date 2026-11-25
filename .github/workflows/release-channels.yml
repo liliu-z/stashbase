@@ -1,0 +1,118 @@
+name: Release channels
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+      source-run:
+        required: true
+        type: string
+      check-only:
+        type: boolean
+        default: false
+    secrets:
+      MS_STORE_TENANT_ID:
+        required: false
+      MS_STORE_CLIENT_ID:
+        required: false
+      MS_STORE_CLIENT_SECRET:
+        required: false
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Stable tag to check (empty selects latest)
+        type: string
+      source-run:
+        description: Original Release run containing store-msix-package (empty reuses the saved receipt)
+        type: string
+      check-only:
+        description: Check credentials and channel status without creating or changing Store submissions
+        type: boolean
+        default: true
+  schedule:
+    - cron: '17 */6 * * *'
+
+permissions:
+  contents: read
+  actions: read
+  deployments: write
+  statuses: write
+
+# A product has one pending Store submission. Serialize all submissions/retries.
+concurrency:
+  group: release-channels
+  cancel-in-progress: false
+
+jobs:
+  store:
+    if: github.repository == 'liliu-z/stashbase'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Submit or track the Store version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_TAG: ${{ inputs.tag }}
+          SOURCE_RUN: ${{ inputs.source-run }}
+          CHECK_ONLY: ${{ inputs.check-only }}
+          MS_STORE_TENANT_ID: ${{ secrets.MS_STORE_TENANT_ID }}
+          MS_STORE_CLIENT_ID: ${{ secrets.MS_STORE_CLIENT_ID }}
+          MS_STORE_CLIENT_SECRET: ${{ secrets.MS_STORE_CLIENT_SECRET }}
+        run: |
+          if [[ "$CHECK_ONLY" == "true" ]]; then
+            node scripts/store-release.mjs --tag "$INPUT_TAG" --read-only
+          else
+            node scripts/store-release.mjs --tag "$INPUT_TAG" --source-run "$SOURCE_RUN"
+          fi
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: store-channel-status
+          path: release.nosync/channel-status/store.json
+          if-no-files-found: error
+          retention-days: 90
+
+  audit:
+    needs: store
+    if: ${{ always() && github.repository == 'liliu-z/stashbase' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+      statuses: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm exec playwright install --with-deps chromium
+      - uses: actions/download-artifact@v6
+        continue-on-error: true
+        with:
+          name: store-channel-status
+          path: release.nosync/channel-status
+      - name: Verify every public channel
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: node scripts/check-release-channels.mjs --tag "$INPUT_TAG" --write-status
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: release-channel-status
+          path: release.nosync/channel-status/channels.json
+          if-no-files-found: error
+          retention-days: 90

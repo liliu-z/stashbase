@@ -13,6 +13,8 @@ version-bump commit on main → CI push run succeeds
 → parallel macOS / Linux / Windows packages and smoke checks
 → complete immutable update set is verified
 → release becomes public → Homebrew cask points at the public DMG
+                         → installer CDN manifest moves to the release
+                         → Store submission and recurring channel verification
 ```
 
 Source validation and platform packaging are separate workflows. Source CI runs
@@ -437,7 +439,7 @@ The icon generator derives the three Store assets from `build/icon.svg`.
 
 `scripts/package-windows-store.ps1` rejects a stale Windows executable and
 fails if staging or MakeAppx fails. The Windows job uploads the unsigned MSIX
-and SHA-256 as the `store-msix-package` Actions artifact, retained for 30 days.
+and SHA-256 as the `store-msix-package` Actions artifact, retained for 90 days.
 It does not add MSIX to the NSIS updater feed or publish it as a direct installer.
 Microsoft signs Store submissions; this artifact is not a signed sideload package.
 
@@ -446,6 +448,135 @@ an existing release tag containing this support. It uses the exact-commit CI
 gate and the same Windows Adapter, without uploading or modifying GitHub Release
 assets. The selected tag must already have its published extractor component.
 Ordinary releases produce the Store artifact in the coordinator run as well.
+
+### Store automation and channel completion
+
+`release-channels.yml` runs after public publication, even when the Homebrew or
+CDN follow-up fails. It does not delay other channels for Store certification.
+It also runs every six hours and supports manual dispatch with an optional tag
+and original artifact run ID. A successful Actions run can still mean Store
+certification is pending: `release/all-channels` remains pending until every
+channel passes. The job summary and `release-channel-status` JSON artifact show
+the individual results. Missing configuration, rejected submissions, mismatched
+versions and failed network checks fail visibly; no issue/email is sent by code.
+
+One-time Store setup (credentials can be configured during initial certification;
+automatic updates wait for the first manually submitted version to be published):
+
+1. Associate the Partner Center account with a Microsoft Entra directory and
+   associate an application with submission access, following Microsoft's
+   [submission API prerequisites](https://learn.microsoft.com/en-us/windows/uwp/monetize/create-and-manage-submissions-using-windows-store-services).
+   In **Account settings > Tenants**, create or associate the directory. Then
+   use **User management > Microsoft Entra applications** to add a dedicated
+   release application with the API's required **Manager** role. Review the
+   access grant with the account owner before applying it. If either navigation
+   item is absent, check **My access** and resolve the account's directory/role
+   access first; creating an unrelated Azure app alone does not authorize Store
+   submissions.
+2. Add `MS_STORE_TENANT_ID`, `MS_STORE_CLIENT_ID`, and `MS_STORE_CLIENT_SECRET`
+   as repository Actions secrets. Never put the secret in chat, source, logs,
+   command arguments or reports. Record its expiry with the account operator.
+3. After this workflow is on `main`, dispatch **Release channels** for the
+   desired public stable tag with the original coordinated Release run ID.
+   Normal future releases supply both inputs automatically.
+
+Credential record (2026-11-25): **StashBase GitHub Release** is associated with
+Partner Center with the Manager (Windows) role, and all three repository Actions
+secret names are present. The current client key was created on 2026-11-25 and
+expires on **2028-11-25**, as shown in the application's **Keys > Expires** column.
+Rotate it before expiry: create a replacement, update `MS_STORE_CLIENT_SECRET`,
+verify authentication, then remove the old key. Secret presence alone does not
+establish successful API authentication; verify it in the hosted channel run.
+
+#### Check an existing release during certification
+
+After the workflow is available on `main`, run a check without creating a new
+application release or modifying the pending Store submission:
+
+```bash
+gh workflow run release-channels.yml --repo liliu-z/stashbase --ref main \
+  -f tag=v2.19.1 -f check-only=true
+gh run list --repo liliu-z/stashbase --workflow release-channels.yml --limit 5
+```
+
+Use the desired public stable tag in later checks. In the Actions UI, choose
+**Release channels > Run workflow** and leave **check-only** enabled. This mode
+obtains a Microsoft token, reads the existing submission, checks the public
+channels, and writes the report and aggregate GitHub status. It never creates,
+updates, uploads, commits or deletes a Store submission. GitHub does not reveal
+saved secret values; test authentication in this hosted job rather than trying
+to retrieve secrets into a local shell.
+
+| Report result | Meaning and next action |
+|---|---|
+| Other channels pass; Store pending | Certification/publication is still in progress. Keep the current submission; the six-hour monitor will check again. |
+| All channels pass | The matching Store package is published and all checked download channels agree. Installed-app update acceptance is still separate. |
+| Authentication or permission failure | Check the Entra application, Partner Center role and the three Actions secrets. Rerun the check after fixing configuration. |
+| Certification failure | Read the certification report in Partner Center and address its findings before another submission. |
+| CDN, Brew or website mismatch | Repair the named channel and rerun the check; do not rebuild or overwrite the released application assets. |
+
+#### Every subsequent application release
+
+Follow the [release sequence](#release-runbook) with one patch/minor/major choice
+and one version-bump commit. All desktop packages use that version, and the
+Store package uses `X.Y.Z.0`. The public GitHub release drives the CDN manifest,
+website download buttons and Homebrew cask. After those jobs, **Release channels**
+submits or tracks the Store update and reports each channel's state. Microsoft
+certification proceeds independently; other platforms do not wait for it.
+
+While the first submission is in certification, automatic Store processing only
+tracks it. New Store submissions wait for the first published version. Later,
+the latest stable release waits if an older version occupies the submission
+slot, then proceeds when it becomes available. Inspect the report after each
+release; an Actions success with a pending Store row is not all-channel completion.
+To resume an upload manually, disable **check-only** and supply the original
+artifact run ID (or reuse its saved receipt). Ordinary release calls and scheduled
+runs use submission/tracking mode; manual checks default to read-only.
+
+`scripts/store-release.mjs` owns Store submission and tracking. It validates the
+Partner Center identity and the tagged commit's artifact workflow, verifies the
+MSIX hash and embedded identity/version, creates an upload ZIP, and retains the
+last published listing, pricing, age ratings, declarations and certification
+notes. Only packages and immediate publishing are changed. An unsupported
+Pricing Version 2 value fails closed for operator handling instead of inventing
+a replacement price. Changes to declarations or listing content still require
+review of their owning Partner Center fields.
+
+GitHub deployments in the `microsoft-store` environment persist a non-secret
+receipt: tag, commit, original artifact run, package hash and submission ID.
+The submission ID is recorded before modifying or uploading the new draft.
+Retries use that same receipt and immutable artifact, while an already committed
+submission is only read. A pending draft without a matching receipt is never
+adopted, changed or deleted. A lost create response or receipt-write failure
+requires inspection of the unowned draft in Partner Center. Do not mix portal
+edits with API-owned submissions; follow Microsoft's recovery guidance if that
+has happened. The code does not delete or cancel submissions automatically.
+
+While an older version is in certification, the latest release waits for the
+single Store submission slot. The scheduled check submits the current latest
+version once the slot clears; intermediate releases may be superseded. Rejection
+stops automatic progression for operator review. An expired artifact is an
+explicit failure; do not substitute rebuilt bytes under an existing receipt.
+Prefer the next version, or finish the already reviewed submission manually.
+
+`scripts/check-release-channels.mjs` verifies public platform assets, all three
+updater metadata files and sidecars, CDN manifest digests and public file sizes,
+both Homebrew architectures and checksums, and the four actual website download
+button destinations in a fresh browser. The browser uses no account/profile and
+blocks telemetry. Store completion requires a matching x64 package in the last
+published submission, allowing the Store-owned fourth version segment. Store
+SAS URLs, tokens and full submission JSON are never included in receipts/reports.
+Only structured error codes are retained; full certification reports remain in
+Partner Center. Reports do not establish an installed-app N-to-N+1 update.
+
+For a read-only local audit, run `node scripts/store-release.mjs --tag vX.Y.Z
+--read-only`, then `node scripts/check-release-channels.mjs --tag vX.Y.Z`.
+Browser checks require the pinned Playwright Chromium installation. `--skip-website`
+is available for HTTP-only diagnostics and deliberately leaves that row pending.
+An absent Store credential/report is a failure, not an implicit skip. Scheduled
+checks do not alter CDN objects or the Brew tap: repair those by rerunning their
+failed publication job, then rerun **Release channels**. Never republish the app
+or overwrite released bytes to fix a channel's follow-up.
 
 Partner Center product `9N1Z6TB2H2P5` receives the extracted `.msix` through its
 Packages page. Package acceptance is separate from certification. Complete the
@@ -555,6 +686,10 @@ choice:
    files and generated sidecars, the separate four-platform component set pinned
    by the application, and the tap update. Perform residual packaged UI sanity,
    including N→N+1 updates before calling the update path verified.
+   Inspect **Release channels** and the `release/all-channels` commit status;
+   Store pending is distinct from all channels complete. See
+   [Store automation and channel completion](#store-automation-and-channel-completion)
+   for configuration, receipts, scheduled tracking and channel-specific recovery.
 
 Release notes identify separate arm64/x64 installers, the older Intel component
 limitations, Developer ID signing, and notarization. The macOS workflow requires the signing certificate secrets

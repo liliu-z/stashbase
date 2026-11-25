@@ -1846,6 +1846,12 @@ replace them with the ordinary installer registrations. Packaged runtime and
 stdio MCP remain the same full-trust processes, with data outside the read-only
 installation directory. Store package generation belongs to the
 [release pipeline](release-pipeline.md#microsoft-store-msix).
+Release automation owns Store submission receipts and channel verification;
+runtime update code never receives Partner Center credentials. A generated or
+submitted MSIX is not evidence of Store publication. Store API retries may edit
+only the submission identified by the persisted release receipt, and publication
+checks must match the target package version. External certification does not
+block publication of the other desktop channels.
 
 Main owns launch identity, save barriers, retirement tombstones, and shutdown.
 Readiness must match the spawned instance, not merely a listener or PID.
