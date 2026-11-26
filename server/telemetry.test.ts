@@ -428,7 +428,7 @@ test('HTTP failures retain route, method, request ID and original cause without 
   } finally { f.service.close(); server.closeAllConnections(); server.close(); }
 });
 
-test('slow JSON requests and early closure retain bounded lifecycle evidence without classifying cancellation or streams as failure', async () => {
+test('slow JSON requests and cancellation retain bounded lifecycle evidence without classifying cancellation or streams as failure', async () => {
   const { httpErrorReporting } = await import('./error-reporting.ts');
   const f = fixture();
   const app = express(); app.use(httpErrorReporting(f.service, { slowRequestMs: 20 }));
@@ -469,13 +469,17 @@ test('slow JSON requests and early closure retain bounded lifecycle evidence wit
       headers: headers(closedId), signal: abort.signal,
     });
     await readEntered;
+    // Pin the hosted-runner race: cancellation can arrive after the slow-request
+    // threshold, and pending evidence is legitimate before the terminal close.
+    const cancelDeadline = Date.now() + 2000;
+    while (!f.sent.some(row => row.body.properties.request_id === closedId) && Date.now() < cancelDeadline)
+      await new Promise(resolve => setTimeout(resolve, 5));
     abort.abort();
     await assert.rejects(cancelled, { name: 'AbortError' });
     await readClosed; await tick();
     const closed = f.sent.filter(row => row.body.properties.request_id === closedId);
-    assert.equal(closed.length, 1);
-    assert.equal(closed[0].body.properties.state, 'closed');
-    assert.equal(closed[0].body.properties.context.route, '/api/files/*');
+    assert.deepEqual(closed.map(row => row.body.properties.state), ['pending', 'closed']);
+    assert.equal(closed[1].body.properties.context.route, '/api/files/*');
     assert.ok(f.sent.every(row => row.body.event === 'http_request_lifecycle'));
     assert.doesNotMatch(JSON.stringify(f.sent), /private-document|private-project/);
 
@@ -492,7 +496,6 @@ test('slow JSON requests and early closure retain bounded lifecycle evidence wit
     assert.equal(f.sent.length, before);
   } finally { f.service.close(); server.closeAllConnections(); server.close(); }
 });
-
 
 test('host logs report warnings and errors apart, classified by the caught error alone', async () => {
   const { installHostErrorReporting } = await import('./error-reporting.ts');
@@ -546,7 +549,6 @@ test('distinct error explanations, unknown codes and paths survive without being
   assert.match(payload, /EACCES/);
   f.service.close();
 });
-
 
 test('non-JSON asset failures report status without reading private response content', async () => {
   const { httpErrorReporting } = await import('./error-reporting.ts');
@@ -965,7 +967,6 @@ test('oversized operation context cannot discard an otherwise actionable diagnos
   f.service.close();
 });
 
-
 test('turn recovery retains the originating identity/version/distribution and never invents a completion time', async () => {
   const f = fixture();
   const turn_id = crypto.randomUUID();
@@ -1109,7 +1110,6 @@ test('an observed update shutdown is distinct from crash recovery and survives o
   assert.equal(terminal.timestamp, queued.timestamp);
   recovered.close(); f.service.close();
 });
-
 
 test('runtime exit and socket loss settle independently of the renderer with bounded process evidence', async (t) => {
   const { EventEmitter } = await import('node:events');
@@ -1364,7 +1364,6 @@ test('startup attempts retain initiating scope, successful latency and retry lin
   assert.equal(f.sent.filter(({ body }) => body.event === 'agent_runtime_start_result').length, 2);
   f.service.close();
 });
-
 
 test('a refused context request carries only its explicitly supplied turn ID', async () => {
   const { httpErrorReporting } = await import('./error-reporting.ts');

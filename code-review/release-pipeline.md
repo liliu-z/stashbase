@@ -109,10 +109,12 @@ or asset uploads; source runs on the same ref are also serialized.
   coverage, structural Story accessibility, typecheck, production build, and
   catalog build. Every gate runs to completion and reports failures. Keep its
   commands in the runner, not duplicated as extra CI steps.
-- After dependency setup succeeds, host checks continue after earlier test
-  failures so one run reports the remaining boundaries. Every failed step still
-  fails the source job. Electron smoke requires successful fresh service and
-  Electron builds; cancellation stops subsequent work.
+- After dependency installation succeeds, documentation, package-input and inventory
+  checks and Python setup continue after earlier test failures. Once Python setup
+  succeeds, host checks continue too, so a broken documentation link cannot hide
+  unrelated host failures. Every failed step still fails the source job. Electron
+  smoke requires successful fresh renderer, service and Electron builds;
+  cancellation stops subsequent work.
 - Each platform builds the renderer and Electron boundary once, then reuses
   those outputs for `test:electron:smoke:built`. Host type checks and service
   builds do not repeat renderer work. Local `pnpm check:all` follows the same

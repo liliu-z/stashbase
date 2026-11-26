@@ -46,14 +46,17 @@ jobs:
           python-version: '3.13'
 
       - name: Install dependencies
+        id: dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Verify Vite+ inventory
+        id: toolchain
         run: pnpm test:toolchain
 
       # Static analysis, coverage, Story accessibility and catalog compilation
       # run once. Other platforms retain behavior tests and native builds.
       - name: Check supported renderer
+        id: renderer-linux
         if: runner.os == 'Linux'
         run: pnpm check:web
 
@@ -65,21 +68,25 @@ jobs:
         run: pnpm test:renderer --maxWorkers=2 --testTimeout=15000
 
       - name: Build renderer
-        if: runner.os != 'Linux'
+        id: renderer-native
+        if: ${{ !cancelled() && steps.toolchain.outcome == 'success' && runner.os != 'Linux' }}
         run: pnpm build:web
 
       - name: Check documentation and icons
-        if: runner.os == 'Linux'
+        if: ${{ !cancelled() && steps.dependencies.outcome == 'success' && runner.os == 'Linux' }}
         run: pnpm test:docs && pnpm test:icons
 
       - name: Test renderer packaging input
+        if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
         run: pnpm test:package-inputs
 
       - name: Check test inventory wiring
+        if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
         run: pnpm test:inventory
 
       - name: Install Python sidecar dependencies
         id: python
+        if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
         run: pnpm setup:python
 
       # Collect every host failure after setup; failures still fail the job.
@@ -139,9 +146,9 @@ jobs:
         run: pnpm build:services
 
       - name: Smoke real Electron app lifecycle (Linux)
-        if: ${{ !cancelled() && steps.services.outcome == 'success' && steps.electron.outcome == 'success' && runner.os == 'Linux' }}
+        if: ${{ !cancelled() && steps.services.outcome == 'success' && steps.electron.outcome == 'success' && steps.renderer-linux.outcome == 'success' && runner.os == 'Linux' }}
         run: xvfb-run -a pnpm test:electron:smoke:built
 
       - name: Smoke real Electron app lifecycle (macOS and Windows)
-        if: ${{ !cancelled() && steps.services.outcome == 'success' && steps.electron.outcome == 'success' && runner.os != 'Linux' }}
+        if: ${{ !cancelled() && steps.services.outcome == 'success' && steps.electron.outcome == 'success' && steps.renderer-native.outcome == 'success' && runner.os != 'Linux' }}
         run: pnpm test:electron:smoke:built

@@ -198,12 +198,12 @@ app.whenReady().then(async () => {
   console.error(error);
   process.exitCode = 1;
 }).finally(async () => {
-  clearTimeout(timeout);
   for (const window of BrowserWindow.getAllWindows()) window.destroy();
   for (const socket of sockets.clients) socket.terminate();
   sockets.close();
   server.closeAllConnections();
   await new Promise((resolve) => server.close(resolve));
+  clearTimeout(timeout);
   app.exit(process.exitCode || 0);
 });
 
@@ -254,9 +254,12 @@ async function checkFrameInput(window, serverOrigin) {
     assert.fail(`native iframe input was not observed: ${JSON.stringify(await snapshot())}; ${JSON.stringify(await window.webContents.executeJavaScript('({focused: document.hasFocus(), visibility: document.visibilityState, active: document.activeElement?.tagName, hover: document.querySelector("iframe")?.matches(":hover")})'))}`);
   };
   const movePointer = async (x, y, overFrame) => {
-    window.webContents.sendInputEvent({ type: 'mouseMove', x, y });
     const deadline = Date.now() + 2000;
     while (Date.now() < deadline) {
+      // Showing/focusing the native window and iframe hit testing settle
+      // asynchronously. A single early move can be lost on hosted Windows.
+      // Repeat only positioning; clicks and keys below must still arrive once.
+      window.webContents.sendInputEvent({ type: 'mouseMove', x, y });
       const hovering = await window.webContents.executeJavaScript('Boolean(document.querySelector("iframe")?.matches(":hover"))');
       if (hovering === overFrame) return;
       await new Promise(resolve => setTimeout(resolve, 20));

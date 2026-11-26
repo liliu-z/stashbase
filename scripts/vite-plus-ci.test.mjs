@@ -105,6 +105,7 @@ test('Vite+ task-result caching is disabled repository-wide', () => {
 // This catches hidden rebuilds inside nested scripts, not just repeated CI steps.
 const scripts = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).scripts;
 const hostCheckCondition = "${{ !cancelled() && steps.python.outcome == 'success' }}";
+const dependencyCheckCondition = "${{ !cancelled() && steps.dependencies.outcome == 'success' }}";
 const smokeConditionPrefix = "${{ !cancelled() && steps.services.outcome == 'success' && steps.electron.outcome == 'success' && ";
 function scriptCalls(command) {
   const calls = [];
@@ -125,9 +126,11 @@ test('source validation builds each target once and reuses it for Electron smoke
   const platforms = ['Linux', 'Windows', 'macOS'];
   const commands = platforms.map((os) => [os, steps.filter((step) => {
     if (!step.if) return true;
-    if (step.if === hostCheckCondition) return true;
-    if (step.if === `${smokeConditionPrefix}runner.os == 'Linux' }}`) return os === 'Linux';
-    if (step.if === `${smokeConditionPrefix}runner.os != 'Linux' }}`) return os !== 'Linux';
+    if (step.if === hostCheckCondition || step.if === dependencyCheckCondition) return true;
+    if (step.if === "${{ !cancelled() && steps.dependencies.outcome == 'success' && runner.os == 'Linux' }}") return os === 'Linux';
+    if (step.if === "${{ !cancelled() && steps.toolchain.outcome == 'success' && runner.os != 'Linux' }}") return os !== 'Linux';
+    if (step.if === `${smokeConditionPrefix}steps.renderer-linux.outcome == 'success' && runner.os == 'Linux' }}`) return os === 'Linux';
+    if (step.if === `${smokeConditionPrefix}steps.renderer-native.outcome == 'success' && runner.os != 'Linux' }}`) return os !== 'Linux';
     if (step.if === "runner.os == 'Linux'") return os === 'Linux';
     if (step.if === "runner.os != 'Linux'") return os !== 'Linux';
     assert.fail(`Review the CI selection rule: ${step.if}`);
