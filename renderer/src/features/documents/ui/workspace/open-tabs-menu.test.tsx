@@ -168,6 +168,30 @@ describe('all open tabs', () => {
     expect(triggerShown()).toBe(true);
   });
 
+  it('distinguishes the same relative file across projects and activates the chosen source', async () => {
+    layout.row = 400;
+    layout.content = 800;
+    const runtime = renderStrip();
+    const user = userEvent.setup();
+    const first = { folderPath: '/one/notes', path: 'README.md' };
+    const second = { folderPath: '/two/notes', path: 'README.md' };
+    await act(async () => {
+      await runtime.open(first);
+      await runtime.open(second);
+    });
+    await relayout();
+
+    await user.click(screen.getByRole('button', { name: 'All open tabs (4)' }));
+    const menu = await screen.findByRole('menu', { name: 'All open tabs (4)' });
+    expect(
+      within(menu).getByRole('menuitemradio', { checked: true }).getAttribute('aria-label'),
+    ).toBe('README.md. /two/notes');
+    await user.click(within(menu).getByRole('menuitemradio', { name: 'README.md. /one/notes' }));
+
+    const { activeTabId, tabs } = runtime.store.getState();
+    expect(tabs.find((tab) => tab.id === activeTabId)?.source).toEqual(first);
+  });
+
   it('scrolls the document already in front back into view when it is chosen', async () => {
     layout.row = 400;
     layout.content = 600;

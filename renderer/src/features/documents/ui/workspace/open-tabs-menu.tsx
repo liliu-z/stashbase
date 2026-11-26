@@ -11,18 +11,31 @@ import { Tooltip } from '@/components/ui/tooltip';
 import { sourceName } from '@/features/documents/domain/document';
 import { isExternalSource } from '@/shared/domain/external-source';
 import type { SourceReference } from '@/shared/domain/source-reference';
+import { parentPathOf } from '@/shared/utils/file-path';
 
 export interface OpenTab {
   id: string;
   source: SourceReference;
 }
 
-/** The folder a row names: project-relative inside the project, the full
- *  directory for a file opened from elsewhere, nothing at the project root. */
-function tabFolder(source: SourceReference): string | undefined {
-  const cut = source.path.replace(/\\/gu, '/').lastIndexOf('/');
-  if (cut <= 0) return isExternalSource(source) ? source.path : undefined;
-  return source.path.slice(0, cut);
+function projectTabCollisions(tabs: readonly OpenTab[]): Set<string> {
+  const projects = new Map<string, string>();
+  const collisions = new Set<string>();
+  for (const { source } of tabs) {
+    if (isExternalSource(source)) continue;
+    const path = source.path.replace(/\\/gu, '/');
+    const project = projects.get(path);
+    if (project !== undefined && project !== source.folderPath) collisions.add(path);
+    projects.set(path, source.folderPath);
+  }
+  return collisions;
+}
+
+function tabFolder(source: SourceReference, collisions: ReadonlySet<string>): string {
+  const folder = parentPathOf(source.path);
+  if (isExternalSource(source)) return folder || source.path;
+  if (!collisions.has(source.path.replace(/\\/gu, '/'))) return folder;
+  return folder ? `${folder} · ${source.folderPath}` : source.folderPath;
 }
 
 export function OpenTabsMenu({
@@ -35,6 +48,7 @@ export function OpenTabsMenu({
   onSelect(tabId: string): void;
   tabs: OpenTab[];
 }) {
+  const collisions = projectTabCollisions(tabs);
   return (
     <DropdownMenu>
       <Tooltip content="All open tabs" side="bottom">
@@ -54,7 +68,7 @@ export function OpenTabsMenu({
       {/* The menu takes its name from the button that opens it. */}
       <DropdownContent align="end" className="w-64">
         {tabs.map((tab) => {
-          const folder = tabFolder(tab.source);
+          const folder = tabFolder(tab.source, collisions);
           return (
             <MenuItem
               checked={tab.id === activeTabId}
