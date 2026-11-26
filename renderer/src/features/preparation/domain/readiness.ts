@@ -6,11 +6,7 @@
  * actions — is total over its kinds. A new kind therefore fails the build
  * here instead of silently rendering nothing.
  */
-import type {
-  FolderIndexStatus,
-  PreparationFailure,
-  PreparationProgress,
-} from '@/shared/domain/folder-index-status';
+import type { FolderIndexStatus, PreparationProgress } from '@/shared/domain/folder-index-status';
 
 export type SourceReadiness =
   | { readonly kind: 'current' }
@@ -43,33 +39,12 @@ const CANCELLED: SourceReadiness = { kind: 'cancelled' };
 const POLL_BUSY_MS = 1_500;
 const POLL_IDLE_MS = 8_000;
 
-/** A legacy derived note `dir/.base.ext.md` names its visible source
- *  `dir/base.ext`; every other spelling is already the source path. */
-export function sourcePathForRecord(recordPath: string): string {
-  const separator = recordPath.lastIndexOf('/');
-  const directory = separator === -1 ? '' : recordPath.slice(0, separator + 1);
-  const name = separator === -1 ? recordPath : recordPath.slice(separator + 1);
-  const derived = /^\.(.+)\.md$/u.exec(name);
-  return derived ? `${directory}${derived[1]}` : recordPath;
-}
-
-function preparationFailureFor(
-  status: FolderIndexStatus,
-  sourcePath: string,
-): PreparationFailure | null {
-  return (
-    status.preparationFailures.find(
-      (failure) => failure.path === sourcePath || sourcePathForRecord(failure.path) === sourcePath,
-    ) ?? null
-  );
-}
-
 export function sourceReadiness(
   status: FolderIndexStatus | null | undefined,
   sourcePath: string,
 ): SourceReadiness {
   if (!status) return CURRENT;
-  const failure = preparationFailureFor(status, sourcePath);
+  const failure = status.preparationFailures.find((entry) => entry.path === sourcePath);
   if (failure) {
     return failure.status === 'cancelled'
       ? CANCELLED
@@ -86,7 +61,7 @@ export function sourceReadiness(
  *  is still one source, so the readiness it resolves to buckets it once. */
 function reportedPaths(status: FolderIndexStatus): Set<string> {
   return new Set([
-    ...status.preparationFailures.map((failure) => sourcePathForRecord(failure.path)),
+    ...status.preparationFailures.map((failure) => failure.path),
     ...status.pendingConversions,
   ]);
 }

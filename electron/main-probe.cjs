@@ -84,12 +84,12 @@ async function probeServerHealth(port, timeoutMs, expected) {
   const health = await requestJson(port, '/api/health', timeoutMs);
   const evidence = { probe_duration_ms: health.durationMs };
   if (!health.reachable) return { compatible: false, occupied: health.connected,
-    legacyStashBase: false, transient: health.connected,
+    transient: health.connected,
     ...evidence, probe_result: health.result };
   evidence.probe_http_status = health.statusCode;
   const mismatch = serverHealthMismatch(health.body, expected);
   if (health.statusCode === 200 && health.result !== 'invalid_json' && !mismatch) {
-    return { compatible: true, occupied: true, legacyStashBase: false, transient: false,
+    return { compatible: true, occupied: true, transient: false,
       ...evidence, probe_result: 'ready',
       ...(typeof health.body.instanceId === 'string'
         && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(health.body.instanceId)
@@ -103,12 +103,7 @@ async function probeServerHealth(port, timeoutMs, expected) {
   const result = health.statusCode !== 200 ? 'http_error'
     : health.result === 'invalid_json' ? 'invalid_json'
       : mismatch === 'ok' ? 'not_ready' : 'identity_mismatch';
-  // Legacy detection only arbitrates an existing listener. After spawning we
-  // check the new instance alone and keep its health probe as the evidence.
-  const folder = expected.instanceId === undefined ? await requestJson(port, '/api/folder', timeoutMs) : null;
-  const legacyStashBase = !!(folder?.statusCode === 200 && folder.body && typeof folder.body === 'object'
-    && ('current' in folder.body || 'recent' in folder.body) && 'homeDir' in folder.body);
-  return { compatible: false, occupied: true, legacyStashBase, transient: false,
+  return { compatible: false, occupied: true, transient: false,
     ...evidence, probe_result: result, ...(mismatch && ['identity_mismatch', 'not_ready'].includes(result)
       ? { probe_mismatch: mismatch } : {}) };
 }
@@ -188,9 +183,8 @@ async function startServer({
     }
   }
   if (existing.occupied && !existing.compatible && !existing.transient) {
-    const what = existing.legacyStashBase ? 'an older StashBase server' : 'another local service';
     throw new Error(
-      `Port ${port} is already in use by ${what}, so this StashBase build cannot start its server.\n`
+      `Port ${port} is already in use by another local service, so this StashBase build cannot start its server.\n`
       + `Quit the other StashBase/app using http://127.0.0.1:${port}, then reopen StashBase.`,
     );
   }

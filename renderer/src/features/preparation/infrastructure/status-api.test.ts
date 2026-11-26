@@ -19,8 +19,6 @@ const wire = {
   pendingConversions: ['a.pdf'],
   pendingCount: 1,
   preparationFailures: [],
-  semanticAvailable: true,
-  semanticEnabled: true,
   semanticIndexing: { state: 'indexing' },
   total: 5,
   treeVersion: 9,

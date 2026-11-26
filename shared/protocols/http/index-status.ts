@@ -77,12 +77,6 @@ export const indexStatusResponseSchema = z
     /** Persistent preparation failures; survive app restart (AppData
      *  `state.db`). Drive row markers, viewer banners, and Reprocess. */
     preparationFailures: z.array(preparationFailureSchema).max(100_000),
-    // Compatibility alias of semanticEnabled; both report key presence only.
-    semanticAvailable: z.boolean(),
-    /** Human-readable reason, sent only when `semanticAvailable` is false. */
-    semanticDisabledReason: z.string().max(500).optional(),
-    /** False when semantic indexing/retrieval is unconfigured, e.g. no key. */
-    semanticEnabled: z.boolean(),
     semanticIndexing: semanticIndexingStatusSchema,
     /** Files on disk that look indexable. */
     total: countSchema,

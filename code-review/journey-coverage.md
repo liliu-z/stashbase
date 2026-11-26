@@ -478,7 +478,8 @@ documentation and test-inventory checks, and the server build.
 **Readiness evidence (2026-10-18):** `electron/main-probe.cjs` owns bounded fresh
 loopback probes and preserves the final result, identity mismatch field, count
 and timing in startup diagnostics. `main-probe.test.cjs` drives real HTTP
-refusal/stall/status/JSON/identity cases and verifies timeout evidence without
+refusal/stall/status/JSON/identity cases, rejects incompatible listeners without
+probing other endpoints, and verifies timeout evidence without
 weakening spawned-instance ownership. The production Windows 8.5-second listen
 followed by a ten-second readiness timeout remains unexplained; the new evidence
 separates its possible causes on subsequent occurrences.
@@ -1845,6 +1846,11 @@ Host/services: `server/file-save.ts`, `server/text-file-transaction.ts`,
   expand script/network authority.
 
 ## J04: Preparation
+
+Preparation readiness uses current source-path failure records directly.
+`preparation/domain/readiness.test.ts` covers failure precedence over pending
+work and summary deduplication; `server/app-config.test.ts` verifies the single
+semantic indexing state without contacting the embedding provider.
 
 **Replaced app working directory (2026-11-02):** 98 different PDFs on one macOS
 2.18.3 installation failed before batch execution with `ENOENT`. The live host's

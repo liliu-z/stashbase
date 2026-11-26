@@ -42,7 +42,6 @@ export interface RetrievalResult {
 export interface RetrievalDependencies {
   sourceAvailable: typeof sourceAvailable;
   hasEmbeddingKey: () => boolean;
-  embeddingUnavailableReason: () => 'embedding-key-required';
   hybridSearch: (query: string, topK: number, folderRoot: string, pathPrefix?: string, extensions?: string[]) => Promise<SearchHit[]>;
   grep: (query: string, folderRoot: string, opts: ExactSearchOptions) => Promise<{ files: import('../search-display.ts').KeywordHitFile[]; truncated: boolean }>;
 }
@@ -50,7 +49,6 @@ export interface RetrievalDependencies {
 const productionDependencies: RetrievalDependencies = {
   sourceAvailable,
   hasEmbeddingKey: isEmbeddingConfigured,
-  embeddingUnavailableReason: () => 'embedding-key-required',
   hybridSearch: (query, topK, folderRoot, pathPrefix, extensions) =>
     indexer.search(query, topK, folderRoot, pathPrefix, extensions),
   grep: (query, folderRoot, options) => indexer.grep(query, folderRoot, options),
@@ -71,7 +69,7 @@ export function createRetrieval(overrides: Partial<RetrievalDependencies> = {}):
         if (!deps.hasEmbeddingKey()) {
           return {
             evidence: [],
-            availability: { state: 'unavailable', reason: deps.embeddingUnavailableReason() },
+            availability: { state: 'unavailable', reason: 'embedding-key-required' },
             truncated: false,
           };
         }

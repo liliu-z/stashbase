@@ -386,7 +386,7 @@ test('changing or adding a BYOK key reconciles pending files', () => {
   );
 });
 
-test('index-status compatibility flags follow key configuration without probing the provider', () => {
+test('index-status follows key configuration without probing the provider', () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-key-status-'));
   const folder = path.join(home, 'project');
   fs.mkdirSync(folder);
@@ -404,9 +404,7 @@ test('index-status compatibility flags follow key configuration without probing 
       for (const apiKey of [undefined, 'unvalidated-test-key', undefined]) {
         config.setEmbedderConfig({ provider: 'openai', apiKey });
         const status = indexStatusResponseSchema.parse(await buildIndexStatus(${JSON.stringify(folder)}));
-        assert.equal(status.semanticEnabled, !!apiKey);
-        assert.equal(status.semanticAvailable, !!apiKey);
-        assert.equal(status.semanticDisabledReason, apiKey ? undefined : 'Embedding provider key required');
+        assert.equal(status.semanticIndexing.state, apiKey ? 'ready' : 'disabled');
         assert.equal(resolveEmbedderRuntime()?.apiKey, apiKey);
       }
     `);

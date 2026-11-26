@@ -242,6 +242,11 @@ recovery remain separate responsibilities.
 
 ## Preparation and Retrieval
 
+Preparation status identifies failures by the current source path; the renderer
+does not reconstruct source names from retired hidden-note formats.
+`semanticIndexing.state` is the single wire description of semantic indexing
+availability and progress; duplicate configuration flags are not emitted.
+
 `server/state-db.ts` owns the startup preparation-storage check: load the native
 addon in the actual server runtime, round-trip a disposable WAL database in app
 data, and verify the existing status database permits a write transaction without
@@ -1857,6 +1862,8 @@ block publication of the other desktop channels.
 Main owns launch identity, save barriers, retirement tombstones, and shutdown.
 Readiness must match the spawned instance, not merely a listener or PID.
 Each health probe uses a fresh connection and a bounded whole-response deadline.
+Incompatible listeners are rejected using that health response alone; startup
+does not probe retired endpoints to identify old installations.
 Port arbitration uses a short 300 ms probe; once a child is owned, a health
 response may take up to one second, capped by the remaining startup budget.
 Slow valid responses must not be repeatedly discarded by the arbitration timeout.

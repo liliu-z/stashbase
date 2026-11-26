@@ -45,6 +45,7 @@ beforeAll(async () => {
 afterEach(() => {
   cleanup();
   for (const runtime of runtimes.splice(0)) runtime.dispose();
+  vi.useRealTimers();
 });
 
 describe('document tabs', () => {
@@ -257,8 +258,10 @@ describe('document tabs', () => {
   });
 
   it('keeps a recent Markdown editor mounted and revalidates it when reactivated', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    let other = textSource({ content: '# Other' });
     const load = vi.fn<DocumentSourcePort['load']>(async (source) =>
-      textSource({ content: source.path === 'plan.md' ? '# Plan' : '# Other' }),
+      source.path === 'plan.md' ? textSource({ content: '# Plan' }) : other,
     );
     const api = sourceApi({ load });
     const runtime = createRuntime(api);
@@ -275,16 +278,14 @@ describe('document tabs', () => {
       { name: 'other.md Markdown content' },
       { timeout: 5_000 },
     );
+    await act(() => vi.advanceTimersByTimeAsync(2_000));
     await userEvent.setup().click(screen.getByRole('tab', { name: 'plan.md' }));
     await screen.findByRole('document', { name: 'plan.md Markdown content' }, { timeout: 5_000 });
+    other = textSource({ content: '# Other updated', version: 'v2' });
     await userEvent.setup().click(screen.getByRole('tab', { name: 'other.md' }));
 
     expect(screen.getByRole('document', { name: 'other.md Markdown content' })).toBe(retained);
-    await waitFor(() => expect(load).toHaveBeenCalledTimes(3));
-    expect(load.mock.calls.at(-1)?.[0]).toEqual({
-      folderPath: '/project/notes',
-      path: 'drafts/other.md',
-    });
+    await within(retained).findByText('Other updated');
   });
 
   it('replaces the close glyph with a filled circle until an edit is saved', async () => {

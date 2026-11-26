@@ -76,12 +76,6 @@ export async function buildIndexStatus(folderRoot: string): Promise<IndexStatus>
   return {
     folder: curRoot,
     ...status,
-    // Legacy wire aliases describe key configuration, not provider health.
-    semanticEnabled: keyConfigured,
-    semanticAvailable: keyConfigured,
-    ...(!keyConfigured ? {
-      semanticDisabledReason: 'Embedding provider key required',
-    } : {}),
     pending,
     pendingCount: pending.length,
     orphaned,

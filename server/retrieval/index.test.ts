@@ -31,7 +31,6 @@ test('Retrieval reports missing BYOK configuration without invoking vector searc
   const retrieval = createRetrieval({
     sourceAvailable: async () => true,
     hasEmbeddingKey: () => false,
-    embeddingUnavailableReason: () => 'embedding-key-required',
     hybridSearch: async () => {
       called = true;
       return [];

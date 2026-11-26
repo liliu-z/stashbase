@@ -145,12 +145,3 @@ export interface IndexerStatus {
   /** False until the folder has received at least one daemon status response. */
   indexReady: boolean;
 }
-
-/*
- * Semantic availability, its disabled reason, and conversion progress are
- * deliberately absent. They are HTTP-layer concerns that `buildIndexStatus`
- * computes and puts on the response; no indexer knows them. They used to sit
- * here unset, where the response's `...status` spread could have carried a
- * stale `semanticDisabledReason` past the guard that only sets one when
- * semantic is actually unavailable — a payload claiming both at once.
- */

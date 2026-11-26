@@ -14,16 +14,12 @@ import { useSize } from '@/lib/size-context';
 import { cn } from '@/lib/utils';
 import { isExternalSource } from '@/shared/domain/external-source';
 import type { SourceReference } from '@/shared/domain/source-reference';
+import { basePathName } from '@/shared/utils/file-path';
 
 interface Crumb {
   label: string;
   /** The project-relative folder a button reveals; absent, the crumb is text. */
   folder?: string;
-}
-
-function lastSegment(path: string): string {
-  const parts = path.split(/[\\/]/u).filter(Boolean);
-  return parts.at(-1) ?? path;
 }
 
 /** The project and each folder above the document, outermost first. */
@@ -34,7 +30,7 @@ function breadcrumbTrail(source: SourceReference): Crumb[] {
   if (isExternalSource(source)) return cut > 0 ? [{ label: source.path.slice(0, cut) }] : [];
   const folders = cut > 0 ? path.slice(0, cut).split('/') : [];
   return [
-    { label: lastSegment(source.folderPath) },
+    { label: basePathName(source.folderPath) },
     ...folders.map((label, index) => ({ folder: folders.slice(0, index + 1).join('/'), label })),
   ];
 }

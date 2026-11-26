@@ -87,12 +87,6 @@ test('a responsive foreign listener is rejected without spawning', async () => {
   assert.equal(fixture.spawnedId(), undefined);
 });
 
-test('an incompatible legacy StashBase listener keeps the port guidance', async () => {
-  const fixture = startupFixture({ existing: { compatible: false, occupied: true, legacyStashBase: true } });
-  await assert.rejects(startServer(fixture.options), /an older StashBase server/);
-  assert.equal(fixture.spawnedId(), undefined);
-});
-
 test('only source launches reuse a compatible server without launching a child', async () => {
   const fixture = startupFixture({ packaged: false, existing: { compatible: true, occupied: true } });
   assert.equal(await startServer(fixture.options), null);
@@ -158,7 +152,9 @@ test('readiness timeout retains the last probe, count and elapsed time without r
 test('real loopback probes distinguish refusal, stalled response, bad HTTP, bad JSON and wrong identity', async (t) => {
   const http = require('node:http');
   let mode = 'ready';
-  const server = http.createServer((_req, res) => {
+  const requests = [];
+  const server = http.createServer((req, res) => {
+    requests.push(req.url);
     if (mode === 'stall') return;
     if (mode === 'http') { res.writeHead(503); res.end('{}'); return; }
     if (mode === 'json') { res.end('not json'); return; }
@@ -180,6 +176,10 @@ test('real loopback probes distinguish refusal, stalled response, bad HTTP, bad 
     if (nextMode === 'identity') assert.equal(result.probe_mismatch, 'instanceId');
     assert.equal('body' in result, false);
   }
+  const incompatible = await probeServerHealth(port, 1000, { ...identity, appRoot: '/another-build' });
+  assert.equal(incompatible.compatible, false);
+  assert.equal(incompatible.occupied, true);
+  assert.ok(requests.every(url => url === '/api/health'));
   server.closeAllConnections();
   await new Promise(resolve => server.close(resolve));
   const refused = await probeServerHealth(port, 100, identity);

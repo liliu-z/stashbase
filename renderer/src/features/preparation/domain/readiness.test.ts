@@ -7,7 +7,6 @@ import {
   folderPreparationSummary,
   preparationPollInterval,
   readinessStatusLine,
-  sourcePathForRecord,
   sourceReadiness,
   treeMarker,
   type SourceReadiness,
@@ -24,18 +23,15 @@ const SAMPLES: Record<SourceReadinessKind, SourceReadiness> = {
 };
 
 describe('source readiness', () => {
-  it('maps a legacy derived note record back to its visible source', () => {
-    expect(sourcePathForRecord('papers/.report.pdf.md')).toBe('papers/report.pdf');
-    expect(sourcePathForRecord('.notes.md')).toBe('notes');
-    expect(sourcePathForRecord('papers/report.pdf')).toBe('papers/report.pdf');
-  });
-
   it('prefers durable failure records over in-flight progress', () => {
     const snapshot = status({
-      conversionProgress: { 'a.pdf': { currentPage: 2, phase: 'extracting' } },
-      pendingConversions: ['a.pdf', 'b.png'],
+      conversionProgress: {
+        'a.pdf': { currentPage: 2, phase: 'extracting' },
+        'papers/a.pdf': { currentPage: 1, phase: 'extracting' },
+      },
+      pendingConversions: ['a.pdf', 'b.png', 'papers/a.pdf'],
       preparationFailures: [
-        { attempts: 1, lastError: 'boom', path: 'papers/.a.pdf.md', status: 'failed' },
+        { attempts: 1, lastError: 'boom', path: 'papers/a.pdf', status: 'failed' },
       ],
     });
     expect(sourceReadiness(snapshot, 'papers/a.pdf')).toEqual({
@@ -50,6 +46,7 @@ describe('source readiness', () => {
     expect(sourceReadiness(snapshot, 'b.png')).toEqual({ kind: 'pending', progress: null });
     expect(sourceReadiness(snapshot, 'c.md')).toEqual({ kind: 'current' });
     expect(sourceReadiness(null, 'c.md')).toEqual({ kind: 'current' });
+    expect(folderPreparationSummary(snapshot)).toMatchObject({ failed: 1, pending: 2 });
   });
 
   it('marks failed, and cancelled rows but never pending rows', () => {

@@ -24,9 +24,6 @@ const baseline = {
   preparationFailures: [
     { attempts: 2, lastError: 'ocr failed', path: 'scans/blurry.jpg', status: 'failed' },
   ],
-  semanticAvailable: false,
-  semanticDisabledReason: 'Embedding source required',
-  semanticEnabled: false,
   semanticIndexing: { state: 'disabled' },
   total: 14,
   treeVersion: 88,
