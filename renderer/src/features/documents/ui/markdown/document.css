@@ -289,6 +289,15 @@ html[data-focus-mode='on'] .markdown-crepe:focus-within .ProseMirror > :not(.is-
   outline: none;
 }
 
+/* The editor draws its own 2px caret (prosemirror-virtual-cursor) and keeps the
+   native one transparent, so only the drawn caret is coloured here. Crepe paints
+   it in its outline colour, close to the text it sits among; the editor caret
+   colour is the one the composer and code editors use. Three classes outrank
+   Crepe's `.milkdown .ProseMirror-focused`. */
+.markdown-crepe .milkdown .ProseMirror-focused {
+  --prosemirror-virtual-cursor-color: var(--editor-caret);
+}
+
 /* Crepe fixes paragraphs at 16px/24px; prose follows the reading size instead. */
 .markdown-crepe .milkdown .ProseMirror p {
   font-size: inherit;
