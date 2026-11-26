@@ -87,7 +87,7 @@ export interface ProjectDirectoryEntry {
 /** Resolve a raw native or POSIX-spelled path to an absolute POSIX path,
  *  rejecting relative paths, traversal, and control characters.
  *  Does NOT check membership; callers do via `registeredRootForAbs`. */
-export function resolveProjectAbs(raw: unknown): string {
+function resolveProjectAbs(raw: unknown): string {
   return writeDiagnosticStep('path_resolution', 'project_path.resolve_absolute', () => {
     const value = typeof raw === 'string' ? raw : '';
     writeDiagnosticEvidence('project_path.input', {

@@ -8,7 +8,6 @@ import { isExternalSource } from '@/shared/domain/external-source';
 export interface ResolvedContextFile {
   path: string;
   sourcePath: string;
-  readPath: string;
   kind: 'direct' | 'derived';
   sourceFormat: string;
   available: boolean;

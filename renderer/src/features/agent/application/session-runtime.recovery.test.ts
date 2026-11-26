@@ -240,7 +240,6 @@ describe('conversation recovery and pending work', () => {
           kind: 'direct',
           path: '/project/note.md',
           folder: 'project',
-          readPath: '/project/note.md',
           sourcePath: source.path,
           sourceFormat: 'md',
           reason: '',

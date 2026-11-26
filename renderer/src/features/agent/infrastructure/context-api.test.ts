@@ -31,14 +31,16 @@ describe('Agent context API', () => {
       folder: 'Research',
       kind: 'derived',
       path: '/Library/Research/papers/report.pdf',
-      readPath: '/app-data/derived/report.md',
       reason: '',
       sourceFormat: 'pdf',
       sourcePath: 'papers/report.pdf',
     });
     const api = createAgentContextAdapter(http, origin);
     const resolved = await api.resolve(source, new AbortController().signal);
-    expect(resolved).toMatchObject({ kind: 'derived', readPath: '/app-data/derived/report.md' });
+    expect(resolved).toMatchObject({
+      kind: 'derived',
+      path: '/Library/Research/papers/report.pdf',
+    });
     const request = vi.mocked(http.request).mock.calls[0]?.[0];
     expect(request?.path).toBe(
       `/api/project/agent-context-file?${new URLSearchParams({ path: '/Library/Research/papers/report.pdf' })}`,

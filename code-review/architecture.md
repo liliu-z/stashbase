@@ -328,8 +328,9 @@ evaluate that path as shell code or share a mutable temporary constraint copy.
   silently fall back. Key presence is configuration, not health or completion.
 - Retrieval and prepared reads share current-source eligibility and complete-output
   checks. Apply namespace/path/type narrowing before bounded results; report
-  truncation and partial reads. Remap all evidence to visible sources. A legacy
-  derived-path request must resolve through its live source before authorization.
+  truncation and partial reads. Remap all evidence to visible sources. Agent
+  context and file reads expose only source identity; the host resolves prepared
+  output after authorizing the source. AppData paths are not alternate read inputs.
 - Node/Python JSON-RPC is UTF-8 in both directions. The launcher pins the
   process encoding; the daemon also configures its standard streams so direct
   and frozen launches cannot inherit a Windows ANSI code page.

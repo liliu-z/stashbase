@@ -51,7 +51,9 @@ the overview.
 
 - Reads, edits, search results, and file links retain project-and-path identity.
   Missing files and invalid encoding never justify substituting another source
-  or rewriting bytes lossily.
+  or rewriting bytes lossily. Prepared-document reads use the source path too;
+  internal preparation paths are neither exposed in Chat context nor accepted as
+  alternate document identities.
 - Agent text tools accept ordinary UTF-8 source code and configuration within
   project and session permissions, independently of editor and search formats.
   They preserve the requested filename, including `.env` and names without an

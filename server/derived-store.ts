@@ -93,30 +93,6 @@ export function derivedHtmlFor(sourceAbs: string): string {
   return path.join(derivedDir(), `${derivedKey(sourceAbs)}.html`);
 }
 
-function derivedTextPathFor(sourceAbs: string, ext: '.md' | '.html'): string {
-  return ext === '.html' ? derivedHtmlFor(sourceAbs) : derivedNoteFor(sourceAbs);
-}
-
-/** Reverse-map a derived text path back to its source path.
- *  Only manifest-known final text files are accepted; scratch/bundle files and
- *  arbitrary AppData paths are not exposed through MCP file reads. */
-export function sourceForDerivedText(noteAbs: string): string | null {
-  const abs = filesystemPath.absolute(noteAbs);
-  const dir = filesystemPath.absolute(derivedDir());
-  if (!filesystemPath.contains(dir, abs) || filesystemPath.equal(dir, abs)) return null;
-  const base = path.posix.basename(abs);
-  const match = base.match(/^([0-9a-f]{32})\.(md|html)$/i);
-  if (!match) return null;
-  const sourceAbs = readManifest()[match[1]];
-  if (!sourceAbs) return null;
-  return filesystemPath.equal(
-    derivedTextPathFor(sourceAbs, match[2].toLowerCase() === 'html' ? '.html' : '.md'),
-    abs,
-  )
-    ? filesystemPath.absolute(sourceAbs)
-    : null;
-}
-
 /** Absolute path of the derived image bundle (`_files/`) for a source. */
 export function derivedBundleFor(sourceAbs: string): string {
   return path.join(derivedDir(), `${derivedKey(sourceAbs)}_files`);

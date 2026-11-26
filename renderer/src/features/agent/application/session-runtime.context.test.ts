@@ -26,7 +26,6 @@ function derivedContextPort() {
       folder: 'Research',
       kind: 'derived' as const,
       path: `${source.folderPath}/${source.path}`,
-      readPath: '/app-data/derived/report.md',
       reason: '',
       sourceFormat: 'pdf',
       sourcePath: source.path,

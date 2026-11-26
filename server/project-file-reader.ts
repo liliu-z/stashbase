@@ -1,6 +1,6 @@
 import { readTextSnapshotAsync } from './text-file-transaction.ts';
 import path from 'node:path';
-import { derivedNoteFor, sourceForDerivedText } from './derived-store.ts';
+import { derivedNoteFor } from './derived-store.ts';
 import { runWithFolderRoot } from './folder.ts';
 import { detectFormat, detectViewerFormat, isKnownBinaryFile } from './format.ts';
 import {
@@ -14,7 +14,6 @@ import { derivedHtmlPathForDocx } from './docx.ts';
 import { isSpreadsheetFile, spreadsheetAgentText, spreadsheetFilePreview } from './spreadsheet-preview.ts';
 import {
   normalizeProjectFilePath,
-  resolveProjectAbs,
   routeError,
   type AgentContextFile,
 } from './project-file-access.ts';
@@ -26,7 +25,6 @@ export interface ProjectFileRead {
   content: string;
   version?: string;
   sourceFormat?: string;
-  readPath?: string;
   derived?: boolean;
   /** Present only when `content` is a line window rather than the whole file. */
   partial?: true;
@@ -70,7 +68,6 @@ export async function agentContextFile(rawPath: unknown): Promise<AgentContextFi
         path: target.abs,
         folder: folderName,
         sourcePath: target.folderRel,
-        readPath: target.folderRel,
         kind: 'direct',
         sourceFormat,
         available: true,
@@ -82,13 +79,11 @@ export async function agentContextFile(rawPath: unknown): Promise<AgentContextFi
       };
     }
 
-    const derivedAbs = await currentPreparedTextPathAsync(target.abs);
-    if (!derivedAbs) {
+    if (!await currentPreparedTextPathAsync(target.abs)) {
       return {
         path: target.abs,
         folder: folderName,
         sourcePath: target.folderRel,
-        readPath: target.folderRel,
         kind: 'direct',
         sourceFormat,
         available: false,
@@ -100,13 +95,10 @@ export async function agentContextFile(rawPath: unknown): Promise<AgentContextFi
       path: target.abs,
       folder: folderName,
       sourcePath: target.folderRel,
-      readPath: derivedAbs,
       kind: 'derived',
       sourceFormat,
       available: true,
-      reason: sourceFormat === 'docx'
-        ? 'Read the extracted HTML file (an absolute app-data path) first for this DOCX; the original DOCX stays as the source identity.'
-          : 'Read the extracted Markdown note (an absolute app-data path) first for this PDF; use the original only when raw visual or binary detail is needed.',
+      reason: 'Use read_file with the source path for current prepared text; use the original only when raw visual or binary detail is needed.',
     };
   });
 }
@@ -156,12 +148,7 @@ export function applyLineRange(
 }
 
 async function readWholeProjectFile(rawPath: unknown): Promise<ProjectFileRead> {
-  // Legacy context may retain a manifest-known AppData path. Recover its
-  // source, then apply the same membership, containment, and freshness checks.
-  let sourcePath = rawPath;
-  try { sourcePath = sourceForDerivedText(resolveProjectAbs(rawPath)) ?? rawPath; }
-  catch { /* Normal path validation below owns malformed-input errors. */ }
-  const target = await normalizeProjectFilePath(sourcePath);
+  const target = await normalizeProjectFilePath(rawPath);
   return runWithFolderRoot(target.folderRoot, () => writeDiagnosticStep('read', 'read_project_source', async () => {
     const format = detectFormat(target.folderRel);
     if (!format) {
@@ -230,7 +217,6 @@ async function readSourceDerivedFile(
     path: sourceAbs,
     format: sourceFormat === 'docx' ? 'docx-derived-html' : 'pdf-derived-md',
     sourceFormat,
-    readPath: derivedAbs,
     derived: true,
     content,
     version: (await fileStatVersionAsync(folderRel)) ?? undefined,

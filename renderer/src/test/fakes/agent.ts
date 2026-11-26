@@ -121,7 +121,6 @@ export function agentContextPort(overrides: Partial<AgentContextPort> = {}): Age
       folder: 'Research',
       kind: 'direct' as const,
       path: `${source.folderPath}/${source.path}`,
-      readPath: source.path,
       reason: '',
       sourceFormat: 'md',
       sourcePath: source.path,

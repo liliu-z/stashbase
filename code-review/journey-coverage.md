@@ -3757,8 +3757,11 @@ Project choice and first Send: `renderer/src/features/agent/application/project-
 - **Driven Runtime Pass:** isolated built-app seeded-Claude-history passes
   exercise restore, copy/edit actions, timestamps, and Chat-pane controls without
   a live signed-in runtime. A window-authorized read pass (2026-09-14) proves
-  source/prepared-path parity and stale/deleted-source refusal with seeded PDF
-  output, not a native preparation or model turn.
+  prepared-source reads and stale/deleted-source refusal with seeded PDF output,
+  not a native preparation or model turn. Its historical derived-path parity no
+  longer describes the protocol: the 2026-11-26 source-only contract removes
+  `readPath` and reverse lookup. `project-file-reader.test.ts` covers source-path
+  reads, stale/failed/cancelled preparation, and rejection of internal AppData paths.
   A built-app pass (2026-09-15) with an isolated project and controlled agent
   HTTP/socket events verifies draft reachability, mode switches, paused queues
   after Stop/failure/connection loss, same-session reconnect without resend,
@@ -4344,6 +4347,9 @@ agent turn and is not promised for standalone external MCP clients.
 - **Contract Test:** `pnpm test:server` covers transport/operation parity, authorization, scoped
   direct/prepared reads, bounded windows, format/encoding restrictions, mutations,
   and reconcile. Current/stale/cancelled/orphaned prepared evidence is covered.
+  Prepared reads take the original source path; internal AppData paths are not
+  a second MCP identity. Source-only reader/schema tests cover this contract;
+  a new third-party-client pass for this change remains unproven.
   The J07 Agent text-file regression also exercises the external MCP transport;
   explicit UTF-8 code/configuration access does not grant search eligibility.
 - **Driven Runtime Pass:** a 2026-09-16 isolated source HTTP client initializes

@@ -150,7 +150,6 @@ function WorkspacePreview({
           folder: 'Research',
           kind: 'direct',
           path: `${source.folderPath}/${source.path}`,
-          readPath: source.path,
           reason: '',
           sourceFormat: 'md',
           sourcePath: source.path,

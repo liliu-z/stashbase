@@ -11,7 +11,6 @@ export const agentContextFileResponseSchema = z
     folder: boundedText(2_000),
     kind: z.enum(["direct", "derived"]),
     path: boundedText(16_384),
-    readPath: boundedText(16_384),
     reason: boundedText(4_096),
     sourceFormat: boundedText(64),
     sourcePath: boundedText(16_384),

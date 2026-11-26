@@ -28,7 +28,7 @@ test('explicit generic context keeps exact source paths without reading their by
     const context = await agentContextFile(source);
     assert.equal(context.path, filesystemPath.absolute(source));
     assert.equal(context.sourcePath, name);
-    assert.equal(context.readPath, name);
+    assert.equal('readPath' in context, false);
     assert.equal(context.sourceFormat, 'generic');
     assert.equal(context.kind, 'direct');
     assert.equal(context.available, true);
@@ -38,7 +38,7 @@ test('explicit generic context keeps exact source paths without reading their by
   assert.equal(open.mock.callCount(), 0);
 });
 
-test('prepared reads and context require a current source and complete output, including legacy derived paths', async (t) => {
+test('prepared reads expose only source identity and require current complete output', async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-prepared-read-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   await registerProjectFolderAsync(root);
@@ -49,26 +49,28 @@ test('prepared reads and context require a current source and complete output, i
       fs.utimesSync(source, 100, 100);
       registerDerivedSource(source);
       const derived = format === 'docx' ? derivedHtmlPathForDocx(source) : derivedNoteFor(source);
-        fs.mkdirSync(path.dirname(derived), { recursive: true });
-        fs.writeFileSync(derived, format === 'docx'
-          ? '<p>prepared document</p>\n<!-- stashbase-docx-conversion: complete -->'
-          : 'prepared document\n<!-- stashbase-pdf-conversion: complete -->');
+      fs.mkdirSync(path.dirname(derived), { recursive: true });
+      fs.writeFileSync(derived, format === 'docx'
+        ? '<p>prepared document</p>\n<!-- stashbase-docx-conversion: complete -->'
+        : 'prepared document\n<!-- stashbase-pdf-conversion: complete -->');
       const completed = fs.readFileSync(derived, 'utf8');
-      assert.equal((await agentContextFile(source)).available, true);
+      const context = await agentContextFile(source);
+      assert.equal(context.available, true);
+      assert.equal('readPath' in context, false);
+      assert.equal(context.reason.includes(derived), false);
       const read = await readProjectFile(source);
       assert.equal(read.content, completed);
       assert.equal(read.path, filesystemPath.absolute(source));
       assert.ok(read.version);
-      assert.deepEqual(await readProjectFile(derived), read);
-      const window = await readProjectFile(derived, { offset: 1, limit: 1 });
+      assert.equal('readPath' in read, false);
+      await assert.rejects(readProjectFile(derived), { code: 'PROJECT_PATH_OUTSIDE' });
+      const window = await readProjectFile(source, { offset: 1, limit: 1 });
       assert.equal(window.partial, true);
       assert.equal(window.version, undefined);
 
       const unavailable = async () => {
         assert.equal((await agentContextFile(source)).available, false);
-        for (const target of [source, derived]) {
-          await assert.rejects(readProjectFile(target), { status: 409, code: 'CONVERSION_NOT_READY' });
-        }
+        await assert.rejects(readProjectFile(source), { status: 409, code: 'CONVERSION_NOT_READY' });
       };
       fs.writeFileSync(derived, 'partial output');
       await unavailable();
@@ -84,12 +86,12 @@ test('prepared reads and context require a current source and complete output, i
       await unavailable();
       fs.unlinkSync(source);
       await assert.rejects(agentContextFile(source), { status: 404 });
-      for (const target of [source, derived]) await assert.rejects(readProjectFile(target), { status: 404 });
+      await assert.rejects(readProjectFile(source), { status: 404 });
     });
   }
 });
 
-test('legacy derived reads retain project scope, source containment, and the bounded-read limit', async (t) => {
+test('prepared source reads retain project scope, source containment, and the bounded-read limit', async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-prepared-scope-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const project = path.join(root, 'project');
@@ -106,15 +108,14 @@ test('legacy derived reads retain project scope, source containment, and the bou
   registerAttributedAgentSession('other-project', {
     agentId: 'claude', windowId: 'scope', boundFolder: () => other, turnInFlight: () => true,});
   t.after(() => unregisterAttributedAgentSession('other-project'));
-  await assert.rejects(withAgentProjectScope('other-project', () => readProjectFile(derived)), { code: 'PROJECT_SCOPE_MISMATCH' });
+  await assert.rejects(withAgentProjectScope('other-project', () => readProjectFile(source)), { code: 'PROJECT_SCOPE_MISMATCH' });
   fs.truncateSync(derived, 8 * 1024 * 1024 + 1);
-  await assert.rejects(readProjectFile(derived, { limit: 1 }), { code: 'FILE_TOO_LARGE' });
+  await assert.rejects(readProjectFile(source, { limit: 1 }), { code: 'FILE_TOO_LARGE' });
   fs.unlinkSync(source);
   const outside = path.join(root, 'outside.pdf');
   fs.writeFileSync(outside, 'outside');
-  if (fileSymlink(outside, source, t)) await assert.rejects(readProjectFile(derived), { status: 404 });
+  if (fileSymlink(outside, source, t)) await assert.rejects(readProjectFile(source), { status: 404 });
 });
-
 
 test('media remains a project file but has no prepared content or Agent read path', async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-media-read-'));
