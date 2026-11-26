@@ -195,6 +195,8 @@ describe('Agent file changes', () => {
         path: 'drafts/a.md',
       });
       expect(changedSource(scope, 'D:\\notes.md'), root).toBeNull();
+      expect(changedSource(scope, 'C:'), root).toBeNull();
+      expect(changedSource(scope, 'c:'), root).toBeNull();
     }
     // A relative POSIX name that merely starts with a letter and a colon keeps
     // its spelling.

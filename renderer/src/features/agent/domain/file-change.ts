@@ -233,6 +233,7 @@ export function changedSource(scope: AgentScope, rawPath: string): SourceReferen
   const folder = withUpperDrive(normalizeSeparators(scope.path)).replace(/\/+$/u, '');
   const path = withUpperDrive(normalizeSeparators(rawPath));
   let relative: string;
+  if (path === folder) return null;
   if (path.startsWith(`${folder}/`)) relative = path.slice(folder.length + 1);
   else if (/^([a-z]:)?\//iu.test(path)) return null;
   else relative = path.replace(/^\.\//u, '');
