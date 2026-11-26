@@ -468,6 +468,7 @@ test('pinned bundled OpenCode completes one SDK session against a fake compatibl
     socket.request({ t: 'prompt', text });
     await ended;
   };
+  const firstPanelCall = gatewayRequests.length;
   nextTool = { name: 'stashbase_write_file', arguments: JSON.stringify({ path: modeFile, content: 'Edit allowed' }) };
   await runPanelTurn();
   assert.equal(fs.readFileSync(modeFile, 'utf8'), 'Edit allowed');
@@ -477,17 +478,17 @@ test('pinned bundled OpenCode completes one SDK session against a fake compatibl
   await runPanelTurn();
   assert.equal(fs.readFileSync(modeFile, 'utf8'), 'Edit allowed', 'Plan must reject a provider that attempts a write');
 
-  // The main agent stays on the default profile; a model pick is not a role.
+  // The native SDK sends model metadata. The gateway chooses its own profile.
   stage = 'panel main model';
-  const firstPanelCall = gatewayModels.findIndex((entry) => entry.version !== undefined);
-  assert.deepEqual(gatewayModels[firstPanelCall], { profile: 'stashbase-agent-default', version: '4' });
+  assert.ok(gatewayModels.length > firstPanelCall);
+  assert.deepEqual(gatewayModels[firstPanelCall], { profile: undefined, version: undefined });
   socket.request({ t: 'set-model', model: 'writer-pro' });
   const beforeChoice = gatewayRequests.length;
   await runPanelTurn();
   assert.ok(gatewayRequests.length > beforeChoice);
   for (let index = beforeChoice; index < gatewayRequests.length; index++) {
     assert.equal(gatewayRequests[index]!.model, 'stashbase-agent-default');
-    assert.deepEqual(gatewayModels[index], { profile: 'stashbase-agent-default', version: '4' });
+    assert.deepEqual(gatewayModels[index], { profile: undefined, version: undefined });
   }
   nextTool = { name: 'bash', arguments: JSON.stringify({ command: `echo changed > '${modeFile}'`, description: 'Attempt a command in Plan' }) };
   await runPanelTurn();

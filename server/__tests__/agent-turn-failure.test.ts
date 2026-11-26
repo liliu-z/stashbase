@@ -77,8 +77,8 @@ test('hosted prerequisites and native signed-out messages name the actual repair
 });
 
 test('a hosted model refusal asks for a model refresh; a chat waiting for a choice does not', () => {
-  assert.equal(classifyAgentTurnFailure('The selected model configuration has changed. Refresh the models, then review and send again.'), 'model-changed');
-  assert.equal(classifyAgentTurnFailure('The selected model is no longer available. Refresh the models and choose another one.'), 'model-changed');
+  assert.equal(classifyAgentTurnFailure('The selected model configuration has changed. Refresh the models, then retry this turn.'), 'model-changed');
+  assert.equal(classifyAgentTurnFailure('The selected model is no longer available. Refresh the models, then retry this turn.'), 'model-changed');
   assert.equal(classifyAgentTurnFailure('Choose a model for this chat, then send again. The model it used is no longer available.'), null);
 });
 

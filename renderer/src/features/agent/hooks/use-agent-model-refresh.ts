@@ -1,12 +1,10 @@
 /**
- * A fresh hosted model list, fetched from the turn the old one was refused on.
+ * Reload local model metadata after a hosted model refusal.
  *
- * The StashBase Agent reads its approved models when its session starts, and
- * every turn names the configuration it was shown. When the service changes
- * that configuration, the turn is refused; reconnecting starts a session that
- * reads the list again. Nothing is sent again here: the reader reviews the
- * model first, and only then may send the same request from the failed turn.
- * The conversation, the draft, and any paused queue stay as they were.
+ * The gateway selects the default for each new turn and pins admitted turns.
+ * Reconnecting refreshes the native runtime's catalog and compaction limits;
+ * it does not send a prompt. The reader can then retry the failed turn while
+ * the conversation, draft, and paused queue stay as they were.
  */
 import { useCallback, useMemo, useRef, useState } from 'react';
 
@@ -25,8 +23,7 @@ export interface AgentModelRefreshView {
   refresh(errorBlockId: string): void;
 }
 
-/** `onRefresh` re-reads the runtime catalog, so a new chat names the same
- *  models this one now offers. */
+/** `onRefresh` refreshes the shared runtime catalog after reconnecting. */
 export function useAgentModelRefresh(
   session: AgentSessionRuntime,
   onRefresh: () => void,

@@ -183,10 +183,8 @@ const modelAbilities = () => ({
   reasoning: true,
 });
 
-/** One OpenCode model per hosted profile, so each stored message names the
- * profile it ran on and compaction follows that profile's own limits. With no
- * readable list, the broker's unversioned default stands in, as it did before
- * profiles existed. */
+/** OpenCode uses the catalog for local message metadata and compaction limits.
+ * The hosted gateway resolves the actual upstream model per turn. */
 function openCodeModels(
   fallback: string,
   profiles: readonly HostedAgentProfile[],

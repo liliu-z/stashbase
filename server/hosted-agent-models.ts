@@ -1,18 +1,16 @@
 /**
  * The hosted StashBase Agent's model profiles, as the StashBase API approves them.
  *
- * A profile is the hosted service's name for one configured model: the
- * service owns its upstream model, price, and reasoning level, and the client
- * only ever names it by `id` and the `version` it was shown. Sending that
- * version lets the service refuse a turn whose configuration changed after
- * the reader chose it, rather than silently billing a different model.
+ * The catalog supplies names and limits for the native runtime, including
+ * a version for comparing prewarmed configurations. The gateway selects the
+ * actual upstream model for each new turn.
  */
 import { z } from 'zod';
 import type { AgentModel } from '../shared/agent-protocol.ts';
 import { hostedAccessToken, stashbaseClientVersion, STASHBASE_API_URL } from './hosted-account.ts';
 
-/** The profile an unversioned request runs on. Older chats recorded it, and a
- * runtime without a readable list keeps using it. */
+/** The native profile name a runtime uses without a readable catalog. Older
+ * chats also recorded it. */
 export const DEFAULT_HOSTED_AGENT_PROFILE = 'stashbase-agent-default';
 
 const hostedAgentProfileSchema = z.object({

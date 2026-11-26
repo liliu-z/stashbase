@@ -373,9 +373,8 @@ export class OpenCodePanelSession {
   private readonly onClose = () => this.dispose();
   private preparingAttachments: AbortController | null = null;
   private attachmentPreparation: Promise<FilePartInput[]> | null = null;
-  /** The main agent's profile, as the service listed it when this session
-   * started. Undefined runs the unversioned default. */
-  private model: { profile: string; version: number } | undefined;
+  /** Local model metadata from the catalog used to configure this session. */
+  private model: { profile: string } | undefined;
 
   constructor(
     private readonly ws: WebSocket,
@@ -440,14 +439,14 @@ export class OpenCodePanelSession {
   private async initialize(): Promise<void> {
     const started = performance.now();
     try {
-      // Without a readable list the chat still runs, on the default profile
-      // the service picks for an unversioned request.
+      // The catalog configures native model metadata. The gateway chooses
+      // the current default even when this chat cannot read the catalog.
       const profiles = await this.runtime.models().catch((error: unknown) => {
         log.warn(`could not read the agent model list: ${errorMessage(error)}`);
         return [];
       });
       const main = defaultHostedAgentProfile(profiles);
-      if (main) this.model = { profile: main.id, version: main.version };
+      if (main) this.model = { profile: main.id };
       if (this.disposed) return;
       this.client = await this.runtime.client(this.cwd);
       const subscription = await this.client.event.subscribe({ signal: this.abort.signal });

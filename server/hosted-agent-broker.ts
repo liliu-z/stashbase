@@ -26,22 +26,20 @@ const MAX_BODY_BYTES = 16 * 1024 * 1024;
 const AGENT_GATEWAY_PATH = '/v1/agent/chat/completions';
 const UUID_PATTERN = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
-/** The hosted model profile one turn runs on. `version` is the configuration
- * the reader was shown; without it the service runs the profile as it is now. */
+/** Native model metadata used for diagnostics and the OpenAI-compatible body. */
 export interface HostedAgentTurnModel {
   profile: string;
-  version?: number;
 }
 
-/** Hosted refusals that a fresh model list resolves, and nothing else does.
+/** Hosted model refusals offer a catalog refresh before a manual new turn.
  * Both leave as 422 so the native runtime's provider retry cannot repeat a
  * request the service will refuse again, and with one message each that the
  * turn-failure classifier recognizes. */
 const MODEL_REFUSALS: Record<string, string> = {
   agent_model_configuration_changed:
-    'The selected model configuration has changed. Refresh the models, then review and send again.',
+    'The selected model configuration has changed. Refresh the models, then retry this turn.',
   agent_model_unavailable:
-    'The selected model is no longer available. Refresh the models and choose another one.',
+    'The selected model is no longer available. Refresh the models, then retry this turn.',
 };
 
 interface GatewayError {
@@ -225,8 +223,8 @@ export class HostedAgentBroker {
     };
   }
 
-  /** Every model call until `endTurn` — tool continuations included — runs
-   * on the model given here; a different choice waits for the next turn. */
+  /** The gateway uses the same turn ID to keep tool continuations on the
+   * server-selected model. The native profile is local metadata. */
   beginTurn(
     agentSessionId: string,
     turnId: string,
@@ -284,7 +282,7 @@ export class HostedAgentBroker {
         return diagnostic.response(await this.dependencies.fetch(this.dependencies.upstreamUrl, {
           method: 'POST',
           headers: this.gatewayHeaders(token, {
-            accept: 'text/event-stream', idempotencyKey, model, turnId,
+            accept: 'text/event-stream', idempotencyKey, turnId,
           }),
           body,
           signal: callSignal,
@@ -311,7 +309,7 @@ export class HostedAgentBroker {
 
   private gatewayHeaders(
     token: string,
-    call: { accept: string; idempotencyKey: string; model: HostedAgentTurnModel; turnId: string },
+    call: { accept: string; idempotencyKey: string; turnId: string },
   ): Record<string, string> {
     return {
       authorization: `Bearer ${token}`,
@@ -319,8 +317,6 @@ export class HostedAgentBroker {
       accept: call.accept,
       'idempotency-key': call.idempotencyKey,
       'x-stashbase-agent-turn-id': call.turnId,
-      'x-stashbase-agent-profile': call.model.profile,
-      ...(call.model.version === undefined ? {} : { 'x-stashbase-agent-profile-version': String(call.model.version) }),
       'x-stashbase-client-version': this.dependencies.clientVersion(),
     };
   }
@@ -413,7 +409,7 @@ export class HostedAgentBroker {
           method: 'POST',
           headers: this.gatewayHeaders(token, {
             accept: request.headers.accept ?? 'text/event-stream, application/json',
-            idempotencyKey, model, turnId,
+            idempotencyKey, turnId,
           }),
           body,
           signal,

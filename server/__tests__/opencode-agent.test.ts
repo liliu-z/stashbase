@@ -1102,7 +1102,7 @@ test('a Default chat runs its main agent on the service default, whatever model 
   harness.send({ t: 'prompt', text: 'Second' });
   await settle();
 
-  assert.deepEqual(harness.turns, [{ profile: 'writer-fast', version: 3 }, { profile: 'writer-fast', version: 3 }]);
+  assert.deepEqual(harness.turns, [{ profile: 'writer-fast' }, { profile: 'writer-fast' }]);
   assert.deepEqual(harness.prompts.map((prompt) => prompt.model.modelID), ['writer-fast', 'writer-fast']);
 });
 
@@ -1113,7 +1113,7 @@ test('a resumed Default chat that last ran on another model continues on the ser
   assert.equal(harness.events().find((event) => event.t === 'models')?.activeModel, 'writer-fast');
   harness.send({ t: 'prompt', text: 'Continue' });
   await settle();
-  assert.deepEqual(harness.turns, [{ profile: 'writer-fast', version: 3 }]);
+  assert.deepEqual(harness.turns, [{ profile: 'writer-fast' }]);
 });
 
 test('an unreadable model list leaves the StashBase Agent on its unversioned default', async (t) => {

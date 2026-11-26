@@ -9,7 +9,7 @@ import { useAgentModelRefresh } from './use-agent-model-refresh';
 afterEach(cleanup);
 
 /** A live Default conversation whose last turn the service refused because
- *  the chosen model's configuration changed. */
+ *  the hosted model was refused. */
 async function refusedTurn() {
   const transport = agentSessionPort();
   const session = createAgentSessionRuntime({
@@ -26,7 +26,7 @@ async function refusedTurn() {
     failure: 'model-changed',
     kind: 'failed',
     message:
-      'The selected model configuration has changed. Refresh the models, then review and send again.',
+      'The selected model configuration has changed. Refresh the models, then retry this turn.',
   });
   const failure = session.store.getState().transcript.find((block) => block.kind === 'error');
   if (!failure) throw new Error('the refused turn should have failed');

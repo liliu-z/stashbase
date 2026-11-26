@@ -53,8 +53,7 @@ test('hosted Agent broker keeps the account credential upstream and streams an O
   assert.equal(upstream[1].idempotencyKey, upstream[0].idempotencyKey);
   assert.equal(upstream[0].turnId, '00000000-0000-4000-8000-000000000001');
   assert.equal(upstream[1].turnId, upstream[0].turnId);
-  assert.equal(upstream[0].profile, 'stashbase-agent-default');
-  // An unversioned turn leaves the configuration to the service.
+  assert.equal(upstream[0].profile, null);
   assert.equal(upstream[0].version, null);
   assert.equal(runtime.model, 'stashbase-agent-default');
   assert.equal(upstream[0].url, 'https://gateway.invalid/v1/agent/chat/completions');
@@ -84,7 +83,7 @@ test('hosted Agent broker retains the gateway retry delay on a short-term limit'
   } });
 });
 
-test('a turn keeps the model it began with for every call, and the next turn takes a new choice', async (t) => {
+test('model calls and permission reviews share a turn and leave model routing to the service', async (t) => {
   const seen: Array<{ turn: string | null; profile: string | null; version: string | null }> = [];
   const broker = new HostedAgentBroker({
     accessToken: async () => 'fixture-token',
@@ -95,7 +94,7 @@ test('a turn keeps the model it began with for every call, and the next turn tak
         profile: headers.get('x-stashbase-agent-profile'),
         version: headers.get('x-stashbase-agent-profile-version'),
       });
-      return new Response('data: {"choices":[{"delta":{"content":"ok"}}]}\n\ndata: [DONE]\n\n', {
+      return new Response('data: {"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n', {
         headers: { 'content-type': 'text/event-stream' },
       });
     },
@@ -109,20 +108,20 @@ test('a turn keeps the model it began with for every call, and the next turn tak
     body: JSON.stringify({ messages: [{ role: 'user', content: 'hi' }], stream: true }),
   })).text();
 
-  const model = { profile: 'writer-pro', version: 3 };
+  const model = { profile: 'writer-pro' };
   broker.beginTurn('model-turns', '00000000-0000-4000-8000-000000000011', model);
-  // The caller's object changing later cannot move a turn already running.
-  model.profile = 'other';
   await call();
+  assert.equal(await broker.complete('model-turns', model, [{ role: 'user', content: 'Review' }]), 'ok');
   await call();
   broker.endTurn('model-turns');
-  broker.beginTurn('model-turns', '00000000-0000-4000-8000-000000000012', { profile: 'writer-fast', version: 1 });
+  broker.beginTurn('model-turns', '00000000-0000-4000-8000-000000000012', { profile: 'writer-fast' });
   await call();
 
   assert.deepEqual(seen, [
-    { turn: '00000000-0000-4000-8000-000000000011', profile: 'writer-pro', version: '3' },
-    { turn: '00000000-0000-4000-8000-000000000011', profile: 'writer-pro', version: '3' },
-    { turn: '00000000-0000-4000-8000-000000000012', profile: 'writer-fast', version: '1' },
+    { turn: '00000000-0000-4000-8000-000000000011', profile: null, version: null },
+    { turn: '00000000-0000-4000-8000-000000000011', profile: null, version: null },
+    { turn: '00000000-0000-4000-8000-000000000011', profile: null, version: null },
+    { turn: '00000000-0000-4000-8000-000000000012', profile: null, version: null },
   ]);
 });
 
@@ -140,7 +139,7 @@ for (const [status, code] of [[422, 'agent_model_configuration_changed'], [503, 
     await broker.start();
     t.after(() => broker.close());
     const runtime = broker.runtime('model-refused')!;
-    broker.beginTurn('model-refused', '00000000-0000-4000-8000-000000000013', { profile: 'writer-pro', version: 2 });
+    broker.beginTurn('model-refused', '00000000-0000-4000-8000-000000000013', { profile: 'writer-pro' });
     const response = await fetch(`${runtime.baseUrl}/chat/completions`, {
       method: 'POST', headers: { authorization: `Bearer ${runtime.apiKey}` },
       body: JSON.stringify({ messages: [{ role: 'user', content: 'hi' }] }),
@@ -603,7 +602,6 @@ test('an expired permission decision does not retry a rejected authentication at
   assert.equal(authentications, 1);
 });
 
-
 test('hosted broker adapts inline PDFs without changing image bytes, text, tools, or other file parts', async (t) => {
   let forwarded: Record<string, unknown> | undefined;
   const broker = new HostedAgentBroker({
@@ -630,7 +628,6 @@ test('hosted broker adapts inline PDFs without changing image bytes, text, tools
   await response.text();
   assert.deepEqual(forwarded, { messages: [{ role: 'user', content: [text, image, file, { type: 'image_url', image_url: { url: pdf } }] }, tool], stream: true });
 });
-
 
 for (const [label, suffix, expected] of [
   ['unknown finish', 'data: {"choices":[{"delta":{},"finish_reason":"unknown"}]}\n\ndata: [DONE]\n\n', /"finish_reasons":\["unknown"\]/],
@@ -693,7 +690,6 @@ test('broker retains the original socket cause when an already-streaming model r
   assert.match(JSON.stringify(diagnostic.causes), /ECONNRESET/);
   assert.match(diagnostic.message, /"stream_ended":false/);
 });
-
 
 for (const [reason, ending] of [
   ['output limit', 'data: {"choices":[{"delta":{},"finish_reason":"length"}]}\n\ndata: [DONE]\n\n'],

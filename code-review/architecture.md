@@ -1220,14 +1220,15 @@ data migration is not required by [maintenance policy](../MAINTENANCE.md#previou
   Hosted quota failures distinguish insufficient request credits from
   insufficient turn budget and preserve their recovery classification through
   the native runtime message boundary. `server/hosted-agent-models.ts` reads
-  the approved model profiles. Each OpenQuill chat reads them once at start
-  and configures its OpenCode process with the same list, so stored prompts
-  name their profile and compaction uses that profile's limits. StashBase Agent uses the
-  service's default profile for its own requests and Auto permission review over
-  v1. OpenCode keeps native sub-agents disabled. The chat's stdio MCP host
+  the approved model profiles. Each OpenCode chat uses its startup catalog
+  for native prompt metadata and compaction limits. StashBase Agent omits
+  profile selection headers for its model calls and Auto permission reviews
+  over v1. The gateway selects the current default for a new root turn, pins
+  it for the turn, and checks context against the selected model. OpenCode
+  keeps native sub-agents disabled. The chat's stdio MCP host
   exposes the same built-in project operations as the HTTP transport, bounded
-  by the chat's project scope. Changed or withdrawn model profiles leave the
-  broker as 422, outside native retries, and classify as `model-changed`.
+  by the chat's project scope. The broker surfaces hosted model refusals
+  outside native retries and can classify them as `model-changed`.
   Versions, limits, and upstream identity stay in the host; the listing keeps
   the hosted catalog in memory only. Hosted quota/accounting and Stripe
   billing stay external; the API owns monthly credit grants and first-subscription

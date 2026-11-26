@@ -245,9 +245,10 @@ for unsent text.
   Antigravity offers no list of its skills, so its composer has no skill picker;
   its model still uses the project's skills on its own.
 - StashBase Agent handles conversation, research, and writing on the hosted service's
-  current default model. The service owns model availability, provider, price,
-  and reasoning. StashBase Agent has no model or thinking selector, and native
-  OpenCode sub-agents are disabled.
+  current default model when a new turn begins. Model calls and permission reviews
+  within an admitted turn share its server-selected model and configuration.
+  The service owns model availability, provider, price, and reasoning. StashBase
+  Agent has no model or thinking selector, and native OpenCode sub-agents are disabled.
 - When the desktop app is in the background or minimized, a pending approval
   or clarifying question sends a local system notification. Requests arriving
   together are grouped per window, and each pending request is announced once.
@@ -412,11 +413,15 @@ attachments remain intact; the queue pauses, and the reader can start a new chat
 with the files and a shorter prompt. Upload-size refusals also stop visibly and
 never trigger lossy context recovery.
 Hosted retry responses carry the service's suggested delay to the native runtime.
-When the service changes the configuration of a StashBase Agent model a chat runs on,
-or withdraws it, the refused turn offers **Refresh models**. Refreshing
-reconnects the same conversation to read the list again and keeps the
-transcript, draft, and held queue. It never resends; the failed turn offers
-a manual retry only after the refresh.
+An open StashBase Agent chat uses the service's current default for its next
+turn after an operator publishes a model change. Local compaction uses the
+catalog read when the chat opened. If the new model has a smaller context
+window, the service's limit applies and the context recovery above can run.
+Emergency withdrawal can stop further calls within a turn already using that
+model. A model refusal offers **Refresh models** to reload local runtime
+metadata. Reconnecting preserves the transcript, draft, and held queue without
+resending; the reader can then manually retry from the same chat once a model
+is available.
 StashBase Agent retries an empty model response or a hosted stream interruption before
 output once within the current turn, retaining completed tool results and file
 changes. Both failures share the same single retry. A stream interruption is not
