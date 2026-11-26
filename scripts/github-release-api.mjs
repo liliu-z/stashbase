@@ -64,9 +64,8 @@ export function releaseAssetContentType(name) {
 // `500 Error saving asset`, and a save that fails that way can leave a
 // placeholder asset record behind. Every platform therefore uploads one asset
 // at a time, drops any record that never reached `uploaded`, and retries the
-// same asset before failing the release. An asset already stored at the built
-// size is kept, so a rerun does not have to rebuild the draft. A stored asset
-// whose size differs is a genuine conflict and stops the release.
+// same asset before failing the release. Reuse requires both size and SHA-256;
+// a rebuilt metadata file can have the same size but describe different bytes.
 export async function uploadReleaseAssets({
   api,
   tag,
@@ -107,13 +106,13 @@ async function settleStoredAsset({ api, tag, asset, log }) {
   if (!stored) return 'absent';
 
   if (stored.state === 'uploaded') {
-    if (stored.size === asset.size) {
+    if (stored.size === asset.size && /^sha256:[a-f\d]{64}$/.test(asset.digest ?? '') && stored.digest === asset.digest) {
       log(`[release] kept ${asset.name}, already uploaded`);
       return 'already-uploaded';
     }
     throw new Error(
       `Release ${tag} already contains ${asset.name} at ${stored.size} bytes but this build produced ` +
-        `${asset.size} bytes. Versioned assets are immutable; delete the incomplete draft and restart ` +
+        `${asset.size} bytes with a different or unverified SHA-256. Versioned assets are immutable; delete the incomplete draft and restart ` +
         'the coordinated release.',
     );
   }

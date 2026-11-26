@@ -1,9 +1,9 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { requireGreenCi } from './require-green-ci.mjs';
-import { advanceStore, STORE_APP, STORE_OVERVIEW, storeStatus } from './packaging/store-submission.mjs';
+import { advanceStore, STORE_APP, STORE_OVERVIEW, storeStatus, verifyStoreRun, verifyStorePackageSource } from './packaging/store-submission.mjs';
 import { createStoreClient, STORE_CREDENTIALS, uploadStoreArchive } from './packaging/store-client.mjs';
 import { github, REPO, resolveRelease, saveReport } from './packaging/release-channel-io.mjs';
 
@@ -23,11 +23,7 @@ try {
   let receipt = deployment?.payload;
   const verifyRun = runId => {
     const run = github(`repos/${REPO}/actions/runs/${runId}`);
-    if (run.head_sha !== sha || run.head_repository?.full_name !== REPO ||
-        !['.github/workflows/release.yml', '.github/workflows/build-msix.yml'].includes(run.path) ||
-        !['in_progress', 'completed'].includes(run.status)) {
-      throw new Error('MSIX artifact source does not match the tagged commit and approved workflow');
-    }
+    verifyStoreRun(run, { repository: REPO, tag: report.tag, sha });
   };
   const saveReceipt = async data => {
     deployment = github(`repos/${REPO}/deployments`, { ref: report.tag, environment: 'microsoft-store',
@@ -92,7 +88,11 @@ archive = root / 'store-upload.zip'
 with zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_STORED) as output: output.write(file, name)
 print(json.dumps({'fileName': name, 'sha256': digest, 'zipPath': str(archive)}))
 ` });
-        return JSON.parse(result);
+        const pkg = JSON.parse(result);
+        verifyStorePackageSource(JSON.parse(readFileSync(path.join(temporary, 'store-msix-source.json'), 'utf8')), {
+          tag: report.tag, sha, sourceRun: receipt.sourceRun, packageSha256: pkg.sha256,
+        });
+        return pkg;
       },
     });
   }

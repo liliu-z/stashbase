@@ -440,8 +440,15 @@ version to `major.minor.patch.0`; the Store owns the final revision segment.
 The icon generator derives the three Store assets from `build/icon.svg`.
 
 `scripts/package-windows-store.ps1` rejects a stale Windows executable and
-fails if staging or MakeAppx fails. The Windows job uploads the unsigned MSIX
-and SHA-256 as the `store-msix-package` Actions artifact, retained for 90 days.
+fails if staging or MakeAppx fails. The Windows job uploads the unsigned MSIX,
+SHA-256 and the generated source record as the `store-msix-package` Actions artifact,
+retained for 90 days. The source record binds the actual tag checkout, commit,
+Actions run and package digest. Store submission verifies that record against the
+selected release and downloaded bytes before creating or changing a submission.
+The workflow run must come from this repository's approved main or exact-tag
+workflow; its `head_sha` identifies that workflow ref, not necessarily the
+Windows Adapter's tag checkout. This permits a delayed automatic release or a
+manual tagged rebuild from newer main without weakening package identity checks.
 It does not add MSIX to the NSIS updater feed or publish it as a direct installer.
 Microsoft signs Store submissions; this artifact is not a signed sideload package.
 
@@ -515,8 +522,10 @@ authenticated successfully and verified v2.19.1 on GitHub, the five CDN
 installers, both Homebrew architectures and all four website download buttons.
 Store submission `1152921505702500089` returned `Certification`; the aggregate
 `release/all-channels` status correctly remained pending. No Store submission
-was changed. The recurring schedule and a future API-created update still need
-their own execution evidence after the first Store publication.
+was changed. The [scheduled check on 2026-11-26](https://github.com/liliu-z/stashbase/actions/runs/45738410131)
+then verified all public channels and Store status Published with package 2.19.1.0;
+the aggregate status reached success. A future API-created update still needs
+its own execution evidence.
 
 | Report result | Meaning and next action |
 |---|---|
@@ -621,9 +630,9 @@ release may receive assets, and it accepts a draft alone.
   roughly twenty minutes of refusals before failing the job. A fault that
   outlasts the budget is a GitHub outage, and the job fails rather than
   publishing a partial update set.
-- An asset already stored at the size this build produced is kept, so a rerun
-  does not have to rebuild the draft. A stored asset of a different size stops
-  the release, because versioned assets are immutable.
+- An asset already stored is kept only when both size and SHA-256 match this
+  build. Different bytes or a missing digest stop the release, including
+  same-sized update metadata from another build. Versioned assets are immutable.
 - A rejection GitHub will not reconsider is not retried.
 
 Assertions live in `scripts/github-release-api.test.mjs` behind

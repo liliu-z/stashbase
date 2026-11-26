@@ -106,15 +106,24 @@ test('a transport failure mid-upload is retried', async () => {
   assert.deepEqual(api.calls.filter((call) => call.startsWith('put')).length, 2);
 });
 
-test('an asset already stored at the built size is kept without re-uploading', async () => {
+test('only an asset with the same size and SHA-256 is kept without re-uploading', async () => {
+  const digest = `sha256:${'a'.repeat(64)}`;
   const api = fakeAssetApi({
     responses: [],
-    stored: [{ id: 5, name: asset.name, size: asset.size, state: 'uploaded' }],
+    stored: [{ id: 5, name: asset.name, size: asset.size, digest, state: 'uploaded' }],
   });
 
-  await uploadReleaseAssets({ api, tag: 'v2.9.4', assets: [asset], delay: instantDelay });
+  await uploadReleaseAssets({ api, tag: 'v2.9.4', assets: [{ ...asset, digest }], delay: instantDelay });
 
   assert.deepEqual(api.calls, ['list']);
+  for (const localDigest of [`sha256:${'b'.repeat(64)}`, undefined]) {
+    await assert.rejects(uploadReleaseAssets({ api, tag: 'v2.9.4',
+      assets: [{ ...asset, digest: localDigest }], delay: instantDelay }), /immutable/);
+  }
+  const unverified = fakeAssetApi({ responses: [],
+    stored: [{ id: 5, name: asset.name, size: asset.size, state: 'uploaded' }] });
+  await assert.rejects(uploadReleaseAssets({ api: unverified, tag: 'v2.9.4',
+    assets: [{ ...asset, digest }], delay: instantDelay }), /immutable/);
 });
 
 test('an asset stored at a different size stops the release instead of being replaced', async () => {

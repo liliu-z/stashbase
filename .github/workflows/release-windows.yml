@@ -123,6 +123,7 @@ jobs:
           path: |
             release.nosync/*-store-x64.msix
             release.nosync/*-store-x64.msix.sha256
+            release.nosync/store-msix-source.json
           if-no-files-found: error
           retention-days: 90
           compression-level: 0

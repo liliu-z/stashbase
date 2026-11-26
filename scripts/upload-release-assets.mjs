@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -99,12 +100,15 @@ function assetApi(releaseId) {
   };
 }
 
-const assets = files.map((file) => {
+const assets = [];
+for (const file of files) {
   const resolved = path.resolve(root, file);
   const size = fs.statSync(resolved).size;
   if (size === 0) throw new Error(`Refusing to upload an empty asset: ${file}`);
-  return { path: resolved, name: path.basename(resolved), size };
-});
+  const hash = createHash('sha256');
+  for await (const chunk of fs.createReadStream(resolved)) hash.update(chunk);
+  assets.push({ path: resolved, name: path.basename(resolved), size, digest: `sha256:${hash.digest('hex')}` });
+}
 
 const release = await findDraftReleaseByTag({ request, repo, tag });
 console.log(`[release] ${repo} ${tag} ${release.html_url}`);

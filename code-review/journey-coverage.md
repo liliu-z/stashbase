@@ -75,8 +75,13 @@ Partner Center association and three repository secret entries were configured
 on 2026-11-25. Hosted read-only run 45552682340 authenticated successfully and
 verified GitHub, CDN, Brew and all four live website download destinations for
 v2.19.1; Store returned Certification and aggregate completion remained pending.
-API-created submissions, scheduled execution and installed-app update acceptance
-remain unverified.
+Scheduled run [45738410131](https://github.com/liliu-z/stashbase/actions/runs/45738410131)
+on 2026-11-26 verified every public channel and Store publication of 2.19.1.0;
+the aggregate status reached success. Store artifacts now carry the actual
+checkout commit and package digest, independently of the workflow's main ref.
+Focused fixtures cover delayed-main/tag provenance and same-size asset conflicts.
+API-created submissions and installed-app update acceptance remain unverified;
+the new artifact provenance still needs a hosted Windows packaging run.
 
 **Permission changes (2026-11-24):** The core gate and focused Claude,
 Antigravity and renderer session checks pass for mode reconciliation and

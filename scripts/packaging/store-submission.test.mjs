@@ -3,10 +3,38 @@ import test from 'node:test';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { advanceStore, STORE_APP, STORE_IDENTITY, STORE_PUBLISHER, storeStatus, updateStorePackages } from './store-submission.mjs';
+import { advanceStore, STORE_APP, STORE_IDENTITY, STORE_PUBLISHER, storeStatus, updateStorePackages, verifyStoreRun, verifyStorePackageSource } from './store-submission.mjs';
 import { createStoreClient, uploadStoreArchive, uploadTarget } from './store-client.mjs';
 
 const packageFor = version => ({ fileName: `StashBase-${version}-store-x64.msix`, fileStatus: 'Uploaded', version: `${version}.0`, architecture: 'X64' });
+
+test('Store artifact runs trust the release workflow ref, not the checkout commit in run.head_sha', () => {
+  const target = { repository: 'liliu-z/stashbase', tag: 'v2.19.2', sha: 'tagged-commit' };
+  const run = { head_sha: 'newer-main-commit', head_branch: 'main',
+    head_repository: { full_name: target.repository }, path: '.github/workflows/release.yml',
+    event: 'workflow_run', status: 'in_progress' };
+  assert.doesNotThrow(() => verifyStoreRun(run, target));
+  assert.doesNotThrow(() => verifyStoreRun({ ...run, event: 'workflow_dispatch',
+    path: '.github/workflows/build-msix.yml' }, target));
+  assert.doesNotThrow(() => verifyStoreRun({ ...run, event: 'workflow_dispatch',
+    head_branch: target.tag, head_sha: target.sha }, target));
+  for (const patch of [{ head_branch: 'untrusted-branch' }, { event: 'pull_request' },
+    { head_branch: target.tag }, { path: '.github/workflows/ci.yml' },
+    { head_repository: { full_name: 'other/fork' } }]) {
+    assert.throws(() => verifyStoreRun({ ...run, ...patch }, target), /approved workflow/);
+  }
+});
+
+test('Store submission binds the checked out release to the downloaded MSIX bytes and original run', () => {
+  const source = { tag: 'v2.19.2', sha: 'tagged-commit', sourceRun: '123', packageSha256: 'package-hash' };
+  assert.doesNotThrow(() => verifyStorePackageSource(source, source));
+  for (const key of Object.keys(source)) {
+    assert.throws(() => verifyStorePackageSource({ ...source, [key]: 'different' }, source), /provenance mismatch/);
+    const missing = { ...source }; delete missing[key];
+    assert.throws(() => verifyStorePackageSource(missing, source), /provenance mismatch/);
+  }
+  assert.throws(() => verifyStorePackageSource(undefined, source), /provenance mismatch/);
+});
 function fixture() {
   const events = [];
   const app = { id: STORE_APP, packageIdentityName: STORE_IDENTITY, publisherName: STORE_PUBLISHER, lastPublishedApplicationSubmission: { id: '1' } };

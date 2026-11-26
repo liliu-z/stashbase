@@ -22,6 +22,12 @@ try {
   if ((Get-Item $output).Length -eq 0) { throw 'MakeAppx produced an empty package.' }
   $hash = (Get-FileHash $output -Algorithm SHA256).Hash.ToLowerInvariant()
   Set-Content -Path "$output.sha256" -Value "$hash  $(Split-Path $output -Leaf)" -Encoding utf8
+  if ($env:GITHUB_RUN_ID) {
+    $sourceCommit = & git -C $root rev-parse HEAD
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot identify the MSIX source commit.' }
+    @{ tag = "v$version"; sha = $sourceCommit.Trim(); sourceRun = $env:GITHUB_RUN_ID; packageSha256 = $hash } |
+      ConvertTo-Json | Set-Content -Path (Join-Path $root 'release.nosync/store-msix-source.json') -Encoding utf8
+  }
   Write-Host "Store package: $output"
   Write-Host "SHA256: $hash"
 } finally {

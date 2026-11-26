@@ -7,11 +7,32 @@ export const STORE_OVERVIEW = `https://partner.microsoft.com/dashboard/products/
 const ACTIVE = new Set(['CommitStarted', 'PreProcessing', 'Certification', 'Release', 'PendingPublication', 'Publishing']);
 const FAILED = new Set(['Canceled', 'CommitFailed', 'PreProcessingFailed', 'CertificationFailed', 'ReleaseFailed', 'PublishFailed']);
 
-export function packageVersions(submission) {
+export function verifyStoreRun(run, { repository, tag, sha }) {
+  // workflow_run and a dispatch from main describe the workflow ref, while the
+  // Windows adapter explicitly checks out the release tag. The artifact records
+  // that checkout separately; only trusted main/tag workflow definitions may supply it.
+  const trustedRef = run.head_branch === 'main' || (run.head_branch === tag && run.head_sha === sha);
+  if (!trustedRef || run.head_repository?.full_name !== repository ||
+      !['workflow_run', 'workflow_dispatch'].includes(run.event) ||
+      !['.github/workflows/release.yml', '.github/workflows/build-msix.yml'].includes(run.path) ||
+      !['in_progress', 'completed'].includes(run.status)) {
+    throw new Error('MSIX artifact source does not match the tagged commit and approved workflow');
+  }
+}
+
+export function verifyStorePackageSource(source, expected) {
+  for (const key of ['tag', 'sha', 'sourceRun', 'packageSha256']) {
+    if (typeof expected[key] !== 'string' || !expected[key] || source?.[key] !== expected[key]) {
+      throw new Error(`MSIX artifact provenance mismatch: ${key}`);
+    }
+  }
+}
+
+function packageVersions(submission) {
   return (submission?.applicationPackages ?? []).filter(p => p.fileStatus !== 'PendingDelete').map(p => p.version).filter(Boolean);
 }
 
-export function hasStoreVersion(submission, version) {
+function hasStoreVersion(submission, version) {
   storeVersion(version);
   return (submission?.applicationPackages ?? []).some(p => p.fileStatus === 'Uploaded' &&
     String(p.architecture).toLowerCase() === 'x64' && p.version?.split('.').slice(0, 3).join('.') === version);
