@@ -55,6 +55,7 @@ test('publication and scheduled monitoring keep Store mutations serialized and a
   assert.ok(followup.needs.includes('publish-homebrew'));
   assert.match(followup.if, /always\(\).*publish-release.result == 'success'/);
   assert.equal(monitor.concurrency['cancel-in-progress'], false);
+  assert.equal(monitor.concurrency.queue, 'max', 'checks must not replace a pending release carrying its source-run');
   assert.ok(monitor.on.schedule.length);
   assert.equal(monitor.on.pull_request, undefined);
   assert.equal(monitor.on.workflow_dispatch.inputs['check-only'].default, true);

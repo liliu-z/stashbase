@@ -43,6 +43,7 @@ permissions:
 # A product has one pending Store submission. Serialize all submissions/retries.
 concurrency:
   group: release-channels
+  queue: max
   cancel-in-progress: false
 
 jobs:

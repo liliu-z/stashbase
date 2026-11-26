@@ -80,6 +80,9 @@ on 2026-11-26 verified every public channel and Store publication of 2.19.1.0;
 the aggregate status reached success. Store artifacts now carry the actual
 checkout commit and package digest, independently of the workflow's main ref.
 Focused fixtures cover delayed-main/tag provenance and same-size asset conflicts.
+The Store CLI fixture covers correcting a tentative artifact run, rejecting an
+untrusted replacement, preserving bound receipts and read-only checks. A workflow
+contract check guards retention of queued releases behind channel monitoring.
 API-created submissions and installed-app update acceptance remain unverified;
 the new artifact provenance still needs a hosted Windows packaging run.
 

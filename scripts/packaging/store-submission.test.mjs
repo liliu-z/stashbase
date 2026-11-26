@@ -1,12 +1,103 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import os from 'node:os';
 import path from 'node:path';
 import { advanceStore, STORE_APP, STORE_IDENTITY, STORE_PUBLISHER, storeStatus, updateStorePackages, verifyStoreRun, verifyStorePackageSource } from './store-submission.mjs';
 import { createStoreClient, uploadStoreArchive, uploadTarget } from './store-client.mjs';
 
 const packageFor = version => ({ fileName: `StashBase-${version}-store-x64.msix`, fileStatus: 'Uploaded', version: `${version}.0`, architecture: 'X64' });
+
+test('Store CLI can correct a tentative source but cannot replace a bound receipt or write in read-only mode', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'store-source-# retry-'));
+  try {
+    const preload = path.join(root, 'mock.mjs');
+    const receiptPath = path.join(root, 'receipt.json');
+    await writeFile(preload, String.raw`
+import cp from 'node:child_process';
+import fs from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
+const statePath = 'receipt.json';
+const sha = 'a'.repeat(40);
+cp.execFileSync = (command, args, options = {}) => {
+  if (command !== 'gh' || args[0] !== 'api') throw new Error('Unexpected subprocess');
+  const route = args[1];
+  const body = options.input ? JSON.parse(options.input) : null;
+  let value;
+  if (body && process.env.STORE_TEST_READ_ONLY) throw new Error('Unexpected read-only write');
+  if (body && route.endsWith('/deployments')) {
+    value = { id: 900, payload: body.payload };
+    fs.writeFileSync(statePath, JSON.stringify(value));
+  } else if (body && route.includes('/statuses')) value = { id: 1 };
+  else if (route.includes('/releases/')) value = { tag_name: 'v2.19.2', draft: false, prerelease: false };
+  else if (route.includes('/commits/')) value = { sha };
+  else if (route.includes('/deployments?')) value = fs.existsSync(statePath) ? [JSON.parse(fs.readFileSync(statePath, 'utf8'))] : [];
+  else if (route.endsWith('/artifacts?per_page=100')) value = { artifacts: [] };
+  else if (/actions\/runs\/\d+$/.test(route)) value = {
+    head_branch: route.endsWith('/333') ? 'untrusted-branch' : 'main',
+    head_repository: { full_name: 'liliu-z/stashbase' },
+    path: '.github/workflows/release.yml', event: 'workflow_run', status: 'completed',
+  };
+  else if (route.includes('/git/ref/tags/')) value = { object: { type: 'commit', sha } };
+  else if (route.includes('/actions/workflows/ci.yml/runs?')) value = {
+    workflow_runs: [{ id: 500, head_sha: sha, event: 'push', status: 'completed', conclusion: 'success' }],
+  };
+  else throw new Error('Unexpected GitHub route: ' + route);
+  return JSON.stringify(value);
+};
+syncBuiltinESMExports();
+process.env.MS_STORE_TENANT_ID = '11111111-1111-1111-1111-111111111111';
+process.env.MS_STORE_CLIENT_ID = '22222222-2222-2222-2222-222222222222';
+process.env.MS_STORE_CLIENT_SECRET = 'fixture-only';
+delete process.env.GITHUB_STEP_SUMMARY;
+globalThis.fetch = async (url, options) => {
+  let value;
+  if (String(url).includes('/oauth2/token')) value = { access_token: 'fixture-only' };
+  else if (options.method === 'GET' && String(url).endsWith('/9N1Z6TB2H2P5')) value = {
+    id: '9N1Z6TB2H2P5', packageIdentityName: 'StashBase.StashBase',
+    publisherName: 'CN=7009CBF4-3C51-44A5-943B-4BA69A1EA67B', lastPublishedApplicationSubmission: { id: '1' },
+  };
+  else if (options.method === 'GET' && String(url).endsWith('/submissions/1')) value = {
+    id: '1', status: 'Published', applicationPackages: [{ fileName: 'old.msix', fileStatus: 'Uploaded', architecture: 'X64', version: '2.19.1.0' }],
+  };
+  else throw new Error('Unexpected network operation');
+  return new Response(JSON.stringify(value), { status: 200 });
+};
+`);
+    const run = async (source, readOnly = false) => {
+      const result = spawnSync(process.execPath, ['--import', pathToFileURL(preload).href,
+        fileURLToPath(new URL('../store-release.mjs', import.meta.url)), '--source-run', source,
+        ...(readOnly ? ['--read-only'] : [])], {
+        cwd: root, encoding: 'utf8', timeout: 10_000,
+        env: { ...process.env, STORE_TEST_READ_ONLY: readOnly ? '1' : '' },
+      });
+      assert.equal(result.error, undefined);
+      assert.equal(result.status, 1, result.stderr);
+      const report = JSON.parse(await readFile(path.join(root, 'release.nosync/channel-status/store.json'), 'utf8'));
+      return report.channels['Microsoft Store'].detail;
+    };
+    const receipt = async () => JSON.parse(await readFile(receiptPath, 'utf8'));
+    assert.match(await run('111'), /MSIX artifact is missing/);
+    assert.equal((await receipt()).payload.sourceRun, '111');
+    assert.match(await run('222'), /MSIX artifact is missing/);
+    const tentative = await receipt();
+    assert.equal(tentative.payload.sourceRun, '222');
+    assert.match(await run('333'), /approved workflow/);
+    assert.deepEqual(await receipt(), tentative);
+    assert.match(await run('111', true), /Published/);
+    assert.deepEqual(await receipt(), tentative);
+    for (const binding of [{ packageSha256: 'hash' }, { submissionId: '2' }]) {
+      const bound = { ...tentative, payload: { ...tentative.payload, ...binding } };
+      await writeFile(receiptPath, JSON.stringify(bound));
+      assert.match(await run('111'), /original artifact run/);
+      assert.deepEqual(await receipt(), bound);
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
 
 test('Store artifact runs trust the release workflow ref, not the checkout commit in run.head_sha', () => {
   const target = { repository: 'liliu-z/stashbase', tag: 'v2.19.2', sha: 'tagged-commit' };

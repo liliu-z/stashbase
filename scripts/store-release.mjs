@@ -32,10 +32,13 @@ try {
     receipt = deployment.payload;
   };
   if (values['source-run'] && !/^\d+$/.test(values['source-run'])) throw new Error('Invalid source run ID');
-  if (receipt && values['source-run'] && receipt.sourceRun !== values['source-run']) {
+  const sourceChanged = values['source-run'] && receipt?.sourceRun !== values['source-run'];
+  if (sourceChanged && (receipt?.submissionId || receipt?.packageSha256)) {
     throw new Error('Retry must use the original artifact run recorded for this release');
   }
-  if (!readOnly && !receipt && values['source-run']) {
+  // Keep a source while waiting for certification, but bind it only once a
+  // package or submission is recorded. A mistaken candidate must be correctable.
+  if (!readOnly && sourceChanged) {
     verifyRun(values['source-run']);
     await saveReceipt({ sourceRun: values['source-run'] });
   }

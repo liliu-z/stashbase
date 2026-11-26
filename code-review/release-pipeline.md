@@ -475,6 +475,8 @@ certification is pending: `release/all-channels` remains pending until every
 channel passes. The job summary and `release-channel-status` JSON artifact show
 the individual results. Missing configuration, rejected submissions, mismatched
 versions and failed network checks fail visibly; no issue/email is sent by code.
+All invocations share a serial concurrency group with the maximum pending queue,
+so monitoring does not replace a queued release carrying its artifact run ID.
 
 One-time Store setup (credentials can be configured during initial certification;
 automatic updates wait for the first manually submitted version to be published):
@@ -571,6 +573,11 @@ review of their owning Partner Center fields.
 
 GitHub deployments in the `microsoft-store` environment persist a non-secret
 receipt: tag, commit, original artifact run, package hash and submission ID.
+An initial source-only receipt lets scheduled runs resume after waiting for older
+certification. A mistaken source can be corrected by supplying another approved
+workflow run only while neither a package hash nor a submission ID is recorded.
+Read-only checks never replace the source. Once either binding exists, the source
+is immutable; package provenance and identity checks still precede submission.
 The submission ID is recorded before modifying or uploading the new draft.
 Retries use that same receipt and immutable artifact, while an already committed
 submission is only read. A pending draft without a matching receipt is never
@@ -583,7 +590,7 @@ While an older version is in certification, the latest release waits for the
 single Store submission slot. The scheduled check submits the current latest
 version once the slot clears; intermediate releases may be superseded. Rejection
 stops automatic progression for operator review. An expired artifact is an
-explicit failure; do not substitute rebuilt bytes under an existing receipt.
+explicit failure; do not substitute rebuilt bytes under a bound receipt.
 Prefer the next version, or finish the already reviewed submission manually.
 
 `scripts/check-release-channels.mjs` verifies public platform assets, all three
