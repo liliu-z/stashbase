@@ -83,8 +83,12 @@ Focused fixtures cover delayed-main/tag provenance and same-size asset conflicts
 The Store CLI fixture covers correcting a tentative artifact run, rejecting an
 untrusted replacement, preserving bound receipts and read-only checks. A workflow
 contract check guards retention of queued releases behind channel monitoring.
-API-created submissions and installed-app update acceptance remain unverified;
-the new artifact provenance still needs a hosted Windows packaging run.
+The v2.19.2 [release run](https://github.com/liliu-z/stashbase/actions/runs/45855601916)
+passed Windows packaging/provenance validation and committed API submission
+1152921505702517725 (initially CommitStarted). The website audit distinguishes
+direct installers from the Store listing, retaining the Windows installer check
+while validating the Store product address. Installed-app update acceptance
+and the Store-installed runtime remain unverified.
 
 **Permission changes (2026-11-24):** The core gate and focused Claude,
 Antigravity and renderer session checks pass for mode reconciliation and

@@ -45,6 +45,15 @@ test('partial update sets, wrong hashes, stale links and architecture mismatch a
   assert.throws(() => checkCdnManifest(extra.release, extra.manifest), /unexpected asset set/);
 });
 
+test('Store listing links can await certification without replacing the current Windows installer', () => {
+  const f = fixture();
+  const store = { platform: 'windows_x64', method: 'microsoft_store', version: 'v2.19.1',
+    url: 'https://apps.microsoft.com/detail/9n1z6tb2h2p5' };
+  checkWebsiteLinks(f.release, [...f.links, store]);
+  assert.throws(() => checkWebsiteLinks(f.release, [...f.links, { ...store, url: 'https://apps.microsoft.com/detail/another-product' }]), /Store/);
+  assert.throws(() => checkWebsiteLinks(f.release, [...f.links.filter(link => link.platform !== 'windows_x64'), store]), /windows_x64/);
+});
+
 test('publication and scheduled monitoring keep Store mutations serialized and audit failures visible', () => {
   const read = file => YAML.parse(fs.readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8'));
   const coordinator = read('.github/workflows/release.yml');

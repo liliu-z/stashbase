@@ -55,14 +55,16 @@ await Promise.all([
       const page = await context.newPage();
       await page.goto('https://stashbase.ai/download/', { waitUntil: 'domcontentloaded', timeout: 45_000 });
       await page.waitForFunction(tag => ['macos_arm64', 'macos_x64', 'windows_x64', 'linux_amd64'].every(platform => {
-        const links = [...document.querySelectorAll(`a[data-download-platform="${platform}"]`)];
+        const links = [...document.querySelectorAll(`a[data-download-platform="${platform}"]`)]
+          .filter(link => link.getAttribute('data-download-method') !== 'microsoft_store');
         return links.length && links.every(link => link.getAttribute('data-download-release') === tag);
       }), release.tag_name, { timeout: 30_000 });
       const links = await page.locator('a[data-download-platform]').evaluateAll(elements => elements.map(link => ({
-        platform: link.getAttribute('data-download-platform'), version: link.getAttribute('data-download-release'), url: link.href,
+        platform: link.getAttribute('data-download-platform'), version: link.getAttribute('data-download-release'),
+        method: link.getAttribute('data-download-method'), url: link.href,
       })));
       checkWebsiteLinks(release, links);
-      return `${release.tag_name}; all four platform buttons resolved in a fresh browser`;
+      return `${release.tag_name}; all four installer platforms and any Store listing links verified in a fresh browser`;
     } finally { await browser.close(); }
   }),
 ]);

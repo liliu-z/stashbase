@@ -1,4 +1,5 @@
 import { releaseInstallers, DOWNLOAD_ORIGIN } from './download-mirror.mjs';
+import { STORE_APP } from './store-submission.mjs';
 
 export const WEBSITE_PLATFORMS = { macos_arm64: 'mac-arm64.dmg', macos_x64: 'mac-x64.dmg', windows_x64: 'win-x64.exe', linux_amd64: 'linux-amd64.deb' };
 
@@ -53,8 +54,13 @@ export function checkCask(release, source) {
 
 export function checkWebsiteLinks(release, links) {
   const version = release.tag_name.slice(1);
+  for (const link of links.filter(link => link.method === 'microsoft_store')) {
+    if (link.platform !== 'windows_x64' || link.url.toLowerCase() !== `https://apps.microsoft.com/detail/${STORE_APP.toLowerCase()}`) {
+      throw new Error('Website Microsoft Store button points to the wrong product');
+    }
+  }
   for (const [platform, suffix] of Object.entries(WEBSITE_PLATFORMS)) {
-    const matches = links.filter(link => link.platform === platform);
+    const matches = links.filter(link => link.platform === platform && link.method !== 'microsoft_store');
     const name = `StashBase-${version}-${suffix}`;
     const allowed = [`${DOWNLOAD_ORIGIN}/${release.tag_name}/${name}`, `https://github.com/liliu-z/stashbase/releases/download/${release.tag_name}/${name}`];
     if (!matches.length || matches.some(link => link.version !== release.tag_name || !allowed.includes(link.url))) {

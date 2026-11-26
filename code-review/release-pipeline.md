@@ -533,8 +533,11 @@ Store submission `1152921505702500089` returned `Certification`; the aggregate
 `release/all-channels` status correctly remained pending. No Store submission
 was changed. The [scheduled check on 2026-11-26](https://github.com/liliu-z/stashbase/actions/runs/45738410131)
 then verified all public channels and Store status Published with package 2.19.1.0;
-the aggregate status reached success. A future API-created update still needs
-its own execution evidence.
+the aggregate status reached success. The v2.19.2
+[coordinated run](https://github.com/liliu-z/stashbase/actions/runs/45855601916)
+then passed Windows packaging and source-provenance checks, uploaded the MSIX and
+committed API-created submission 1152921505702517725. Its initial status was
+CommitStarted; that is submission evidence, not Store publication or installation.
 
 | Report result | Meaning and next action |
 |---|---|
@@ -595,8 +598,10 @@ Prefer the next version, or finish the already reviewed submission manually.
 
 `scripts/check-release-channels.mjs` verifies public platform assets, all three
 updater metadata files and sidecars, CDN manifest digests and public file sizes,
-both Homebrew architectures and checksums, and the four actual website download
-button destinations in a fresh browser. The browser uses no account/profile and
+both Homebrew architectures and checksums, and all four direct-installer platforms
+in a fresh browser. A Microsoft Store website button must point to this product's
+listing; its static version label may lag while certification runs and never
+substitutes for the Windows installer check. The browser uses no account/profile and
 blocks telemetry. Store completion requires a matching x64 package in the last
 published submission, allowing the Store-owned fourth version segment. Store
 SAS URLs, tokens and full submission JSON are never included in receipts/reports.
