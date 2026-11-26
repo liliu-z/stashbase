@@ -102,4 +102,4 @@ Prepared text, downloaded PDF/OCR components, and search indexes need local
 disk space. Removing a folder from the project registry clears its
 StashBase-owned index and derived data without deleting the source files.
 
-Continue with [Start Writing](../README.md#start-writing).
+Continue with [Start Writing](../README.md#start-a-project).
