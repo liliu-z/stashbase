@@ -147,7 +147,7 @@ describe('HTML document', () => {
     fireEvent.load(frame);
   });
 
-  it('loads a newer version that arrives through an external store after the page settled', async () => {
+  it('loads a newer version while the shown frame is settling', () => {
     // The asset query delivers versions through useSyncExternalStore, so a
     // newer version renders at sync priority while the shown page's own ready
     // signal is still queued at default priority.
@@ -175,22 +175,27 @@ describe('HTML document', () => {
         />
       );
     }
-    render(<Host />);
-    const [shown] = frames();
-    if (!shown) throw new Error('HTML preview frame is missing.');
-    fireEvent.load(shown);
-    // The shown page reports ready once its load settles.
-    await act(() => new Promise((resolve) => setTimeout(resolve, 200)));
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      render(<Host />);
+      const [shown] = frames();
+      if (!shown) throw new Error('HTML preview frame is missing.');
+      fireEvent.load(shown);
 
-    act(() => {
-      version = 'two';
-      for (const listener of listeners) listener();
-    });
-    await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
-    expect(frames().map((frame) => frame.getAttribute('src'))).toEqual([
-      'data:text/html,one',
-      'data:text/html,two',
-    ]);
+      act(() => {
+        // Keep the frame's 80 ms ready update and the sync store update in one flush.
+        vi.advanceTimersByTime(80);
+        version = 'two';
+        for (const listener of listeners) listener();
+      });
+      expect(frames().map((frame) => frame.getAttribute('src'))).toEqual([
+        'data:text/html,one',
+        'data:text/html,two',
+      ]);
+    } finally {
+      cleanup();
+      vi.useRealTimers();
+    }
   });
 
   it('keeps the shown page until its replacement is ready, at the same reading position', async () => {
