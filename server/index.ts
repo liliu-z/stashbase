@@ -37,7 +37,7 @@ import {
 } from './agent-contract.ts';
 import { onClose, ensureFolderHome, registeredFolderRoots } from './folder.ts';
 import { filesystemPath } from './filesystem-path.ts';
-import { bootBindAllFolders, resetIndexerRuntime } from './state.ts';
+import { bootBindAllFolders } from './state.ts';
 import { reapOrphanDaemons, reclaimStaleServerPort } from './stale-lock.ts';
 import { startParentWatchdog } from './parent-watchdog.ts';
 import { logger } from './log.ts';
@@ -92,7 +92,6 @@ import { parsePortArg } from '../shared/port-arg.ts';
 
 const log = logger('server');
 installHostErrorReporting();
-
 
 // Compatibility adapters preserve the established Claude SDK and Codex
 // app-server behaviour behind one panel contract.  Their native protocols
@@ -475,7 +474,6 @@ function modelOf(req: import('node:http').IncomingMessage): string | undefined {
     return value && value.length <= 200 ? value : undefined;
   } catch { return undefined; }
 }
-
 
 /** Raw explicit-folder request off the WS URL. Membership validation happens
  *  in the connection handler via `resolveAgentSessionScope`. */

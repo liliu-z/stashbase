@@ -78,7 +78,7 @@ export interface ExternalFileGrant {
 }
 
 /** A window that keeps dropping files without closing them stops here. */
-export const MAX_EXTERNAL_FILE_GRANTS_PER_WINDOW = 256;
+const MAX_EXTERNAL_FILE_GRANTS_PER_WINDOW = 256;
 
 const grants = new Map<string, ExternalFileGrant>();
 const tokensByWindowFile = new Map<string, string>();
@@ -258,7 +258,7 @@ export function revokeExternalFile(token: string, windowId: string): boolean {
   return true;
 }
 
-export function revokeWindowExternalFiles(windowId: string): void {
+function revokeWindowExternalFiles(windowId: string): void {
   for (const grant of [...grants.values()]) {
     if (grant.windowId === windowId) revokeExternalFile(grant.token, windowId);
   }

@@ -16,9 +16,7 @@ export const externalFileTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{22,64}$/
 
 export const externalFileOpenRequestSchema = z.object({ path: absolutePathSchema }).strict();
 
-export const EXTERNAL_FILE_REFUSALS = ['copy-required', 'directory', 'unavailable', 'no-project'] as const;
-
-export type ExternalFileRefusal = (typeof EXTERNAL_FILE_REFUSALS)[number];
+const EXTERNAL_FILE_REFUSALS = ['copy-required', 'directory', 'unavailable', 'no-project'] as const;
 
 /**
  * What opening one dropped file resolved to: a read grant for a file outside

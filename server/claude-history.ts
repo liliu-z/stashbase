@@ -258,7 +258,7 @@ type HistoryMessage = { type: string; uuid?: string; message: unknown };
  *  attachment, which the SDK's history reader leaves out. Each goes back as a
  *  user message after the message its chain hangs from, so a reopened chat
  *  shows what the reader sent where Claude read it. */
-export function withFollowUps(
+function withFollowUps(
   messages: HistoryMessage[],
   native: NativeTranscriptEntry[],
 ): HistoryMessage[] {

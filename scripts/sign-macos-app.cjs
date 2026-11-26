@@ -43,4 +43,3 @@ module.exports = signMacosApp;
 module.exports.isBundledOpenCode = isBundledOpenCode;
 module.exports.optionsForSignedFile = optionsForSignedFile;
 module.exports.createOptionsForFile = createOptionsForFile;
-module.exports.openCodeEntitlements = openCodeEntitlements;

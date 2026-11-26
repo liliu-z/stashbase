@@ -51,7 +51,6 @@ test('MCP project mutations work outside an active folder and enforce versions',
     mcpRoutes,
     projectMutations,
     stateDb,
-    derivedStore,
     state,
   ] = await Promise.all([
     import('express'),
@@ -60,7 +59,6 @@ test('MCP project mutations work outside an active folder and enforce versions',
     import('./routes/mcp-http.ts'),
     import('./project-file-mutations.ts'),
     import('./state-db.ts'),
-    import('./derived-store.ts'),
     import('./state.ts'),
   ]);
   clearCurrentFolder = folder.clearCurrentFolder;

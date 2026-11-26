@@ -33,7 +33,6 @@ import {
 } from '../retrieval/index.ts';
 import { attributedRequestSession } from '../agent-session-registry.ts';
 import type { IndexerStatus, SearchHit } from '../indexer.ts';
-import type { KeywordHitFile } from '../search-display.ts';
 import type { SyncResult } from '../sync.ts';
 import { ProjectOperationError } from './errors.ts';
 import type { SearchTypeCategory } from '../../shared/search-types.ts';
@@ -47,8 +46,6 @@ import { diagnoseFileWrite } from '../write-diagnostics.ts';
 import type { WriteOperationDiagnostic } from '../../shared/protocols/write-diagnostics.ts';
 import { markDiagnosticReported } from '../error-diagnostics.ts';
 import type { TelemetryEvent } from '../../shared/protocols/http/telemetry.ts';
-
-export type { ProjectKeywordFile } from '../../shared/search-results.ts';
 
 export { ProjectOperationError } from './errors.ts';
 

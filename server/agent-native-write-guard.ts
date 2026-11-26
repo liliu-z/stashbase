@@ -15,7 +15,7 @@ const MAX_LINK_HOPS = 40;
 // The native form also resolves Windows 8.3 names and on-disk letter case.
 const realpathNative = promisify(fs.realpath.native);
 
-export const PROJECT_NATIVE_WRITE_REASON =
+const PROJECT_NATIVE_WRITE_REASON =
   'This path is inside the StashBase project. Use the StashBase MCP `edit_file` tool to change an existing project file or `write_file` to create one. Native write tools are only for requested files outside the project.';
 
 /** Whether a native write tool's target resolves inside the bound project.

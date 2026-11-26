@@ -16,10 +16,10 @@ import fs from 'node:fs';
 import { MAX_TEXT_READ_BYTES } from './active-file-operations.ts';
 import type { DelimitedTable, TableDelimiter, TableEncoding } from '../shared/protocols/http/files.ts';
 
-export const MAX_TABLE_BYTES = 512 * 1024 * 1024;
-export const MAX_TABLE_PAGE_ROWS = 500;
+const MAX_TABLE_BYTES = 512 * 1024 * 1024;
+const MAX_TABLE_PAGE_ROWS = 500;
 /** Excel's own column ceiling; wider records keep their first columns. */
-export const MAX_TABLE_COLUMNS = 16_384;
+const MAX_TABLE_COLUMNS = 16_384;
 /** Excel's cell ceiling. A longer field is cut, visibly, with an ellipsis. */
 const MAX_FIELD_CHARACTERS = 32_767;
 const MAX_FIELD_BYTES = MAX_FIELD_CHARACTERS * 4;

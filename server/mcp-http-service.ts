@@ -17,8 +17,6 @@ import {
 import { mount as mountMcpHttpTransport } from './routes/mcp-http.ts';
 import type { McpHttpStatus } from '../shared/mcp.ts';
 
-export type { McpHttpStatus } from '../shared/mcp.ts';
-
 const log = logger('mcp-http-service');
 
 export interface DockerMcpListener {

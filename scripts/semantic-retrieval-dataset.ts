@@ -12,18 +12,18 @@ export interface SemanticEvalDataset {
   queries: SemanticEvalQuery[];
 }
 
-export type SemanticEvalDocument =
+type SemanticEvalDocument =
   | { path: string; kind: 'direct' }
   | { path: string; kind: 'prepared'; preparedText: string };
 
-export interface SemanticEvalQuery {
+interface SemanticEvalQuery {
   id: string;
   text: string;
   relevant: string[];
   compareExact?: boolean;
 }
 
-export interface SemanticEvalBaselineRun {
+interface SemanticEvalBaselineRun {
   provider: string;
   model: string;
   runId: string;

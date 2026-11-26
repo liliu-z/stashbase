@@ -153,7 +153,7 @@ export async function readCodexModelCatalog(
 }
 
 /** The StashBase Agent's approved profiles, as the picker names them. */
-export async function readHostedAgentModelCatalog(): Promise<CatalogReading> {
+async function readHostedAgentModelCatalog(): Promise<CatalogReading> {
   return { models: hostedAgentCatalogModels(await fetchHostedAgentProfiles()) };
 }
 

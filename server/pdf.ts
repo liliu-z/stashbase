@@ -33,7 +33,7 @@ const PDF_TEXT_PROBE_REAP_TIMEOUT_MS = 2000;
 const PDF_COST_TEXT_LAYER = 0;
 const PDF_COST_OCR_OR_UNKNOWN = 10;
 
-export interface ConvertResult {
+interface ConvertResult {
   /** Absolute AppData path of the written derived Markdown. */
   notePath: string;
   /** Absolute AppData path of the extracted asset bundle. */

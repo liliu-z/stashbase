@@ -100,6 +100,7 @@ async function jsonBody<T>(response: Response): Promise<T | null> {
   try { return await response.json() as T; } catch { return null; }
 }
 
+/** @public Exercised inside isolated child processes in hosted-account.test.ts. */
 export function normalizedGoogleProfile(user: AuthUser | undefined): Pick<HostedAccountSession, 'displayName' | 'avatarUrl'> {
   const displayName = normalizeHostedDisplayName(user?.name);
   const avatarUrl = parseGoogleAvatarUrl(user?.image)?.toString();
@@ -522,6 +523,7 @@ export async function hostedAccountAvatar(): Promise<{ contentType: string; byte
 // credential format. It is stable through access-token refresh.
 const generationKey = crypto.randomBytes(32);
 
+/** @public Exercised inside isolated child processes in hosted-account.test.ts. */
 export function hostedAccountGeneration(): string | undefined {
   const session = getHostedAccountSession();
   if (!session) return undefined;

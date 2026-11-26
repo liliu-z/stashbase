@@ -44,7 +44,7 @@ import { SEARCH_TYPE_CATEGORIES, type SearchTypeCategory } from '../shared/searc
 /** Directly readable text formats — indexed directly (the file is the source). */
 export type FileFormat = DirectTextFormat;
 
-export type { DirectTextFormat, KnownViewerFormat, ViewerFormat } from '../shared/file-formats.ts';
+export type { KnownViewerFormat, ViewerFormat } from '../shared/file-formats.ts';
 
 /** Recognised note extensions and how the rest of the pipeline should
  *  treat them. Adding a format = one line here + a chunker + a viewer —
@@ -88,7 +88,6 @@ const NOTE_STEM_RE = new RegExp(`^(.*/)?([^/]+)\\.(${NOTE_EXT_ALT})$`, 'i');
 export function isNoteName(name: string): boolean {
   return NOTE_EXT_RE.test(name);
 }
-
 
 /** True when a path/basename has the legacy hidden-note shape
  *  (`.<sourceBasename>.md`, e.g. `.report.pdf.md`). Used for cleanup/remap
@@ -141,7 +140,6 @@ export function isDocxFile(name: string): boolean {
   const base = pathBasename(name);
   return DOCX_PATTERN.test(base) && !base.startsWith('~$') && !base.startsWith('.~');
 }
-
 
 /** True for an unstructured **convertible source** — files
  *  whose searchable text comes from an app-data derived note and are

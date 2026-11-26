@@ -42,6 +42,7 @@ const log = logger('routes/upload');
 // Multipart bodies stream into an app-owned OS-temp staging directory. This
 // keeps long PCM recordings and PDFs out of both renderer and server heaps;
 // the generous cap is a disk-safety boundary rather than a memory boundary.
+/** @public Exercised inside isolated child processes in upload.test.ts. */
 export const MAX_UPLOAD_FILE_BYTES = 8 * 1024 * 1024 * 1024;
 const UPLOAD_TEMP_ROOT = path.join(os.tmpdir(), 'stashbase-upload');
 const UPLOAD_STALE_MAX_AGE_MS = 24 * 60 * 60_000;

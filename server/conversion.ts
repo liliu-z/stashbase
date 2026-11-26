@@ -138,7 +138,7 @@ export function setDerivedNoteIndexer(
  *  old derived text → re-convert. This is the change-detection signal now
  *  that the derived text lives in app data (path-hash keyed, so its
  *  location doesn't change when the source content changes). */
-export function derivedIsFresh(
+function derivedIsFresh(
   spec: DerivedFreshnessSpec,
   absPath: string,
   known?: { sourceMtimeMs: number; derivedMtimeMs: number },
@@ -313,7 +313,6 @@ function sourceSignature(absPath: string): SourceSignature | null {
     return null;
   }
 }
-
 
 function sameSourceSignature(a: SourceSignature | null, b: SourceSignature | null): boolean {
   return a != null && b != null && a.size === b.size && a.mtimeMs === b.mtimeMs;

@@ -24,7 +24,7 @@ export function releaseInstallers(release) {
   });
 }
 
-export async function fileDigests(file) {
+async function fileDigests(file) {
   const sha256 = createHash('sha256');
   const md5 = createHash('md5');
   for await (const chunk of createReadStream(file)) {

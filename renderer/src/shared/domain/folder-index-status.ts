@@ -14,7 +14,7 @@ export type PreparationProgress =
     }
   | { readonly phase: 'indexing' };
 
-export interface PreparationFailure {
+interface PreparationFailure {
   readonly attempts: number;
   readonly lastError: string;
   readonly path: string;

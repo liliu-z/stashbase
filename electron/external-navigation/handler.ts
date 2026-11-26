@@ -1,4 +1,4 @@
-import type { BrowserWindow, IpcMain } from 'electron';
+import type { IpcMain } from 'electron';
 
 import {
   EXTERNAL_NAVIGATION_CAPABILITY,

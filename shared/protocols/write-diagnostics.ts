@@ -5,17 +5,17 @@ export const WRITE_STAGES = ['validation', 'path_resolution', 'project_match', '
 export type WriteStage = typeof WRITE_STAGES[number];
 export type DiagnosticValue = string | number | boolean | null | DiagnosticValue[] | { [key: string]: DiagnosticValue };
 const value: z.ZodType<DiagnosticValue> = z.lazy(() => z.union([z.string(), z.number().finite(), z.boolean(), z.null(), z.array(value), z.record(value)]));
-export const writeFailureSchema = z.object({
+const writeFailureSchema = z.object({
   name: z.string(), code: z.string(), errno: z.union([z.number(), z.string()]).optional(),
   syscall: z.string().optional(), path: z.string().optional(), dest: z.string().optional(),
   stack: z.array(z.string()),
 }).strict();
-export const writeStepSchema = z.object({
+const writeStepSchema = z.object({
   sequence: z.number().int(), stage: z.enum(WRITE_STAGES), action: z.string(),
   started_ms: z.number(), duration_ms: z.number(), result: z.enum(['success', 'failed', 'observed']),
   evidence: z.record(value), error: writeFailureSchema.optional(),
 }).strict();
-export const writeOperationSchema = z.object({
+const writeOperationSchema = z.object({
   operation_id: z.string().uuid(), diagnostic_id: z.string().uuid(),
   request_id: z.string().optional(), turn_id: z.string().optional(), tool_call_id: z.string().optional(),
   correlation: z.object({ request: z.enum(['linked', 'unavailable']), turn: z.enum(['linked', 'unavailable']), tool: z.enum(['linked', 'unavailable']) }).strict(),

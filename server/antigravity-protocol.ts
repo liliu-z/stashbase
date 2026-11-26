@@ -186,7 +186,7 @@ const NATIVE_WRITE_TOOLS = new Set([
 const NATIVE_COMMAND_TOOLS = new Set(['run_command', 'send_command_input']);
 const NATIVE_NETWORK_TOOLS = new Set(['read_url_content', 'search_web']);
 
-export type AntigravityToolKind =
+type AntigravityToolKind =
   | 'read'
   | 'stashbase-read'
   | 'stashbase-write'

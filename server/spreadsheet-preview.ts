@@ -241,7 +241,7 @@ export async function spreadsheetFilePreview(bytes: Buffer, name: string, signal
 }
 
 /** A1-style column letters for a zero-based column index. */
-export function spreadsheetColumnLabel(column: number): string {
+function spreadsheetColumnLabel(column: number): string {
   let label = '';
   for (let value = column + 1; value > 0; value = Math.floor((value - 1) / 26)) {
     label = String.fromCharCode(65 + ((value - 1) % 26)) + label;

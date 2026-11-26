@@ -55,7 +55,7 @@ export interface RenameEntry {
   new: string;
 }
 
-export interface CascadeResult {
+interface CascadeResult {
   /** Files whose contents were rewritten + saved to disk. Caller is
    *  responsible for re-indexing — `indexer.upsertFile` per entry, or
    *  bundled into whatever follow-up sync the route runs. */

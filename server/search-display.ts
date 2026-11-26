@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import { filesystemPath } from './filesystem-path.ts';
 import type { KeywordHitFile } from '../shared/search-results.ts';
 
-export type { KeywordHitFile, KeywordMatch } from '../shared/search-results.ts';
+export type { KeywordHitFile } from '../shared/search-results.ts';
 
 /**
  * The MFS exact-search output after product display mapping, before a route

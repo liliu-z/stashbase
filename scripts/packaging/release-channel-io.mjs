@@ -9,7 +9,7 @@ export function github(route, data) {
     ...(data ? { input: JSON.stringify(data) } : {}),
   }));
 }
-export function tagVersion(tag) {
+function tagVersion(tag) {
   if (!/^v[1-9]\d*\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(tag ?? '')) throw new Error('Expected a stable vX.Y.Z tag');
   return tag.slice(1);
 }

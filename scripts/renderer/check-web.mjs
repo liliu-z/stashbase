@@ -19,7 +19,7 @@ export const gates = [
   { name: 'architecture', command: 'pnpm', args: ['test:renderer-architecture'] },
   { name: 'size', command: 'pnpm', args: ['check:renderer-size'] },
   { name: 'conventions', command: 'pnpm', args: ['check:renderer-conventions'] },
-  { name: 'unused', command: 'pnpm', args: ['check:renderer-unused'] },
+  { name: 'unused', command: 'pnpm', args: ['check:unused'] },
   { name: 'duplication', command: 'pnpm', args: ['check:renderer-dupes'] },
   { name: 'format', command: 'pnpm', args: ['format:web'] },
   { name: 'lint', command: 'pnpm', args: ['lint:web'] },

@@ -16,7 +16,7 @@ const dependencyCruiserBin = path.join(
   'bin',
   'dependency-cruise.mjs',
 );
-const oxlintBin = path.join(repositoryRoot, 'node_modules', 'oxlint', 'bin', 'oxlint');
+const vitePlusBin = path.join(repositoryRoot, 'node_modules', 'vite-plus', 'bin', 'vp');
 const dependencyCruiserConfig = path.join(repositoryRoot, 'dependency-cruiser.config.cjs');
 const oxlintConfig = path.join(repositoryRoot, '.oxlintrc.json');
 const architectureDeclaration = {
@@ -41,6 +41,7 @@ function write(root, relativePath, source) {
 function fixture(context) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-renderer-architecture-'));
   context.after(() => fs.rmSync(root, { recursive: true, maxRetries: 10, retryDelay: 100 }));
+  write(root, 'package.json', JSON.stringify({ name: 'architecture-fixture', private: true }));
   write(
     root,
     'renderer/renderer-architecture.json',
@@ -453,8 +454,9 @@ test('Oxlint rejects platform APIs in protected feature layers', (context) => {
   );
 
   const result = runNodeTool(
-    oxlintBin,
+    vitePlusBin,
     [
+      'lint',
       // Pin the reporter: oxlint switches to GitHub annotations when it sees
       // GITHUB_ACTIONS, and that format carries only the primary message, so the
       // custom text these assertions read would vanish in CI.

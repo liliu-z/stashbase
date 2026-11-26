@@ -23,7 +23,6 @@ process.env.STASHBASE_LOCAL_DATA_ROOT = path.join(scratch, 'app-data');
 const {
   cancelAllGitHubImports,
   detectGitLfs,
-  GitHubImportError,
   importPublicGitHubRepository,
   parseAndValidateGitHubUrl,
   publishStagedRepository,

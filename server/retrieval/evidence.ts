@@ -2,7 +2,7 @@ import { filesystemPath } from '../filesystem-path.ts';
 import type { SearchHit } from '../indexer.ts';
 import type { KeywordHitFile } from '../search-display.ts';
 
-export interface SourceLocator {
+interface SourceLocator {
   line?: number;
   endLine?: number;
   page?: number;

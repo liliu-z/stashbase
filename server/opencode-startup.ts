@@ -3,7 +3,7 @@ import type { Readable } from 'node:stream';
 import { agentProcessExitDiagnostic, retireAgentProcess } from './agent-process.ts';
 import { diagnosticText } from '../shared/protocols/diagnostics.ts';
 
-export const OPEN_CODE_START_TIMEOUT_MS = 15_000;
+const OPEN_CODE_START_TIMEOUT_MS = 15_000;
 type OpenCodeChild = ChildProcessByStdio<null, Readable, Readable>;
 
 /** Only startup failures are safe to retry. Cleanup failure fences the owner;

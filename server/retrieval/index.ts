@@ -14,15 +14,15 @@ import { hybridEvidence } from './hybrid.ts';
 import { visibleKeywordEvidence } from './keyword.ts';
 import { availableEvidence, sourceAvailable } from './availability.ts';
 
-export { keywordFilesFromEvidence, searchHitsFromEvidence, type SourceEvidence, type SourceLocator } from './evidence.ts';
+export { keywordFilesFromEvidence, searchHitsFromEvidence } from './evidence.ts';
 
 export type { RetrievalMode } from '../../shared/search-types.ts';
-export type RetrievalAvailability =
+type RetrievalAvailability =
   | { state: 'ready' }
   | { state: 'partial'; reason: 'truncated' }
   | { state: 'unavailable'; reason: 'embedding-key-required' };
 
-export interface RetrievalQuery {
+interface RetrievalQuery {
   mode: RetrievalMode;
   query: string;
   folderRoot: string;
@@ -33,7 +33,7 @@ export interface RetrievalQuery {
   wholeWord?: boolean;
 }
 
-export interface RetrievalResult {
+interface RetrievalResult {
   evidence: import('./evidence.ts').SourceEvidence[];
   availability: RetrievalAvailability;
   truncated: boolean;

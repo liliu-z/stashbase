@@ -76,7 +76,8 @@ export async function deleteFolderRuntimeState(folderRoot: string): Promise<void
   folderSyncGeneration.set(root, currentFolderSyncGeneration(folderRoot) + 1);
 }
 
-/** Resolve the active BYOK runtime config, or null when no key is configured. */
+/** Resolve the active BYOK runtime config, or null when no key is configured.
+ * @public Exercised inside isolated child processes in app-config.test.ts. */
 export function resolveEmbedderRuntime(): EmbedderRuntimeConfig | null {
   const cfg = getEmbedderConfig();
   if (!cfg.apiKey) return null;
@@ -165,7 +166,6 @@ export async function bindIndexerForFolder(folderAbs: string): Promise<void> {
   }
   await indexer.bindFolder(filesystemPath.absolute(folderAbs), runtime);
 }
-
 
 // Serialise indexer bind + sync so rapid folder switches don't race. The
 // seq guard short-circuits a stale tail when the user has already moved

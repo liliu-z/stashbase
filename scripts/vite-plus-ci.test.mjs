@@ -82,7 +82,7 @@ test('the one renderer CI step still covers every replacement check', () => {
     'test:renderer-architecture',
     'check:renderer-size',
     'check:renderer-conventions',
-    'check:renderer-unused',
+    'check:unused',
     'check:renderer-dupes',
     'format:web',
     'lint:web',

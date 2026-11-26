@@ -47,11 +47,9 @@ import type {
 } from '../shared/agent-runtime.ts';
 
 export type {
-  AgentBootstrapFailure,
   AgentBootstrapFailureCode,
   AgentBootstrapFailureStage,
   AgentBootstrapManualRecovery,
-  AgentBootstrapPhase,
   AgentBootstrapStatus,
 } from '../shared/agent-runtime.ts';
 
@@ -813,7 +811,7 @@ const ANTIGRAVITY_INSTALLER = nativeAgentInstallerUrl('antigravity');
  * `~/.local/bin` (`%LOCALAPPDATA%\agy\bin` on Windows) and owns the user's
  * PATH profile, like the other providers' installers. Its POSIX script is
  * written for bash. */
-export async function installAntigravity(
+async function installAntigravity(
   update: (next: ProgressUpdate) => void,
   signal: AbortSignal,
   dependencies: Partial<AgentInstallDependencies> = {},
@@ -1157,7 +1155,7 @@ export const CLAUDE_PS1_BOOTSTRAP = [
   'Remove-Item Env:\\ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue',
 ] as const;
 
-export const ANTIGRAVITY_PS1_BOOTSTRAP = CLAUDE_PS1_BOOTSTRAP;
+const ANTIGRAVITY_PS1_BOOTSTRAP = CLAUDE_PS1_BOOTSTRAP;
 
 export function agentPowerShellInstallerScript(
   installerScript: string,

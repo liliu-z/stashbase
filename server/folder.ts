@@ -23,7 +23,6 @@ import {
   readAppConfigAsync as readConfigAsync,
   readAppConfigStrict as readConfigStrict,
   writeAppConfigStrict as writeConfigStrict,
-  type AppConfigFile,
   type RecentFolder,
 } from './app-config.ts';
 

@@ -68,7 +68,6 @@
     "axe-core": "^4.13.0",
     "happy-dom": "20.11.2",
     "jscpd": "^5.2.0",
-    "knip": "^6.34.0",
     "shadcn": "4.19.0",
     "storybook": "10.5.10",
     "tailwindcss": "4.3.3",

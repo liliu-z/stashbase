@@ -163,10 +163,17 @@ transitive resolution can drift, and recorded again in the source block of
   resolved toolchain and requires a deep match against
   `toolchain/vite-plus.json`, so a silent tool substitution fails the build.
 
-**Known gap — a second Oxlint.** The root manifest pins an Oxlint older than
-the one the pinned Vite+ release delivers, and both resolve in the lockfile.
-The renderer lints with the release's copy, so the root pin is an unused second
-toolchain rather than the linter any gate runs.
+Architecture rule fixtures also invoke the pinned `vp lint`; there is no
+independently installed root Oxlint. The editor schema matches the inventory
+version. The unused-code stage of `pnpm check:web` runs `pnpm check:unused` across
+both workspaces, including the declared host worker and packaging entrypoints.
+
+**Remaining lint scope:** Oxlint 1.79 introduces experimental React Compiler
+diagnostics that the category settings also select. The configuration explicitly
+defers the compiler rules that flag retained runtimes, imperative editors, and
+Story fixtures; the existing Hooks order and exhaustive-dependency rules remain
+errors. A clean lint run does not establish React Compiler compatibility. Review
+those diagnostics before enabling compilation or adopting that additional policy.
 
 ## Native Packaging
 

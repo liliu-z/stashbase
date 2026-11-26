@@ -34,7 +34,7 @@ export type {
 } from '../shared/agent-protocol.ts';
 import type { AgentId } from '../shared/agent-protocol.ts';
 
-export type AgentRuntimeState = 'available' | 'unavailable' | 'failed';
+type AgentRuntimeState = 'available' | 'unavailable' | 'failed';
 import { AGENT_ACCESS_MODES, type AgentAccessMode } from '../shared/agent-runtime.ts';
 
 export { AGENT_ACCESS_MODES, type AgentAccessMode };
@@ -64,7 +64,7 @@ export function parseAgentEffort(value: unknown): string | undefined {
     : undefined;
 }
 
-export interface AgentCapabilities {
+interface AgentCapabilities {
   connection: true;
   prompts: true;
   interrupt: true;
@@ -124,7 +124,7 @@ export function resolveAgentSessionFolder(
 }
 
 /** A session always belongs to one registered project. */
-export type AgentSessionScope = { kind: 'folder'; path: string };
+type AgentSessionScope = { kind: 'folder'; path: string };
 export type AgentSessionScopeResolution =
   | { ok: true; scope: AgentSessionScope }
   | { ok: false; message: string };

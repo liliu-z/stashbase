@@ -34,13 +34,13 @@ export const semanticIndexingStateSchema = z.enum([
   'failed',
 ]);
 
-export const semanticIndexingStatusSchema = z
+const semanticIndexingStatusSchema = z
   .object({
     state: semanticIndexingStateSchema,
   })
   .strict();
 
-export const indexWarningSchema = z
+const indexWarningSchema = z
   .object({ at: z.string().min(1).max(64), message: z.string().max(4096) })
   .strict();
 

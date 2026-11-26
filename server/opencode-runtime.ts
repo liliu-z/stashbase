@@ -96,7 +96,7 @@ export function bundledOpenCodeExecutable(): string | null {
 
 /** Native OpenCode skill reads use ripgrep. Keep Windows independent of a
  * user's PATH and of OpenCode's on-demand binary download. */
-export function bundledOpenCodeRipgrep(): string | null {
+function bundledOpenCodeRipgrep(): string | null {
   if (process.platform !== 'win32') return null;
   const resourcesRoot = process.env.STASHBASE_RESOURCES_PATH?.trim();
   if (resourcesRoot) {

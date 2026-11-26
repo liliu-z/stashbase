@@ -94,7 +94,11 @@ check architecture, or collect coverage. `pnpm check:web` is the complete
 renderer audit for CI and architecture/toolchain changes, including coverage,
 accessibility, static checks, and both builds. Ordinary local UI work uses the
 core gate, formatting/lint, and affected tests.
-Build and lint commands do only their named work.
+`pnpm check:unused` checks host, scripts, shared contracts, and renderer as one
+workspace graph; it is also the unused-code stage of `check:web`. Dynamic worker
+and packaging entries are declared in `knip.config.js`, not excluded from checks.
+Host type checking rejects unused locals as well as unused public declarations
+reported by Knip. Build and lint commands do only their named work.
 Speech owner checks live in `server/speech/*.test.ts`; renderer recovery uses
 the conversation/composer and General settings checks. The native command uses
 the public audio fixture and verifies the pinned model checksum, completed text,

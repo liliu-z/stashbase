@@ -39,7 +39,7 @@ function sampleTimes(profile) {
 const IDLE = new Set(["(idle)", "(program)"]);
 
 /** Self time per function, busiest first. Idle and program time are reported separately. */
-export function selfTimes(profile, top = 25) {
+function selfTimes(profile, top = 25) {
   const { samples } = sampleTimes(profile);
   const totals = new Map();
   let idle = 0;
@@ -58,7 +58,7 @@ export function selfTimes(profile, top = 25) {
 }
 
 /** The heaviest caller chains (innermost first) that end in `functionName`. */
-export function callerChains(profile, functionName, { depth = 8, top = 5 } = {}) {
+function callerChains(profile, functionName, { depth = 8, top = 5 } = {}) {
   const { nodes, parents, samples } = sampleTimes(profile);
   const chains = new Map();
   for (const { node, ms } of samples) {

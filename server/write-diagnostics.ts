@@ -10,7 +10,7 @@ import { diagnosticScope } from './diagnostic-context.ts';
 import { writeDiagnosticBundleSchema, type WriteDiagnosticBundle, type WriteOperationDiagnostic } from '../shared/protocols/write-diagnostics.ts';
 
 export const WRITE_DIAGNOSTIC_TTL = 7 * 24 * 60 * 60 * 1000;
-export const WRITE_DIAGNOSTIC_BYTES = 1024 * 1024;
+const WRITE_DIAGNOSTIC_BYTES = 1024 * 1024;
 const LIMIT = 32;
 type Health = { stored: number; storage_failed: number; queue_refused: number; expired: number; truncated: number; upload_failed: number; upload_unavailable: number };
 type Pending = { bundle: WriteDiagnosticBundle; valid: () => boolean };

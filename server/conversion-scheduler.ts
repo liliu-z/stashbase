@@ -14,7 +14,7 @@ import {
 
 export type ConversionLane = 'light' | 'heavy';
 export type ConversionUrgency = 'interactive' | 'active-folder' | 'background';
-export type ScheduledConversionState = 'queued' | 'running' | 'yielded';
+type ScheduledConversionState = 'queued' | 'running' | 'yielded';
 export type ConversionCancellationReason =
   | 'source-change'
   | 'folder-removed'

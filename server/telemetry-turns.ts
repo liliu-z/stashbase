@@ -26,7 +26,7 @@ export function recordTelemetryToolResult(turn: PendingTurn, input: AgentToolRes
   return true;
 }
 
-export function turnDuration(milliseconds: number): NonNullable<Finished['duration']> {
+function turnDuration(milliseconds: number): NonNullable<Finished['duration']> {
   return milliseconds < 10_000 ? 'under_10s' : milliseconds < 60_000 ? '10s_to_60s'
     : milliseconds < 300_000 ? '1m_to_5m' : 'over_5m';
 }

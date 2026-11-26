@@ -26,8 +26,6 @@ const agentTurnFailureSchema = z.object({ kind: agentTurnFailureKindSchema }).st
 
 import { agentModelSchema } from '../agent-model';
 
-export { agentModelSchema };
-
 const agentSkillSchema = z
   .object({
     id: boundedText(200),

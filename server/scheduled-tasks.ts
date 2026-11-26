@@ -60,7 +60,7 @@ const FILE_AGENT_NAMES: Readonly<Record<AgentId, string>> = {
   stashbase: 'default',
 };
 
-export interface ParsedScheduledTask {
+interface ParsedScheduledTask {
   agent: AgentId | null;
   files: string[];
   id: string;
@@ -90,7 +90,7 @@ function scheduleError(message: string, status: number, code: string): Error {
 }
 
 /** A file-safe id from a task's name, unique among `taken`. */
-export function taskIdFromName(name: string, taken: ReadonlySet<string>): string {
+function taskIdFromName(name: string, taken: ReadonlySet<string>): string {
   const base = name
     .normalize('NFKD')
     .toLowerCase()
@@ -103,7 +103,7 @@ export function taskIdFromName(name: string, taken: ReadonlySet<string>): string
 }
 
 /** `8:05` and `08:05` are the same time; anything else is not a time. */
-export function normalizeTaskTime(value: unknown): string | null {
+function normalizeTaskTime(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const match = value.trim().match(/^(\d{1,2}):(\d{2})$/u);
   if (!match) return null;
@@ -115,7 +115,7 @@ export function normalizeTaskTime(value: unknown): string | null {
 
 /** A project-relative path as the file and the composer spell it, or null for
  *  anything that leaves the project or names no file. */
-export function normalizeTaskFile(value: unknown): string | null {
+function normalizeTaskFile(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const slashed = value.trim().replace(/\\/gu, '/').replace(/^(?:\.\/)+/u, '');
   if (!slashed || slashed.startsWith('/') || /^[A-Za-z]:/u.test(slashed)) return null;
@@ -271,7 +271,7 @@ interface StoredTaskState {
   runs?: StoredRun[];
 }
 
-export interface StoredProjectSchedule {
+interface StoredProjectSchedule {
   scope: string;
   tasks?: Record<string, StoredTaskState>;
 }
@@ -291,7 +291,7 @@ const NO_STATE: TaskState = {
 
 /** How many runs each task keeps, newest first: enough to see whether a
  *  daily task ran each day of the last few weeks. */
-export const RUN_HISTORY_LIMIT = 30;
+const RUN_HISTORY_LIMIT = 30;
 
 /** A run still marked running after this long never reported back. Main's
  *  own dispatch deadline is well inside it. */

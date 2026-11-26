@@ -14,7 +14,7 @@ export function codexConfigPath(): string {
 /** Antigravity keeps the configuration its CLI, IDE and app share under
  * `~/.gemini/config`; it has no directory override (`GEMINI_HOME` does not
  * move it). */
-export function antigravityConfigDir(): string {
+function antigravityConfigDir(): string {
   return path.join(os.homedir(), '.gemini', 'config');
 }
 

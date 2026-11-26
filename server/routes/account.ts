@@ -1,6 +1,6 @@
 import { hostedBillingChangeRequestSchema } from '../../shared/protocols/http/agent-runtime.ts';
 import express from 'express';
-import { emailProofSchema, emailSendSchema, emailVerifySchema, emailCancelSchema, accountLinkActionSchema } from '../../shared/protocols/http/embedder.ts';
+import { emailProofSchema, emailSendSchema, emailVerifySchema, emailFlowSchema, accountLinkActionSchema } from '../../shared/protocols/http/embedder.ts';
 import { getHostedAccountSession, markAccountOfferSeen, resetAccountOffers } from '../app-config.ts';
 import {
   assertHostedGeneration,
@@ -180,7 +180,7 @@ export function mount(app: express.Express, { appReturnToken }: AccountRouteOpti
     catch (error) { res.status(400).json({ error: errorMessage(error) }); }
   });
   app.post('/api/account/email/cancel', (req, res) => {
-    const input = emailCancelSchema.safeParse(req.body);
+    const input = emailFlowSchema.safeParse(req.body);
     if (!input.success) return res.status(400).json({ error: 'Invalid sign-in request.' });
     cancelHostedEmail(input.data.flowId); res.json({ success: true });
   });

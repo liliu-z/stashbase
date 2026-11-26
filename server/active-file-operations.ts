@@ -105,7 +105,7 @@ export async function saveTextAsync(relPath: string, content: string, beforePubl
   await saveBytesAsync(relPath, Buffer.from(content, 'utf8'), beforePublish);
 }
 
-export async function saveBytesAsync(relPath: string, bytes: Buffer, beforePublish?: () => Promise<void>): Promise<void> {
+async function saveBytesAsync(relPath: string, bytes: Buffer, beforePublish?: () => Promise<void>): Promise<void> {
   const target = await resolveSafeAsync(relPath, 'creatable');
   await writeDiagnosticStep('persist', 'create_target_parent', () => fs.promises.mkdir(path.dirname(target), { recursive: true }), {
     path: path.dirname(target), target_path: target, syscall: 'mkdir', recursive: true, target_partial_write_possible: false,

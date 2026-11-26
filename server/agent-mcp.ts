@@ -233,7 +233,7 @@ const CODEX_AUTO_APPROVED_STASHBASE_TOOLS = [
 /** Seconds Antigravity waits for the approval hook. A StashBase approval card
  * has no deadline of its own, so the hook allows nearly an hour; the host
  * answers before Antigravity's own limit (`antigravity-approval.ts`). */
-export const ANTIGRAVITY_HOOK_TIMEOUT_SECONDS = 3600;
+const ANTIGRAVITY_HOOK_TIMEOUT_SECONDS = 3600;
 const ANTIGRAVITY_HOOK_CURL_SECONDS = ANTIGRAVITY_HOOK_TIMEOUT_SECONDS - 60;
 const ANTIGRAVITY_HOOK_ROUTE = '/api/agent/antigravity/hook';
 const ANTIGRAVITY_HOOK_UNREACHABLE = '{"decision":"deny","reason":"StashBase could not review this action, so it was not run."}';

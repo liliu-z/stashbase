@@ -41,7 +41,7 @@ export type CodexSessionBlock =
 /** A restored file attachment: a name-only document card, or — only for images
  * originally uploaded through StashBase's transient attachment route — a
  * previewable thumbnail. */
-export type CodexAttachment = RestoredAttachment;
+type CodexAttachment = RestoredAttachment;
 
 const historyLists = new Map<string, Promise<CodexSessionRow[]>>();
 const log = logger('codex-history');

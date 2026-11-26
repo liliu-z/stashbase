@@ -8,7 +8,7 @@ const appearanceScaleSchema = z.enum(['small', 'default', 'large']);
 
 /** Document text size as a step on the reading menu's slider; the
  *  stylesheet maps each step to a multiple of the reading font's base size. */
-export const READING_TEXT_SIZE_STEPS = 7;
+const READING_TEXT_SIZE_STEPS = 7;
 const readingTextSizeSchema = z.number().int().min(1).max(READING_TEXT_SIZE_STEPS);
 
 /** Which font sets Markdown prose: one of the two StashBase ships, or the

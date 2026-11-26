@@ -36,7 +36,7 @@ interface ConversationRecord {
   blocks: AntigravityHistoryBlock[];
 }
 
-export interface AntigravitySessionRow {
+interface AntigravitySessionRow {
   id: string;
   title: string;
   lastModified: number;
@@ -54,7 +54,7 @@ class SessionNotFoundError extends Error {
   constructor() { super('session not found for current folder'); }
 }
 
-export function antigravityHistoryDirectory(): string {
+function antigravityHistoryDirectory(): string {
   return path.join(appDataRoot(), 'agent-history', 'antigravity');
 }
 

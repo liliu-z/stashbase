@@ -42,7 +42,7 @@ export interface FileEntry {
   availability?: WorkspaceEntryAvailability;
 }
 
-export interface FolderEntry {
+interface FolderEntry {
   /** Folder-relative POSIX path (e.g. `topic/sub`). */
   path: string;
   kind?: 'normal' | 'excluded' | 'unreadable';

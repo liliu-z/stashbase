@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -1415,8 +1414,6 @@ test('Codex installation reports missing output without a fabricated ENOENT chec
   }
 });
 
-
-
 test('development failure injection is mutually exclusive and one-shot', () => {
   const previousDebug = process.env.STASHBASE_AGENT_DEBUG;
   process.env.STASHBASE_AGENT_DEBUG = '1';
@@ -1465,7 +1462,6 @@ test('every turn failure script is bounded prose and only crash is session-fatal
     assert.equal(script.fatal, kind === 'crash');
   }
 });
-
 
 test('explicit readiness finds a version-manager Agent through the login shell', { skip: process.platform === 'win32' }, async () => {
   const previousShell = process.env.SHELL;

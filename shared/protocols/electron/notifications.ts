@@ -11,7 +11,7 @@ export const NOTIFICATIONS_CHANGED = 'notifications:changed';
 export const NOTIFICATIONS_ACTIVATE = 'notifications:activate';
 
 const identifier = z.string().min(1).max(1200);
-export const sessionActivitySchema = z.object({
+const sessionActivitySchema = z.object({
   id: identifier,
   project: z.string().max(160),
   conversation: z.string().max(160),
@@ -31,7 +31,7 @@ const eventFields = {
   project: z.string().max(160),
   conversation: z.string().max(160),
 };
-export const notificationEventSchema = z.discriminatedUnion('kind', [
+const notificationEventSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('agent-confirmation'), ...eventFields }).strict(),
   z.object({ kind: z.literal('agent-completed'), ...eventFields }).strict(),
   z.object({ kind: z.literal('agent-failed'), ...eventFields }).strict(),
@@ -64,7 +64,7 @@ export const notificationUpdateSchema = z.object({
   kind: notificationKindSchema.optional(),
 }).strict();
 export type NotificationPreferences = z.infer<typeof notificationPreferenceSchema>;
-export const notificationSettingsTargetSchema = z.enum(['macos', 'windows', 'gnome', 'kde', 'manual']);
+const notificationSettingsTargetSchema = z.enum(['macos', 'windows', 'gnome', 'kde', 'manual']);
 export type NotificationSettingsTarget = z.infer<typeof notificationSettingsTargetSchema>;
 export const notificationStatusSchema = notificationPreferenceSchema.extend({
   supported: z.boolean(),

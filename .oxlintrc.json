@@ -1,5 +1,5 @@
 {
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "$schema": "https://unpkg.com/oxlint@1.79.0/configuration_schema.json",
   "plugins": ["typescript", "unicorn", "oxc", "react", "import", "jsx-a11y", "vitest"],
   "categories": {
     "correctness": "error",
@@ -10,6 +10,17 @@
     "react/react-in-jsx-scope": "off",
     "react/exhaustive-deps": "error",
     "react/rules-of-hooks": "error",
+    // Oxlint 1.79 adds experimental React Compiler analysis to the categories
+    // above. Keep the adopted Hooks rules while compiler compatibility of our
+    // retained runtimes, imperative editors, and Story fixtures is audited.
+    "react/exhaustive-effect-dependencies": "off",
+    "react/globals": "off",
+    "react/immutability": "off",
+    "react/memo-dependencies": "off",
+    "react/purity": "off",
+    "react/refs": "off",
+    "react/set-state-in-effect": "off",
+    "react/static-components": "off",
     "import/no-unassigned-import": "off",
     "import/default": "off",
     "eslint/no-await-in-loop": "off",

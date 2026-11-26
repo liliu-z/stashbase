@@ -3,7 +3,7 @@ import { rendererDeliverySchema } from '../telemetry-delivery';
 export { countDelivery, type RendererDelivery } from '../telemetry-delivery';
 
 const runtime = z.enum(['stashbase', 'claude', 'codex', 'antigravity']);
-export const agentStopReasonSchema = z.enum(['session_closed', 'window_closed', 'scope_removed', 'app_shutdown',
+const agentStopReasonSchema = z.enum(['session_closed', 'window_closed', 'scope_removed', 'app_shutdown',
   'spare_expired', 'spare_replaced', 'spare_discarded', 'startup_failed', 'configuration_changed', 'process_exit', 'interrupted']);
 export type AgentStopReason = z.infer<typeof agentStopReasonSchema>;
 export const processTerminationSchema = z.object({
@@ -19,10 +19,10 @@ export const processTerminationSchema = z.object({
   fallback_error: diagnostic.optional(),
 }).strict();
 export const agentTurnStageSchema = z.enum(['preparing', 'host_accepted', 'runtime_dispatched', 'model_request_started', 'response_started', 'waiting_permission', 'tool_running']);
-export const agentTurnReasonSchema = z.enum(['completed', 'runtime_error', 'user_cancelled', 'context_invalid', 'connection_lost', 'session_closed', 'scope_removed', 'app_shutdown', 'host_shutdown', 'app_update', 'host_restarted']);
+const agentTurnReasonSchema = z.enum(['completed', 'runtime_error', 'user_cancelled', 'context_invalid', 'connection_lost', 'session_closed', 'scope_removed', 'app_shutdown', 'host_shutdown', 'app_update', 'host_restarted']);
 export type AgentTurnStage = z.infer<typeof agentTurnStageSchema>;
 export const AGENT_TOOL_RESULT_LIMIT = 1000;
-export const agentToolCategorySchema = z.enum(['read', 'write', 'shell', 'search', 'agent', 'other']);
+const agentToolCategorySchema = z.enum(['read', 'write', 'shell', 'search', 'agent', 'other']);
 export const agentToolResultSchema = z.object({
   call_id: z.string().min(1).max(512), category: agentToolCategorySchema,
   outcome: z.enum(['success', 'failed']),
@@ -39,7 +39,7 @@ export const agentToolSummarySchema = toolCounts.extend({
     shell: toolCounts.optional(), search: toolCounts.optional(), agent: toolCounts.optional(), other: toolCounts.optional() }).strict(),
   limited: z.boolean(),
 }).strict();
-export type AgentToolSummary = z.infer<typeof agentToolSummarySchema>;
+
 const outcome = z.enum(['success', 'failed', 'cancelled', 'blocked']);
 export { errorDiagnostic } from '../diagnostics';
 export type { ErrorDiagnostic } from '../diagnostics';
@@ -95,13 +95,13 @@ const diagnosticFields = {
   turn_id: z.string().uuid().optional(), request_id: z.string().uuid().optional(),
   context: diagnosticContextSchema.optional(),
 };
-export const serverStartStageSchema = z.enum(['network', 'arbitration', 'spawn', 'waiting_ready', 'ready']);
+const serverStartStageSchema = z.enum(['network', 'arbitration', 'spawn', 'waiting_ready', 'ready']);
 const serverStartFields = {
   app_session_id: z.string().uuid(), attempt_id: z.string().uuid(),
   stage: serverStartStageSchema, elapsed_ms: z.number().nonnegative(),
   context: diagnosticContextSchema.optional(),
 };
-export const serverStartEventSchemas = [
+const serverStartEventSchemas = [
   z.object({ event: z.literal('server_start_initiated'), ...serverStartFields }).strict(),
   z.object({ event: z.literal('server_start_success'), ...serverStartFields, reused: z.boolean() }).strict(),
   z.object({ event: z.literal('server_start_failed'), ...serverStartFields, diagnostic }).strict(),

@@ -751,7 +751,7 @@ export class AntigravitySession implements AttributedAgentSession {
   }
 }
 
-export function antigravityAccessMode(value: unknown): AgentAccessMode {
+function antigravityAccessMode(value: unknown): AgentAccessMode {
   return (ANTIGRAVITY_ACCESS_MODES as readonly unknown[]).includes(value) ? value as AgentAccessMode : 'default';
 }
 

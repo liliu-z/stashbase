@@ -26,12 +26,11 @@ import {
   listConversionStatus,
   readConversionStatusMap,
   setConversionStatus,
-  type ConversionStatus,
   type ConversionStatusEntry,
 } from './state-db.ts';
 import { filesystemPath } from './filesystem-path.ts';
 
-export type { ConversionStatus, ConversionStatusEntry };
+export type { ConversionStatusEntry };
 export type ConversionStatusMap = Record<string, ConversionStatusEntry>;
 export type { ConversionProgress } from '../shared/conversion.ts';
 import type { ConversionProgress } from '../shared/conversion.ts';

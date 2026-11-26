@@ -46,5 +46,3 @@ export type ProjectKeywordFile = z.infer<typeof exactSearchResponseSchema>['file
 /** The folder-local hit file the MFS adapter produces, before the route
  *  stamps the member folder on it. */
 export type KeywordHitFile = Omit<ProjectKeywordFile, 'folder'>;
-
-export type KeywordMatch = KeywordHitFile['matches'][number];

@@ -39,7 +39,6 @@ import { projectNativeWriteGuard } from './agent-native-write-guard.ts';
 import { agentBootstrapCoordinator } from './agent-runtime-installer.ts';
 import { randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
-import path from 'node:path';
 import { filesystemPath } from './filesystem-path.ts';
 import type { WebSocket } from 'ws';
 import {

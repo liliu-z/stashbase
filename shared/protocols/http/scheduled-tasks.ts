@@ -24,7 +24,7 @@ const instant = z.string().datetime();
 export const scheduledTaskIdSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/u);
 
 /** Local wall-clock time, every day. */
-export const scheduledTaskTimeSchema = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/u);
+const scheduledTaskTimeSchema = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/u);
 
 const name = z.string().trim().min(1).max(SCHEDULED_TASK_LIMITS.name);
 const prompt = z.string().max(SCHEDULED_TASK_LIMITS.prompt);
@@ -33,7 +33,7 @@ const relativePath = z.string().min(1).max(4096);
 /** What one task asks for: a name, a daily time, the request and the project
  *  files it names, and which Agent runs it (null: the project's own choice).
  *  Files are paths only; the run reads whatever they hold at that moment. */
-export const scheduledTaskDefinitionSchema = z
+const scheduledTaskDefinitionSchema = z
   .object({
     agent: agentIdSchema.nullable(),
     files: z.array(relativePath).max(SCHEDULED_TASK_LIMITS.files),
@@ -53,7 +53,7 @@ const runTrigger = z.enum(['schedule', 'manual']);
  *  runs that never started because StashBase was closed or asleep; one entry
  *  covers `missedCount` days, from `startedAt` (the first one's time) to
  *  `occurrence` (the last one's). */
-export const scheduledTaskRunSchema = z
+const scheduledTaskRunSchema = z
   .object({
     agent: agentIdSchema.nullable(),
     finishedAt: instant.nullable(),
@@ -75,7 +75,7 @@ export const scheduledTaskRunSchema = z
 
 /** One task as the file states it plus what this app keeps about it. A task
  *  the file states badly still appears, with the reason it cannot run. */
-export const scheduledTaskSchema = z
+const scheduledTaskSchema = z
   .object({
     agent: agentIdSchema.nullable(),
     enabled: z.boolean(),
@@ -112,7 +112,7 @@ export const scheduledProjectsSchema = z
 
 /** A task as the form saves it. A new task has no id yet; the server gives it
  *  one from its name, unique in the file. */
-export const scheduledTaskDraftSchema = scheduledTaskDefinitionSchema
+const scheduledTaskDraftSchema = scheduledTaskDefinitionSchema
   .extend({ id: scheduledTaskIdSchema.optional() })
   .strict();
 

@@ -10,7 +10,7 @@ const price = z.string().max(128).regex(/^price_[A-Za-z0-9]+$/);
 const code = z.string().regex(/^[0-9A-HJKMNP-TV-Z]{13}$/);
 const revision = z.string().regex(/^(0|[1-9][0-9]{0,18})$/)
   .refine((value) => value.length < 19 || value <= '9223372036854775807');
-export const creditAmount = z.string().regex(/^(0|[1-9][0-9]*)\.[0-9]{9}$/);
+const creditAmount = z.string().regex(/^(0|[1-9][0-9]*)\.[0-9]{9}$/);
 const creditUnit = z.literal('credits-v1');
 
 const windows = {
@@ -230,7 +230,6 @@ export const referralAccountSchema = cloudReferralMeSchema.omit({ accountSubject
 export const referralHistorySchema = cloudReferralHistorySchema.omit({ accountSubject: true });
 export const referralGrantsSchema = cloudReferralGrantsSchema.omit({ accountSubject: true });
 
-export const referralCheckoutBenefitSchema = z.enum(['standard', 'referral', 'discount']);
 const checkout = { ...generation, priceId: price, referralRevision: revision };
 export const referralCheckoutInputSchema = z.discriminatedUnion('benefit', [
   z.strictObject({ ...checkout, benefit: z.literal('standard') }),
@@ -252,12 +251,6 @@ export const referralFailureSchema = z.strictObject({
 });
 
 export type CreditBreakdown = z.infer<typeof creditBreakdownSchema>;
-export type ReferralAccount = z.infer<typeof referralAccountSchema>;
-export type ReferralCheckoutBenefit = z.infer<typeof referralCheckoutBenefitSchema>;
 export type ReferralCheckoutInput = z.infer<typeof referralCheckoutInputSchema>;
-export type ReferralHistory = z.infer<typeof referralHistorySchema>;
-export type ReferralGrants = z.infer<typeof referralGrantsSchema>;
 export type ReferralPreview = z.infer<typeof referralPreviewSchema>;
-export type ReferralTerms = z.infer<typeof terms>;
-export type ReferralProgress = z.infer<typeof referralProgress>;
 export type CloudReferralCheckoutInput = z.infer<typeof cloudReferralCheckoutInputSchema>;

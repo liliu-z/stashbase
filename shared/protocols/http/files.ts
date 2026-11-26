@@ -231,8 +231,8 @@ export const genericFilePreviewResponseSchema = z.union([
     .strict(),
 ]);
 
-export const TABLE_DELIMITERS = [',', '\t', ';', '|'] as const;
-export const TABLE_ENCODINGS = ['utf-16le', 'utf-16be', 'gb18030'] as const;
+const TABLE_DELIMITERS = [',', '\t', ';', '|'] as const;
+const TABLE_ENCODINGS = ['utf-16le', 'utf-16be', 'gb18030'] as const;
 export type TableDelimiter = (typeof TABLE_DELIMITERS)[number];
 export type TableEncoding = (typeof TABLE_ENCODINGS)[number];
 

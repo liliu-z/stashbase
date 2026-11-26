@@ -22,7 +22,7 @@ import {
   embedderFailureSchema,
   emailSendSchema,
   emailVerifySchema,
-  emailSentSchema,
+  emailFlowSchema,
   accountMethodsSchema,
   accountLinkStartSchema,
   accountLinkStatusSchema,
@@ -91,7 +91,7 @@ export function createAccountAdapter(
         ...accessRequest('/api/account/email/send', signal),
         method: 'POST',
         body: emailSendSchema.parse({ email }),
-        schema: emailSentSchema,
+        schema: emailFlowSchema,
       });
     },
     async verifyEmail(flowId, otp, signal) {

@@ -1824,6 +1824,12 @@ remain a documented trust gap, not permission to expand the boundary.
 Executable configurations own exact layering, lint, coverage, size, duplication,
 and unused-code rules. Do not reproduce their inventories here. Primitive/story
 reachability complements unused-code analysis, which counts test-only callers.
+`pnpm check:unused` follows host and renderer together so shared contracts retain
+real consumers across workspaces. `knip.config.js` declares runtime-loaded workers,
+Electron boundaries, packaging hooks, and subprocess entries; ordinary script
+helpers must be reachable from their callers. Host TypeScript also rejects unused
+locals after exports are removed. Reachability is not proof of product necessity.
+Architecture lint fixtures and renderer lint both use the pinned `vp lint`.
 
 One token/geometry/motion system serves app and catalog through shared providers.
 Server-rendered pages opened outside the renderer restate those token values

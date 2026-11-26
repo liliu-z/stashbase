@@ -566,7 +566,7 @@ function htmlToText(html: string): string {
  *  full HTML 5 named-entity table) but covers what arxiv / Wikipedia
  *  exports and hand-written notes use in practice. Exported so the
  *  files-layer preview can reuse it instead of carrying its own copy. */
-export function decodeEntities(text: string): string {
+function decodeEntities(text: string): string {
   return text
     .replace(/&nbsp;/gi, ' ')
     .replace(/&amp;/gi, '&')

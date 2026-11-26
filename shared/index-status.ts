@@ -13,16 +13,12 @@
 import type { z } from 'zod';
 import type {
   indexStatusResponseSchema,
-  indexWarningSchema,
   preparationFailureSchema,
   semanticIndexingStateSchema,
-  semanticIndexingStatusSchema,
 } from './protocols/http/index-status.ts';
 
 /** Coarse embedding-readiness label the renderer renders directly. */
 export type SemanticIndexingState = z.output<typeof semanticIndexingStateSchema>;
-
-
 
 /** Persistent file preparation failure record — subset of the on-disk
  *  entry, with timestamps the UI doesn't need stripped. */
