@@ -1,3 +1,14 @@
+/**
+ * The Markdown editor's side of the writing settings: focus mode's current
+ * block, typewriter scrolling, spellcheck kept off inline code, and the word
+ * and character count in the corner.
+ *
+ * The character rule is a writer's, not a site's: every character as it is
+ * seen counts once, spaces and punctuation included, and the breaks between
+ * paragraphs do not. Sites with post limits weigh characters their own way
+ * (X counts each Chinese character and emoji as two, and every link as 23),
+ * so the count is a draft's length, not a promise that a post fits.
+ */
 import type { CrepeBuilder } from '@milkdown/crepe/builder';
 import { inlineCodeAttr } from '@milkdown/kit/preset/commonmark';
 import type { Node as ProseMirrorNode } from '@milkdown/kit/prose/model';
@@ -20,26 +31,70 @@ export function countWords(text: string): number {
   return unspaced + (spaced?.length ?? 0);
 }
 
+/** Characters as they are seen: a grapheme cluster each, so an accented
+ *  letter, a flag or a family emoji built from several code points still
+ *  counts once. Spaces and punctuation count; paragraph breaks do not. */
+const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+
+export function countCharacters(text: string): number {
+  let count = 0;
+  for (const { segment } of graphemes.segment(text)) if (segment !== '\n') count += 1;
+  return count;
+}
+
+export interface TextCount {
+  characters: number;
+  words: number;
+}
+
+/** The document's counts, and the selection's while text is selected. */
+interface WritingCount {
+  document: TextCount;
+  selection: TextCount | null;
+}
+
+const EMPTY: WritingCount = { document: { characters: 0, words: 0 }, selection: null };
+
+function countBetween(doc: ProseMirrorNode, from: number, to: number): TextCount {
+  // Blocks are joined by a break, so a word never runs across two
+  // paragraphs and the break itself is not counted as a character.
+  const text = doc.textBetween(from, to, '\n', '\n');
+  return { characters: countCharacters(text), words: countWords(text) };
+}
+
 /**
- * The document's word count, counted only while something reads it. The
- * editor hands over each new document; counting waits for the visible count
- * to ask, so a hidden count costs nothing and a shown one re-renders only
- * itself.
+ * The document's word and character counts, counted only while something
+ * reads them. The editor hands over each new document and selection;
+ * counting waits for the visible count to ask, so a hidden count costs
+ * nothing and a shown one re-renders only itself.
  */
 export interface WordCounter {
-  update(doc: ProseMirrorNode): void;
+  update(doc: ProseMirrorNode, selection?: { from: number; to: number }): void;
   subscribe(listener: () => void): () => void;
-  count(): number;
+  count(): WritingCount;
+}
+
+interface TextRange {
+  from: number;
+  to: number;
 }
 
 export function createWordCounter(): WordCounter {
   let doc: ProseMirrorNode | null = null;
-  let counted: { doc: ProseMirrorNode; count: number } | null = null;
+  let selected: TextRange | null = null;
+  let counted: { doc: ProseMirrorNode; total: TextCount } | null = null;
+  let snapshot: { doc: ProseMirrorNode | null; selected: TextRange | null; value: WritingCount } = {
+    doc: null,
+    selected: null,
+    value: EMPTY,
+  };
   const listeners = new Set<() => void>();
   return {
-    update(next) {
-      if (doc === next) return;
+    update(next, selection) {
+      const range = selection && selection.from !== selection.to ? selection : null;
+      if (doc === next && range?.from === selected?.from && range?.to === selected?.to) return;
       doc = next;
+      selected = range;
       for (const listener of listeners) listener();
     },
     subscribe(listener) {
@@ -47,11 +102,17 @@ export function createWordCounter(): WordCounter {
       return () => listeners.delete(listener);
     },
     count() {
-      if (!doc) return 0;
-      if (counted?.doc !== doc) {
-        counted = { doc, count: countWords(doc.textBetween(0, doc.content.size, ' ', ' ')) };
-      }
-      return counted.count;
+      if (!doc) return EMPTY;
+      // The same answer object until something changes, so React reads a
+      // stable snapshot.
+      if (snapshot.doc === doc && snapshot.selected === selected) return snapshot.value;
+      if (counted?.doc !== doc) counted = { doc, total: countBetween(doc, 0, doc.content.size) };
+      const value = {
+        document: counted.total,
+        selection: selected ? countBetween(doc, selected.from, selected.to) : null,
+      };
+      snapshot = { doc, selected, value };
+      return value;
     },
   };
 }
@@ -84,7 +145,7 @@ function centerCaret(view: EditorView): void {
  * while typewriter scrolling is on, asked at each move so the setting applies
  * without rebuilding the editor, and only for typing and keyboard moves, so a
  * click places the caret where the reader pointed; and every new document
- * reaches the word counter. Inline code is paths and identifiers, so it is
+ * and selection reaches the word counter. Inline code is paths and identifiers, so it is
  * kept out of the spellchecker, which could only underline it.
  */
 export function attachWritingAids(editor: CrepeBuilder, counter: WordCounter): void {
@@ -108,12 +169,12 @@ export function attachWritingAids(editor: CrepeBuilder, counter: WordCounter): v
             },
           },
           view: (view) => {
-            counter.update(view.state.doc);
+            counter.update(view.state.doc, view.state.selection);
             return {
               update(next, previous) {
                 const edited = previous.doc !== next.state.doc;
-                if (edited) counter.update(next.state.doc);
                 const moved = edited || !previous.selection.eq(next.state.selection);
+                if (moved) counter.update(next.state.doc, next.state.selection);
                 if (
                   moved &&
                   (edited || !pointerPlaced) &&
@@ -130,17 +191,32 @@ export function attachWritingAids(editor: CrepeBuilder, counter: WordCounter): v
   );
 }
 
-/** The document's word count in the corner, while the reader has it on. */
+/** The document's word and character counts in the corner, while the reader
+ *  has them on. While text is selected, the selection's counts lead, out of
+ *  the document's. */
 export function WordCount({ counter }: { counter: WordCounter }) {
   if (!useAppliedAppearance()?.wordCount) return null;
   return <WordCountLabel counter={counter} />;
 }
 
 function WordCountLabel({ counter }: { counter: WordCounter }) {
-  const count = useSyncExternalStore(counter.subscribe, counter.count, counter.count);
-  return (
-    <div className="markdown-word-count">
-      {count === 1 ? '1 word' : `${count.toLocaleString()} words`}
-    </div>
+  const { document, selection } = useSyncExternalStore(
+    counter.subscribe,
+    counter.count,
+    counter.count,
   );
+  return <div className="markdown-word-count">{countLabel(document, selection)}</div>;
+}
+
+function plural(count: number, one: string, many: string): string {
+  return count === 1 ? one : many;
+}
+
+export function countLabel(document: TextCount, selection: TextCount | null): string {
+  const words = document.words.toLocaleString();
+  const characters = document.characters.toLocaleString();
+  if (!selection) {
+    return `${words} ${plural(document.words, 'word', 'words')} · ${characters} ${plural(document.characters, 'character', 'characters')}`;
+  }
+  return `${selection.words.toLocaleString()} of ${words} ${plural(document.words, 'word', 'words')} · ${selection.characters.toLocaleString()} of ${characters} ${plural(document.characters, 'character', 'characters')}`;
 }
