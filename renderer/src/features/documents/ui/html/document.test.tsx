@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useSyncExternalStore } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
 
 import { createDocumentNavigationRuntime } from '@/features/documents/application/navigation-runtime';
@@ -144,6 +145,57 @@ describe('HTML document', () => {
     expect(onOpenExternal).toHaveBeenCalledWith('https://example.com/guide');
 
     fireEvent.load(frame);
+  });
+
+  it('loads a newer version while the shown frame is settling', () => {
+    // The asset query delivers versions through useSyncExternalStore, so a
+    // newer version renders at sync priority while the shown page's own ready
+    // signal is still queued at default priority.
+    let version = 'one';
+    const listeners = new Set<() => void>();
+    const navigation = createDocumentNavigationRuntime('tab-1');
+    function Host() {
+      const current = useSyncExternalStore(
+        (listener) => {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+        () => version,
+      );
+      return (
+        <HtmlDocument
+          active
+          name="dashboard.html"
+          navigation={navigation}
+          onNavigate={vi.fn()}
+          onOpenExternal={vi.fn(async () => true)}
+          resource={{ kind: 'source', url: `data:text/html,${current}`, version: current }}
+          source={{ folderPath: '/project', path: 'dashboard.html' }}
+          tabId="tab-1"
+        />
+      );
+    }
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      render(<Host />);
+      const [shown] = frames();
+      if (!shown) throw new Error('HTML preview frame is missing.');
+      fireEvent.load(shown);
+
+      act(() => {
+        // Keep the frame's 80 ms ready update and the sync store update in one flush.
+        vi.advanceTimersByTime(80);
+        version = 'two';
+        for (const listener of listeners) listener();
+      });
+      expect(frames().map((frame) => frame.getAttribute('src'))).toEqual([
+        'data:text/html,one',
+        'data:text/html,two',
+      ]);
+    } finally {
+      cleanup();
+      vi.useRealTimers();
+    }
   });
 
   it('keeps the shown page until its replacement is ready, at the same reading position', async () => {
