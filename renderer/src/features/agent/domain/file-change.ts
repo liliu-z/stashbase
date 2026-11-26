@@ -217,13 +217,21 @@ function normalizeSeparators(path: string): string {
   return path.replace(/\\/g, '/');
 }
 
+/** A Windows drive letter names one drive in either case, and agents report
+ *  `c:\…` for a project opened as `C:\…`, so the letter alone is folded.
+ *  Every directory after it keeps its spelling: Windows can make a directory
+ *  case-sensitive, where `project` and `Project` are two folders. */
+function withUpperDrive(path: string): string {
+  return path.replace(/^([a-z]):(?=\/|$)/u, (_, drive: string) => `${drive.toUpperCase()}:`);
+}
+
 /** The workspace source behind a changed path: a path already relative to
  *  the folder, or an absolute one inside it. A path outside the scoped
  *  folder has no openable source. */
 export function changedSource(scope: AgentScope, rawPath: string): SourceReference | null {
   if (scope.kind !== 'folder') return null;
-  const folder = normalizeSeparators(scope.path).replace(/\/+$/u, '');
-  const path = normalizeSeparators(rawPath);
+  const folder = withUpperDrive(normalizeSeparators(scope.path)).replace(/\/+$/u, '');
+  const path = withUpperDrive(normalizeSeparators(rawPath));
   let relative: string;
   if (path === folder) return null;
   if (path.startsWith(`${folder}/`)) relative = path.slice(folder.length + 1);
