@@ -12,7 +12,7 @@
 import type { CrepeBuilder } from '@milkdown/crepe/builder';
 import { inlineCodeAttr } from '@milkdown/kit/preset/commonmark';
 import type { Node as ProseMirrorNode } from '@milkdown/kit/prose/model';
-import { Plugin, type EditorState } from '@milkdown/kit/prose/state';
+import { Plugin, type EditorState, type Selection } from '@milkdown/kit/prose/state';
 import { Decoration, DecorationSet, type EditorView } from '@milkdown/kit/prose/view';
 import { $prose } from '@milkdown/kit/utils';
 import { useSyncExternalStore } from 'react';
@@ -69,21 +69,16 @@ function countBetween(doc: ProseMirrorNode, from: number, to: number): TextCount
  * nothing and a shown one re-renders only itself.
  */
 export interface WordCounter {
-  update(doc: ProseMirrorNode, selection?: { from: number; to: number }): void;
+  update(doc: ProseMirrorNode, selection: Selection): void;
   subscribe(listener: () => void): () => void;
   count(): WritingCount;
 }
 
-interface TextRange {
-  from: number;
-  to: number;
-}
-
 export function createWordCounter(): WordCounter {
   let doc: ProseMirrorNode | null = null;
-  let selected: TextRange | null = null;
+  let selected: Selection | null = null;
   let counted: { doc: ProseMirrorNode; total: TextCount } | null = null;
-  let snapshot: { doc: ProseMirrorNode | null; selected: TextRange | null; value: WritingCount } = {
+  let snapshot: { doc: ProseMirrorNode | null; selected: Selection | null; value: WritingCount } = {
     doc: null,
     selected: null,
     value: EMPTY,
@@ -91,10 +86,9 @@ export function createWordCounter(): WordCounter {
   const listeners = new Set<() => void>();
   return {
     update(next, selection) {
-      const range = selection && selection.from !== selection.to ? selection : null;
-      if (doc === next && range?.from === selected?.from && range?.to === selected?.to) return;
+      if (doc === next && selected?.eq(selection)) return;
       doc = next;
-      selected = range;
+      selected = selection;
       for (const listener of listeners) listener();
     },
     subscribe(listener) {
@@ -109,7 +103,19 @@ export function createWordCounter(): WordCounter {
       if (counted?.doc !== doc) counted = { doc, total: countBetween(doc, 0, doc.content.size) };
       const value = {
         document: counted.total,
-        selection: selected ? countBetween(doc, selected.from, selected.to) : null,
+        selection:
+          selected && !selected.empty
+            ? selected.ranges.reduce(
+                (total, { $from, $to }) => {
+                  const count = countBetween($from.doc, $from.pos, $to.pos);
+                  return {
+                    characters: total.characters + count.characters,
+                    words: total.words + count.words,
+                  };
+                },
+                { characters: 0, words: 0 },
+              )
+            : null,
       };
       snapshot = { doc, selected, value };
       return value;

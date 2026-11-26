@@ -4,8 +4,10 @@
  * focus mode leaves undimmed.
  */
 import { CrepeBuilder } from '@milkdown/crepe/builder';
+import { table } from '@milkdown/crepe/feature/table';
 import { editorViewCtx } from '@milkdown/kit/core';
 import { TextSelection } from '@milkdown/kit/prose/state';
+import { CellSelection } from '@milkdown/kit/prose/tables';
 import { afterEach, describe, expect, it } from 'vite-plus/test';
 
 import {
@@ -25,7 +27,7 @@ afterEach(async () => {
 async function open(source: string) {
   const host = document.createElement('div');
   document.body.append(host);
-  const editor = new CrepeBuilder({ root: host, defaultValue: source });
+  const editor = new CrepeBuilder({ root: host, defaultValue: source }).addFeature(table);
   const counter = createWordCounter();
   attachWritingAids(editor, counter);
   await editor.create();
@@ -106,6 +108,37 @@ describe('attachWritingAids', () => {
       view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 3)));
     });
     expect(counter.count().selection).toBeNull();
+  });
+
+  it('counts every selected table cell when the selection expands around the same head', async () => {
+    const { counter, editor } = await open(
+      '| alpha | beta gamma |\n| --- | --- |\n| delta | epsilon |',
+    );
+    editor.editor.action((ctx) => {
+      const view = ctx.get(editorViewCtx);
+      const cells: number[] = [];
+      view.state.doc.descendants((node, position) => {
+        if (['cell', 'header_cell'].includes(node.type.spec.tableRole)) cells.push(position);
+      });
+      const select = (anchor: number | undefined, head: number | undefined) => {
+        if (anchor === undefined || head === undefined) throw new Error('Table cell not found');
+        view.dispatch(
+          view.state.tr.setSelection(CellSelection.create(view.state.doc, anchor, head)),
+        );
+      };
+      select(cells[1], cells[1]);
+      expect(counter.count().selection).toEqual({ characters: 10, words: 2 });
+      let updates = 0;
+      const unsubscribe = counter.subscribe(() => {
+        updates += 1;
+      });
+      select(cells[0], cells[1]);
+      expect(counter.count().selection).toEqual({ characters: 15, words: 3 });
+      expect(updates).toBe(1);
+      select(cells[1], cells[3]);
+      expect(counter.count().selection).toEqual({ characters: 17, words: 3 });
+      unsubscribe();
+    });
   });
 
   it('marks only the block that holds the caret', async () => {

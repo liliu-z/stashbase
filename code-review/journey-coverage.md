@@ -1117,6 +1117,13 @@ Host/services: `server/folder.ts`, `server/github-import.ts`, `server/project-fi
 
 ## J03: Documents
 
+`ui/markdown/writing-aids.test.ts` exercises the real editor's text, row and
+column selections. Counts include every selected cell and refresh when a
+selection expands while its head cell stays fixed.
+An isolated macOS Electron pass using the built renderer selected a row through
+the table UI and verified the visible count and highlighted cells. This does not
+establish Windows/Linux packaged rendering.
+
 **Rename literal preservation (2026-11-20):** `server/links.ts` uses CommonMark
 positions to confirm inline links/images before matching their destinations;
 escaped prose, inline code, fenced/indented code and raw HTML are excluded. `server/links.test.ts` checks that live
