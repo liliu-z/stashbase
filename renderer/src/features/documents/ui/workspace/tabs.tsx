@@ -4,7 +4,8 @@
  * it. Delete or a middle click closes a tab, and every tab is a drag source
  * for its file. A right click, the menu key or Shift+F10 opens the tab's menu. Given a `newTab`, the strip ends in a plus that opens the New tab,
  * a tab holding no document whose page offers the first moves; the New tab
- * sits last and selected, and choosing a document closes it.
+ * sits last and selected, and choosing a document closes it. While the tabs
+ * overflow the strip, a list of every open document sits beside the plus.
  */
 import { Circle, Plus, X } from 'lucide-react';
 import {
@@ -34,7 +35,9 @@ import type { SourceReference } from '@/shared/domain/source-reference';
 import { useRequestSignals } from '@/shared/runtime/use-request-signals';
 import { writeSourceDrag } from '@/shared/utils/source-drag';
 
+import { OpenTabsMenu } from './open-tabs-menu';
 import { DocumentTabMenu, useTabMenu, type DocumentTabMenuActions } from './tab-menu';
+import { useTabOverflow } from './use-tab-overflow';
 
 export interface DocumentTabsProps {
   className?: string;
@@ -156,6 +159,11 @@ export function DocumentTabs({
   const size = 'icon-compact' as const;
   const focusAfterClose = useRef(false);
   const tabElements = useRef(new Map<string, HTMLButtonElement>());
+  const newTabOpen = newTab?.open ?? false;
+  // A rename can widen a tab as much as opening one can.
+  const strip = useTabOverflow(
+    `${newTabOpen}:${tabs.map((tab) => sourceName(tab.source)).join('/')}`,
+  );
 
   useLayoutEffect(() => {
     if (!focusAfterClose.current || !activeTabId) return;
@@ -168,7 +176,6 @@ export function DocumentTabs({
     tabElements.current.get(activeTabId)?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
   }, [activeTabId]);
 
-  const newTabOpen = newTab?.open ?? false;
   const plus = newTab && (
     <Tooltip content="New tab" side="bottom">
       <Button
@@ -246,7 +253,11 @@ export function DocumentTabs({
         }}
         value={newTabOpen ? NEW_TAB_ID : (activeTabId ?? '')}
       >
-        <TabsList aria-label="Open documents" className="scrollbar-hide max-w-full overflow-x-auto">
+        <TabsList
+          aria-label="Open documents"
+          className="scrollbar-hide max-w-full overflow-x-auto"
+          ref={strip.listRef}
+        >
           {tabs.map((tab) => {
             const document = runtime.getDocument(tab.id);
             if (!document) return null;
@@ -282,6 +293,27 @@ export function DocumentTabs({
           )}
         </TabsList>
       </Tabs>
+      {strip.overflowing && (
+        // The wrapper is what the overflow reading counts as the list's share
+        // of the row while it shows.
+        <div className="flex shrink-0" ref={strip.triggerRef}>
+          <OpenTabsMenu
+            activeTabId={newTabOpen ? null : activeTabId}
+            onSelect={(tabId) => {
+              newTab?.close();
+              // Activating the tab already in front changes nothing, so the
+              // effect that scrolls the active tab into view does not run.
+              if (tabId === activeTabId) {
+                tabElements.current
+                  .get(tabId)
+                  ?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+              }
+              activate(tabId);
+            }}
+            tabs={tabs}
+          />
+        </div>
+      )}
       {plus}
       {menuTab && (
         <DocumentTabMenu
