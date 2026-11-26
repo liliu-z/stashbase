@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vite-plus/test';
 
 import {
   activateDocumentTab,
+  adjacentDocumentTab,
   closeDocumentTab,
   createDocumentTabsState,
   keepDocumentTab,
@@ -126,5 +127,17 @@ describe('document tabs', () => {
     expect(state.tabs).toEqual([]);
     expect(state.activeTabId).toBeNull();
     expect(isConsistent(state)).toBe(true);
+  });
+
+  it('names the neighbouring tab, wrapping at the ends, and none for a lone tab', () => {
+    const three = createDocumentTabsState({
+      activeTabId: 'a',
+      tabs: ['a', 'b', 'c'].map((id) => ({ id, source: { ...notes, path: `${id}.md` } })),
+    });
+    expect(adjacentDocumentTab(three, 1)?.id).toBe('b');
+    expect(adjacentDocumentTab(three, -1)?.id).toBe('c');
+    expect(adjacentDocumentTab(activateDocumentTab(three, 'c'), 1)?.id).toBe('a');
+    const lone = createDocumentTabsState({ activeTabId: 'a', tabs: [{ id: 'a', source: notes }] });
+    expect(adjacentDocumentTab(lone, 1)).toBeNull();
   });
 });

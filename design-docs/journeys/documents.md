@@ -16,7 +16,11 @@ source mutations, saving, and release guarantees.
    stays folded until a document inside it comes in front again. While another
    panel covers Files, the row is brought into view when Files is shown.
 2. Keep a preview or start editing to retain its tab. A middle click closes a
-   tab as Close does. A tab's menu (right click,
+   tab as Close does. Ctrl+Tab and Ctrl+Shift+Tab (or Ctrl+PageDown and
+   Ctrl+PageUp) move to the next or previous tab, wrapping at the ends; from
+   New tab, which sits last, they bring in the first or the last document.
+   Cmd/Ctrl+1 to 8 open that tab and Cmd/Ctrl+9 the last. A
+   tab's menu (right click,
    the menu key or Shift+F10) closes it, the others, those to its right, or all,
    each saving as Close does; the first tab that stays open for a draft question
    or a failed save stops the rest. It also shows the file in the system file
