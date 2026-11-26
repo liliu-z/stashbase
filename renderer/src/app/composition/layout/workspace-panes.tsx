@@ -55,6 +55,8 @@ export interface WorkspacePanesProps {
   onReprocess(source: SourceReference): void;
   /** Opens what an Agent turn changed in one file as a review inside it. */
   onReviewTurnChange(request: { source: SourceReference; turnId: string }): void;
+  /** Shows a project-relative folder in Files, from the document's breadcrumb. */
+  onRevealFolder(folder: string): void;
   onShowDocuments(): void;
   session: WorkspaceSessionController;
   settings: SettingsCommand;
@@ -74,6 +76,7 @@ export function WorkspacePanes({
   onCreateInteractiveNote,
   onPrepare,
   onReprocess,
+  onRevealFolder,
   onReviewTurnChange,
   onShowDocuments,
   session,
@@ -205,6 +208,11 @@ export function WorkspacePanes({
                       systemTextApi={dependencies.settings.systemTextApi}
                     />
                   )}
+                  folderReveal={
+                    workspace
+                      ? { folderPath: workspace.scope.folder.path, reveal: onRevealFolder }
+                      : undefined
+                  }
                   revealLabel={dependencies.workspace.revealLabel}
                   runtime={documents}
                   sourceApi={dependencies.documents.adapters.source}

@@ -15,6 +15,9 @@ source mutations, saving, and release guarantees.
    and scrolls the row fully into view. A folder the reader folds
    stays folded until a document inside it comes in front again. While another
    panel covers Files, the row is brought into view when Files is shown.
+   Above the document, a breadcrumb names its project and the folders it sits
+   in, so files that share a name stay apart. Choosing a folder shows it in
+   Files. A file opened from outside the project names its directory only.
 2. Keep a preview or start editing to retain its tab. A middle click closes a
    tab as Close does. A tab's menu (right click,
    the menu key or Shift+F10) closes it, the others, those to its right, or all,
