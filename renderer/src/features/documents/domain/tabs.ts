@@ -93,6 +93,14 @@ export function createDocumentTabsState(
   );
 }
 
+/** The tab after (1) or before (-1) the one in front, wrapping at the ends,
+ *  or null when there is no other tab to go to. */
+export function adjacentDocumentTab(state: DocumentTabsState, step: 1 | -1): DocumentTab | null {
+  const index = state.tabs.findIndex((tab) => tab.id === state.activeTabId);
+  if (index < 0 || state.tabs.length < 2) return null;
+  return state.tabs[(index + step + state.tabs.length) % state.tabs.length] ?? null;
+}
+
 /** The tab the reader is only looking at, if there is one. */
 export function previewDocumentTab(state: DocumentTabsState): DocumentTab | null {
   return state.tabs.find((tab) => tab.preview) ?? null;

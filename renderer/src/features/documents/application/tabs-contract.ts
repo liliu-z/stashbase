@@ -51,6 +51,11 @@ export interface DocumentTabsRuntime {
    *  whether it ran, so a caller can drop the rest of a stale completion too. */
   accept(captured: CapturedTabsScope, completion: () => void): boolean;
   activate(tabId: string): Promise<boolean>;
+  /** Brings the tab after (1) or before (-1) the one in front, wrapping at the
+   *  ends. The neighbour is chosen when the step's turn in the transition
+   *  queue comes, so steps queued behind an open, a save or each other move
+   *  on from where the previous one landed. */
+  activateAdjacent(step: 1 | -1): Promise<boolean>;
   /** The source in front of the reader, or null when nothing is open. */
   activeSource(): SourceReference | null;
   /** Reopens the previous visit in the history. An open tab is used as it
