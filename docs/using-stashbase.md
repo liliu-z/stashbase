@@ -1,6 +1,6 @@
 # Using StashBase
 
-Start with [Start Writing](../README.md#start-writing): enter a project,
+Start with [Start Writing](../README.md#start-a-project): enter a project,
 brainstorm with an agent, and begin drafting when ready.
 
 ## Choose a Folder and an Agent
