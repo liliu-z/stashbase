@@ -11,7 +11,7 @@ import { AgentAccountRefusedError } from '../agent-setup-diagnostic.ts';
 import { AgentBootstrapCoordinator, verifyAgentExecutable } from '../agent-runtime-installer.ts';
 import { antigravityCurrentModel, antigravityModelsFromListing, withCurrentModel } from '../antigravity-model-catalog.ts';
 import { antigravityErrorFromStderr, isReadOnlyCommand, parseAntigravityLine } from '../antigravity-protocol.ts';
-import { antigravityHookLauncher, ensureAgentMcp } from '../agent-mcp.ts';
+import { antigravityHookCommand, antigravityHookLauncher, ensureAgentMcp } from '../agent-mcp.ts';
 
 const geminiConfigurationFailure = 'modelProvider is set to "gemini" in settings.json, but the GEMINI_API_KEY environment variable is not set. Set GEMINI_API_KEY to your Gemini API key, or remove "modelProvider" from settings.json to use the default backend.';
 
@@ -351,17 +351,20 @@ test('Antigravity setup adds StashBase beside the reader\'s own MCP servers and 
   const ownHook = { PreToolUse: [{ matcher: 'run_command', hooks: [{ command: '/my/guard' }] }] };
   fs.writeFileSync(hooks, JSON.stringify({ guard: ownHook }));
   ensureAgentMcp('antigravity');
+  const binDir = path.join(os.homedir(), '.stashbase', 'bin');
+  const expectedMcpLauncher = path.join(binDir, process.platform === 'win32' ? 'stashbase-mcp.cmd' : 'stashbase-mcp');
+  const expectedHookLauncher = path.join(binDir, process.platform === 'win32' ? 'stashbase-antigravity-hook.cmd' : 'stashbase-antigravity-hook');
   const servers = JSON.parse(fs.readFileSync(mcp, 'utf8')).mcpServers;
   assert.deepEqual(servers.linter, { command: 'lint-mcp' });
-  assert.match(servers.stashbase.command, /stashbase-mcp/);
+  assert.equal(servers.stashbase.command, expectedMcpLauncher);
   const written = JSON.parse(fs.readFileSync(hooks, 'utf8'));
   assert.deepEqual(written.guard, ownHook);
   const [entry] = written.stashbase.PreToolUse;
   assert.equal(entry.matcher, '*');
-  assert.match(entry.hooks[0].command, /stashbase-antigravity-hook/);
-  assert.ok(fs.existsSync(entry.hooks[0].command), 'the hook launcher exists');
+  assert.equal(entry.hooks[0].command, antigravityHookCommand(expectedHookLauncher));
+  assert.ok(fs.existsSync(expectedHookLauncher), 'the hook launcher exists');
   if (process.platform !== 'win32') {
-    assert.ok(fs.statSync(entry.hooks[0].command).mode & 0o100, 'the hook launcher is executable');
+    assert.ok(fs.statSync(expectedHookLauncher).mode & 0o100, 'the hook launcher is executable');
   }
 
   fs.writeFileSync(hooks, '{ "guard": ');
@@ -372,7 +375,7 @@ test('Antigravity setup adds StashBase beside the reader\'s own MCP servers and 
   fs.writeFileSync(mcp, '');
   fs.writeFileSync(hooks, '\uFEFF{"guard":' + JSON.stringify(ownHook) + '}');
   ensureAgentMcp('antigravity');
-  assert.match(JSON.parse(fs.readFileSync(mcp, 'utf8')).mcpServers.stashbase.command, /stashbase-mcp/);
+  assert.equal(JSON.parse(fs.readFileSync(mcp, 'utf8')).mcpServers.stashbase.command, expectedMcpLauncher);
   assert.deepEqual(JSON.parse(fs.readFileSync(hooks, 'utf8')).guard, ownHook);
   fs.rmSync(config, { recursive: true, force: true });
 });
@@ -417,4 +420,99 @@ test('the hook launcher is neutral outside StashBase, asks the host inside, and 
   await new Promise((resolve) => setTimeout(resolve, 20));
   assert.match(await run({ ...outside, STASHBASE_AGENT_SESSION_ID: 'session-1' }), /"decision":"deny"/);
   assert.equal(spawnSync('sh', ['-n', launcher]).status, 0);
+});
+
+test('antigravityHookCommand escapes Windows cmd metacharacters and leaves non-Windows paths unchanged', () => {
+  assert.equal(
+    antigravityHookCommand('C:\\Users\\Jane Doe\\.stashbase\\bin\\stashbase-antigravity-hook.cmd', 'win32'),
+    'C:\\Users\\Jane^ Doe\\.stashbase\\bin\\stashbase-antigravity-hook.cmd',
+  );
+  assert.equal(
+    antigravityHookCommand('C:\\Users\\Jane (Work)\\.stashbase\\bin\\stashbase-antigravity-hook.cmd', 'win32'),
+    'C:\\Users\\Jane^ ^(Work^)\\.stashbase\\bin\\stashbase-antigravity-hook.cmd',
+  );
+  assert.equal(
+    antigravityHookCommand('C:\\Users\\Tom & Jerry\\.stashbase\\bin\\stashbase-antigravity-hook.cmd', 'win32'),
+    'C:\\Users\\Tom^ ^&^ Jerry\\.stashbase\\bin\\stashbase-antigravity-hook.cmd',
+  );
+  assert.equal(
+    antigravityHookCommand('C:\\Users\\100% Real\\.stashbase\\bin\\stashbase-antigravity-hook.cmd', 'win32'),
+    'C:\\Users\\100^%^ Real\\.stashbase\\bin\\stashbase-antigravity-hook.cmd',
+  );
+  assert.equal(
+    antigravityHookCommand('C:\\Users\\%TEMP%\\.stashbase\\bin\\stashbase-antigravity-hook.cmd', 'win32'),
+    'C:\\Users\\^%TEMP^%\\.stashbase\\bin\\stashbase-antigravity-hook.cmd',
+  );
+  assert.equal(
+    antigravityHookCommand('C:\\Users\\Plain\\.stashbase\\bin\\stashbase-antigravity-hook.cmd', 'win32'),
+    'C:\\Users\\Plain\\.stashbase\\bin\\stashbase-antigravity-hook.cmd',
+  );
+  for (const platform of ['darwin', 'linux'] as const) {
+    const unixPath = '/Users/jane doe/.stashbase/bin/stashbase-antigravity-hook';
+    assert.equal(antigravityHookCommand(unixPath, platform), unixPath);
+  }
+});
+
+test('MCP configs keep raw executable paths while Windows hook setup runs through cmd.exe under special characters', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stashbase-agy-meta-'));
+  const home = path.join(root, 'Jane (Work) & %TEMP%');
+  fs.mkdirSync(home, { recursive: true });
+  const prevHome = process.env.HOME;
+  const prevProfile = process.env.USERPROFILE;
+  const prevCodex = process.env.CODEX_HOME;
+  const prevClaude = process.env.CLAUDE_CONFIG_DIR;
+  t.after(() => {
+    for (const [key, val] of [
+      ['HOME', prevHome],
+      ['USERPROFILE', prevProfile],
+      ['CODEX_HOME', prevCodex],
+      ['CLAUDE_CONFIG_DIR', prevClaude],
+    ] as const) {
+      if (val === undefined) delete process.env[key];
+      else process.env[key] = val;
+    }
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+  process.env.HOME = home;
+  process.env.USERPROFILE = home;
+  process.env.CODEX_HOME = path.join(home, '.codex');
+  process.env.CLAUDE_CONFIG_DIR = home;
+
+  ensureAgentMcp('antigravity');
+  ensureAgentMcp('claude');
+  ensureAgentMcp('codex');
+
+  const expectedMcp = path.join(home, '.stashbase', 'bin', process.platform === 'win32' ? 'stashbase-mcp.cmd' : 'stashbase-mcp');
+  const expectedHook = path.join(home, '.stashbase', 'bin', process.platform === 'win32' ? 'stashbase-antigravity-hook.cmd' : 'stashbase-antigravity-hook');
+
+  const agyMcp = JSON.parse(fs.readFileSync(path.join(home, '.gemini', 'config', 'mcp_config.json'), 'utf8'));
+  const claudeMcp = JSON.parse(fs.readFileSync(path.join(home, '.claude.json'), 'utf8'));
+  const codexToml = fs.readFileSync(path.join(home, '.codex', 'config.toml'), 'utf8');
+  assert.equal(agyMcp.mcpServers.stashbase.command, expectedMcp);
+  assert.equal(claudeMcp.mcpServers.stashbase.command, expectedMcp);
+  assert.ok(codexToml.includes(`command = ${JSON.stringify(expectedMcp)}`));
+
+  const hooksJson = JSON.parse(fs.readFileSync(path.join(home, '.gemini', 'config', 'hooks.json'), 'utf8'));
+  const hookCommand = hooksJson.stashbase.PreToolUse[0].hooks[0].command as string;
+  assert.equal(hookCommand, antigravityHookCommand(expectedHook));
+
+  if (process.platform !== 'win32') return;
+  const mcpWrapperBody = fs.readFileSync(expectedMcp, 'utf8');
+  assert.match(mcpWrapperBody, /^set "STASHBASE_APP_ROOT=.*"/m);
+  assert.match(mcpWrapperBody, /^"[^"]+" "[^"]+" %\* --port=\d+$/m);
+
+  const { STASHBASE_AGENT_SESSION_ID: _ignored, ...outside } = process.env;
+  for (const args of [
+    ['/c', hookCommand],
+    ['/d', '/s', '/c', `"${hookCommand}"`],
+  ]) {
+    const result = spawnSync('cmd.exe', args, {
+      env: outside,
+      input: '{"conversationId":"c1"}',
+      encoding: 'utf8',
+      windowsVerbatimArguments: true,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout.trim(), '{"decision":"allow"}');
+  }
 });
