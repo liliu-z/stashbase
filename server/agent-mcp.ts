@@ -285,6 +285,22 @@ function writeAntigravityHookLauncher(homeDir = os.homedir()): string {
   return launcher;
 }
 
+// Characters cmd.exe interprets outside quotes (plus '=' as a cmd token delimiter);
+// a caret keeps each literal across `cmd /c`, `cmd /d /s /c`, and argv-quoted spawns.
+const HOOK_CMD_META = /([()\][%!^"`<>&|;,=*? ])/g;
+
+/** Format the Antigravity PreToolUse `command` string for the target platform.
+ * Antigravity runs hook `command` strings through `cmd.exe` on Windows rather than
+ * inside a batch file (`cmdQuote` doubles `%`, which `cmd /c` does not collapse) or
+ * as a `{ command, args }` process spawn. Non-Windows keeps its raw path unchanged. */
+export function antigravityHookCommand(
+  launcher: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  if (platform !== 'win32') return launcher;
+  return path.win32.normalize(launcher).replace(HOOK_CMD_META, '^$1');
+}
+
 /** Replace only StashBase's entry in Antigravity's shared hooks file; every
  * other hook, and an unparseable file, is left as it was. */
 function configureAntigravityHooks(file: string, launcher: string): void {
@@ -292,7 +308,10 @@ function configureAntigravityHooks(file: string, launcher: string): void {
   if (!config) throw new Error(`Couldn't parse ${file}; leaving it untouched.`);
   const desired = {
     PreToolUse: [
-      { matcher: '*', hooks: [{ type: 'command', command: launcher, timeout: ANTIGRAVITY_HOOK_TIMEOUT_SECONDS }] },
+      {
+        matcher: '*',
+        hooks: [{ type: 'command', command: antigravityHookCommand(launcher), timeout: ANTIGRAVITY_HOOK_TIMEOUT_SECONDS }],
+      },
     ],
   };
   if (isDeepStrictEqual(config.stashbase, desired)) return;
